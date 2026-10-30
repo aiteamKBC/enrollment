@@ -1,0 +1,61 @@
+.shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 15% 8%, rgb(238 228 255 / .34), transparent 28rem),
+    linear-gradient(180deg, #faf9f6 0%, #f6f5f1 100%);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  min-height: 72px;
+  padding: 10px 28px;
+  background: #fff;
+  border-bottom: 1px solid #e7e4ee;
+  box-shadow: 0 4px 18px rgb(37 24 69 / .04);
+  color: #182d48;
+}
+
+.brand { display: flex; align-items: center; gap: 16px; min-width: 0; text-decoration: none; }
+.logo { width: 120px; height: 54px; object-fit: contain; }
+.brandText { padding-left: 16px; border-left: 1px solid #e2e8f0; }
+.brandText p { color: #008b82; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.brandText span { display: block; margin-top: 3px; font-size: 17px; font-weight: 700; line-height: 1.3; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.college { padding: 7px 12px; border-radius: 999px; background: #e3f9f3; color: #008b82; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 5px; background: #fff; color: #24496b; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; }
+.button:hover { background: #f5f7fa; }
+.logout { color: #ef4444; border-color: #fecaca; }
+.logout:hover { background: #fff1f2; }
+.main { min-width: 0; }
+.backButton { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; margin-bottom: 4px; padding: 7px 10px; border: 1px solid #b8c8d9; border-radius: 5px; background: #fff; color: #24496b; font-size: 12px; font-weight: 600; cursor: pointer; }
+.backButton:hover { background: #f0f4f8; }
+.content.content { max-width: 1276px; padding: 24px 28px 48px; }
+.content.monthsCanvas { width: 100%; max-width: none; }
+
+/* These headings previously inherited their sizes from WorkspaceShell. */
+.content :where(h1) { font-size: clamp(23px, 2vw, 28px); line-height: 1.25; }
+.content :where(h2) { font-size: 17px; }
+
+@media (max-width: 639px) {
+  .header { padding: 12px 16px; gap: 14px; }
+  .brand { gap: 10px; }
+  .logo { width: 92px; height: 44px; }
+  .brandText { padding-left: 10px; }
+  .brandText p { font-size: 8px; }
+  .brandText span { font-size: 14px; }
+  .actions { width: 100%; justify-content: flex-end; }
+  .college { margin-right: auto; font-size: 8px; padding: 6px 8px; }
+  .button { font-size: 11px; padding-inline: 9px; }
+  .content.content { padding: 16px 12px 28px; }
+}
+
+@media print {
+  .header { display: none; }
+  .shell { background: #fff; }
+  .content.content { max-width: none; padding: 0; }
+}

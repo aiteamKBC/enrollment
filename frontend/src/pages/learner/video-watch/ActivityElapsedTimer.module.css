@@ -1,0 +1,83 @@
+.timer {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: 0.3rem;
+  flex: 0 0 14rem;
+  width: 14rem;
+  max-width: 100%;
+  min-height: 5.25rem;
+  overflow: hidden;
+  padding: 0.5rem 0.65rem 0.55rem;
+  border: 1px solid rgb(223 210 240 / 0.52);
+  border-radius: 0.9rem;
+  color: #fff;
+  background:
+    radial-gradient(circle at 88% -30%, rgb(245 201 79 / 0.35), transparent 47%),
+    linear-gradient(120deg, #211333, var(--kbc-learner-primary, #4f2d7f) 72%, #7042a5);
+  box-shadow: 0 16px 28px -20px rgb(49 25 85 / 0.8), inset 0 1px rgb(255 255 255 / 0.2);
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: rgb(255 255 255 / 0.82);
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.icon {
+  display: grid;
+  width: 1.1rem;
+  height: 1.1rem;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.15);
+  color: #f5c94f;
+  font-size: 0.65rem;
+}
+
+.liveDot {
+  width: 0.3rem;
+  height: 0.3rem;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #f5c94f;
+  box-shadow: 0 0 0 3px rgb(245 201 79 / 0.16);
+}
+
+.parts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+}
+
+.part {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 0.1rem;
+}
+
+.part + .part {
+  border-left: 1px solid rgb(255 255 255 / 0.17);
+}
+
+.value {
+  font-size: clamp(1.5rem, 2vw, 1.85rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.065em;
+  line-height: 1;
+}
+
+.label {
+  color: rgb(255 255 255 / 0.75);
+  font-size: 0.45rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}

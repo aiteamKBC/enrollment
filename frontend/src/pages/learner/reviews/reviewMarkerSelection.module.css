@@ -1,0 +1,14 @@
+/* APTEM selection only. Keep each surface's status colours and layout. */
+.control[data-selection='marker']:is([aria-current='step'], [aria-pressed='true']) .marker {
+  outline: 2px solid oklch(var(--primary-400));
+  outline-offset: 4px;
+}
+.control[data-selection='marker']:is(a, button):focus-visible { outline: none; }
+.control[data-selection='marker']:focus-visible .marker {
+  outline: 3px solid oklch(var(--primary-400));
+  outline-offset: 4px;
+}
+@media (forced-colors: active) {
+  .control[data-selection='marker']:is([aria-current='step'], [aria-pressed='true']) .marker,
+  .control[data-selection='marker']:focus-visible .marker { outline-color: Highlight; }
+}

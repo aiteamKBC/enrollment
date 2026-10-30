@@ -1,0 +1,256 @@
+.page {
+  --login-purple: #5b21b6;
+  --login-purple-dark: #3f176f;
+  height: 100dvh;
+  min-height: 100dvh;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  box-sizing: border-box;
+  background: radial-gradient(circle at 15% 20%, rgba(255,255,255,.8), transparent 34%), linear-gradient(135deg, #eee9ff 0%, #f8f6ff 48%, #ded4ff 100%);
+  color: #241b35;
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.card { position: relative; z-index: 1; width: 100%; min-height: 0; display: grid; place-items: center; }
+
+.bookStage {
+  position: relative;
+  width: min(94vw, calc(100dvh * 1.5));
+  aspect-ratio: 3 / 2;
+  flex: 0 0 auto;
+  z-index: 1;
+}
+
+.patterns { position: fixed; z-index: 0; inset: 0; overflow: hidden; background: radial-gradient(circle at 12% 20%, rgba(196, 173, 255, .32), transparent 25%), radial-gradient(circle at 87% 78%, rgba(184, 151, 245, .28), transparent 27%); pointer-events: none; }
+.patternTopLeft, .patternBottomRight { position: absolute; display: block; width: 28%; height: 55%; background-repeat: no-repeat; background-size: contain; opacity: .34; filter: drop-shadow(0 12px 22px rgba(85, 48, 148, .08)); }
+.patternTopLeft { top: -10%; left: -4%; background-image: url('/assets/patterns/kbc-ibis-wreath.png'); background-position: left top; }
+.patternBottomRight { right: -4%; bottom: -13%; background-image: url('/assets/patterns/kbc-horse-growth.png'); background-position: right bottom; }
+.bookImage { position: absolute; z-index: 1; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; }
+
+.logoOverlay { position: absolute; z-index: 2; top: 11.5%; left: 13.2%; width: 7.5%; pointer-events: none; }
+.logo { display: block; width: 100%; height: auto; opacity: .98; }
+
+.formPanel {
+  position: absolute;
+  z-index: 3;
+  top: 14.5%;
+  left: 51.5%;
+  width: 40.5%;
+  height: 71.5%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  overflow: auto;
+  padding: 4.5% 5.5%;
+  scrollbar-width: none;
+}
+.formPanel::-webkit-scrollbar { display: none; }
+.formContent { width: 100%; max-width: 390px; margin-inline: auto; }
+
+.intro { margin-bottom: 23px; }
+.intro h1 { margin: 0; color: #291442; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(25px, 2.25vw, 34px); font-weight: 700; letter-spacing: -.035em; line-height: 1.08; }
+.intro p { margin: 8px 0 0; color: #645a73; font-size: clamp(12px, 1vw, 15px); line-height: 1.45; }
+.form { display: grid; gap: 14px; }
+.fieldGroup { display: grid; gap: 7px; }
+.fieldGroup label, .labelRow label { color: #352344; font-size: clamp(11px, .9vw, 14px); font-weight: 700; line-height: 1.3; }
+.labelRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.forgotButton, .rememberRow, .passwordToggle { border: 0; background: transparent; cursor: pointer; font: inherit; }
+.forgotButton { border-radius: 5px; color: var(--login-purple); font-size: clamp(10px, .82vw, 13px); font-weight: 700; line-height: 1.3; }
+.forgotButton:hover { color: var(--login-purple-dark); }
+.inputShell { position: relative; }
+.inputShell input { display: block; width: 100%; height: clamp(42px, 3.55vw, 52px); box-sizing: border-box; border: 1px solid #d9d0e7; border-radius: 9px; outline: 0; background: rgba(255,255,255,.8); color: #291442; font: inherit; font-size: clamp(12px, .95vw, 15px); line-height: 1; padding: 0 43px; transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease; }
+.inputShell input::placeholder { color: #887c99; opacity: 1; }
+.inputShell input:hover { border-color: #b8a6d2; background: #fff; }
+.inputShell input:focus { border-color: var(--login-purple); background: #fff; box-shadow: 0 0 0 3px rgba(91,33,182,.16); }
+.inputIcon { position: absolute; z-index: 1; top: 50%; left: 14px; color: #77658d; font-size: 17px; line-height: 1; transform: translateY(-50%); pointer-events: none; }
+.passwordToggle { position: absolute; z-index: 1; top: 50%; right: 7px; display: grid; width: 32px; height: 32px; place-items: center; border-radius: 7px; color: #77658d; font-size: 17px; transform: translateY(-50%); }
+.passwordToggle:hover { background: #f0e9ff; color: var(--login-purple); }
+.forgotButton:focus-visible, .rememberRow:focus-visible, .passwordToggle:focus-visible, .primaryButton:focus-visible, .microsoftButton:focus-visible { outline: 3px solid rgba(91,33,182,.3); outline-offset: 2px; }
+
+.rememberGroup { display: grid; gap: 5px; justify-items: start; }
+.rememberRow { display: inline-flex; width: max-content; align-items: center; gap: 8px; padding: 0; color: #4e415b; font-size: clamp(11px, .82vw, 13px); font-weight: 700; line-height: 1.3; }
+.checkboxVisual { display: grid; width: 17px; height: 17px; flex: 0 0 auto; place-items: center; border: 1.5px solid #9586a2; border-radius: 4px; background: #fff; color: transparent; font-size: 12px; }
+.rememberRow[aria-pressed='true'] .checkboxVisual { border-color: var(--login-purple); background: var(--login-purple); color: #fff; }
+.rememberHint { max-width: 300px; margin: 0; color: #766a81; font-size: clamp(9px, .7vw, 11px); line-height: 1.45; }
+
+.error { display: flex; align-items: flex-start; gap: 8px; padding: 9px 11px; border: 1px solid #fecaca; border-radius: 8px; background: #fff7f7; color: #b91c1c; font-size: clamp(10px, .78vw, 12px); line-height: 1.4; }
+.primaryButton, .microsoftButton { display: flex; width: 100%; min-height: clamp(42px, 3.55vw, 52px); box-sizing: border-box; align-items: center; justify-content: center; border-radius: 9px; cursor: pointer; font: inherit; font-size: clamp(11px, .9vw, 14px); font-weight: 800; line-height: 1; }
+.primaryButton { border: 0; background: linear-gradient(105deg, #4b168c 0%, #6525b5 100%); color: #fff; box-shadow: 0 9px 18px rgba(91,33,182,.22); transition: transform 170ms ease, box-shadow 170ms ease; }
+.primaryButton:hover:not(:disabled) { box-shadow: 0 12px 24px rgba(91,33,182,.3); transform: translateY(-1px); }
+.primaryButton:active:not(:disabled), .microsoftButton:active:not(:disabled) { transform: translateY(1px); }
+.primaryButton:disabled, .microsoftButton:disabled { cursor: not-allowed; opacity: .55; }
+.loadingLabel { display: inline-flex; align-items: center; gap: 8px; }
+
+.ssoBlock { margin-top: 17px; }
+.divider { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin-bottom: 12px; color: #988da2; }
+.divider span { height: 1px; background: #e1dce7; }
+.divider strong { font-size: 9px; letter-spacing: .08em; }
+.microsoftButton { gap: 9px; border: 1px solid #d9d4df; background: rgba(255,255,255,.86); color: #352d3e; }
+.microsoftButton:hover:not(:disabled) { border-color: #b7a5d0; background: #fff; }
+.microsoftMark { width: 17px; height: 17px; flex: 0 0 auto; }
+.ssoHint { margin: 7px 0 0; color: #776c83; font-size: 10px; line-height: 1.45; text-align: center; }
+.secureFooter { margin-top: 17px; padding-top: 12px; border-top: 1px solid rgba(126,104,146,.22); color: #766b80; font-size: 10px; text-align: center; }
+.secureFooter span { display: inline-flex; align-items: center; gap: 6px; }
+.secureFooter svg.app-icon { color: var(--login-purple); font-size: 14px; }
+
+@media (max-width: 1365px) and (min-width: 768px) and (orientation: landscape) {
+  .formPanel {
+    top: 12%;
+    height: 76%;
+    align-items: safe center;
+    padding: 2.25% 4%;
+  }
+  .intro { margin-bottom: 12px; }
+  .form { gap: 9px; }
+  .ssoBlock { margin-top: 10px; }
+  .secureFooter { margin-top: 10px; padding-top: 8px; }
+}
+
+@media (max-width: 1365px) and (min-width: 768px) and (orientation: portrait) {
+  .page { padding: 0; overflow-y: auto; overflow-x: hidden; }
+  /* The tablet artwork is a portrait composition with a reserved white
+     panel below the illustration. Keep the form in that panel instead of
+     making it part of the page flow. */
+  .bookStage {
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    aspect-ratio: auto;
+    background: url('/login-tablet-background.png') center top / 100% 100% no-repeat;
+  }
+  .bookImage,
+  .patterns {
+    display: none;
+  }
+  .logoOverlay {
+    display: block;
+    top: 3.5%;
+    left: 7%;
+    width: 17%;
+  }
+  .formPanel {
+    top: 60%;
+    left: 8%;
+    width: 84%;
+    height: auto;
+    padding: 0;
+    align-items: flex-start;
+    overflow: visible;
+  }
+  .formContent {
+    max-width: 390px;
+  }
+  .intro { margin-bottom: 10px; }
+  .intro h1 { font-size: clamp(23px, 2.6vw, 31px); }
+  .intro p { margin-top: 4px; font-size: clamp(10px, 1.1vw, 13px); }
+  .form { gap: 7px; }
+  .fieldGroup { gap: 4px; }
+  .fieldGroup label, .labelRow label { font-size: clamp(10px, .95vw, 12px); }
+  .forgotButton, .rememberRow { font-size: clamp(9px, .9vw, 12px); }
+  .inputShell input { height: clamp(36px, 3.2vw, 44px); font-size: clamp(10px, .95vw, 13px); }
+  .inputIcon { left: 12px; font-size: 15px; }
+  .passwordToggle { width: 28px; height: 28px; font-size: 15px; }
+  .rememberHint, .error, .ssoHint, .secureFooter { font-size: clamp(8px, .75vw, 10px); }
+  .primaryButton, .microsoftButton { min-height: clamp(36px, 3.2vw, 44px); font-size: clamp(10px, .95vw, 13px); }
+  .ssoBlock { margin-top: 8px; }
+  .divider { margin-bottom: 7px; }
+  .secureFooter { margin-top: 8px; padding-top: 6px; }
+}
+
+@media (max-width: 767px) {
+  .page { height: 100dvh; min-height: 100dvh; overflow-y: auto; overflow-x: hidden; padding: 0; background: #f8f4ff; }
+  .card { width: 100%; height: 100dvh; min-height: 0; }
+  .bookStage {
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    aspect-ratio: auto;
+    padding: 0;
+    background: url('/login-mobile-background.png') center top / 100% 100% no-repeat;
+  }
+  .bookStage::after,
+  .bookImage,
+  .patterns {
+    display: none;
+  }
+  .logoOverlay {
+    display: block;
+    top: 3%;
+    left: 7%;
+    width: 22%;
+  }
+  .formPanel {
+    top: 60%;
+    left: 6%;
+    width: 88%;
+    height: auto;
+    padding: 0;
+    align-items: flex-start;
+    overflow: visible;
+  }
+  .formContent { max-width: 360px; }
+  .intro { margin-bottom: 12px; }
+  .intro h1 { font-size: clamp(25px, 8vw, 32px); }
+  .intro p { margin-top: 5px; font-size: clamp(12px, 3.4vw, 14px); }
+  .form { gap: 10px; }
+  .fieldGroup { gap: 6px; }
+  .fieldGroup label, .labelRow label, .forgotButton, .rememberRow { font-size: clamp(12px, 3.4vw, 14px); }
+  .inputShell input { height: clamp(44px, 12vw, 52px); font-size: clamp(13px, 3.6vw, 15px); }
+  .inputIcon { left: 11px; font-size: 15px; }
+  .passwordToggle { width: 28px; height: 28px; font-size: 15px; }
+  .rememberHint, .error, .ssoHint, .secureFooter { font-size: clamp(10px, 2.8vw, 12px); }
+  .primaryButton, .microsoftButton { min-height: clamp(44px, 12vw, 52px); font-size: clamp(12px, 3.4vw, 14px); }
+  .ssoBlock { margin-top: 12px; }
+  .divider { margin-bottom: 10px; }
+  .secureFooter { margin-top: 12px; padding-top: 8px; }
+}
+
+/* Very short devices still get the complete action area without introducing
+   an inner scrollbar; the security note is secondary to the sign-in controls. */
+@media (max-width: 1365px) and (min-width: 768px) and (orientation: portrait) and (max-height: 700px) {
+  .formPanel {
+    transform: scaleY(.8);
+    transform-origin: top center;
+  }
+  .secureFooter { display: none; }
+}
+
+/* Mobile keeps the more readable spacing even on short browser viewports;
+   the page itself can scroll instead of vertically squashing the form. */
+@media (max-width: 767px) and (max-height: 700px) {
+  .formPanel { transform: none; }
+  .secureFooter { display: block; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton, .microsoftButton, .inputShell input { transition: none; }
+}
+.downloadPage {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 20px;
+  background: #f7f6f0;
+  color: #153f35;
+}
+.downloadCard {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 440px;
+  font-size: 17px;
+  line-height: 1.6;
+}
+.downloadCard h1 { font-size: 30px; line-height: 1.2; }
+.downloadCard img { background: #153f35; padding: 8px; border-radius: 8px; box-sizing: content-box; }
+.downloadCard a { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.downloadCard a, .downloadCard button { min-height: 56px; font-size: 17px; }
+.downloadCard a { background: #153f35; box-shadow: none; }
+.downloadCard a:focus-visible, .downloadCard button:focus-visible {
+  outline: 3px solid #153f35;
+  outline-offset: 4px;
+}

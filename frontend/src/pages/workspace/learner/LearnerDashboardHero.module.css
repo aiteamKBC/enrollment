@@ -1,0 +1,301 @@
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 1.125rem 1.5rem;
+  border: 1px solid rgb(189 148 255 / 0.28);
+  border-radius: 1.5rem;
+  background: var(--kbc-learner-primary, #4f2d7f);
+  color: #fff;
+  box-shadow: 0 8px 22px -12px rgb(79 45 127 / 0.45);
+}
+
+.artwork {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* The supplied artwork includes white margins; crop them without altering the asset. */
+  background: linear-gradient(0deg, rgb(79 45 127 / 0.88), rgb(79 45 127 / 0.72)),
+    url('https://jokdxsdbxorzciulkdyl.supabase.co/storage/v1/object/public/images/ad6d34c7dae948ab8038f42ebe5631e7.png') center / 102.5% 132% no-repeat;
+}
+
+.top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1.25rem; align-items: center; min-height: 4.5rem; position: relative; }
+.identity { display: flex; align-items: flex-start; gap: 1rem; min-width: 0; position: relative; z-index: 1; }
+.identityText { min-width: 0; }
+.avatar { position: relative; flex-shrink: 0; padding-top: 0.2rem; }
+.avatar > div > button,
+.avatar > span:not(.statusBadge) {
+  width: 4.5rem;
+  height: 4.5rem;
+  /* The shared workspace button rule otherwise replaces the avatar's circle. */
+  border-radius: 50% !important;
+  background: radial-gradient(circle at 25% 25%, #a382cf, #77509f 55%, #5e378d 75%, #b197d1);
+  border: 1px solid #c9a0ff;
+  color: #fff;
+  font-size: 1.75rem;
+  box-shadow: inset 0 0 13px rgb(240 216 255 / 0.55), 0 8px 30px rgb(99 39 177 / 0.45);
+}
+.hero .eyebrow { margin: 0 0 0.3rem; color: #eee5ff; font-size: 0.625rem; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 700; }
+.hero h1.name { margin: 0; color: #fff; font-size: clamp(1.5rem, 2cqi, 2rem) !important; line-height: 1.16; font-weight: 700; letter-spacing: -0.035em; overflow-wrap: anywhere; }
+.hero .description { margin: 0.3rem 0 0; font-size: 0.875rem; line-height: 1.5; color: #f2ebff; overflow-wrap: anywhere; }
+.statusBadge { position: absolute; z-index: 2; top: -0.05rem; left: -0.05rem; display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 2px solid #5e378d; border-radius: 50%; background: rgb(196 179 223 / 0.85); box-shadow: 0 2px 8px rgb(29 12 66 / 0.35); }
+.statusBadge > span { width: 0.65rem; height: 0.65rem; border-radius: 50%; }
+.statusBadge[data-tone='positive'] { background: rgb(143 225 179 / 0.38); }
+.statusBadge[data-tone='positive'] > span { background: #6eefa0; box-shadow: 0 0 9px rgb(87 236 149 / 0.55); }
+.headerFacts { display: flex; align-items: stretch; flex-wrap: wrap; gap: 0.7rem 1rem; margin-top: 0.55rem; }
+.headerFact { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; color: #f2ebff; }
+.headerFact + .headerFact { border-left: 1px solid rgb(220 198 255 / 0.35); padding-left: 1rem; }
+.headerFact > svg { width: 1rem; height: 1rem; flex-shrink: 0; color: #d1b6fa; }
+.headerFact > span { display: flex; align-items: baseline; gap: 0.35rem; min-width: 0; }
+.headerFactLabel { color: #cdb3ed; font-size: 0.7rem; white-space: nowrap; }
+.headerFact strong { color: #fff; font-size: 0.8rem; font-weight: 650; overflow-wrap: anywhere; }
+.hero .quote { display: flex; align-items: center; gap: 0.8rem; margin: 0.875rem 0 0; color: #c7afea; font-size: clamp(0.8rem, 1.1cqi, 1.0625rem); font-style: italic; line-height: 1.5; }
+.quote::before { content: ''; width: 2.5rem; height: 3px; background: #b18ce7; border-radius: 5px; flex-shrink: 0; }
+.handwriting { position: absolute; left: 45%; top: 0.25rem; transform: rotate(-12deg); color: rgb(193 134 255 / 0.55); font-family: 'Segoe Script', 'Brush Script MT', cursive; font-size: 1.5rem; font-style: italic; line-height: 1.05; pointer-events: none; }
+.handwriting span { margin-left: 1rem; }
+.handwriting::after { content: ''; display: block; width: 115%; height: 1rem; margin-top: 0.25rem; border-top: 2px solid currentColor; border-radius: 50%; }
+.actionArea { justify-self: end; width: max-content; max-width: 100%; position: relative; z-index: 1; }
+.actions { display: flex; gap: 0.625rem; }
+.action { display: inline-flex; align-items: center; justify-content: center; gap: 0.75rem; min-width: 0; min-height: 2.75rem; padding: 0.625rem 1rem; border: 1px solid #eee5ff; border-radius: 0.8rem; background: #fff; color: var(--kbc-learner-primary, #4f2d7f); font-size: 0.8125rem; font-weight: 700; line-height: 1.4; transition: transform 160ms ease, box-shadow 160ms ease; }
+.action > svg { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
+.action > .actionArrow { width: 1.25rem; height: 1.25rem; }
+.primaryAction { background: linear-gradient(120deg, #8054b2, #5c348d); border-color: #a872f2; color: #fff; box-shadow: inset 0 0 16px rgb(199 156 255 / 0.15); }
+.action:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgb(29 12 66 / 0.25); }
+.action:disabled { opacity: 0.65; cursor: wait; }
+.hero .actionCaption { margin: 0.875rem 0 0; color: #c7afea; font-size: clamp(0.8rem, 1cqi, 1rem); font-style: italic; line-height: 1.5; }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.75fr); gap: 0.625rem; margin-top: 0.875rem; }
+.cardsWithActions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 3.6fr); }
+.cardsWithActions .modulesCard { grid-column: 3; }
+.cardsWithActions .card { min-height: 6rem; }
+.actionCards { grid-column: 4; margin: 0; min-width: 0; }
+.card { position: relative; isolation: isolate; overflow: hidden; min-width: 0; border: 1px solid rgb(204 174 255 / 0.25); border-radius: 1.125rem; background: linear-gradient(125deg, rgb(184 139 243 / 0.17), rgb(183 153 228 / 0.07)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06); padding: 0.6rem; }
+.cohortCard, .datesCard, .modulesCard { min-height: 6.5rem; }
+.factRow { display: flex; align-items: center; gap: 0.625rem; position: relative; z-index: 1; min-width: 0; }
+.card dl { margin: 0; min-width: 0; }
+.hero .card dt, .hero .moduleHeading h2 { color: #f5eeff; font-size: 0.7rem !important; line-height: 1.3; font-weight: 400; margin: 0; }
+.hero .card dd { color: #fff; font-size: 0.8rem; line-height: 1.3; font-weight: 650; margin: 0.15rem 0 0; overflow-wrap: anywhere; }
+.icon { width: 2rem; height: 2rem; display: grid; place-items: center; flex-shrink: 0; border-radius: 1.15rem; background: linear-gradient(145deg, rgb(184 142 247 / 0.36), rgb(162 123 228 / 0.22)); color: #fff; }
+.icon > svg { width: 1.2rem; height: 1.2rem; stroke-width: 2; }
+.hero .cardMotto { position: relative; z-index: 1; display: flex; align-items: center; gap: 0.75rem; margin: auto 0 0; color: #c1a4fa; font-size: 0.625rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; line-height: 1.9; }
+.cardMotto::before { content: ''; display: block; width: 2.5rem; height: 4px; border-radius: 5px; background: linear-gradient(90deg, #c073ff, #8e44e8); flex-shrink: 0; }
+.cohortCard, .datesCard, .modulesCard { display: flex; flex-direction: column; }
+.cohortCard > .cardMotto::before, .datesCard > .cardMotto::before { width: 4px; height: 1.75rem; }
+.peopleArtwork { position: absolute; bottom: 0; right: 0.5rem; width: 38%; height: auto; color: #9363df; opacity: 0.32; z-index: -1; }
+.modulesCard { background: linear-gradient(130deg, rgb(166 128 211 / 0.3), rgb(170 142 237 / 0.14) 45%, rgb(111 81 172 / 0.15)); border-color: rgb(188 141 255 / 0.5); padding: 0.75rem; }
+.moduleHeading { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.moduleHeading .icon { background: linear-gradient(145deg, #a47fcb, #765198); }
+.moduleHeading h2 { flex: 1; min-width: 0; }
+.viewAll { display: inline-flex; align-items: center; gap: 0.4rem; color: #e3d0ff; font-size: 0.75rem; white-space: nowrap; }
+.viewAll svg { width: 1rem; height: 1rem; }
+.moduleContent { display: grid; grid-template-columns: 3rem minmax(0, 1fr); align-items: center; gap: 0.4rem; flex: 1; margin: 0.2rem 0 0; min-width: 0; }
+.moduleList { list-style: none; padding: 0; margin: 0; max-height: 3.2rem; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+.moduleList li + li { margin-top: 0.2rem; }
+.hero .moduleList li a,
+.hero .moduleList li .moduleItem { display: flex; width: 100%; align-items: center; justify-content: flex-start; gap: 0.55rem; min-height: 1.3rem; padding: 0.15rem 0.4rem; border-radius: 0.6rem; border: 1px solid rgb(213 188 255 / 0.14); background: rgb(29 16 64 / 0.24); color: #fff; font-size: 0.7rem; line-height: 1.25; transition: background 160ms ease; }
+.moduleList a:hover { background: rgb(128 74 212 / 0.4); }
+.moduleTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.moduleList a > svg { flex-shrink: 0; width: 1rem; height: 1rem; color: #b196d7; }
+.moduleDot { flex-shrink: 0; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: linear-gradient(#d781ff, #973cf0); }
+.moduleList li:nth-child(4n + 2) .moduleDot { background: linear-gradient(#77e3ff, #1aa2dd); }
+.moduleList li:nth-child(4n + 3) .moduleDot { background: linear-gradient(#8cf594, #32b86e); }
+.moduleList li:nth-child(4n + 4) .moduleDot { background: linear-gradient(#fff394, #f5c94f); }
+.hero .modulePlaceholder { color: #ddccef; font-size: 0.875rem; }
+.learningArtwork { position: relative; height: 3rem; transform: scale(0.4); transform-origin: left center; }
+.learningArtwork span { position: absolute; width: 6.25rem; height: 6.25rem; left: 0.55rem; border-radius: 1rem; transform: rotateX(55deg) rotateZ(-45deg); border: 2px solid #a064ed; box-shadow: -4px 5px 0 #6433aa, -6px 9px 15px rgb(30 13 70 / 0.25); }
+.learningArtwork span:nth-child(1) { top: 2.5rem; background: linear-gradient(140deg, #a466e8, #432c98); }
+.learningArtwork span:nth-child(2) { top: 1rem; background: linear-gradient(140deg, #b776ff, #6a34b9); }
+.learningArtwork span:nth-child(3) { top: -0.5rem; background: linear-gradient(140deg, #d7a4ff, #9761ec); border-color: #d9b0ff; }
+.learningArtwork > svg { position: absolute; width: 3.5rem; height: 3.5rem; color: #f0daff; top: 0.7rem; left: 2.05rem; transform: rotate(-10deg); stroke-width: 1.5; }
+.coachCard { display: flex; align-items: center; padding: 0.6rem; }
+.contactCard { display: flex; flex-direction: column; justify-content: center; gap: 0.625rem; padding: 0.75rem; }
+.contactCard > .factRow + .factRow { border-top: 1px solid rgb(220 198 255 / 0.25); padding-top: 0.625rem; }
+.contactLine { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.28rem !important; color: #e7d8ff; font-size: 0.72rem !important; }
+.contactLine svg { width: 0.85rem; height: 0.85rem; flex-shrink: 0; color: #cbb1f0; }
+.contactLine a { min-width: 0; overflow-wrap: anywhere; color: inherit; text-decoration: none; }
+.contactLine a:hover { text-decoration: underline; }
+.datesCard .factRow { gap: 0.625rem; }
+.datesCard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-content: center; gap: 0.5rem; }
+.startDate { display: flex; gap: 0.45rem; align-items: center; border: 0; padding: 0; margin: 0; min-width: 0; }
+.startDate > svg { width: 1.125rem; height: 1.125rem; color: #bea0ec; flex-shrink: 0; }
+.hero .startDate dt { color: #c6afe9; font-size: 0.8125rem; }
+.hero .startDate dd { font-size: 0.875rem; margin-top: 0.25rem; }
+.datesCard > .factRow { border-left: 1px solid rgb(220 198 255 / 0.25); padding-left: 0.5rem; }
+.calendarArtwork { position: absolute; bottom: -1.75rem; right: -0.65rem; width: 4rem; height: 5rem; color: #aa7cef; opacity: 0.12; transform: rotate(10deg); stroke-width: 3; z-index: -1; }
+.action:focus-visible, .hero a:focus-visible, .moduleList:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+
+
+/* Keep the live facts prominent in the compact banner; decorative slogans need no height. */
+.hero .quote, .hero .actionCaption, .hero .cardMotto { display: none; }
+
+@container learnerOverview (max-width: 85rem) {
+  .handwriting { display: none; }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.6fr); }
+  .cardsWithActions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .cardsWithActions .modulesCard { grid-column: span 2; width: 70%; justify-self: start; }
+  .actionCards { grid-column: span 4; }
+}
+@container learnerOverview (max-width: 65rem) {
+  .top { grid-template-columns: 1fr; gap: 0.875rem; }
+  .actionArea { justify-self: start; width: auto; }
+  .observerHero .top { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  .observerHero .identity { grid-column: 1; grid-row: 1; }
+  .observerHero .actionArea { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; width: max-content; }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.35fr); }
+  .cardsWithActions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cardsWithActions .modulesCard { grid-column: span 2; width: 70%; justify-self: start; }
+  .actionCards { grid-column: span 2; }
+  .artwork { background-size: auto, auto 132%; background-position: center, 90% center; }
+}
+@container learnerOverview (max-width: 38rem) {
+  .hero { padding: 1rem; border-radius: 1rem; }
+  .observerHero .top { grid-template-columns: 1fr; }
+  .observerHero .actionArea { grid-column: 1; grid-row: 2; justify-self: stretch; width: 100%; }
+  .cards { grid-template-columns: 1fr; gap: 0.625rem; margin-top: 0.875rem; }
+  .cardsWithActions .modulesCard { grid-column: auto; width: 100%; }
+  .actionCards { grid-column: auto; }
+  .cohortCard, .datesCard { min-height: 0; }
+  .peopleArtwork { width: 4rem; opacity: 0.18; }
+  .actions { flex-wrap: wrap; gap: 0.5rem; }
+  .actionArea, .action { width: 100%; }
+  .identity { gap: 0.75rem; }
+  .headerFacts { gap: 0.55rem 0.75rem; }
+  .headerFact + .headerFact { padding-left: 0.75rem; }
+  .headerFact > span { display: block; }
+  .headerFactLabel, .headerFact strong { display: block; }
+  .hero h1.name { font-size: clamp(1.35rem, 6cqi, 1.65rem) !important; }
+  .avatar > div > button, .avatar > span:not(.statusBadge) { width: 3.5rem; height: 3.5rem; font-size: 1.5rem; }
+  .moduleContent { grid-template-columns: 3.5rem minmax(0, 1fr); }
+  .learningArtwork { transform: scale(0.45); }
+  .datesCard { display: flex; }
+  .datesCard > .factRow { border-left: 0; border-top: 1px solid rgb(220 198 255 / 0.25); padding: 0.6rem 0 0; margin-top: 0.6rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .action, .moduleList a { transition: none; }
+  .action:hover:not(:disabled) { transform: none; }
+}
+
+/* The overview banner is intentionally compact so the progress cards begin
+   in the same viewport on normal laptop screens. */
+@container learnerOverview (min-width: 65rem) {
+  .hero {
+    padding: .8rem 1rem;
+    border-radius: 1.1rem;
+  }
+
+  .top {
+    gap: .75rem;
+    min-height: 3.75rem;
+  }
+
+  .identity {
+    gap: .7rem;
+  }
+
+  .avatar > div > button,
+  .avatar > span:not(.statusBadge) {
+    width: 3.75rem;
+    height: 3.75rem;
+    font-size: 1.45rem;
+  }
+
+  .hero h1.name {
+    font-size: clamp(1.25rem, 1.7cqi, 1.7rem) !important;
+  }
+
+  .hero .description {
+    margin-top: .2rem;
+    font-size: .75rem;
+    line-height: 1.3;
+  }
+
+  .headerFacts {
+    gap: .4rem .7rem;
+    margin-top: .35rem;
+  }
+
+  .headerFact > svg {
+    width: .85rem;
+    height: .85rem;
+  }
+
+  .headerFactLabel {
+    font-size: .6rem;
+  }
+
+  .headerFact strong {
+    font-size: .7rem;
+  }
+
+  .actions {
+    gap: .4rem;
+  }
+
+  .action {
+    min-height: 2.3rem;
+    gap: .45rem;
+    padding: .45rem .7rem;
+    font-size: .7rem;
+  }
+
+  .action > svg,
+  .action > .actionArrow {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .cards {
+    gap: .45rem;
+    margin-top: .55rem;
+  }
+
+  .cardsWithActions .card,
+  .cohortCard,
+  .datesCard,
+  .modulesCard {
+    min-height: 5.4rem;
+  }
+
+  .card {
+    padding: .45rem;
+    border-radius: .85rem;
+  }
+
+  .modulesCard {
+    padding: .55rem;
+  }
+
+  .icon {
+    width: 1.65rem;
+    height: 1.65rem;
+  }
+
+  .icon > svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .hero .card dd {
+    font-size: .7rem;
+  }
+
+  .hero .card dt,
+  .hero .moduleHeading h2 {
+    font-size: .6rem !important;
+  }
+
+  .moduleContent {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+  }
+
+  .learningArtwork {
+    transform: scale(.32);
+  }
+
+  .hero .moduleList li a,
+  .hero .moduleList li .moduleItem {
+    min-height: 1.15rem;
+    padding: .1rem .3rem;
+    font-size: .62rem;
+  }
+}

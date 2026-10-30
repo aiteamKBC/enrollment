@@ -1,0 +1,387 @@
+.theme {
+  --log-ink: #1c304b;
+  --log-muted: #647087;
+  --log-purple: var(--action-primary, #5b21b6);
+  --log-soft: #f3eff8;
+  --log-border: #e4e5ec;
+  --record-positive-bg: #f3eff8;
+  --record-positive-ink: #56367f;
+  --record-positive-border: #e0d7ec;
+  --record-accepted-accent: #654294;
+}
+.index { display: grid; gap: 20px; min-width: 0; color: var(--log-ink); }
+.indexHeader { display: flex; align-items: center; justify-content: space-between; gap: 24px 40px; min-height: 300px; padding: 48px clamp(24px, 3vw, 64px); border-radius: 22px; background: linear-gradient(90deg, transparent 62%, #f4efff 76%), url('/my-learning-hero-pattern.png') left center / 76% 100% no-repeat, linear-gradient(110deg, #fff 45%, #f4efff 100%); }
+.identity { min-width: 0; flex: 1 1 280px; }
+.index .eyebrow { margin: 0 0 12px; color: #7764a2; font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+:global(.dashboard-theme .workspace-main) .index .eyebrow { font-size: 12px; font-weight: 700; }
+.index .identity h1 { position: relative; margin: 0; padding-left: 32px; color: #1d103f; font-size: clamp(30px, 2.5vw, 44px); line-height: 1.2; font-weight: 750; overflow-wrap: anywhere; }
+.index .identity h1::before { position: absolute; top: 3px; bottom: 3px; left: 0; width: 7px; border-radius: 8px; background: var(--log-purple); content: ''; }
+.learnerMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; margin: 12px 0 0 32px; color: #5d7190; font-size: 16px; }
+.learnerMeta > span + span { position: relative; padding-left: 20px; }
+.learnerMeta > span + span::before { position: absolute; left: 0; content: '|'; }
+.calendarArt { display: grid; flex: 0 0 clamp(130px, 13vw, 200px); min-width: 0; place-items: center; pointer-events: none; }
+.calendarArt img { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 10px #38207820); }
+.completion { display: flex; align-items: flex-start; gap: 16px; flex: 0 1 360px; min-width: 270px; padding: 22px 24px; border: 1px solid #ffffffbd; border-radius: 22px; background: #ffffffb8; box-shadow: 0 10px 30px #3d22700a; backdrop-filter: blur(8px); }
+.completionIcon { display: grid; width: 54px; height: 54px; flex-shrink: 0; place-items: center; border-radius: 16px; background: #eee9f9; color: #8f77c8; font-size: 28px; }
+.completionDetails { flex: 1; min-width: 0; }
+.completionDetails > div:first-child { display: flex; flex-direction: column; gap: 2px; color: #5d7190; font-size: 12px; }
+.completion strong { color: #1d103f; font-size: 25px; line-height: 1.2; font-variant-numeric: tabular-nums; font-weight: 700; }
+.completion strong > span { color: var(--log-muted); font-size: 17px; font-weight: 400; }
+.completion p { margin-top: 8px; color: #8392aa; font-size: 11px; }
+.progress { height: 5px; margin-top: 8px; overflow: hidden; border-radius: 8px; background: #e8e5ee; }
+.progress > span { display: block; height: 100%; border-radius: inherit; background: var(--log-purple); }
+.learnerIndexHeader {
+  min-height: 150px;
+  gap: 12px 24px;
+  padding: 16px clamp(18px, 2vw, 32px);
+  background: #f4efff;
+}
+.index .learnerIndexHeader .eyebrow,
+:global(.dashboard-theme .workspace-main) .index .learnerIndexHeader .eyebrow { margin-bottom: 6px; font-size: 10px; }
+.index .learnerIndexHeader .identity h1 { padding-left: 20px; font-size: clamp(23px, 1.9vw, 30px); }
+.index .learnerIndexHeader .identity h1::before { width: 4px; }
+.learnerIndexHeader .learnerMeta { gap: 4px 12px; margin: 6px 0 0 20px; font-size: 12px; }
+.learnerIndexHeader .learnerMeta > span + span { padding-left: 12px; }
+.learnerIndexHeader .calendarArt { flex-basis: 110px; }
+.learnerIndexHeader .completion { flex-basis: 260px; min-width: 220px; gap: 10px; padding: 12px 14px; border-radius: 16px; }
+.learnerIndexHeader .completionIcon { width: 36px; height: 36px; border-radius: 11px; font-size: 18px; }
+.learnerIndexHeader .completionDetails > div:first-child { font-size: 11px; }
+.learnerIndexHeader .completion strong { font-size: 19px; }
+.learnerIndexHeader .completion strong > span { font-size: 12px; }
+.learnerIndexHeader .completion p { margin-top: 4px; font-size: 10px; }
+.learnerIndexHeader .progress { height: 4px; margin-top: 4px; }
+.planTotal { display: grid; grid-template-columns: auto repeat(2, minmax(0, 1fr)); align-items: center; gap: 18px; padding: 18px 22px; border: 1px solid #ded6eb; border-radius: 16px; background: linear-gradient(110deg, #fff, #f7f3ff); box-shadow: 0 6px 18px #30204e0a; }
+.planTotalIcon { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 13px; background: var(--log-purple); color: white; font-size: 21px; }
+.planTotal > div { min-width: 0; }
+.planTotal > div + div { padding-left: 18px; border-left: 1px solid #e4ddee; }
+.planTotal p { color: var(--log-muted); font-size: 10px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.planTotal strong { display: block; margin-top: 3px; color: #1d103f; font-size: 21px; font-variant-numeric: tabular-nums; }
+.planTotal div > span { color: var(--log-muted); font-size: 10px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.filters { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid #eee9f5; border-radius: 14px; background: #fff; }
+.filters button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 7px 13px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--log-muted); font-size: 12px; font-weight: 500; }
+.filters button[aria-pressed="true"] { border-color: var(--log-purple); background: var(--log-purple); color: white; box-shadow: 0 3px 8px #4319811f; }
+.filters button > span { min-width: 21px; border-radius: 5px; padding: 1px 5px; background: #e1e1ea; color: #5d6474; font-size: 10px; font-variant-numeric: tabular-nums; }
+.filters button[aria-pressed="true"] > span { background: #ffffffdb; color: var(--log-purple); }
+.yearFilter { display: flex; align-items: center; gap: 9px; min-height: 42px; padding-left: 12px; border: 1px solid var(--log-border); border-radius: 12px; background: white; color: var(--log-purple); box-shadow: 0 3px 12px #29204a0a; }
+.index .yearFilter select { min-height: 40px; min-width: 110px; padding: 8px 32px 8px 0; appearance: none; border: 0; border-radius: 9px; background-color: transparent; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235d7190' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-position: right 10px center; background-repeat: no-repeat; background-size: 16px; color: var(--log-ink); font-size: 12px; cursor: pointer; }
+.index :is(a, button):focus-visible { outline: 2px solid var(--log-purple); outline-offset: 3px; }
+.index .yearFilter select:focus { border: 0 !important; outline: 0 !important; box-shadow: none !important; background-color: transparent !important; }
+.index .yearFilter select:focus-visible { color: var(--log-purple); font-weight: 700; }
+.years { display: grid; gap: 20px; min-width: 0; }
+.yearGroup { min-width: 0; overflow: hidden; border: 1px solid #e7e5f0; border-radius: 18px; background: white; box-shadow: 0 7px 22px #30204e0a; }
+.yearHeading { display: flex; align-items: center; gap: 24px; padding: 15px 30px; border-bottom: 1px solid var(--log-border); background: linear-gradient(115deg, #f0efff, #f7f5ff); }
+:global(.dashboard-theme .workspace-main) .index .yearHeading h2 { color: var(--log-ink); font-size: 14px; font-weight: 600; letter-spacing: .015em; }
+.yearHeading > span { color: var(--log-muted); font-size: 11px; }
+.months { display: grid; grid-template-columns: minmax(0, 1fr); }
+.month { display: grid; grid-template-columns: minmax(190px, 1.3fr) minmax(170px, 1fr) minmax(130px, .8fr) 136px 124px; align-items: center; gap: 18px; min-width: 0; padding: 20px 30px; transition: background 150ms; }
+.month + .month { border-top: 1px solid #eff0f4; }
+.month:last-child { border-radius: 0 0 14px 14px; }
+.month:hover, .month:focus-within { background: #faf9fc; }
+.monthIdentity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.monthIdentity > div { min-width: 0; }
+.monthIcon { display: grid; place-items: center; width: 44px; height: 50px; flex-shrink: 0; border: 1px solid #e4ddee; border-radius: 12px; background: #f5f1fb; color: var(--log-purple); font-size: 21px; }
+:global(.dashboard-theme .workspace-main) .index .monthIdentity h3 { color: var(--log-ink); font-size: 14px; line-height: 1.4; font-weight: 600; letter-spacing: -.01em; }
+.monthIdentity p { margin-top: 4px; color: var(--log-muted); font-size: 11px; }
+.hours { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.hours dt { color: var(--log-muted); font-size: 10px; }
+.hours dd { display: flex; align-items: center; gap: 8px; margin-top: 5px; color: var(--log-ink); font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hours dd > :first-child { color: #293f72; font-size: 17px; }
+.signatures { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 11px; }
+.signatures > span { display: inline-flex; align-items: center; gap: 5px; }
+.signed { color: var(--log-purple); }
+.unsigned { color: var(--log-muted); }
+.status { display: inline-flex; align-items: center; justify-self: start; gap: 5px; max-width: 100%; padding: 5px 8px; border-radius: 6px; background: #f0f1f5; color: #677086; font-size: 10px; font-weight: 500; }
+.complete { background: var(--log-soft); color: var(--log-purple); }
+.openMonth { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 7px 9px; border: 1px solid #ded6eb; border-radius: 7px; color: var(--log-purple); font-size: 11px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.openMonth:hover { border-color: var(--log-purple); background: var(--log-soft); }
+.scheduleNote { display: flex; align-items: flex-start; gap: 10px; padding: 14px 20px; border: 1px solid #dbe7ff; border-radius: 12px; background: #f3f8ff; color: #657b9e; font-size: 12px; line-height: 1.6; }
+.scheduleNote > :first-child { flex-shrink: 0; font-size: 15px; }
+.noResults { display: grid; justify-items: center; gap: 10px; padding: 36px 20px; border: 1px solid var(--log-border); border-radius: 14px; background: white; text-align: center; }
+.noResults > :first-child { color: var(--log-purple); font-size: 28px; }
+.noResults p { color: var(--log-muted); font-size: 13px; }
+.noResults button { min-height: 38px; padding: 8px 12px; border-radius: 7px; background: var(--log-soft); color: var(--log-purple); font-size: 12px; font-weight: 600; }
+.skeletonRow { display: flex; align-items: center; gap: 18px; padding: 18px 20px; border-top: 1px solid var(--log-border); }
+
+/* Coach monthly logs: one master-detail workspace matching the approved design. */
+.coachCanvas { width: 100%; max-width: 1560px; padding: 18px 24px 30px; }
+:global(.dashboard-theme[data-workspace-role="coach"] .workspace-main):has(.coachCanvas) { background: #f8f8ff !important; }
+.coachWorkspace { display: grid; gap: 18px; min-width: 0; color: #18162d; }
+.coachHero { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 118px; overflow: hidden; padding: 24px 30px; border: 1px solid #ebe5fb; border-radius: 15px; background: radial-gradient(circle at 72% 22%, rgb(255 255 255 / 82%), transparent 30%), linear-gradient(105deg, #f3efff 0%, #f8f5ff 54%, #eee6ff 100%); box-shadow: 0 8px 24px rgb(74 42 132 / 5%); }
+.coachHero::after { position: absolute; inset: 0; background: repeating-linear-gradient(132deg, transparent 0 76px, rgb(115 73 184 / 3%) 76px 77px); content: ''; pointer-events: none; }
+.coachHero > div { position: relative; z-index: 1; }
+.coachHero h1 { margin: 0; color: #161329; font-size: clamp(27px, 2.1vw, 36px); font-weight: 780; letter-spacing: -.8px; line-height: 1.1; }
+.coachHero p { margin-top: 8px; color: #6f6a85; font-size: 15px; }
+.coachHero img { position: absolute; z-index: 1; right: 34px; width: 132px; height: 132px; object-fit: contain; filter: drop-shadow(0 12px 13px rgb(64 30 125 / 18%)); transform: rotate(5deg); }
+.coachWorkspaceGrid { display: grid; grid-template-columns: minmax(280px, 350px) minmax(0, 1fr); align-items: start; gap: 14px; min-width: 0; }
+.coachLearnerPanel { min-width: 0; overflow: hidden; border: 1px solid #e2e3ec; border-radius: 14px; background: #fff; box-shadow: 0 7px 22px rgb(42 31 76 / 4%); }
+.coachLearnerPanelHeader { display: grid; gap: 14px; padding: 18px; border-bottom: 1px solid #ececf3; }
+.coachLearnerPanelHeader h2 { color: #201d34; font-size: 19px; font-weight: 750; }
+.coachLearnerSearch { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 13px; border: 1px solid #dfe1eb; border-radius: 10px; background: #fbfbfd; color: #8a8da0; }
+.coachLearnerSearch:focus-within { border-color: #7951cf; box-shadow: 0 0 0 3px rgb(121 81 207 / 10%); }
+.coachLearnerSearch svg { flex-shrink: 0; width: 18px; height: 18px; }
+.coachLearnerSearch input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #232037; font-size: 13px; }
+/* The workspace control theme adds its own input frame; the label already owns this search border. */
+:global(body .dashboard-theme[data-workspace-role="coach"] .workspace-main) .coachLearnerSearch input,
+:global(body .dashboard-theme[data-workspace-role="coach"] .workspace-main) .coachLearnerSearch input:focus {
+  min-height: 0;
+  height: auto;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  appearance: none;
+}
+.coachLearnerSearch input::placeholder { color: #9b9dab; }
+.coachLearnerList { display: grid; max-height: 622px; overflow-y: auto; }
+.coachLearnerLink { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 76px; padding: 12px 16px; border-bottom: 1px solid #eeeef3; color: #29263a; text-decoration: none; transition: background-color 150ms, color 150ms; }
+.coachLearnerLink:last-child { border-bottom: 0; }
+.coachLearnerLink:hover { background: #faf8ff; }
+.coachLearnerLink[aria-current="page"] { background: linear-gradient(100deg, #f4efff, #f9f6ff); color: #39206b; }
+.coachLearnerLink > svg { width: 18px; height: 18px; color: #79748b; }
+.coachLearnerLink[aria-current="page"] > svg { color: #5c2db6; }
+.coachLearnerAvatar, .coachProfileAvatar { display: grid; place-items: center; flex-shrink: 0; border-radius: 50%; background: #e9ddff; color: #5a2aa7; font-weight: 750; }
+.coachLearnerAvatar { width: 46px; height: 46px; font-size: 13px; }
+.coachLearnerLink[data-tone="1"] .coachLearnerAvatar { background: #e4f0ff; color: #315c96; }
+.coachLearnerLink[data-tone="2"] .coachLearnerAvatar { background: #e4f8ee; color: #31785a; }
+.coachLearnerLink[data-tone="3"] .coachLearnerAvatar { background: #ffe8ef; color: #9d4561; }
+.coachLearnerLink[data-tone="4"] .coachLearnerAvatar { background: #fff2d4; color: #886528; }
+.coachLearnerText { min-width: 0; }
+.coachLearnerText strong, .coachLearnerText small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coachLearnerText strong { font-size: 14px; font-weight: 720; }
+.coachLearnerText small { margin-top: 5px; color: #74768a; font-size: 11px; }
+.coachLearnerEmpty { padding: 24px 14px; }
+.coachSelectedLearner { min-width: 0; }
+.coachLoadingHero { background: #f3efff; }
+.coachLoadingHero::after { display: none; }
+.coachLoadingHeading { display: grid; width: min(100%, 360px); gap: 12px; }
+.coachLoadingLearners { display: grid; }
+.coachLoadingLearners > div { display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 12px 16px; border-bottom: 1px solid #eeeef3; }
+.coachLoadingLearners > div:last-child { border-bottom: 0; }
+.coachLoadingLearners > div > div { display: grid; flex: 1; gap: 8px; min-width: 0; }
+.coachLoadingCard { display: block; min-height: auto; padding: 22px; }
+.coachLogOverview { display: grid; gap: 14px; min-width: 0; }
+.coachProfileCard { display: grid; grid-template-columns: minmax(260px, 1.4fr) minmax(190px, .75fr) minmax(170px, .62fr); align-items: center; min-height: 124px; padding: 20px 26px; border: 1px solid #e3e4ed; border-radius: 14px; background: #fff; box-shadow: 0 7px 22px rgb(42 31 76 / 4%); }
+.coachProfileIdentity { display: flex; align-items: center; gap: 18px; min-width: 0; padding-right: 24px; }
+.coachProfileAvatar { width: 76px; height: 76px; background: linear-gradient(145deg, #eee5ff, #d7c0ff); font-size: 22px; }
+.coachProfileIdentity > div { min-width: 0; }
+.coachProfileIdentity h2 { overflow-wrap: anywhere; color: #17142c; font-size: 23px; font-weight: 750; letter-spacing: -.35px; }
+.coachProfileIdentity p { margin-top: 6px; color: #706493; font-size: 14px; }
+.coachProfileFact { align-self: stretch; display: flex; justify-content: center; flex-direction: column; min-width: 0; padding: 4px 28px; border-left: 1px solid #e7e7ee; }
+.coachProfileFact > span:first-child { color: #68697c; font-size: 12px; }
+.coachProfileFact strong { margin-top: 4px; color: #17142c; font-size: 24px; font-weight: 760; font-variant-numeric: tabular-nums; }
+.coachProfileFact strong small { color: #312d45; font-size: 18px; font-weight: 650; }
+.coachProfileFact p { margin-top: 4px; color: #918b9f; font-size: 11px; }
+.coachProfileFact .coachPlanValue { font-size: 15px; }
+.coachSummaryCard { overflow: hidden; border: 1px solid #e3e4ed; border-radius: 14px; background: #fff; box-shadow: 0 7px 22px rgb(42 31 76 / 4%); }
+.coachSummaryCard > h2 { padding: 16px 22px 8px; color: #211e34; font-size: 18px; font-weight: 750; }
+.coachSummaryGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 22px 22px; }
+.coachSummaryGrid > div { display: flex; align-items: center; gap: 18px; min-width: 0; padding: 8px 24px 8px 6px; }
+.coachSummaryGrid > div + div { padding-left: 36px; border-left: 1px solid #e8e8ef; }
+.coachSummaryIcon { display: grid; width: 64px; height: 64px; flex-shrink: 0; place-items: center; border-radius: 50%; background: #f1efff; color: #5266e8; }
+.coachSummaryIcon svg { width: 30px; height: 30px; }
+.coachSummaryGrid p { color: #6c6e82; font-size: 13px; }
+.coachSummaryGrid strong { display: block; margin-top: 5px; color: #161329; font-size: 22px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.coachWarning { padding: 11px 14px; border: 1px solid #f0d69a; border-radius: 9px; background: #fff9e9; color: #815f16; font-size: 12px; }
+.coachMonthsCard { min-width: 0; overflow: hidden; border: 1px solid #e3e4ed; border-radius: 14px; background: #fff; box-shadow: 0 7px 22px rgb(42 31 76 / 4%); }
+.coachMonthsToolbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 70px; padding: 11px 14px 0; border-bottom: 1px solid #ececf2; }
+.coachMonthTabs { display: flex; align-self: stretch; gap: 4px; }
+.coachMonthTabs button { position: relative; display: inline-flex; align-items: center; gap: 10px; min-height: 50px; padding: 10px 12px; border: 0; background: transparent; color: #66677a; font-size: 12px; font-weight: 650; cursor: pointer; }
+.coachMonthTabs button::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 3px; border-radius: 3px 3px 0 0; background: transparent; content: ''; }
+.coachMonthTabs button[aria-pressed="true"] { color: #5d2bc0; }
+.coachMonthTabs button[aria-pressed="true"]::after { background: #7442d1; }
+.coachMonthTabs button span { display: grid; min-width: 24px; height: 24px; place-items: center; border-radius: 999px; background: #e9e6f2; color: #66677a; font-size: 11px; }
+.coachMonthTabs button[aria-pressed="true"] span { background: #e8dcff; color: #5d2bc0; }
+.coachYearFilter { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; color: #68697c; font-size: 11px; }
+.coachYearFilter select { min-width: 110px; height: 40px; padding: 0 34px 0 14px; border: 1px solid #dee0e9; border-radius: 9px; background-color: #fff; color: #29263a; font-size: 13px; font-weight: 650; }
+.coachTableScroll { max-width: 100%; overflow-x: auto; }
+.coachMonthTable { width: 100%; min-width: 900px; border-collapse: collapse; color: #363347; font-size: 12px; }
+.coachMonthTable th { height: 46px; padding: 10px 14px; background: #f7f6fc; color: #55566b; font-weight: 680; text-align: left; white-space: nowrap; }
+.coachMonthTable td { height: 60px; padding: 10px 14px; border-top: 1px solid #ececf2; white-space: nowrap; }
+.coachMonthTable td:first-child strong { color: #343044; font-weight: 700; }
+.coachSignatureState { display: inline-flex; align-items: center; justify-content: center; min-height: 30px; padding: 5px 12px; border-radius: 9px; font-size: 10px; font-weight: 650; }
+.coachSignatureState[data-tone="pending"] { background: #fff0cf; color: #93621b; }
+.coachSignatureState[data-tone="signed"] { background: #e6f7ed; color: #26724e; }
+.coachSignatureState[data-tone="progress"] { background: #edf0f7; color: #646b7a; }
+.coachReportButton { display: inline-flex; align-items: center; justify-content: center; min-width: 100px; min-height: 38px; padding: 8px 13px; border-radius: 8px; background: #5d16cf; color: #fff; font-size: 11px; font-weight: 680; text-decoration: none; box-shadow: 0 5px 11px rgb(93 22 207 / 18%); }
+.coachReportButton:hover { background: #4e10b1; }
+.coachHelperNote { display: flex; align-items: center; gap: 9px; margin: 10px; padding: 11px 14px; border: 1px solid #cfe0ff; border-radius: 9px; background: #f1f6ff; color: #74809a; font-size: 11px; }
+.coachHelperNote svg { flex-shrink: 0; color: #3978e8; }
+.coachNoMonths { display: grid; justify-items: center; gap: 8px; padding: 36px 20px; text-align: center; }
+.coachNoMonths > svg { color: #6731c4; font-size: 28px; }
+.coachNoMonths h3 { font-size: 16px; font-weight: 700; }
+.coachNoMonths p { color: #74768a; font-size: 12px; }
+.coachNoMonths button, .coachRetryButton { min-height: 38px; padding: 8px 14px; border: 1px solid #d8ccee; border-radius: 8px; background: #f6f1ff; color: #5d2bc0; font-size: 12px; font-weight: 650; }
+
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"] .workspace-main):has(.coachCanvas) { background: var(--coach-dark-page) !important; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachWorkspace { color: var(--coach-dark-text); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) :is(.coachLearnerPanel, .coachProfileCard, .coachSummaryCard, .coachMonthsCard) { border-color: var(--coach-dark-border); background: var(--coach-dark-surface); box-shadow: none; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachHero { border-color: var(--coach-dark-border); background: linear-gradient(110deg, var(--coach-dark-soft), #302a4e); box-shadow: none; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) :is(.coachHero h1, .coachLearnerLink, .coachProfileIdentity h2, .coachProfileFact strong, .coachSummaryCard > h2, .coachSummaryGrid strong, .coachMonthTable, .coachMonthTable td:first-child strong, .coachLearnerPanelHeader h2) { color: var(--coach-dark-text); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachProfileFact strong small { color: #d9e3ef; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) :is(.coachHero p, .coachLearnerText small, .coachProfileIdentity p, .coachProfileFact > span:first-child, .coachProfileFact p, .coachSummaryGrid p, .coachYearFilter, .coachNoMonths p) { color: var(--coach-dark-muted); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) :is(.coachLearnerPanelHeader, .coachLearnerLink, .coachProfileFact, .coachSummaryGrid > div + div, .coachMonthsToolbar, .coachMonthTable td, .coachLoadingLearners > div) { border-color: var(--coach-dark-border); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachLearnerLink:hover { background: var(--coach-dark-hover); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachLearnerLink[aria-current="page"] { background: var(--coach-dark-active); color: var(--coach-dark-text); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachLearnerSearch { border-color: var(--coach-dark-border); background: var(--coach-dark-page); color: var(--coach-dark-muted); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachLearnerSearch input { color: var(--coach-dark-text); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachLearnerSearch input::placeholder { color: var(--coach-dark-muted); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachLoadingHero { background: linear-gradient(110deg, var(--coach-dark-surface), var(--coach-dark-soft)); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachSummaryIcon { background: var(--coach-dark-hover); color: #b7c9ff; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachMonthTable th { background: var(--coach-dark-hover); color: var(--coach-dark-text); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachMonthTable tbody tr { background: var(--coach-dark-surface) !important; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachMonthTable tbody tr:nth-child(even) { background: var(--coach-dark-soft) !important; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachMonthTable tbody tr:hover { background: var(--coach-dark-hover) !important; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachYearFilter select { border-color: var(--coach-dark-border); background-color: var(--coach-dark-page); color: var(--coach-dark-text); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachMonthTabs button { color: var(--coach-dark-muted); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachMonthTabs button[aria-pressed="true"] { color: #d9c7f7; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachMonthTabs button span { background: var(--coach-dark-hover); color: var(--coach-dark-muted); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachMonthTabs button[aria-pressed="true"] span { background: #493c67; color: #eadfff; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachHelperNote { border-color: #365a7e; background: #172f4a; color: #c5d6e8; }
+
+/* The selected learner summary has its own async skeleton. These light index
+   surfaces otherwise flash white after the outer coach learner list loads. */
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachSelectedLearner :is(.indexHeader, .yearGroup) {
+  border-color: var(--coach-dark-border);
+  background: var(--coach-dark-surface);
+  background-image: none;
+  box-shadow: none;
+}
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachSelectedLearner .yearHeading { border-color: var(--coach-dark-border); background: var(--coach-dark-soft); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="coach"]) .coachSelectedLearner .skeletonRow { border-color: var(--coach-dark-border); }
+
+@media (max-width: 1120px) {
+  .coachCanvas { padding-inline: 16px; }
+  .coachWorkspaceGrid { grid-template-columns: 270px minmax(0, 1fr); }
+  .coachProfileCard { grid-template-columns: minmax(220px, 1fr) minmax(165px, .7fr); }
+  .coachProfileFact:last-child { grid-column: 1 / -1; min-height: 64px; border-top: 1px solid #e7e7ee; }
+}
+@media (max-width: 860px) {
+  .coachWorkspaceGrid { grid-template-columns: minmax(0, 1fr); }
+  .coachLearnerList { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 310px; }
+  .coachLearnerLink:nth-child(odd) { border-right: 1px solid #eeeef3; }
+  .coachHero img { right: 18px; width: 110px; height: 110px; }
+}
+@media (max-width: 620px) {
+  .coachCanvas { padding: 10px 10px 22px; }
+  .coachHero { min-height: 105px; padding: 20px; }
+  .coachHero img { width: 92px; height: 92px; opacity: .74; }
+  .coachHero p { max-width: 220px; font-size: 13px; }
+  .coachLearnerList { grid-template-columns: minmax(0, 1fr); }
+  .coachLearnerLink:nth-child(odd) { border-right: 0; }
+  .coachProfileCard { grid-template-columns: minmax(0, 1fr); padding: 18px; }
+  .coachProfileIdentity { padding: 0 0 18px; }
+  .coachProfileFact { min-height: 70px; padding: 14px 0; border-top: 1px solid #e7e7ee; border-left: 0; }
+  .coachProfileFact:last-child { grid-column: auto; }
+  .coachSummaryGrid { grid-template-columns: minmax(0, 1fr); }
+  .coachSummaryGrid > div { padding: 10px 4px; }
+  .coachSummaryGrid > div + div { padding: 18px 4px 4px; border-top: 1px solid #e8e8ef; border-left: 0; }
+  .coachMonthsToolbar { align-items: stretch; flex-direction: column; padding-top: 8px; }
+  .coachMonthTabs { overflow-x: auto; }
+  .coachMonthTabs button { white-space: nowrap; }
+  .coachYearFilter { justify-content: space-between; }
+}
+
+/* Match the learner Attendance palette, including the index while it loads.
+   The coach also uses this module, so keep these overrides inside its learner shell. */
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme {
+  --log-ink: #f6f8fb;
+  --log-muted: #b6c4d5;
+  --log-purple: #bfa3ee;
+  --log-soft: #302748;
+  --log-border: #3b526c;
+  --record-positive-bg: #302748;
+  --record-positive-ink: #e2d2fa;
+  --record-positive-border: #5c4a79;
+  color: var(--log-ink);
+}
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme :is(.indexHeader, .learnerIndexHeader) {
+  background: #182d48;
+  border: 1px solid var(--log-border);
+}
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme :is(.index .identity h1, .completion strong, .index .yearHeading h2, .index .monthIdentity h3) { color: var(--log-ink); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme :is(.index .eyebrow, .completionIcon, .hours dd > :first-child) { color: var(--log-purple); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme :is(.learnerMeta, .completionDetails > div:first-child, .completion p, .index .yearHeading > span, .monthIdentity p, .hours dt, .noResults p) { color: var(--log-muted); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme :is(.yearGroup, .filters, .yearFilter, .noResults, .futureMonth, .completion) {
+  background: #182d48;
+  border-color: var(--log-border);
+  box-shadow: none;
+}
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .yearHeading { background: #24405d; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme :is(.month + .month, .skeletonRow, .pagination) { border-color: var(--log-border); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .month:is(:hover, :focus-within) { background: #24405d; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme :is(.monthIcon, .completionIcon, .status, .filters button > span, .noResults button, .futureSecondaryAction) {
+  background: #24405d;
+  border-color: var(--log-border);
+  color: #e2d2fa;
+}
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme :is(.filters button, .yearFilter select, .futureSecondaryAction) { color: var(--log-ink); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .filters button[aria-pressed="true"] { background: #54377d; color: #fff; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .filters button[aria-pressed="true"] > span { background: #e8def7; color: #362055; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .openMonth { border-color: #6d5793; color: var(--log-purple); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .openMonth:hover { background: #302748; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .hours dd { color: var(--log-ink); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .progress { background: #2b4562; }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .scheduleNote { background: #1e344d; border-color: var(--log-border); color: var(--log-muted); }
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) .theme .futureMonth { background-image: none; }
+.savedMessage { border: 1px solid var(--record-positive-border); border-radius: 10px; padding: 14px 16px; background: var(--record-positive-bg); color: var(--record-positive-ink); font-size: 13px; }
+.futureMonth { max-width: 660px; margin: clamp(40px, 10vh, 110px) auto 0; border: 1px solid #ded6eb; border-radius: 18px; background: linear-gradient(145deg, #fff 0%, #faf8fd 100%); box-shadow: 0 12px 32px rgb(49 30 79 / 8%); }
+.futureMonth :global(.ui-empty-state) { padding-block: 44px; }
+.futurePrimaryAction, .futureSecondaryAction { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; text-decoration: none; }
+.futurePrimaryAction { background: var(--log-purple); color: white; }
+.futurePrimaryAction:hover { background: #56367f; }
+.futureSecondaryAction { border: 1px solid var(--log-border); background: white; color: var(--log-ink); }
+.futureSecondaryAction:hover { border-color: #cfc4dc; background: var(--log-soft); }
+.futurePrimaryAction svg, .futureSecondaryAction svg { width: 15px; height: 15px; }
+@media (max-width: 1200px) {
+  .indexHeader { column-gap: 20px; }
+  .calendarArt { flex-basis: 130px; }
+  .month { grid-template-columns: minmax(160px, 1.2fr) minmax(150px, 1fr) minmax(120px, .8fr) 106px; gap: 12px 16px; padding: 16px; }
+  .monthIdentity { grid-column: 1; grid-row: 1 / 3; }
+  .hours { grid-column: 2; grid-row: 1 / 3; }
+  .signatures { grid-column: 3; grid-row: 1; }
+  .status { grid-column: 3; grid-row: 2; }
+  .openMonth { grid-column: 4; grid-row: 1 / 3; }
+}
+@media (max-width: 760px) {
+  .index { gap: 18px; padding-inline: 12px; }
+  .indexHeader { flex-wrap: wrap; gap: 18px; min-height: 0; padding: 24px; background-size: cover, cover, cover; }
+  .learnerIndexHeader { gap: 12px; padding: 16px; }
+  .identity { flex-basis: 100%; }
+  .calendarArt { flex-basis: 100px; }
+  .learnerIndexHeader .calendarArt { flex-basis: 80px; }
+  .completion { flex: 1; min-width: 0; max-width: none; }
+  .month { grid-template-columns: minmax(0, 1fr) auto; gap: 14px; padding: 16px; }
+  .monthIdentity { grid-column: 1; grid-row: 1; }
+  .status { grid-column: 2; grid-row: 1; max-width: 118px; }
+  .hours { grid-column: 1 / -1; grid-row: 2; padding-block: 12px; border-block: 1px solid #eff0f4; }
+  .signatures { grid-column: 1; grid-row: 3; }
+  .openMonth { grid-column: 2; grid-row: 3; min-height: 40px; }
+  .monthIcon { width: 32px; height: 38px; font-size: 17px; }
+  .monthIdentity { gap: 9px; }
+  .yearHeading { padding: 12px 16px; }
+}
+@media (max-width: 420px) {
+  .indexHeader { padding: 20px 16px; }
+  .learnerIndexHeader { padding: 16px; }
+  .calendarArt { display: none; }
+  .index .identity h1 { padding-left: 20px; font-size: 29px; }
+  .index .identity h1::before { width: 5px; }
+  .learnerMeta { margin-left: 20px; font-size: 13px; }
+  .completion { padding: 16px; }
+  .planTotal { grid-template-columns: auto 1fr; gap: 12px; padding: 14px; }
+  .planTotal > div + div { grid-column: 2; padding: 10px 0 0; border-top: 1px solid #e4ddee; border-left: 0; }
+  .filters { width: 100%; }
+  .filters button { flex: 1; padding-inline: 7px; gap: 6px; font-size: 11px; }
+  .yearFilter { width: 100%; }
+  .index .yearFilter select { flex: 1; }
+  .month { gap: 12px 8px; padding: 14px 12px; }
+  :global(.dashboard-theme .workspace-main) .index .monthIdentity h3 { font-size: 13px; }
+  .monthIcon { display: none; }
+  .status { max-width: 110px; font-size: 9px; }
+  .signatures { gap: 6px 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .month { transition: none; } }

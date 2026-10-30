@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Attendance mode approval</title>
+<style>body{font:16px/1.6 system-ui,sans-serif;background:#f5f7fa;color:#192e46;margin:0;padding:24px}main{max-width:600px;margin:8vh auto;padding:32px;background:white;border:1px solid #dce3ec;border-radius:16px}button{font:inherit;padding:10px 20px;border:1px solid #192e46;border-radius:8px;cursor:pointer;background:#192e46;color:white;margin-right:12px}button[value=decline]{background:white;color:#192e46}</style></head>
+<body><main><h1>Attendance mode approval</h1>
+{% if error %}<p role="alert">{{ error }}</p>
+{% elif done %}<p role="status">{% if approved %}Approved. Future planned lecture hours are now allocated to recorded sessions.{% else %}Declined. Live Sessions remains active and absence reminders resume.{% endif %}</p>
+{% else %}<p><strong>{{ learner_name }}</strong> has requested Lazy Mode.</p><p>Approving allocates their remaining planned lecture hours to recorded sessions and keeps absence reminder emails paused. Historical attendance and total planned hours stay the same.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}"><button name="decision" value="approve">Approve</button><button name="decision" value="decline">Decline</button></form>{% endif %}
+</main></body></html>

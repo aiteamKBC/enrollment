@@ -1,0 +1,91 @@
+/* Scope the learner's purple palette to the eight assignment steps. The step
+   fields are also used by Extra Activity, so their shared classes stay intact. */
+.assignmentWizard {
+  border-color: oklch(var(--primary-200)) !important;
+}
+
+.assignmentWizard [class~="bg-sky-50/50"],
+.assignmentWizard [class~="bg-slate-50"] {
+  background-color: oklch(var(--primary-50) / 0.6) !important;
+}
+
+.assignmentWizard [class~="bg-blue-50"],
+.assignmentWizard [class~="bg-slate-100"] {
+  background-color: oklch(var(--primary-50)) !important;
+}
+
+.assignmentWizard [class~="bg-slate-200"] {
+  background-color: oklch(var(--primary-100)) !important;
+}
+
+.assignmentWizard [class~="bg-slate-900"] {
+  background-color: oklch(var(--primary-700)) !important;
+}
+
+.assignmentWizard [class~="border-slate-200"],
+.assignmentWizard [class~="border-blue-100"] {
+  border-color: oklch(var(--primary-100)) !important;
+}
+
+.assignmentWizard [class~="border-slate-300"],
+.assignmentWizard [class~="border-blue-200"] {
+  border-color: oklch(var(--primary-200)) !important;
+}
+
+.assignmentWizard [class~="border-blue-300"] {
+  border-color: oklch(var(--primary-300)) !important;
+}
+
+.assignmentWizard [class~="border-slate-900"] {
+  border-color: oklch(var(--primary-700)) !important;
+}
+
+.assignmentWizard [class~="text-slate-900"],
+.assignmentWizard [class~="text-blue-950"],
+.assignmentWizard [class~="text-blue-900"] {
+  color: oklch(var(--primary-900)) !important;
+}
+
+.assignmentWizard [class~="text-blue-700"] {
+  color: oklch(var(--primary-700)) !important;
+}
+
+.assignmentWizard [class~="accent-blue-600"] {
+  accent-color: oklch(var(--primary-600));
+}
+
+.assignmentWizard [class~="hover:bg-sky-50"]:hover:not(:disabled),
+.assignmentWizard [class~="hover:bg-blue-50"]:hover:not(:disabled) {
+  background-color: oklch(var(--primary-50)) !important;
+}
+
+.assignmentWizard [class~="focus:border-blue-400"]:focus,
+.assignmentWizard [class~="focus-within:ring-blue-500"]:focus-within {
+  border-color: oklch(var(--primary-400)) !important;
+  --tw-ring-color: oklch(var(--primary-200));
+}
+
+.assignmentWizard [class~="focus:ring-blue-100"]:focus {
+  --tw-ring-color: oklch(var(--primary-100));
+}
+
+.assignmentWizard [class~="focus-visible:outline-blue-600"]:focus-visible {
+  outline-color: oklch(var(--primary-600)) !important;
+}
+
+:global([data-theme='dark']) .assignmentWizard { border-color: #3b526c !important; }
+:global([data-theme='dark']) .assignmentWizard :is(
+  [class~="bg-sky-50/50"], [class~="bg-slate-50"], [class~="bg-blue-50"],
+  [class~="bg-slate-100"], [class~="bg-slate-200"]
+) { background-color: #213854 !important; }
+:global([data-theme='dark']) .assignmentWizard :is(
+  [class~="text-slate-900"], [class~="text-blue-950"], [class~="text-blue-900"]
+) { color: #f6f8fb !important; }
+:global([data-theme='dark']) .assignmentWizard [class~="text-blue-700"] { color: #d7c4f4 !important; }
+:global([data-theme='dark']) .assignmentWizard :is(
+  [class~="border-slate-200"], [class~="border-blue-100"],
+  [class~="border-slate-300"], [class~="border-blue-200"]
+) { border-color: #3b526c !important; }
+:global([data-theme='dark']) .assignmentWizard :is([class~="hover:bg-sky-50"], [class~="hover:bg-blue-50"]):hover:not(:disabled) {
+  background-color: #304766 !important;
+}

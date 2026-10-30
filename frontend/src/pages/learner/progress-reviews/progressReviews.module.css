@@ -1,0 +1,161 @@
+/* Reviews list/detail presentation. Kept local to this route so the shared
+   learner theme cannot repaint the review summary into a competing hero. */
+.page {
+  container: reviewsPage / inline-size;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.page :global(.learner-super-admin-hero) {
+  border: 1px solid #e3e9f1 !important;
+  border-radius: 1rem !important;
+  background: #f6f8fb !important;
+  background-image: none !important;
+  box-shadow: 0 1px 2px rgb(24 45 72 / 0.04), 0 8px 22px -18px rgb(24 45 72 / 0.2) !important;
+  color: #182d48 !important;
+}
+
+.page :global(.learner-super-admin-hero) :is(h1, h2, h3) {
+  color: #182d48 !important;
+}
+
+.page :global(.learner-super-admin-hero) :global(.text-foreground-500) {
+  color: #637388 !important;
+}
+
+.page :global(.learner-super-admin-hero) :global(.text-primary-600) {
+  color: #673ab7 !important;
+}
+
+.page :global(.learner-super-admin-hero) :global(.bg-primary-100\/60) {
+  border-color: #dfe5ee !important;
+  background: #edf1f6 !important;
+}
+
+.page :global(.progress-review-hero-metric) {
+  min-width: 0 !important;
+  min-height: 5.4rem !important;
+  border: 1px solid #e0e6ee !important;
+  border-radius: 0.8rem !important;
+  background: #fff !important;
+  box-shadow: 0 2px 5px rgb(24 45 72 / 0.07) !important;
+}
+
+.page :global(.progress-review-hero-metric) :is(p, span) {
+  color: #637388;
+}
+
+.page :global(.progress-review-hero-metric) p:last-child {
+  color: #182d48 !important;
+  font-size: 1.45rem !important;
+  line-height: 1.1 !important;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 0.85rem;
+  scrollbar-width: thin;
+}
+
+.tableWrap :global(table) {
+  min-width: 62rem;
+  table-layout: fixed;
+}
+
+.tableWrap :global(thead) {
+  background: #182d48 !important;
+}
+
+.tableWrap :global(thead th) {
+  height: 3rem !important;
+  border-color: #294564 !important;
+  background: #182d48 !important;
+  color: #fff !important;
+  font-size: 0.64rem !important;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.tableWrap :global(tbody tr) {
+  min-height: 4.7rem;
+  background: #fff;
+  transition: background 150ms ease;
+}
+
+.tableWrap :global(tbody tr:nth-child(even)) {
+  background: #f6f8fb;
+}
+
+.tableWrap :global(tbody tr:hover) {
+  background: #edf1f6 !important;
+}
+
+.tableWrap :global(tbody td) {
+  border-color: #e0e6ee !important;
+  color: #29425f;
+  vertical-align: middle;
+}
+
+.tableWrap :global(tbody td:first-child) {
+  color: #182d48;
+}
+
+.page :global([role="tablist"]) {
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid #e0e6ee;
+  border-radius: 0.85rem;
+  background: #f6f8fb;
+}
+
+.page :global([role="tab"]) {
+  border: 1px solid transparent;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: #637388;
+}
+
+.page :global([role="tab"][aria-selected="true"]) {
+  border-color: #aebdcd;
+  background: #fff;
+  color: #182d48;
+  box-shadow: 0 2px 5px rgb(24 45 72 / 0.12);
+}
+
+.primaryButton {
+  background: #182d48 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px -6px rgb(24 45 72 / 0.55) !important;
+}
+
+.primaryButton:hover {
+  background: #24496b !important;
+}
+
+@container reviewsPage (max-width: 48rem) {
+  .page :global(.progress-review-hero-metric) {
+    min-height: 4.8rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tableWrap :global(tbody tr) { transition: none; }
+}
+
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global(.learner-super-admin-hero) {
+  background: #182d48 !important;
+  border-color: #3b526c !important;
+  color: #f6f8fb !important;
+}
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global(.learner-super-admin-hero) :is(h1, h2, h3) { color: #f6f8fb !important; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global(.learner-super-admin-hero) :global(.text-foreground-500) { color: #b6c4d5 !important; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global(.learner-super-admin-hero) :global(.text-primary-600) { color: #d7c4f4 !important; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global(.learner-super-admin-hero) :global(.bg-primary-100\/60) { background: #302748 !important; border-color: #71558e !important; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global(.progress-review-hero-metric) { background: #213854 !important; border-color: #3b526c !important; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global(.progress-review-hero-metric) :is(p, span) { color: #b6c4d5; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global(.progress-review-hero-metric) p:last-child { color: #f6f8fb !important; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global([role='tablist']) { background: #182d48; border-color: #3b526c; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global([role='tab']) { color: #b6c4d5; }
+:global([data-theme='dark'] body .dashboard-theme[data-workspace-role='learner']) .page :global([role='tab'][aria-selected='true']) { background: #304766; border-color: #526b88; color: #f6f8fb; }
+:global([data-theme='dark']) .tableWrap :global(tbody tr:hover) { background: #304766 !important; }

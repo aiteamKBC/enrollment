@@ -1,0 +1,45 @@
+.dialog { width: min(492px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); margin: auto; padding: 26px; overflow-y: auto; border: 1px solid #dce3ec; border-radius: 18px; background: #fff; color: #19314e; box-shadow: 0 18px 60px #142d4930; }
+.dialog::backdrop { background: #1a293a80; }
+.header { display: flex; align-items: flex-start; gap: 16px; }
+.header > div { flex: 1; min-width: 0; }
+.eyebrow { font-size: 11px; line-height: 18px; letter-spacing: .14em; font-weight: 700; text-transform: uppercase; }
+.header h2 { margin-top: 4px; font-size: 18px; line-height: 26px; font-weight: 700; }
+.description { margin-top: 4px; color: #526a84; font-size: 14px; line-height: 22px; overflow-wrap: anywhere; }
+.close { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: #f8fafc; color: #657b93; flex-shrink: 0; }
+.dialog label { display: block; min-width: 0; font-size: 12px; font-weight: 600; line-height: 18px; color: #526a84; }
+.session { margin-top: 22px; }
+.dialog input, .dialog select, .dialog textarea { display: block; box-sizing: border-box; width: 100%; min-width: 0; margin-top: 7px; padding: 0 12px; border: 1px solid #ccd8e7; border-radius: 14px; color: #19314e; background: #fff; font-size: 16px; font-weight: 400; color-scheme: light; }
+.dialog input, .dialog select { height: 44px; }
+.dialog select { height: 50px; font-size: 17px; }
+.fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 22px; }
+.calendarCheck { display: flex; align-items: center; gap: 12px; min-height: 56px; margin-top: 18px; padding: 11px 16px; border: 1px solid #dce3ec; border-radius: 15px; background: #f8fafc; box-shadow: 0 2px 5px #142d4908; }
+.calendarCheck > i { flex: 0 0 auto; font-size: 18px; }
+.calendarCheck > div { min-width: 0; }
+.calendarCheck p, .calendarCheck a { color: #19314e; font-size: 13px; font-weight: 700; line-height: 19px; }
+.calendarCheck a:hover { text-decoration: underline; }
+.calendarCheck small { display: block; margin-top: 1px; color: #70839a; font-size: 10px; font-weight: 500; }
+.calendarConflict { border-color: #f2c0c5; background: #fff5f5; }
+.calendarConflict p, .calendarConflict > i { color: #b42332; }
+.duration, .notes { margin-top: 18px; }
+.notes > span { font-weight: 400; }
+.dialog textarea { min-height: 104px; padding: 12px; resize: vertical; line-height: 22px; }
+.notes > small { display: block; margin-top: 5px; color: #70839a; font-size: 11px; font-weight: 400; }
+.footer { display: flex; gap: 8px; margin-top: 22px; }
+.footer button { flex: 1; min-height: 49px; border: 1px solid #dce3ec; border-radius: 14px; padding: 10px; font-size: 15px; font-weight: 700; color: #3b5575; box-shadow: 0 2px 4px #142d4909; }
+.footer .primary { background: #19314e; color: #fff; border-color: #19314e; }
+.footer .primary:hover { background: #264567; }
+.dialog button:disabled, .dialog input:disabled, .dialog select:disabled, .dialog textarea:disabled { opacity: .5; cursor: not-allowed; }
+.dialog button:focus-visible, .dialog input:focus-visible, .dialog select:focus-visible, .dialog textarea:focus-visible, .calendarCheck a:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+.message, .error { margin-top: 14px; font-size: 12px; line-height: 20px; }
+.message { color: #526a84; }
+.error { color: #b42332; background: #fff4f4; border: 1px solid #f6c7cc; padding: 10px; border-radius: 10px; }
+.error button { font-weight: 700; text-decoration: underline; }
+:global(:is(.dark, [data-theme="dark"])) .dialog { background: #18283d; color: #e1eaf5; border-color: #34465d; }
+:global(:is(.dark, [data-theme="dark"])) .description, :global(:is(.dark, [data-theme="dark"])) .dialog label, :global(:is(.dark, [data-theme="dark"])) .message { color: #a4b7cd; }
+:global(:is(.dark, [data-theme="dark"])) .dialog input, :global(:is(.dark, [data-theme="dark"])) .dialog select, :global(:is(.dark, [data-theme="dark"])) .dialog textarea, :global(:is(.dark, [data-theme="dark"])) .close { color: #e1eaf5; background: #20344c; border-color: #425873; color-scheme: dark; }
+:global(:is(.dark, [data-theme="dark"])) .calendarCheck { background: #20344c; border-color: #425873; }
+:global(:is(.dark, [data-theme="dark"])) .calendarCheck p, :global(:is(.dark, [data-theme="dark"])) .calendarCheck a { color: #e1eaf5; }
+:global(:is(.dark, [data-theme="dark"])) .footer button { color: #e1eaf5; border-color: #425873; }
+:global(:is(.dark, [data-theme="dark"])) .footer .primary { background: #345b88; }
+:global(:is(.dark, [data-theme="dark"])) .error { color: #fda4af; background: #472d3d; border-color: #7e4556; }
+@media (max-width: 380px) { .dialog { padding: 20px; } .fields { grid-template-columns: minmax(0, 1fr); } .dialog select { font-size: 14px; } }

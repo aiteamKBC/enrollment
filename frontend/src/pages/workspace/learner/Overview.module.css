@@ -1,0 +1,636 @@
+.overview {
+  container: learnerOverview / inline-size;
+}
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(1.25rem, 2.2cqi, 2.25rem);
+  border-radius: 1.125rem;
+  color: #fff;
+}
+
+.heroArtwork {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 95% 0%, rgb(255 255 255 / 0.09), transparent 65%);
+}
+
+.heroArtwork::before,
+.heroArtwork::after {
+  content: '';
+  position: absolute;
+  width: 75%;
+  height: 220%;
+  top: -170%;
+  left: 7%;
+  border-radius: 0 0 50% 50%;
+  transform: rotate(-32deg);
+  background: rgb(255 255 255 / 0.035);
+  border-bottom: 1px solid rgb(255 255 255 / 0.04);
+}
+
+.heroArtwork::after {
+  top: -150%;
+  left: 28%;
+  background: rgb(255 255 255 / 0.025);
+}
+
+.heroTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.75rem;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 1.5cqi, 1.5rem);
+  min-width: 0;
+  flex: 1 1 26rem;
+}
+
+.identity .avatar {
+  width: clamp(4rem, 7cqi, 6.5rem);
+  height: clamp(4rem, 7cqi, 6.5rem);
+  font-size: clamp(1.5rem, 2.5cqi, 2.25rem);
+  box-shadow: inset 0 1px 10px rgb(255 255 255 / 0.04);
+}
+
+.eyebrow {
+  margin-bottom: 0.375rem;
+  color: rgb(255 255 255 / 0.7);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.overview .hero .name {
+  color: #fff;
+  font-size: clamp(1.6rem, 2.8cqi, 2.625rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin-top: 0.625rem;
+  color: rgb(255 255 255 / 0.9);
+  font-size: clamp(0.8125rem, 1.15cqi, 1rem);
+  line-height: 1.5;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.heroAction {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1.125rem;
+  border: 1px solid rgb(255 255 255 / 0.6);
+  border-radius: 0.875rem;
+  background: #fff;
+  color: var(--kbc-learner-primary, #4f2d7f);
+  box-shadow: 0 3px 8px rgb(0 0 0 / 0.08);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  transition: background 150ms, box-shadow 150ms;
+}
+
+.heroAction > svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  flex-shrink: 0;
+}
+
+.heroAction:hover {
+  background: var(--learner-soft);
+}
+
+.heroAction.primaryAction {
+  color: #fff;
+  background: var(--learner-purple);
+  border-color: rgb(255 255 255 / 0.22);
+}
+
+.heroAction.primaryAction:hover {
+  background: rgb(var(--learner-purple-600));
+}
+
+.heroAction:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.fact {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-width: 0;
+  padding: 0.875rem 1rem;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.055);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035);
+}
+
+.factIcon {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  color: rgb(255 255 255 / 0.65);
+}
+
+.factLabel {
+  color: rgb(255 255 255 / 0.65);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.factValue {
+  margin-top: 0.2rem;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.statusIcon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.statusIcon > span {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.metric {
+  --metric-fill: var(--kbc-learner-primary, #4f2d7f);
+  --metric-track: #edf2f7;
+  --metric-text: var(--kbc-learner-primary-dark, #362055);
+  position: relative;
+  container-type: inline-size;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 9.5rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid oklch(var(--foreground-100) / 0.55);
+  border-radius: 1.25rem;
+  background: var(--kbc-surface);
+  box-shadow: 0 2px 8px rgb(79 45 127 / 0.08), 0 12px 24px -20px rgb(79 45 127 / 0.22);
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.metric[data-accent='green'] {
+  --metric-fill: var(--learner-success);
+}
+
+.metric[data-accent='red'] {
+  --metric-fill: var(--learner-danger);
+}
+
+.dashboardCardsRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  min-width: 0;
+}
+
+.dashboardCardsRow > :first-child,
+.dashboardCardsRow > :last-child {
+  min-width: 0;
+}
+
+@container learnerOverview (min-width: 68rem) {
+  .dashboardCardsRow {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .75rem;
+  }
+
+  .dashboardCardsRow > :first-child { grid-column: span 3; }
+  .dashboardCardsRow > :last-child {
+    grid-column: span 4;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+  }
+
+  .metricsInline .metric {
+    min-height: 9.5rem;
+    padding: .75rem;
+    border-radius: .75rem;
+  }
+
+  .metricsInline {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+  }
+
+  .metricsInline .metricTop {
+    column-gap: .5rem;
+  }
+
+  .metricsInline .metricRing {
+    width: 4.25rem;
+    height: 4.25rem;
+    flex-basis: 4.25rem;
+  }
+
+  .metricsInline .metricRing::after { inset: .5rem; }
+  .metricsInline .metricRingValue { font-size: .85rem; }
+  .metricsInline .metricLabel { font-size: .8rem; line-height: 1.2; }
+  .metricsInline .metricDetail { font-size: .68rem; line-height: 1.25; }
+}
+
+.metric[data-accent='yellow'] {
+  --metric-fill: var(--kbc-learner-secondary, #f5c94f);
+}
+
+.metric .metricFill {
+  background: var(--metric-fill);
+}
+
+:global([data-theme='dark']) .metric[data-accent='purple'] {
+  --metric-fill: var(--learner-purple);
+  --metric-track: #2d3c50;
+}
+
+.metric:hover {
+  border-color: rgb(var(--learner-purple-300));
+  box-shadow: 0 10px 26px -15px rgb(var(--learner-purple-500) / 0.25);
+}
+
+.metric:focus-visible {
+  outline: 2px solid var(--learner-purple);
+  outline-offset: 3px;
+}
+
+.metricTop {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 1.5rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.metricRing {
+  --metric-progress: 0%;
+  position: relative;
+  display: grid;
+  width: 6.25rem;
+  height: 6.25rem;
+  flex: 0 0 6.25rem;
+  border-radius: 50%;
+  place-items: center;
+  background: conic-gradient(from -90deg, var(--metric-fill) var(--metric-progress), var(--metric-track) 0);
+}
+
+.metricRing::after {
+  position: absolute;
+  inset: 0.75rem;
+  border-radius: 50%;
+  background: var(--kbc-surface);
+  content: '';
+}
+
+.metricRingValue {
+  position: relative;
+  z-index: 1;
+  color: var(--metric-text);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricBody {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.metricLabel {
+  color: var(--metric-text);
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.metricHeading {
+  min-width: 0;
+}
+
+.metricArrow {
+  display: none;
+}
+
+.metricA11yData,
+.metricA11yProgress {
+  position: absolute;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.metricDetail {
+  margin-top: 0.35rem;
+  color: var(--metric-text);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.metricTop {
+  margin-bottom: 0;
+}
+
+.metricCaption {
+  margin-top: 0.25rem;
+  color: var(--kbc-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+@container learnerOverview (min-width: 32rem) {
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container learnerOverview (min-width: 44rem) {
+  .facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@container learnerOverview (min-width: 44rem) {
+  .dashboardTabContent > .metricsInline {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container learnerOverview (min-width: 66rem) {
+  .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@container learnerOverview (min-width: 80rem) {
+  .facts {
+    grid-template-columns: 0.85fr 1.75fr 1.15fr 1.2fr 0.85fr 1.25fr;
+    gap: 1.5rem;
+  }
+  .fact:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -0.8125rem;
+    top: 25%;
+    bottom: 25%;
+    width: 1px;
+    background: rgb(255 255 255 / 0.22);
+  }
+}
+
+@container learnerOverview (max-width: 31.99rem) {
+  .heroActions { width: 100%; }
+  .heroAction { flex: 1 1 100%; }
+  .fact { padding: 0.75rem; gap: 0.625rem; }
+  .factIcon { width: 1.25rem; height: 1.25rem; }
+  .statusIcon { width: 1.75rem; height: 1.75rem; }
+  .factValue { font-size: 0.75rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroAction, .metric { transition: none; }
+}
+
+/* Keep the dashboard's large hero readable when a long programme or employer
+   name arrives from the live learner record. */
+@container learnerOverview (max-width: 44rem) {
+  .heroTop { gap: 1.25rem; }
+  .identity { flex-basis: 100%; }
+  .heroActions { width: 100%; }
+  .heroAction { flex: 1 1 12rem; }
+}
+
+@container learnerOverview (max-width: 31.99rem) {
+  .hero { padding: 1rem; }
+  .heroTop { gap: 1rem; }
+  .identity { align-items: flex-start; }
+  .identity .avatar { width: 3.5rem; height: 3.5rem; }
+  .overview .hero .name { font-size: clamp(1.35rem, 8vw, 1.75rem); }
+  .description { margin-top: 0.4rem; font-size: 0.75rem; }
+  .facts { gap: 0.5rem; margin-top: 1.25rem; }
+  .fact { min-height: 4.25rem; }
+}
+
+/* The learner shell declares its light tokens on the workspace element. Give
+   this dashboard its own dark tokens so those declarations cannot shadow the
+   dark palette inherited from the document. */
+:global([data-theme='dark']) .overview {
+  --kbc-surface: #182d48;
+  --kbc-border: #3b526c;
+  --kbc-text: #f6f8fb;
+  --kbc-muted: #b6c4d5;
+  --kbc-learner-primary-dark: #f6f8fb;
+  --learner-soft: #1e344d;
+  --learner-accent-soft: #302748;
+  --learner-success-soft: #163c31;
+  --learner-danger-soft: #462a32;
+  --learner-warning-soft: #413923;
+  --learner-purple: #bfa3ee;
+  --learner-success: #7bc8a8;
+  --learner-danger: #ed9b9b;
+  --learner-warning: #e1c285;
+  --background-50: 0.294102 0.056505 255.375;
+  --background-100: 0.319363 0.053029 252.608;
+  --background-200: 0.363560 0.060944 250.610;
+  --background-300: 0.431038 0.051799 252.048;
+  --foreground-100: 0.431038 0.051799 252.048;
+  --foreground-200: 0.550142 0.038042 255.313;
+  --foreground-300: 0.708112 0.035671 251.094;
+  --foreground-400: 0.814891 0.028491 253.267;
+  --foreground-500: 0.855793 0.023452 252.196;
+  --foreground-600: 0.896042 0.024335 253.958;
+  --foreground-700: 0.921505 0.014966 251.163;
+  --foreground-800: 0.956540 0.007965 253.854;
+  --foreground-900: 0.978460 0.004531 258.324;
+  --foreground-950: 1 0 0;
+  color: var(--kbc-text);
+}
+
+:global([data-theme='dark']) .overview .metric {
+  --metric-track: #3b526c;
+  --metric-text: #f6f8fb;
+  @apply border-slate-600 bg-slate-900;
+}
+
+:global([data-theme='dark']) .overview .metricRing::after {
+  background: #182d48;
+}
+
+:global([data-theme='dark']) .overview :global([aria-label='Rewards and points']) {
+  --rewards-navy: #bfa3ee;
+  --rewards-navy-soft: #302748;
+}
+
+.overview :global(.learner-dashboard-week-note) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.overview :global(.learner-dashboard-week-note > span) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+:global([data-theme='dark']) .overview :global(.learner-dashboard-week-note) {
+  background: #413923 !important;
+  border-color: #e1c285 !important;
+  color: #fff1cb !important;
+}
+
+:global([data-theme='dark']) .overview :global(.learner-dashboard-week-note > svg) {
+  color: #e1c285 !important;
+}
+
+:global([data-theme='dark']) .overview :global(.learner-dashboard-ksb-chip) {
+  background: #253b54 !important;
+  border-color: #5a7695 !important;
+  color: #dbe8f7 !important;
+}
+
+:global([data-theme='dark']) .overview :global(.learner-dashboard-ksb-chip[data-ksb-type='K']) {
+  background: #302748 !important;
+  border-color: #8060b1 !important;
+  color: #e8dcff !important;
+}
+
+:global([data-theme='dark']) .overview :global(.learner-dashboard-ksb-chip[data-ksb-type='S']) {
+  background: #173b3f !important;
+  border-color: #468f92 !important;
+  color: #a8e4e1 !important;
+}
+
+:global([data-theme='dark']) .overview :global(.learner-dashboard-ksb-chip[data-ksb-type='B']) {
+  background: #403224 !important;
+  border-color: #a88048 !important;
+  color: #f5d3a0 !important;
+}
+
+/* Keep the overview summary and chart cards together in the first viewport. */
+.dashboardTabContent {
+  display: grid;
+  gap: .75rem;
+  min-width: 0;
+}
+
+.dashboardTabContent > .metrics {
+  gap: .65rem;
+}
+
+.dashboardTabContent > .metricsInline .metricRingValue {
+  font-size: 1.1rem;
+}
+
+.dashboardTabContent > .metricsInline .metricDetail {
+  font-size: 1.05rem;
+}
+
+@container learnerOverview (min-width: 68rem) {
+  .dashboardTabContent > .metricsInline .metric {
+    min-height: 8rem;
+    padding: .6rem;
+  }
+
+  .dashboardTabContent > .metricsInline .metricRing {
+    width: 3.85rem;
+    height: 3.85rem;
+    flex-basis: 3.85rem;
+  }
+
+  .dashboardTabContent > .metricsInline .metricRing::after {
+    inset: .45rem;
+  }
+
+  .dashboardTabContent > .metricsInline .metricLabel {
+    font-size: .74rem;
+  }
+
+  .dashboardTabContent > .metricsInline .metricRingValue {
+    font-size: .75rem;
+  }
+
+  .dashboardTabContent > .metricsInline .metricDetail {
+    font-size: .8rem;
+  }
+}
+
+/* Compact KPI cards so the overview charts fit in the first viewport. */
+.dashboardTabContent > .metricsInline .metric {
+  min-height: 0;
+  padding: .7rem .85rem;
+}
+
+@container learnerOverview (min-width: 68rem) {
+  .dashboardTabContent > .metricsInline .metric {
+    min-height: 0;
+    padding: .6rem .75rem;
+  }
+
+  .dashboardTabContent > .metricsInline .metricRing {
+    width: 3.4rem;
+    height: 3.4rem;
+    flex-basis: 3.4rem;
+  }
+
+  .dashboardTabContent > .metricsInline .metricRing::after {
+    inset: .4rem;
+  }
+}
+
+@container learnerOverview (min-width: 66rem) {
+  .dashboardTabContent > .metricsInline {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

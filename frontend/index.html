@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      (() => {
+        try {
+          const params = new URLSearchParams(location.search);
+          let pending = ['inclusion_state', 'safeguarding_state'].some(key => /^[a-f0-9]{64}$/.test(params.get(key) || ''));
+          for (const key of ['inclusion_sso_pending', 'safeguarding_sso_pending']) {
+            try {
+              const stored = JSON.parse(sessionStorage.getItem(key) || 'null');
+              pending ||= !!stored && stored.expires > Date.now() && /^[a-f0-9]{64}$/.test(stored.state);
+            } catch (_) { /* Ignore unavailable or invalid browser storage. */ }
+          }
+          if (pending) document.documentElement.dataset.inclusionBoot = '';
+        } catch (_) { /* Normal application rendering remains available. */ }
+      })();
+    </script>
+
+    <style>
+      #inclusion-boot { display: none; }
+      html[data-inclusion-boot] #inclusion-boot { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 24px; background: #f8f5f1; color: #362044; }
+      #inclusion-boot .inclusion-content { text-align: center; max-width: 480px; }
+      #inclusion-boot .inclusion-emblem { display: grid; place-items: center; width: 76px; height: 76px; box-sizing: border-box; margin: 0 auto 28px; border: 1px solid #ddc58d; border-radius: 50%; background: #f0e7d8; color: #95722e; }
+      #inclusion-boot svg { width: 34px; height: 34px; }
+      #inclusion-boot h1 { margin: 0; font: 500 clamp(24px, 4vw, 30px)/1.3 Georgia, serif; letter-spacing: -.3px; }
+      #inclusion-boot p { margin: 12px 0 0; font: 14px/1.6 Arial, sans-serif; color: #807586; }
+      #inclusion-boot .inclusion-dots { display: flex; justify-content: center; gap: 7px; margin-top: 30px; }
+      #inclusion-boot .inclusion-dots span { width: 6px; height: 6px; border-radius: 50%; background: #b69957; animation: inclusion-breathe 1.8s ease-in-out infinite; }
+      #inclusion-boot .inclusion-dots span:nth-child(2) { animation-delay: .2s; }
+      #inclusion-boot .inclusion-dots span:nth-child(3) { animation-delay: .4s; }
+      @keyframes inclusion-breathe { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { #inclusion-boot .inclusion-dots span { animation: none; opacity: .7; } }
+    </style>
+
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRlpa29EIhlITUpJD6_DnqkUXNTYZbZ5DX6MzdH_hgMj1QBfhpNgIY77bY&amp;s=10" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem('theme');
+          const theme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : 'light';
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+          if (theme === 'light' && localStorage.getItem('accessibility-monochrome') === 'true') {
+            document.documentElement.dataset.accessibility = 'monochrome';
+          }
+        } catch (_) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+    <title>KBC LearningOS — Apprenticeship Operating System | Kent Business College</title>
+    <meta name="description" content="KBC LearningOS is the complete UK apprenticeship learning, evidence, monitoring, coaching, employer, compliance, QA and reporting operating system for Kent Business College. Better than a normal LMS." />
+    <meta name="keywords" content="apprenticeship platform, learning operating system, KBC, Kent Business College, apprenticeship management, ePortfolio, compliance, Ofsted, ILR, evidence" />
+    <link rel="canonical" href="https://kbc.ac.uk/learningos" />
+    <meta property="og:title" content="KBC LearningOS — Apprenticeship Operating System" />
+    <meta property="og:description" content="The complete UK apprenticeship learning, evidence, monitoring and compliance operating system for Kent Business College." />
+    <meta property="og:type" content="website" />
+    <meta name="geo.region" content="GB-KEN" />
+    <meta name="geo.placename" content="Kent, United Kingdom" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.5.0/remixicon.min.css">
+  </head>
+  <body>
+    <div id="root"><div id="inclusion-boot" role="status" aria-live="polite" aria-label="Opening Inclusion &amp; Safeguarding">
+      <div class="inclusion-content">
+        <div class="inclusion-emblem" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z"/><path d="m8 12 3 3 5-6"/></svg></div>
+        <h1>Inclusion &amp; Safeguarding</h1><p>A moment for your wellbeing.</p>
+        <div class="inclusion-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+    </div></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

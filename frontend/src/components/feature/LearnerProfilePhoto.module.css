@@ -1,0 +1,12 @@
+.root { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; gap: .5rem; }
+.avatar { position: relative; display: block; width: 5rem; height: 5rem; border-radius: 50%; background: rgb(255 255 255 / .15); color: white; font-size: 1.75rem; font-weight: 700; box-shadow: 0 0 0 2px rgb(255 255 255 / .2); cursor: pointer; flex-shrink: 0; }
+.avatar:focus-visible { outline: 3px solid white; outline-offset: 5px; }
+.avatar:disabled { cursor: wait; }
+.image { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.image img { width: 100%; height: 100%; object-fit: cover; }
+.camera { position: absolute; bottom: 0; right: 0; display: grid; place-items: center; width: clamp(1.5rem, 2.5cqi, 2rem); height: clamp(1.5rem, 2.5cqi, 2rem); border: 2px solid white; border-radius: 50%; color: white; background: var(--kbc-accent, #7c3aed); box-shadow: 0 2px 8px rgb(0 0 0 / .15); transition: transform .15s; }
+.avatar:hover .camera { transform: scale(1.1); }
+.feedback { max-width: 11rem; color: inherit; font-size: .75rem; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
+.spinner { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } .camera { transition: none; } }

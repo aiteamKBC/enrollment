@@ -1,0 +1,53 @@
+/* The learner's curriculum timeline: taught slots and the delivery days a
+   cohort holiday closed, in the curriculum's own order. Uses the learner
+   palette tokens so it reads as part of the Training Plan rather than as a
+   transplanted curriculum component. */
+.root { margin-top:18px; }
+.heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; font-size:13px; font-weight:750; color:var(--kbc-text); margin:0 0 10px; }
+.heading span { font-size:11px; font-weight:600; color:var(--kbc-muted); }
+.month + .month { margin-top:14px; }
+/* The navy bar marks the month name only, so it is drawn on the label itself
+   with a tight line-height rather than on the whole month section. */
+.monthLabel { font-size:10px; font-weight:700; letter-spacing:1.2px; line-height:1.2; text-transform:uppercase; color:var(--kbc-learner-primary, #4f2d7f); margin:0 0 7px;
+  border-left:2px solid var(--kbc-learner-primary, #4f2d7f); padding-left:12px; }
+.rows { list-style:none; margin:0; padding:0 0 0 14px; display:flex; flex-direction:column; gap:7px; }
+.rows > li { display:grid; grid-template-columns:18px minmax(0,1fr); gap:10px; align-items:start;
+  border-bottom:1px solid var(--kbc-border); padding:9px 0; background:transparent; }
+.rows > li:last-child { border-bottom:0; }
+.rows > li > svg { margin-top:2px; color:var(--learner-purple); }
+.rowTitle { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:baseline; gap:7px; font-size:12px; color:var(--kbc-text); }
+.rowTitle strong { font-weight:700; overflow-wrap:anywhere; }
+.weekNumber { font-size:10px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--kbc-muted); }
+.detailInline { min-width:0; justify-self:end; color:var(--kbc-muted); font-size:11px; line-height:1.5; text-align:right; overflow-wrap:anywhere; }
+
+/* A closed slot is marked, not shouted: the warning tone says the college is
+   shut, while the card keeps the same shape as a taught week so the timeline
+   still reads as one sequence. */
+.readingWeek { background:var(--learner-warning-soft); border-color:var(--learner-warning); }
+.readingWeek > svg { color:var(--learner-warning); }
+.readingHeader { grid-column:1 / -1; display:flex; align-items:center; min-height:30px; margin:-9px 0 0; padding:6px 10px; border-radius:7px 7px 0 0; background:var(--kbc-learner-secondary, #f5c94f); color:var(--kbc-primary-secondary, #3f2466); font-size:11px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; }
+.readingBadge { font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+  border-radius:999px; padding:2px 8px; background:var(--learner-warning); color:var(--kbc-surface); }
+.holiday { font-size:11px; color:var(--kbc-text); margin-top:4px !important; line-height:1.5; overflow-wrap:anywhere; }
+.holiday strong { font-weight:750; }
+
+/* The curriculum team's own hint for a holiday week. Set apart from the
+   holiday lines above it because those state a fact from the calendar, while
+   this is somebody telling the learner what to do about it. */
+.holidayNote { font-size:11px; color:var(--kbc-text); margin-top:6px !important; line-height:1.5; overflow-wrap:anywhere;
+  border-left:2px solid var(--learner-warning); padding-left:9px; }
+.holidayNote strong { font-weight:750; }
+.noSession { font-size:11px; font-weight:650; color:var(--kbc-muted); margin-top:3px !important; }
+.more { font-size:11px; color:var(--kbc-muted); margin-top:9px !important; }
+
+:global([data-theme='dark']) .monthLabel {
+  color: #d7c4f4;
+  border-color: #bfa3ee;
+}
+
+@media (max-width:560px) {
+  .rows > li { grid-template-columns:minmax(0,1fr); }
+  .rows > li > svg { display:none; }
+  .rowTitle { grid-template-columns:1fr; gap:3px; }
+  .detailInline { justify-self:start; text-align:left; }
+}

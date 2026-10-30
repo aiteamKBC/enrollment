@@ -1,0 +1,924 @@
+/*
+ * Student workspace palette, taken from features/old-otjh/journalPdf.ts.
+ * The root scope also reaches menus/dialogs rendered into document.body.
+ * Leaving a learner workspace automatically restores the other portal's theme.
+ */
+:root:has(.dashboard-theme[data-workspace-role="learner"]),
+.dashboard-theme[data-workspace-role="learner"] {
+  /* Legacy navy tokens are kept for compatibility, but resolve to the learner purple. */
+  --learner-navy: #4f2d7f;
+  --learner-purple: #673ab7;
+  --learner-success: #167853;
+  --learner-danger: #b93737;
+  --learner-warning: #9c762b;
+  --learner-soft: #f6f8fb;
+  --learner-accent-soft: #f0eaf8;
+  --learner-success-soft: #e5f1eb;
+  --learner-danger-soft: #f8e9e9;
+  --learner-warning-soft: #f8f0df;
+
+  /* RGB scales support all Tailwind opacity, hover and focus variants. */
+  --learner-navy-50: 247 244 251;
+  --learner-navy-100: 240 234 248;
+  --learner-navy-200: 223 210 240;
+  --learner-navy-300: 196 175 228;
+  --learner-navy-400: 148 112 204;
+  --learner-navy-500: 103 58 183;
+  --learner-navy-600: 89 49 158;
+  --learner-navy-700: 77 42 136;
+  --learner-navy-800: 62 34 110;
+  --learner-navy-900: 48 27 85;
+  --learner-navy-950: 33 18 57;
+  --learner-purple-50: 247 244 251;
+  --learner-purple-100: 240 234 248;
+  --learner-purple-200: 223 210 240;
+  --learner-purple-300: 196 175 228;
+  --learner-purple-400: 148 112 204;
+  --learner-purple-500: 103 58 183;
+  --learner-purple-600: 89 49 158;
+  --learner-purple-700: 77 42 136;
+  --learner-purple-800: 62 34 110;
+  --learner-purple-900: 48 27 85;
+  --learner-purple-950: 33 18 57;
+  --learner-success-50: 240 248 244;
+  --learner-success-100: 229 241 235;
+  --learner-success-200: 201 227 215;
+  --learner-success-300: 155 201 179;
+  --learner-success-400: 88 162 129;
+  --learner-success-500: 22 120 83;
+  --learner-success-600: 18 102 70;
+  --learner-success-700: 16 86 59;
+  --learner-success-800: 13 69 48;
+  --learner-success-900: 11 53 37;
+  --learner-success-950: 7 37 26;
+  --learner-danger-50: 253 245 245;
+  --learner-danger-100: 248 233 233;
+  --learner-danger-200: 239 205 205;
+  --learner-danger-300: 223 165 165;
+  --learner-danger-400: 203 109 109;
+  --learner-danger-500: 185 55 55;
+  --learner-danger-600: 159 47 47;
+  --learner-danger-700: 135 40 40;
+  --learner-danger-800: 110 32 32;
+  --learner-danger-900: 86 26 26;
+  --learner-danger-950: 59 18 18;
+  --learner-warning-50: 252 248 240;
+  --learner-warning-100: 248 240 223;
+  --learner-warning-200: 239 224 186;
+  --learner-warning-300: 223 198 138;
+  --learner-warning-400: 197 162 81;
+  --learner-warning-500: 156 118 43;
+  --learner-warning-600: 133 99 36;
+  --learner-warning-700: 113 84 31;
+  --learner-warning-800: 92 68 25;
+  --learner-warning-900: 72 53 19;
+  --learner-warning-950: 49 37 14;
+  --learner-neutral-50: 246 248 251;
+  --learner-neutral-100: 237 241 246;
+  --learner-neutral-200: 222 226 232;
+  --learner-neutral-300: 187 200 215;
+  --learner-neutral-400: 131 144 162;
+  --learner-neutral-500: 99 115 136;
+  --learner-neutral-600: 75 94 118;
+  --learner-neutral-700: 52 75 102;
+  --learner-neutral-800: 36 64 93;
+  --learner-neutral-900: 24 45 72;
+  --learner-neutral-950: 16 30 48;
+
+  /* Existing semantic utilities consume OKLCH channel values. */
+  --background-50: 1.000000 0.000000 89.876;
+  --background-100: 0.978460 0.004531 258.324;
+  --background-200: 0.956540 0.007965 253.854;
+  --background-300: 0.911462 0.009234 258.337;
+  --background-400: 0.827456 0.025430 251.933;
+  --background-500: 0.648990 0.030866 256.525;
+  --background-600: 0.550142 0.038042 255.313;
+  --background-700: 0.475872 0.045461 254.500;
+  --background-800: 0.406072 0.053928 253.021;
+  --background-900: 0.294102 0.056505 255.375;
+  --background-950: 0.232236 0.040148 255.247;
+  /* Learner primary utilities follow the purple brand scale, not the legacy navy scale. */
+  --primary-50: var(--secondary-50);
+  --primary-100: var(--secondary-100);
+  --primary-200: var(--secondary-200);
+  --primary-300: var(--secondary-300);
+  --primary-400: var(--secondary-400);
+  --primary-500: var(--secondary-500);
+  --primary-600: var(--secondary-600);
+  --primary-700: var(--secondary-700);
+  --primary-800: var(--secondary-800);
+  --primary-900: var(--secondary-900);
+  --primary-950: var(--secondary-950);
+  --secondary-50: 0.971443 0.009773 305.406;
+  --secondary-100: 0.945777 0.019688 305.262;
+  --secondary-200: 0.883439 0.042971 305.093;
+  --secondary-300: 0.789765 0.077226 302.763;
+  --secondary-400: 0.619413 0.138727 300.462;
+  --secondary-500: 0.474250 0.186171 294.782;
+  --secondary-600: 0.426578 0.166905 295.214;
+  --secondary-700: 0.385186 0.148283 295.709;
+  --secondary-800: 0.334294 0.124990 295.819;
+  --secondary-900: 0.285254 0.100393 296.088;
+  --secondary-950: 0.226760 0.072776 298.097;
+  --accent-50: 0.971443 0.009773 305.406;
+  --accent-100: 0.945777 0.019688 305.262;
+  --accent-200: 0.883439 0.042971 305.093;
+  --accent-300: 0.789765 0.077226 302.763;
+  --accent-400: 0.619413 0.138727 300.462;
+  --accent-500: 0.474250 0.186171 294.782;
+  --accent-600: 0.426578 0.166905 295.214;
+  --accent-700: 0.385186 0.148283 295.709;
+  --accent-800: 0.334294 0.124990 295.819;
+  --accent-900: 0.285254 0.100393 296.088;
+  --accent-950: 0.226760 0.072776 298.097;
+  --foreground-50: 0.978460 0.004531 258.324;
+  --foreground-100: 0.911462 0.009234 258.337;
+  --foreground-200: 0.827456 0.025430 251.933;
+  --foreground-300: 0.648990 0.030866 256.525;
+  --foreground-400: 0.550142 0.038042 255.313;
+  --foreground-500: 0.475872 0.045461 254.500;
+  --foreground-600: 0.406072 0.053928 253.021;
+  --foreground-700: 0.363560 0.060944 250.610;
+  --foreground-800: var(--secondary-900);
+  --foreground-900: var(--secondary-950);
+  --foreground-950: var(--secondary-950);
+
+  --kbc-primary-deep: var(--learner-navy);
+  --kbc-primary: var(--learner-navy);
+  --kbc-primary-secondary: #3f2466;
+  --kbc-primary-accent: var(--learner-purple);
+  --kbc-purple-soft: #f0eaf8;
+  --kbc-purple-wash: var(--learner-soft);
+  --kbc-brand-gold: var(--learner-purple);
+  --kbc-app-bg: var(--learner-soft);
+  --kbc-canvas: var(--learner-soft);
+  --kbc-page-bg: var(--learner-soft);
+  --kbc-surface: #ffffff;
+  --kbc-border: #dee2e8;
+  --kbc-text: var(--learner-navy);
+  --kbc-muted: #637388;
+  --kbc-table-header-text: #ffffff;
+  --kbc-table-text: var(--kbc-text);
+  --kbc-table-border: var(--kbc-border);
+  --kbc-chrome-color: var(--learner-navy);
+  --kbc-hero-gradient: linear-gradient(var(--learner-navy), var(--learner-navy));
+  --kbc-shadow-card: 0 1px 2px rgb(79 45 127 / 0.04), 0 8px 20px -16px rgb(79 45 127 / 0.2);
+  --kbc-shadow-popover: 0 20px 48px -24px rgb(79 45 127 / 0.3), 0 4px 12px -8px rgb(79 45 127 / 0.16);
+
+  --action-primary: var(--learner-navy);
+  --action-primary-hover: #3f2466;
+  --action-primary-active: #362055;
+  --action-primary-foreground: #ffffff;
+  --action-primary-focus: rgb(103 58 183 / 0.28);
+  --color-success: var(--learner-success);
+  --color-warning: var(--learner-warning);
+  --color-danger: var(--learner-danger);
+
+  --resource-reading-icon: var(--learner-navy);
+  --resource-reading-bg: var(--learner-soft);
+  --resource-reading-border: var(--kbc-border);
+  --resource-video-icon: var(--learner-purple);
+  --resource-video-bg: var(--learner-accent-soft);
+  --resource-video-border: #dfd2f0;
+  --resource-podcast-icon: var(--learner-purple);
+  --resource-podcast-bg: var(--learner-accent-soft);
+  --resource-podcast-border: #dfd2f0;
+  --resource-quiz-icon: var(--learner-purple);
+  --resource-quiz-bg: var(--learner-accent-soft);
+  --resource-quiz-border: #dfd2f0;
+  --resource-assignment-icon: var(--learner-navy);
+  --resource-assignment-bg: var(--learner-soft);
+  --resource-assignment-border: var(--kbc-border);
+  --resource-document-icon: var(--learner-navy);
+  --resource-document-bg: var(--learner-soft);
+  --resource-document-border: var(--kbc-border);
+
+  --llp-background: var(--background-50);
+  --llp-surface: var(--background-50);
+  --llp-card: var(--background-50);
+  --llp-popover: var(--background-50);
+  --llp-popover-foreground: var(--foreground-900);
+  --llp-foreground: var(--foreground-900);
+  --llp-primary: var(--primary-500);
+  --llp-primary-foreground: 1 0 0;
+  --llp-secondary: var(--background-100);
+  --llp-secondary-foreground: var(--foreground-900);
+  --llp-muted: var(--background-100);
+  --llp-muted-foreground: var(--foreground-400);
+  --llp-accent: var(--accent-500);
+  --llp-accent-foreground: 1 0 0;
+  --llp-border: var(--background-300);
+  --llp-input: var(--background-300);
+  --llp-ring: var(--accent-500);
+  --llp-success: 0.509378 0.104657 161.944;
+  --llp-warning: 0.589370 0.102424 81.089;
+  --llp-destructive: 0.530791 0.166804 24.866;
+  --llp-destructive-foreground: 1 0 0;
+}
+
+/* Keep the existing dark-mode control, with navy surfaces and readable text. */
+:root[data-theme="dark"]:has(.dashboard-theme[data-workspace-role="learner"]),
+:root[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"] {
+  --learner-soft: #1e344d;
+  --learner-accent-soft: #302748;
+  --learner-success-soft: #163c31;
+  --learner-danger-soft: #462a32;
+  --learner-warning-soft: #413923;
+  --learner-purple: #bfa3ee;
+  --learner-success: #7bc8a8;
+  --learner-danger: #ed9b9b;
+  --learner-warning: #e1c285;
+  --kbc-app-bg: #101e30;
+  --kbc-page-bg: #101e30;
+  --kbc-canvas: #101e30;
+  --kbc-surface: #182d48;
+  --kbc-purple-soft: #24405d;
+  --kbc-border: #3b526c;
+  --kbc-text: #f6f8fb;
+  --kbc-muted: #b6c4d5;
+  --kbc-learner-surface: #182d48;
+  --kbc-learner-page: #101e30;
+  --kbc-learner-border: #3b526c;
+  --kbc-learner-text: #f6f8fb;
+  --kbc-learner-muted: #b6c4d5;
+  --kbc-learner-primary-dark: #d7c4f4;
+  --kbc-primary: #24496b;
+  --kbc-primary-deep: #d2deed;
+  --kbc-primary-secondary: #315f89;
+  --action-primary: #24496b;
+  --action-primary-hover: #315f89;
+  --theme-app-bg: var(--kbc-app-bg);
+  --theme-page-bg: var(--kbc-page-bg);
+  --theme-surface: var(--kbc-surface);
+  --theme-surface-secondary: var(--learner-soft);
+  --theme-surface-elevated: var(--learner-soft);
+  --theme-input: var(--kbc-page-bg);
+  --theme-text-primary: var(--kbc-text);
+  --theme-text-secondary: var(--kbc-muted);
+  --theme-text-muted: var(--kbc-muted);
+  --theme-border: var(--kbc-border);
+  --theme-border-strong: #637388;
+  --theme-hover: #24405d;
+  --background-50: 0.294102 0.056505 255.375;
+  --background-100: 0.319363 0.053029 252.608;
+  --background-200: 0.363560 0.060944 250.610;
+  --background-300: 0.431038 0.051799 252.048;
+  --background-400: 0.518211 0.050915 249.823;
+  --background-500: 0.614349 0.043284 249.687;
+  --background-600: 0.708112 0.035671 251.094;
+  --background-700: 0.814891 0.028491 253.267;
+  --background-800: 0.896042 0.024335 253.958;
+  --background-900: 0.956540 0.007965 253.854;
+  --background-950: 0.978460 0.004531 258.324;
+  --foreground-50: 0.319363 0.053029 252.608;
+  --foreground-100: 0.431038 0.051799 252.048;
+  --foreground-200: 0.550142 0.038042 255.313;
+  --foreground-300: 0.708112 0.035671 251.094;
+  --foreground-400: 0.814891 0.028491 253.267;
+  --foreground-500: 0.855793 0.023452 252.196;
+  --foreground-600: 0.896042 0.024335 253.958;
+  --foreground-700: 0.921505 0.014966 251.163;
+  --foreground-800: 0.956540 0.007965 253.854;
+  --foreground-900: 0.978460 0.004531 258.324;
+  --foreground-950: 1.000000 0.000000 89.876;
+  --primary-50: var(--secondary-50);
+  --primary-100: var(--secondary-100);
+  --primary-200: var(--secondary-200);
+  --primary-300: var(--secondary-300);
+  --primary-400: var(--secondary-400);
+  --primary-500: var(--secondary-500);
+  --primary-600: var(--secondary-600);
+  --primary-700: var(--secondary-700);
+  --primary-800: var(--secondary-800);
+  --primary-900: var(--secondary-900);
+  --primary-950: var(--secondary-950);
+  --accent-50: 0.299356 0.059186 295.139;
+  --accent-100: 0.353110 0.078607 294.010;
+  --accent-200: 0.441524 0.089925 297.688;
+  --accent-300: 0.546887 0.103960 301.922;
+  --accent-400: 0.666359 0.111463 302.117;
+  --accent-500: 0.767142 0.108961 301.015;
+  --accent-600: 0.814597 0.089369 302.167;
+  --accent-700: 0.865403 0.065564 302.870;
+  --accent-800: 0.914263 0.040439 301.290;
+  --accent-900: 0.946380 0.022235 302.932;
+  --accent-950: 0.971443 0.009773 305.406;
+  --secondary-50: 0.299356 0.059186 295.139;
+  --secondary-100: 0.353110 0.078607 294.010;
+  --secondary-200: 0.441524 0.089925 297.688;
+  --secondary-300: 0.546887 0.103960 301.922;
+  --secondary-400: 0.666359 0.111463 302.117;
+  --secondary-500: 0.767142 0.108961 301.015;
+  --secondary-600: 0.814597 0.089369 302.167;
+  --secondary-700: 0.865403 0.065564 302.870;
+  --secondary-800: 0.914263 0.040439 301.290;
+  --secondary-900: 0.946380 0.022235 302.932;
+  --secondary-950: 0.971443 0.009773 305.406;
+}
+
+/* Narrow compatibility rules for older shared CSS with fixed colours. */
+body:has(.dashboard-theme[data-workspace-role="learner"]) .dashboard-theme[data-workspace-role="learner"] :is(.kbc-sidebar-panel, .kbc-workspace-topbar),
+body:has(.dashboard-theme[data-workspace-role="learner"]) .dashboard-theme[data-workspace-role="learner"] .workspace-main table thead th {
+  background: var(--kbc-learner-primary, #4f2d7f) !important;
+  color: #ffffff !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-sidebar-active-marker {
+  background: var(--learner-purple) !important;
+  box-shadow: none !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] aside[data-workspace-role="learner"] > .bg-brand-deep {
+  background: var(--kbc-learner-primary, #4f2d7f) !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-breadcrumbs {
+  background: var(--kbc-surface) !important;
+  border-color: var(--kbc-border) !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main :is(.ui-panel, .ui-metric-card, .card-premium):hover {
+  border-color: #bbc8d7 !important;
+  box-shadow: var(--kbc-shadow-card) !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main :is(.coach-metric-card, .workspace-hero-metric) {
+  background: var(--learner-soft) !important;
+  border-color: var(--kbc-border) !important;
+  box-shadow: var(--kbc-shadow-card) !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main :is(.coach-metric-card, .workspace-hero-metric) :is(.workspace-hero-metric__value, .workspace-hero-metric__label, p) {
+  color: var(--kbc-text) !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main :is(.learner-super-admin-hero, .workspace-hero-banner) {
+  box-shadow: var(--kbc-shadow-card) !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .page-header .workspace-hero-banner__icon {
+  background: var(--kbc-purple-soft) !important;
+  color: var(--kbc-primary-deep) !important;
+  border-color: var(--kbc-border) !important;
+  box-shadow: none !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .page-header .workspace-hero-banner__icon > svg {
+  color: inherit !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main :is(span, div)[class*="rounded"][class*="bg-emerald-50"]:has(> svg) {
+  background: var(--learner-success-soft) !important;
+  color: var(--learner-success);
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main :is(span, div)[class*="rounded"][class*="bg-red-50"]:has(> svg) {
+  background: var(--learner-danger-soft) !important;
+  color: var(--learner-danger);
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main :is(span, div)[class*="rounded"][class*="bg-amber-50"]:has(> svg) {
+  background: var(--learner-warning-soft) !important;
+  color: var(--learner-warning);
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main table tbody tr:hover {
+  box-shadow: inset 3px 0 0 var(--learner-purple);
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .learner-overview-learning-plan-button {
+  border-color: #dee2e8 !important;
+  background: #ffffff !important;
+  color: var(--kbc-learner-primary, #4f2d7f) !important;
+  box-shadow: none !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .learner-overview-learning-plan-button:hover {
+  background: #edf1f6 !important;
+}
+
+body:has(.dashboard-theme[data-workspace-role="learner"]) :is(button, a):is(.primary-action, .bg-primary-500, .bg-primary-600, .bg-primary-700) {
+  box-shadow: 0 3px 10px -6px rgb(79 45 127 / 0.25) !important;
+}
+
+body:has(.dashboard-theme[data-workspace-role="learner"]) :is(input, textarea, select):focus {
+  border-color: var(--learner-purple) !important;
+  box-shadow: 0 0 0 3px rgb(103 58 183 / 0.16) !important;
+}
+
+body:has(.dashboard-theme[data-workspace-role="learner"]) :is(input, textarea)::placeholder {
+  color: var(--kbc-muted);
+}
+
+/* Header popovers and modal buttons live outside the workspace DOM. */
+body:has(.dashboard-theme[data-workspace-role="learner"]) :is(.swal2-popup, .workspace-drawer, .kbc-sidebar-flyout) {
+  background: var(--kbc-surface) !important;
+  border-color: var(--kbc-border) !important;
+  color: var(--kbc-text) !important;
+}
+
+/* Final learner guardrails. Several older dashboard themes are loaded in the
+   same bundle and their dark-mode hero rules are intentionally broad. These
+   learner-scoped rules keep the student palette stable after all compatibility
+   layers have been evaluated. */
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .learner-super-admin-hero,
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .workspace-hero-banner {
+  background: var(--kbc-learner-primary, #4f2d7f) !important;
+  background-image: none !important;
+  border-color: rgb(196 175 228 / 0.45) !important;
+  box-shadow: var(--kbc-shadow-card) !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .learner-super-admin-hero :is(h1, h2, h3, p, dt, dd) {
+  color: inherit;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .workspace-hero-banner :is(h1, h2, h3) {
+  color: #fff !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .workspace-hero-banner__identity > div > :is(p, .workspace-hero-description, .workspace-hero-eyebrow) {
+  color: rgb(255 255 255 / 0.78) !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] [aria-busy="true"] .kbc-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--learner-soft) 25%,
+    var(--learner-accent-soft) 50%,
+    var(--learner-soft) 75%
+  );
+  background-size: 200% 100%;
+}
+
+[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main .learner-super-admin-hero,
+[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main .workspace-hero-banner {
+  background: var(--kbc-learner-primary, #4f2d7f) !important;
+  background-image: none !important;
+  border-color: rgb(196 175 228 / 0.52) !important;
+}
+
+[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .kbc-skeleton {
+  background: linear-gradient(90deg, #263f59 25%, #3a5572 50%, #263f59 75%);
+  background-size: 200% 100%;
+}
+
+@media (max-width: 640px) {
+  body .dashboard-theme[data-workspace-role="learner"] .workspace-main {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: clip !important;
+  }
+}
+
+/* Shared learner shell reference treatment. These rules are intentionally
+   scoped to the learner shell so admin, coach, tutor and curriculum chrome
+   keep their existing layouts and colours. */
+.dashboard-theme[data-workspace-role="learner"] {
+  --kbc-learner-primary: #4f2d7f;
+  --kbc-learner-primary-hover: #3f2466;
+  --kbc-learner-primary-dark: #362055;
+  --kbc-learner-secondary: #f5c94f;
+  --kbc-learner-secondary-hover: #e4b936;
+  --kbc-learner-secondary-soft: #fff8d8;
+  --kbc-learner-surface: #ffffff;
+  --kbc-learner-page: #f7f8fb;
+  --kbc-learner-border: #e2e8f0;
+  --kbc-learner-text: #1e293b;
+  --kbc-learner-muted: #64748b;
+}
+
+.kbc-learner-route-skeleton {
+  --kbc-sidebar-offset: 240px;
+}
+
+.kbc-learner-route-skeleton-sidebar {
+  background: #4f2d7f;
+}
+
+.kbc-learner-route-skeleton-header {
+  height: 80px;
+  background: #4f2d7f;
+}
+
+html[data-theme="dark"] .kbc-learner-route-skeleton-sidebar {
+  background: #111f32;
+}
+
+html[data-theme="dark"] .kbc-learner-route-skeleton-header {
+  background: #162740;
+  border-bottom: 1px solid #3b526c;
+}
+
+.kbc-learner-route-skeleton-sidebar .kbc-skeleton,
+.kbc-learner-route-skeleton-header .kbc-skeleton {
+  background: rgb(255 255 255 / 0.18);
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar,
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel {
+  background: #4f2d7f !important;
+}
+
+body:has(.dashboard-theme[data-workspace-role="learner"]) .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel,
+body:has(.dashboard-theme[data-workspace-role="learner"]) .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header {
+  background: #4f2d7f !important;
+}
+
+.kbc-learner-sidebar-pattern {
+  background-position: left bottom;
+  background-repeat: no-repeat;
+  background-size: 58% auto;
+  opacity: 0.1;
+}
+
+/* Advanced Admin uses the same full-height navigation pattern with its own
+   compact purple selection. Learner navigation and permissions stay separate. */
+body .dashboard-theme[data-workspace-role="advanced-admin"] .kbc-learner-sidebar-panel {
+  background: #21164b !important;
+}
+
+body .dashboard-theme[data-workspace-role="advanced-admin"] .kbc-learner-sidebar-panel nav[aria-label="Advanced Admin primary navigation"] :is(a, button) {
+  border-radius: 8px;
+  color: #fff;
+}
+
+body .dashboard-theme[data-workspace-role="advanced-admin"] .kbc-learner-sidebar-panel nav[aria-label="Advanced Admin primary navigation"] :is(a, button):not([aria-current="page"]) {
+  background: transparent;
+}
+
+body .dashboard-theme[data-workspace-role="advanced-admin"] .kbc-learner-sidebar-panel nav[aria-label="Advanced Admin primary navigation"] :is(a, button):not([aria-current="page"]):hover {
+  background: rgb(255 255 255 / 0.11);
+}
+
+body .dashboard-theme[data-workspace-role="advanced-admin"] .kbc-learner-sidebar-panel nav[aria-label="Advanced Admin primary navigation"] a[aria-current="page"] {
+  background: #5b34a5 !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a, button) {
+  color: #ffffff;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel:not([data-collapsed]) nav[aria-label="Learner primary navigation"] :is(a, button) {
+  border-radius: 0;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]) {
+  background: transparent;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]):hover,
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]):focus-visible {
+  background: rgb(255 255 255 / 0.1);
+  color: #ffffff;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a[aria-current="page"], button[aria-current="true"]) {
+  background: #f5c94f !important;
+  color: #4f2d7f !important;
+  font-weight: 600;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a[aria-current="page"], button[aria-current="true"]) :is(svg, span) {
+  color: inherit;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel .kbc-sidebar-number-badge {
+  color: #ffffff !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-signout:hover,
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-signout:focus-visible {
+  background: rgb(255 255 255 / 0.1);
+}
+
+/* Curriculum uses the learner-style full-height shell while keeping its own
+   routes and role identity. Match the learner navigation palette exactly. */
+body .dashboard-theme[data-workspace-role="curriculum"] :is(.kbc-learner-sidebar, .kbc-learner-sidebar-panel) {
+  background: #4f2d7f !important;
+}
+
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a, button) {
+  color: #ffffff;
+}
+
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel:not([data-collapsed]) nav[aria-label="Curriculum Designer primary navigation"] :is(a, button) {
+  border-radius: 0;
+}
+
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]) {
+  background: transparent;
+}
+
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]):hover,
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]):focus-visible {
+  background: rgb(255 255 255 / 0.1);
+  color: #ffffff;
+}
+
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a[aria-current="page"], button[aria-current="true"]) {
+  background: #f5c94f !important;
+  color: #4f2d7f !important;
+  font-weight: 600;
+}
+
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a[aria-current="page"], button[aria-current="true"]) :is(svg, span) {
+  color: inherit;
+}
+
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel .kbc-sidebar-number-badge {
+  color: #ffffff !important;
+}
+
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-signout:hover,
+body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-signout:focus-visible {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.kbc-learner-submenu {
+  position: relative;
+  max-height: 0;
+  margin: 0 0 0 10px;
+  padding: 0 0 0 16px;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition: max-height 300ms ease, margin-top 300ms ease, padding-bottom 300ms ease, opacity 220ms ease, transform 300ms ease, visibility 0s linear 300ms;
+}
+
+.kbc-learner-submenu[data-open="true"] {
+  max-height: 440px;
+  margin-top: 3px;
+  padding-bottom: 2px;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+
+.kbc-learner-submenu-track,
+.kbc-learner-submenu-track-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 2px;
+  border-radius: 999px;
+}
+
+.kbc-learner-submenu-track {
+  bottom: 12px;
+  background: rgb(255 255 255 / 0.25);
+}
+
+.kbc-learner-submenu-track-fill {
+  height: var(--kbc-active-line-height, 0px);
+  background: #ffffff;
+  box-shadow: 0 0 7px rgb(255 255 255 / 0.35);
+  transition: height 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.kbc-learner-submenu[data-open="true"] .kbc-learner-submenu-track-fill {
+  animation: kbc-learner-submenu-line-fill 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes kbc-learner-submenu-line-fill {
+  from { height: 0; opacity: 0.45; }
+  to { height: var(--kbc-active-line-height, 0px); opacity: 1; }
+}
+
+.kbc-learner-submenu[data-open="false"] .kbc-learner-submenu-track-fill {
+  height: 0 !important;
+  transition-duration: 180ms;
+}
+
+.kbc-learner-submenu-item {
+  position: relative;
+}
+
+.kbc-learner-submenu-item::before {
+  position: absolute;
+  top: 50%;
+  left: -16px;
+  width: 16px;
+  height: 12px;
+  border-bottom: 2px solid rgb(255 255 255 / 0.25);
+  border-left: 2px solid rgb(255 255 255 / 0.25);
+  border-bottom-left-radius: 10px;
+  content: '';
+  transform: translateY(-50%);
+  transition: border-color 300ms ease, width 300ms ease;
+}
+
+.kbc-learner-submenu-item[data-active-path="true"]::before {
+  border-color: #ffffff;
+}
+
+.kbc-learner-submenu-item > a {
+  min-height: 36px;
+  padding: 5px 8px !important;
+  gap: 8px !important;
+  border-radius: 8px;
+  font-size: 12px !important;
+  background: transparent !important;
+  color: rgb(255 255 255 / 0.72) !important;
+}
+
+.kbc-learner-submenu-item > a > span:first-child {
+  width: 16px;
+  height: 16px;
+}
+
+.kbc-learner-submenu-item > a > span:first-child svg {
+  width: 16px;
+  height: 16px;
+}
+
+.kbc-learner-submenu-item > a:hover,
+.kbc-learner-submenu-item > a:focus-visible {
+  background: rgb(255 255 255 / 0.1) !important;
+  color: #ffffff !important;
+}
+
+.kbc-learner-submenu-item > a[aria-current="page"] {
+  background: rgb(245 201 79 / 0.18) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kbc-learner-submenu,
+  .kbc-learner-submenu[data-open="true"] {
+    transition: none;
+    transform: none;
+  }
+
+  .kbc-learner-submenu-track-fill,
+  .kbc-learner-submenu-item::before {
+    transition: none;
+    animation: none;
+  }
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header {
+  height: 80px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #4f2d7f !important;
+  color: #ffffff !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header-pattern {
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: auto 190%;
+  opacity: 0.12;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header :is(.kbc-topbar-title, .kbc-topbar-subtitle, .kbc-topbar-user-name) {
+  color: #ffffff !important;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header .kbc-navigation-menu {
+  position: relative;
+  z-index: 1;
+  color: #ffffff;
+}
+
+body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header > :not(.kbc-learner-header-pattern) {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-theme.workspace-shell[data-workspace-role="learner"] {
+  --kbc-sidebar-offset: 0px;
+  overflow-x: hidden;
+}
+
+@media (min-width: 1024px) {
+.dashboard-theme.workspace-shell[data-workspace-role="learner"] {
+  --kbc-sidebar-offset: var(--kbc-sidebar-width, 240px);
+}
+
+}
+
+/* Keep the learner dashboard's content surfaces on the primary purple scale.
+   The shared shell already uses this palette; this closes the remaining navy
+   override on the profile hero. */
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .learner-super-admin-hero,
+body .dashboard-theme[data-workspace-role="learner"] .workspace-main .workspace-hero-banner {
+  background: var(--kbc-learner-primary, #4f2d7f) !important;
+}
+
+@media (max-width: 1023px) {
+  .kbc-learner-sidebar-panel {
+    width: min(240px, 86vw);
+  }
+
+  .kbc-learner-header {
+    height: 64px !important;
+  }
+}
+
+/* Dark learner chrome is shared by every learner screen. Keep the purple
+   reference treatment above for light mode. */
+html[data-theme="dark"] body:has(.dashboard-theme[data-workspace-role="learner"]) .dashboard-theme[data-workspace-role="learner"] :is(.kbc-learner-sidebar, .kbc-learner-sidebar-panel) {
+  background: #111f32 !important;
+}
+
+html[data-theme="dark"] body:has(.dashboard-theme[data-workspace-role="learner"]) .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header {
+  background: #162740 !important;
+  border-bottom: 1px solid #3b526c !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] :is(.kbc-learner-sidebar-pattern, .kbc-learner-header-pattern) {
+  opacity: 0.06;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a[aria-current="page"], button[aria-current="true"]) {
+  background: #304766 !important;
+  color: #f6f8fb !important;
+  box-shadow: inset 3px 0 0 #bfa3ee;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]):hover,
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]):focus-visible {
+  background: #24405d !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="curriculum"] :is(.kbc-learner-sidebar, .kbc-learner-sidebar-panel) {
+  background: #111f32 !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a[aria-current="page"], button[aria-current="true"]) {
+  background: #304766 !important;
+  color: #f6f8fb !important;
+  box-shadow: inset 3px 0 0 #bfa3ee;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]):hover,
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="curriculum"] .kbc-learner-sidebar-panel :is(a, button):not([aria-current="page"]):not([aria-current="true"]):focus-visible {
+  background: #24405d !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header .kbc-workspace-switcher-button {
+  background: #304766 !important;
+  border-color: #526b88 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .kbc-learner-header .kbc-workspace-switcher-button:is(:hover, [aria-expanded="true"]) {
+  background: #3b5577 !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-breadcrumbs {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-breadcrumb-home {
+  background: #263d5a !important;
+  border-color: #526b88 !important;
+  color: #f6f8fb !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-breadcrumb-step {
+  background: #263d5a !important;
+}
+
+html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-breadcrumb-step.is-current {
+  background: #4a3e66 !important;
+}
+
+@property --kbc-ring-progress {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --kbc-ring-submitted {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+.kbc-animated-conic-ring {
+  --kbc-ring-progress: var(--kbc-ring-target, 0%);
+  --kbc-ring-submitted: var(--kbc-ring-submitted-target, 0%);
+  animation: kbc-ring-reveal 900ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes kbc-ring-reveal {
+  from { --kbc-ring-progress: 0%; --kbc-ring-submitted: 0%; }
+  to { --kbc-ring-progress: var(--kbc-ring-target, 0%); --kbc-ring-submitted: var(--kbc-ring-submitted-target, 0%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kbc-animated-conic-ring { animation: none; }
+}

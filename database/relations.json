@@ -1,0 +1,367 @@
+[
+  {
+    "schema": "Coach",
+    "table": "coach_calendar_color_preference",
+    "kind": "r"
+  },
+  {
+    "schema": "Coach",
+    "table": "coach_calendar_event",
+    "kind": "v"
+  },
+  {
+    "schema": "Coach",
+    "table": "coach_calendar_sequence",
+    "kind": "r"
+  },
+  {
+    "schema": "Coach",
+    "table": "coach_imported_meeting_ownership",
+    "kind": "r"
+  },
+  {
+    "schema": "Coach",
+    "table": "coach_imported_review_instance",
+    "kind": "r"
+  },
+  {
+    "schema": "Coach",
+    "table": "coach_migrated_review_template",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "calendar_busy_slots",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "calendar_connections",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "coach_calendar_event",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "learner_free_courses",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "learner_ksb_assignments",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "learner_ksbs",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "learner_training_plan_components",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "learner_training_plan_modules",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "learner_training_plan_weeks",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "learners",
+    "kind": "r"
+  },
+  {
+    "schema": "Learner",
+    "table": "reviews",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "activity_events",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "coaches",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "cohorts",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "components",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "england_holidays",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "free_course_weeks",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "free_courses",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "free_programme_components",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "free_programme_modules",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "groups",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "holidays",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "ksb_definitions",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "ksb_mappings",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "ksb_profile_versions",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "ksb_profiles",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "module_details",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "modules",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "programmes",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "record_revisions",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "record_versions",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "standard_ksbs",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "tutors",
+    "kind": "r"
+  },
+  {
+    "schema": "curriculum",
+    "table": "weeks",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Apprenticeship_Agreements",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Created_users",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Eligibility_Form_Layouts",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Employers",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Enrolment_Documents",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Enrolment_Reviews",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Extended_ILR",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "ILR_Documents",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Organisations",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Review_Eligibility",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Review_Health_Safety",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Review_RPL",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Review_ULN_Privacy",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Staff_users",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Training_Plan_Documents",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Cv_Job",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Form_Layouts",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Ilr_Learner_Details",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Introduction",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Ksb_Assessments",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Personal_Details",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Plr",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Plr_Records",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Policy_Acks",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Wizard_Skills_Radar",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "Written_Agreements",
+    "kind": "r"
+  },
+  {
+    "schema": "enrolment",
+    "table": "eligibility_form",
+    "kind": "r"
+  },
+  {
+    "schema": "login",
+    "table": "Invitations",
+    "kind": "r"
+  },
+  {
+    "schema": "login",
+    "table": "Login_accounts",
+    "kind": "r"
+  },
+  {
+    "schema": "login",
+    "table": "Login_audit",
+    "kind": "r"
+  },
+  {
+    "schema": "login",
+    "table": "Login_sessions",
+    "kind": "r"
+  },
+  {
+    "schema": "login",
+    "table": "Password_resets",
+    "kind": "r"
+  },
+  {
+    "schema": "login",
+    "table": "coach_directory",
+    "kind": "r"
+  }
+]

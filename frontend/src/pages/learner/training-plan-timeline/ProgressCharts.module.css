@@ -1,0 +1,886 @@
+.charts { container: progressCharts / inline-size; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 1.25rem; min-width: 0; --programme-navy: var(--kbc-learner-primary, #4f2d7f); --programme-navy-light: #c4afe4; --programme-navy-soft: #f0eaf8; }
+.card { display: flex; flex-direction: column; align-self: stretch; width: 100%; min-width: 0; padding: 1.25rem; border: 1px solid var(--kbc-border); border-radius: 1.125rem; background: var(--kbc-surface); box-shadow: 0 2px 8px rgb(79 45 127 / .04); }
+.card header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.card header > div { min-width: 0; }
+:global(.dashboard-theme) .card h2 { margin: .25rem 0 .4rem; color: var(--kbc-learner-primary, #4f2d7f); font-size: .9375rem; line-height: 1.4; }
+.eyebrow { color: var(--programme-navy); font-size: .625rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
+.subtitle { color: var(--kbc-muted); font-size: .75rem; line-height: 1.5; overflow-wrap: anywhere; }
+.total { color: var(--programme-navy); font-size: 1.4rem; line-height: 1.2; text-align: right; white-space: nowrap; }
+.total small { display: block; margin-top: .3rem; color: var(--kbc-muted); font-size: .625rem; font-weight: 400; }
+.chart { display: block; width: 100%; min-height: 9rem; max-height: 13rem; margin: .75rem 0 .35rem; }
+.gridLine { stroke: var(--kbc-border); stroke-dasharray: 3 4; }
+.axis { fill: var(--kbc-muted); font: 10px var(--font-body, sans-serif); }
+.track { fill: var(--learner-soft); }
+.barValue { fill: var(--kbc-text); font: 600 11px var(--font-body, sans-serif); }
+.measures { display: grid; gap: .35rem; margin: 0; }
+.measures > div { display: grid; grid-template-columns: 5.25rem minmax(0, 1fr); align-items: baseline; gap: .5rem; }
+.measures dt { display: flex; align-items: center; gap: .4rem; font-size: .6875rem; font-weight: 600; color: var(--kbc-text); }
+.measures i { width: .4rem; height: .4rem; border-radius: 50%; flex-shrink: 0; }
+.measures dd { margin: 0; color: var(--kbc-muted); font-size: .6875rem; line-height: 1.5; text-align: right; }
+.card .note { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--kbc-border); font-size: .625rem; line-height: 1.6; color: var(--kbc-muted); }
+.moduleCount { flex-shrink: 0; padding: .25rem .45rem; border-radius: .375rem; color: var(--programme-navy); background: var(--programme-navy-soft); font-size: .625rem; }
+.programmeAxis { display: flex; justify-content: space-between; color: var(--kbc-muted); font-size: .625rem; padding: 1.3rem .65rem .5rem; }
+.programmeRows { display: flex; flex-direction: column; gap: .75rem; max-height: 22rem; overflow: auto; padding: .125rem; scrollbar-gutter: stable; }
+.module { appearance: none; display: flex; flex-direction: column; gap: .6rem; width: 100%; padding: .75rem; border: 1px solid transparent; border-radius: .75rem; background: transparent; color: var(--kbc-text); text-align: left; cursor: pointer; }
+.module:hover { border-color: #c8d2df; background: #f4f7fa; }
+.module[aria-pressed='true'] { border-color: #4f2d7f; background: #f0eaf8; box-shadow: 0 1px 2px rgb(79 45 127 / .05); }
+.module:focus-visible { outline: 2px solid var(--programme-navy); outline-offset: -2px; }
+.rowHeading { order: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; width: 100%; font-size: .75rem; }
+.rowHeading strong { font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.rowHeading b { white-space: nowrap; font-size: .6875rem; color: var(--programme-navy); }
+.moduleTrack { order: 2; display: block; flex: 0 0 .65rem; min-height: .65rem; width: 100%; border-radius: .25rem; overflow: hidden; background: #dce1e8; }
+.moduleTrack > span { display: block; min-width: 0; height: 100%; background: #4f2d7f; border-radius: inherit; }
+.coverage { order: 3; display: block; color: var(--kbc-muted); font-size: .625rem; line-height: 1.4; }
+.empty { margin: auto 0; padding: 2rem 0; color: var(--kbc-muted); font-size: .8125rem; line-height: 1.6; }
+.monthlyCard { position: relative; grid-column: 1 / -1; overflow: visible; --otjh-navy: var(--kbc-learner-primary, #4f2d7f); --otjh-navy-light: #c4afe4; }
+.monthlyCard .eyebrow { color: var(--otjh-navy); }
+.monthlyLegend { display: flex; flex-wrap: wrap; align-items: center; gap: 1.1rem; margin-top: 1rem; color: var(--kbc-muted); font-size: .6875rem; }
+.monthlyLegend span { display: inline-flex; align-items: center; gap: .45rem; }
+.monthlyLegend i, .monthlyTooltip i { display: inline-block; flex-shrink: 0; }
+.targetKey { width: 1rem; height: 1px; background: var(--kbc-learner-primary, #4f2d7f); }
+.submittedKey { width: .65rem; height: .65rem; border-radius: 50%; background: var(--otjh-navy-light); }
+.completedKey { width: .65rem; height: .65rem; border-radius: 50%; background: var(--otjh-navy); }
+.monthlyScroll { width: 100%; min-width: 0; max-width: 100%; margin-top: 1.25rem; overflow-x: auto; overflow-y: hidden; padding: .25rem 0 .5rem; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); scrollbar-gutter: stable; scrollbar-width: thin; overscroll-behavior-inline: contain; cursor: grab; }
+.monthlyScroll[data-panning='true'] { cursor: grabbing; user-select: none; }
+.monthlyScroll:focus-visible { border-radius: .5rem; outline: 2px solid var(--otjh-navy); outline-offset: 2px; }
+.monthlyScroll::-webkit-scrollbar { height: .55rem; }
+.monthlyScroll::-webkit-scrollbar-track { border-radius: 999px; background: var(--scrollbar-track); }
+.monthlyScroll::-webkit-scrollbar-thumb { border: 2px solid var(--scrollbar-track); border-radius: 999px; background: var(--scrollbar-thumb); }
+.monthlyScroll::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+.monthlyPlot { position: relative; height: 16.5rem; padding: 0 .75rem 0 2.75rem; }
+.yAxis { position: absolute; inset: 0 auto 2.4rem 0; width: 2.2rem; color: var(--kbc-muted); font-size: .625rem; }
+.yAxis span { position: absolute; right: 0; transform: translateY(50%); }
+.grid { position: absolute; inset: 0 .75rem 2.4rem 2.75rem; pointer-events: none; }
+.grid i { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--kbc-border); }
+.monthBars { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(var(--month-count, 1), minmax(3rem, 1fr)); height: 100%; }
+.monthColumn { display: grid; grid-template-rows: minmax(0, 1fr) 2.4rem; min-width: 0; padding: 0 .3rem; border-radius: .5rem; color: var(--kbc-muted); cursor: pointer; }
+.monthColumn:hover, .monthColumn:focus-visible { background: color-mix(in srgb, var(--otjh-navy-light) 26%, transparent); color: var(--otjh-navy); outline: none; }
+.barArea { position: relative; display: block; width: min(2.6rem, 70%); height: 100%; margin: 0 auto; }
+.barArea > i { position: absolute; right: 0; bottom: 0; left: 0; display: block; }
+.submittedBar { border-radius: .45rem .45rem 0 0; background: var(--otjh-navy-light); }
+.completedBar { border-radius: .35rem .35rem 0 0; background: var(--otjh-navy); }
+.targetLine { right: -.55rem !important; left: -.55rem !important; height: 1px; background: var(--kbc-learner-primary, #4f2d7f); transform: translateY(50%); }
+.monthLabel { display: grid; place-content: center; padding-top: .45rem; text-align: center; font-size: .6875rem; font-weight: 650; }
+.monthLabel small { margin-top: .1rem; font-size: .55rem; font-weight: 500; opacity: .72; }
+.tooltipPosition { position: absolute; z-index: 5; top: 3.8rem; left: clamp(8.5rem, var(--tooltip-left), calc(100% - 8.5rem)); pointer-events: none; }
+.monthlyTooltip { width: 17rem; transform: translateX(-50%); border: 1px solid var(--kbc-border); border-radius: .35rem; padding: 1rem; background: var(--kbc-surface); box-shadow: 0 10px 28px rgb(79 45 127 / .16); color: var(--kbc-text); }
+.monthlyTooltip > strong { display: block; color: var(--kbc-learner-primary, #4f2d7f); font-size: .78rem; }
+.monthlyTooltip dl { display: grid; gap: .6rem; margin: .75rem 0 0; }
+.monthlyTooltip dl > div { display: grid; grid-template-columns: minmax(5.6rem, 1fr) auto; align-items: center; gap: .75rem; }
+.monthlyTooltip dt { display: flex; align-items: center; gap: .45rem; color: var(--kbc-muted); font-size: .6875rem; }
+.monthlyTooltip dd { margin: 0; color: var(--kbc-learner-primary, #4f2d7f); font-size: .6875rem; font-weight: 750; white-space: nowrap; }
+.monthlyTooltip .variance { margin-top: .15rem; border-top: 1px solid var(--kbc-border); padding-top: .65rem; }
+.overall { display: grid; grid-template-columns: minmax(8rem, auto) minmax(8rem, 1fr) auto; align-items: center; gap: 1rem; margin-top: .75rem; border-top: 1px solid var(--kbc-border); padding-top: 1rem; }
+.overall > div:first-child { display: grid; gap: .2rem; }
+.overall > div:first-child strong { color: var(--kbc-learner-primary, #4f2d7f); font-size: .75rem; }
+.overall > div:first-child span { color: var(--kbc-muted); font-size: .625rem; }
+.overallTrack { position: relative; height: .55rem; overflow: visible; border-radius: 999px; background: var(--kbc-border); }
+.overallTrack i { position: absolute; top: 0; bottom: 0; left: 0; display: block; border-radius: inherit; }
+.submittedOverall { background: var(--otjh-navy-light); }
+.completedOverall { background: var(--otjh-navy); }
+.overallTrack b { position: absolute; top: -.28rem; width: 1px; height: 1.1rem; background: var(--kbc-learner-primary, #4f2d7f); transform: translateX(-50%); }
+.overall > strong { font-size: .75rem; white-space: nowrap; }
+.ahead { color: var(--learner-success); }
+.behind { color: var(--learner-warning); }
+@container trainingDetails (max-width: 42rem) {
+  .charts { grid-template-columns: minmax(0, 1fr); }
+  .monthlyCard { grid-column: auto; }
+  .tooltipPosition { left: 50%; }
+  .overall { grid-template-columns: minmax(0, 1fr) auto; }
+  .overall > div:first-child { grid-column: 1 / -1; }
+}
+
+:global([data-theme='dark'] :is(.learner-dashboard, .dashboard-theme[data-workspace-role='learner'])) .charts {
+  --programme-navy: #bfa3ee;
+  --programme-navy-light: #d7c4f4;
+  --programme-navy-soft: #302748;
+}
+
+:global([data-theme='dark'] :is(.learner-dashboard, .dashboard-theme[data-workspace-role='learner'])) .monthlyCard {
+  --otjh-navy: #bfa3ee;
+  --otjh-navy-light: #8768ba;
+}
+
+:global([data-theme='dark'] :is(.learner-dashboard, .dashboard-theme[data-workspace-role='learner'])) :is(.module:hover, .module[aria-pressed='true']) {
+  @apply border-slate-600 bg-slate-800;
+}
+
+:global([data-theme='dark'] :is(.learner-dashboard, .dashboard-theme[data-workspace-role='learner'])) .moduleTrack {
+  background: #3b526c;
+}
+
+:global([data-theme='dark'] :is(.learner-dashboard, .dashboard-theme[data-workspace-role='learner'])) .moduleTrack > span {
+  background: #bfa3ee;
+}
+
+:global([data-theme='dark'] :is(.learner-dashboard, .dashboard-theme[data-workspace-role='learner'])) :is(
+  .monthlyTooltip > strong, .monthlyTooltip dd, .overall > div:first-child strong
+) {
+  color: #bfa3ee;
+}
+
+:global([data-theme='dark'] .dashboard-theme[data-workspace-role='learner']) .card h2 {
+  color: #d7c4f4;
+}
+
+/* Compact learner-dashboard presentation: the overview keeps both top cards
+   and the OTJ chart visible together without changing the underlying values. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.moduleProgressCard {
+  min-height: 0;
+}
+
+.modulePicker select {
+  min-width: 10rem;
+  max-width: 15rem;
+  min-height: 2rem;
+  padding: .35rem 1.8rem .35rem .6rem;
+  border: 1px solid var(--kbc-border);
+  border-radius: .6rem;
+  background: var(--kbc-surface);
+  color: var(--kbc-learner-primary, #4f2d7f);
+  font: inherit;
+  font-size: .7rem;
+  font-weight: 650;
+}
+
+.measureRings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .5rem;
+  align-items: start;
+  margin-top: .8rem;
+}
+
+.measureRingItem {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: .25rem;
+  text-align: center;
+}
+
+.measureRing {
+  --measure-progress: 0%;
+  --measure-color: var(--programme-navy);
+  position: relative;
+  display: grid;
+  width: clamp(3.5rem, 7.2cqi, 5.15rem);
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg, var(--measure-color) var(--measure-progress), #edf0f5 0);
+  color: var(--programme-navy);
+  font-size: clamp(.7rem, 1.25cqi, .95rem);
+  font-weight: 750;
+}
+
+.measureRing::after {
+  position: absolute;
+  inset: 17%;
+  border-radius: 50%;
+  background: var(--kbc-surface);
+  content: '';
+}
+
+.measureRing > span {
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.measureRingItem strong {
+  max-width: 100%;
+  color: var(--programme-navy);
+  font-size: .68rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.measureRingItem small {
+  max-width: 100%;
+  color: var(--kbc-muted);
+  font-size: .55rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.programmeRows {
+  gap: .2rem;
+  max-height: none;
+}
+
+.module {
+  display: grid;
+  grid-template-columns: minmax(5rem, 1fr) minmax(5rem, 1.8fr) auto;
+  align-items: center;
+  gap: .55rem;
+  padding: .35rem .45rem;
+}
+
+.rowHeading {
+  min-width: 0;
+  font-size: .68rem;
+}
+
+.rowHeading strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moduleTrack {
+  min-height: .45rem;
+  height: .45rem;
+}
+
+.coverage {
+  font-size: .56rem;
+  white-space: nowrap;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-top: .45rem;
+  color: var(--kbc-muted);
+  font-size: .58rem;
+}
+
+.pageButtons {
+  display: inline-flex;
+  align-items: center;
+  gap: .2rem;
+}
+
+.pageButtons button {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-items: center;
+  border: 1px solid var(--kbc-border);
+  border-radius: .45rem;
+  background: var(--kbc-surface);
+  color: var(--programme-navy);
+  font-size: .65rem;
+}
+
+.pageButtons button[aria-current='page'] {
+  border-color: var(--programme-navy);
+  background: var(--programme-navy);
+  color: #fff;
+}
+
+.pageButtons button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.monthlyLegend {
+  gap: .8rem;
+  margin-top: .35rem;
+}
+
+.monthlyScroll {
+  margin-top: .55rem;
+}
+
+.monthlyPlot {
+  height: 10rem;
+}
+
+.monthLabel {
+  font-size: .62rem;
+}
+
+.overall {
+  gap: .65rem;
+  margin-top: .45rem;
+  padding-top: .55rem;
+}
+
+@container progressCharts (max-width: 42rem) {
+  .measureRings {
+    gap: .25rem;
+  }
+
+  .modulePicker select {
+    min-width: 8rem;
+  }
+}
+
+@container progressCharts (max-width: 30rem) {
+  .charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .monthlyCard {
+    grid-column: auto;
+  }
+
+  .measureRings {
+    gap: .15rem;
+  }
+
+  .measureRingItem small,
+  .coverage {
+    display: none;
+  }
+
+  .module {
+    grid-template-columns: minmax(5rem, 1fr) minmax(5rem, 1.5fr) auto;
+  }
+}
+
+/* Exact dashboard card treatment from the supplied overview reference. */
+:global(.learner-dashboard) .charts {
+  gap: .75rem;
+}
+
+:global(.learner-dashboard) .charts > .card {
+  padding: .85rem 1rem;
+  border-radius: .9rem;
+  box-shadow: 0 2px 9px rgb(79 45 127 / .08);
+}
+
+:global(.learner-dashboard) .charts > .card header {
+  align-items: center;
+}
+
+:global(.learner-dashboard) .charts > .card header .eyebrow,
+:global(.learner-dashboard) .charts > .card header .subtitle,
+:global(.learner-dashboard) .charts > .card header .moduleCount {
+  display: none;
+}
+
+:global(.learner-dashboard) .charts > .card header h2 {
+  margin: 0;
+  padding-left: .6rem;
+  border-left: 4px solid #4f2d7f;
+  color: #362055;
+  font-size: .9rem;
+  line-height: 1.25;
+}
+
+:global(.learner-dashboard) .moduleProgressCard,
+:global(.learner-dashboard) .programmeProgressCard {
+  min-height: 15rem;
+}
+
+:global(.learner-dashboard) .modulePicker select {
+  min-width: 11rem;
+  min-height: 2rem;
+  padding: .35rem .65rem;
+  border-color: #d9dfea;
+  border-radius: .65rem;
+  color: #362055;
+  font-size: .7rem;
+}
+
+:global(.learner-dashboard) .measureRings {
+  gap: .35rem;
+  margin-top: 1.15rem;
+}
+
+:global(.learner-dashboard) .measureRing {
+  width: clamp(3.8rem, 7.6cqi, 4.9rem);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .65);
+}
+
+:global(.learner-dashboard) .measureRingItem {
+  gap: .28rem;
+}
+
+:global(.learner-dashboard) .measureRingItem strong {
+  color: #362055;
+  font-size: .68rem;
+  font-weight: 650;
+}
+
+:global(.learner-dashboard) .measureRingItem small {
+  color: #7a7895;
+  font-size: .57rem;
+}
+
+:global(.learner-dashboard) .programmeAxis {
+  display: grid;
+  grid-template-columns: minmax(5rem, .9fr) minmax(8rem, 1.8fr) auto;
+  gap: .55rem;
+  padding: .65rem .45rem .3rem;
+  color: #6f6c89;
+  font-size: .62rem;
+  font-weight: 650;
+}
+
+:global(.learner-dashboard) .programmeAxis span:last-child {
+  grid-column: 2 / -1;
+}
+
+:global(.learner-dashboard) .programmeRows {
+  gap: .12rem;
+  padding: 0 .1rem;
+}
+
+:global(.learner-dashboard) .module {
+  grid-template-columns: minmax(5rem, .9fr) minmax(8rem, 1.8fr) auto;
+  gap: .55rem;
+  padding: .33rem .35rem;
+  border-radius: .45rem;
+}
+
+:global(.learner-dashboard) .rowHeading {
+  display: contents;
+  font-size: .68rem;
+}
+
+:global(.learner-dashboard) .rowHeading strong {
+  grid-column: 1;
+  min-width: 0;
+  color: #362055;
+}
+
+:global(.learner-dashboard) .rowHeading b {
+  grid-column: 3;
+  color: #362055;
+  font-size: .62rem;
+}
+
+:global(.learner-dashboard) .moduleTrack {
+  grid-column: 2;
+  grid-row: 1;
+  height: .48rem;
+  min-height: .48rem;
+  border-radius: 999px;
+  background: #edf0f5;
+}
+
+:global(.learner-dashboard) .moduleTrack > span {
+  background: linear-gradient(90deg, #7543d3, #6b35c7);
+}
+
+:global(.learner-dashboard) .coverage {
+  display: none;
+}
+
+:global(.learner-dashboard) .monthlyCard {
+  min-height: 12.5rem;
+}
+
+:global(.learner-dashboard) .monthlyCard header {
+  min-height: 1.7rem;
+}
+
+:global(.learner-dashboard) .monthlyLegend {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  margin: 0;
+  gap: .85rem;
+  font-size: .62rem;
+}
+
+:global(.learner-dashboard) .monthlyScroll {
+  margin-top: .35rem;
+}
+
+:global(.learner-dashboard) .monthlyPlot {
+  height: 8.25rem;
+}
+
+:global(.learner-dashboard) .monthColumn {
+  grid-template-rows: minmax(0, 1fr) 1.8rem;
+}
+
+:global(.learner-dashboard) .monthLabel {
+  padding-top: .25rem;
+  font-size: .62rem;
+}
+
+:global(.learner-dashboard) .monthLabel small {
+  display: none;
+}
+
+:global(.learner-dashboard) .overall {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .75rem;
+  margin-top: .2rem;
+  border-top: 0;
+  border-radius: .6rem;
+  padding: .55rem .75rem;
+  background: #f3edff;
+}
+
+:global(.learner-dashboard) .overall > div:first-child {
+  display: block;
+}
+
+:global(.learner-dashboard) .overall > div:first-child strong {
+  color: #51268d;
+  font-size: .7rem;
+}
+
+:global(.learner-dashboard) .overall > div:first-child span {
+  display: block;
+  margin-top: .1rem;
+  color: #6d6384;
+  font-size: .6rem;
+}
+
+:global(.learner-dashboard) .overallTrack,
+:global(.learner-dashboard) .overall > strong {
+  display: none;
+}
+
+:global(.learner-dashboard) .pagination {
+  color: #6f6c89;
+}
+
+/* Learner dashboard overview, matched to the supplied reference. The compact
+   ring captions render only inside the dashboard; other consumers (training
+   plan, coach case file) keep the full presentation. */
+.measureCount {
+  display: none;
+}
+
+:global(.learner-dashboard) .measureRingItem small,
+:global(.learner-dashboard) .programmeProgressCard .note {
+  display: none;
+}
+
+/* Module progress: one-line title with a compact picker. */
+:global(.learner-dashboard) .moduleProgressCard header h2 {
+  white-space: nowrap;
+}
+
+:global(.learner-dashboard) .modulePicker {
+  flex: 0 0 auto;
+}
+
+:global(.learner-dashboard) .modulePicker select {
+  width: 12rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Thin rings on a tint of their own colour. */
+:global(.learner-dashboard) .measureRings {
+  margin-top: 1.35rem;
+}
+
+:global(.learner-dashboard) .measureRing {
+  width: clamp(4.2rem, 8.4cqi, 5.4rem);
+  background: conic-gradient(from 0deg, var(--measure-color) var(--measure-progress), color-mix(in srgb, var(--measure-color) 16%, #fff) 0);
+  box-shadow: none;
+  color: #1f1147;
+  font-size: clamp(.72rem, 1.3cqi, .9rem);
+  font-weight: 700;
+}
+
+:global(.learner-dashboard) .measureRing::after {
+  inset: 11%;
+}
+
+:global(.learner-dashboard) .measureRingItem {
+  gap: .2rem;
+}
+
+:global(.learner-dashboard) .measureRingItem strong {
+  margin-top: .45rem;
+  color: #1f1147;
+  font-size: .72rem;
+  font-weight: 500;
+}
+
+:global(.learner-dashboard) .measureCount {
+  display: grid;
+  justify-items: center;
+  gap: .1rem;
+}
+
+:global(.learner-dashboard) .measureCount b {
+  color: #1f1147;
+  font-size: .9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+:global(.learner-dashboard) .measureCount em {
+  color: #7a7895;
+  font-size: .62rem;
+  font-style: normal;
+}
+
+/* Programme progress: plain rows, no selected highlight, square pager. */
+:global(.learner-dashboard) .programmeRows {
+  gap: .3rem;
+}
+
+:global(.learner-dashboard) .module {
+  padding: .42rem .35rem;
+}
+
+:global(.learner-dashboard) .module:hover,
+:global(.learner-dashboard) .module[aria-pressed='true'] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:global(.learner-dashboard) .rowHeading strong {
+  font-weight: 500;
+}
+
+:global(.learner-dashboard) .rowHeading b {
+  font-size: .68rem;
+  font-weight: 500;
+}
+
+:global(.learner-dashboard) .moduleTrack > span {
+  background: #7543d3;
+}
+
+:global(.learner-dashboard) .pagination {
+  margin-top: auto;
+  padding-top: .6rem;
+  font-size: .62rem;
+}
+
+:global(.learner-dashboard) .pageButtons {
+  gap: .35rem;
+}
+
+:global(.learner-dashboard) .pageButtons button {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-color: #e3dcef;
+  border-radius: .5rem !important;
+  color: #362055;
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+:global(.learner-dashboard) .pageButtons button[aria-current='page'] {
+  border-color: #3a1d6e;
+  background: #3a1d6e;
+  color: #fff;
+}
+
+/* Off-the-job hours keep the original target line, stacked bars, full
+   tooltip and overall progress row; only the earlier compact footer styling
+   is undone here. */
+:global(.learner-dashboard) .overall {
+  grid-template-columns: minmax(8rem, auto) minmax(8rem, 1fr) auto;
+  gap: .75rem;
+  margin-top: .45rem;
+  padding: .6rem 0 0;
+  border-top: 1px solid var(--kbc-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+:global(.learner-dashboard) .overall > div:first-child {
+  display: grid;
+  gap: .2rem;
+}
+
+:global(.learner-dashboard) .overallTrack,
+:global(.learner-dashboard) .overall > strong {
+  display: block;
+}
+
+@container progressCharts (max-width: 42rem) {
+  :global(.learner-dashboard) .overall {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  :global(.learner-dashboard) .overall > div:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+:global([data-theme='dark'] .learner-dashboard) :is(.measureRing, .measureRingItem strong, .measureCount b) {
+  color: #e9defc;
+}
+
+/* Dashboard spacing: tighter cards so Off-The-Job Hours is visible without
+   scrolling, plus layouts for tablet and phone widths. */
+:global(.learner-dashboard) .moduleProgressCard,
+:global(.learner-dashboard) .programmeProgressCard {
+  min-height: 0;
+}
+
+:global(.learner-dashboard) .moduleProgressCard header {
+  flex-wrap: wrap;
+}
+
+:global(.learner-dashboard) .modulePicker select {
+  width: min(12rem, 100%);
+}
+
+:global(.learner-dashboard) .measureRings {
+  margin-top: .85rem;
+  row-gap: .75rem;
+}
+
+:global(.learner-dashboard) .measureRing {
+  width: clamp(3.6rem, 7cqi, 4.5rem);
+}
+
+:global(.learner-dashboard) .measureRingItem strong {
+  margin-top: .25rem;
+}
+
+:global(.learner-dashboard) .programmeAxis {
+  padding-top: .45rem;
+}
+
+:global(.learner-dashboard) .programmeRows {
+  gap: .1rem;
+}
+
+:global(.learner-dashboard) .module {
+  padding: .3rem .35rem;
+}
+
+:global(.learner-dashboard) .pagination {
+  flex-wrap: wrap;
+  padding-top: .45rem;
+}
+
+:global(.learner-dashboard) .pageButtons {
+  flex-wrap: wrap;
+  gap: .25rem;
+}
+
+:global(.learner-dashboard) .pageButtons button {
+  width: 1.7rem;
+  height: 1.7rem;
+}
+
+:global(.learner-dashboard) .monthlyLegend span {
+  gap: .35rem;
+}
+
+/* Tablet: stack the two cards so the rings keep a readable size. */
+@container trainingDetails (max-width: 56rem) {
+  :global(.learner-dashboard) .charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :global(.learner-dashboard) .monthlyCard {
+    grid-column: auto;
+  }
+}
+
+/* Narrow: the legend moves under the title instead of overlapping it. */
+@container progressCharts (max-width: 40rem) {
+  :global(.learner-dashboard) .monthlyLegend {
+    position: static;
+    flex-wrap: wrap;
+    margin-top: .35rem;
+  }
+}
+
+/* Phone: two rings per row, counts stay visible. */
+@container progressCharts (max-width: 26rem) {
+  :global(.learner-dashboard) .measureRings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :global(.learner-dashboard) .measureRing {
+    width: 4rem;
+  }
+}
+
+/* Dark mode for the dashboard chart cards: the light-theme text colours above
+   are fixed hex values, so each gets a readable dark counterpart. */
+:global([data-theme='dark'] .learner-dashboard) .charts :is(
+  .card header h2, .rowHeading strong, .rowHeading b, .measureRing, .measureRingItem strong, .measureCount b,
+  .pageButtons button, .modulePicker select
+) {
+  color: #ece4fb !important;
+}
+
+:global([data-theme='dark'] .learner-dashboard) .charts :is(.programmeAxis, .measureCount em, .pagination, .monthlyLegend, .yAxis, .overall > div:first-child span) {
+  color: #b9aed3 !important;
+}
+
+:global([data-theme='dark'] .learner-dashboard) .charts .card header h2 {
+  border-left-color: #bfa3ee;
+}
+
+:global([data-theme='dark'] .learner-dashboard) .charts :is(.modulePicker select, .pageButtons button) {
+  border-color: #4a3d66;
+  background: transparent;
+}
+
+:global([data-theme='dark'] .learner-dashboard) .charts .pageButtons button[aria-current='page'] {
+  border-color: #8b5cf6;
+  background: #8b5cf6;
+  color: #fff !important;
+}
+
+:global([data-theme='dark'] .learner-dashboard) .charts .moduleTrack {
+  background: #3b3452;
+}
+
+:global([data-theme='dark'] .learner-dashboard) .charts .measureRing {
+  background: conic-gradient(from 0deg, var(--measure-color) var(--measure-progress), color-mix(in srgb, var(--measure-color) 22%, var(--kbc-surface, #1d1730)) 0);
+}
+
+/* Module picker fills the rest of the Module progress header. */
+:global(.learner-dashboard) .moduleProgressCard header > div {
+  flex: 0 0 auto;
+}
+
+:global(.learner-dashboard) .modulePicker {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+:global(.learner-dashboard) .modulePicker select {
+  width: 100%;
+  max-width: none;
+}
+
+/* Compact employer rows keep both overview cards at the rings' natural height. */
+:global(.employer-learner-dashboard) .programmeProgressCard .programmeRows {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  gap: .15rem;
+  padding: .15rem .1rem;
+}
+
+:global(.employer-learner-dashboard) .programmeProgressCard .module {
+  min-height: 0;
+  gap: .55rem;
+  padding: .25rem .35rem;
+}
+
+:global(.employer-learner-dashboard) .programmeProgressCard .rowHeading {
+  font-size: .75rem;
+}
+
+:global(.employer-learner-dashboard) .programmeProgressCard .rowHeading b {
+  font-size: .7rem;
+}
+
+:global(.employer-learner-dashboard) .programmeProgressCard .moduleTrack {
+  height: .5rem;
+  min-height: .5rem;
+}

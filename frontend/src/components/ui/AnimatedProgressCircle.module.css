@@ -1,0 +1,19 @@
+.offset {
+  animation: ring-offset 900ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.dash {
+  animation: ring-dash 900ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes ring-offset {
+  from { stroke-dashoffset: var(--ring-start-offset); }
+}
+
+@keyframes ring-dash {
+  from { stroke-dasharray: 0 9999; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offset, .dash { animation: none; }
+}

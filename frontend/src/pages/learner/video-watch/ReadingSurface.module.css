@@ -1,0 +1,24 @@
+.surface { position: relative; }
+
+/* Reading preferences must also override formatting pasted into the editor.
+   These rules only apply to reading text, never other curriculum surfaces. */
+.surface [data-reading-text],
+.surface [data-reading-text] * {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+  color: inherit !important;
+  background-color: transparent !important;
+}
+.surface [data-reading-text] h1 { font-size: 1.6em !important; }
+.surface [data-reading-text] h2 { font-size: 1.35em !important; }
+.surface [data-reading-text] h3 { font-size: 1.15em !important; }
+.surface [data-reading-text] h4 { font-size: 1.05em !important; }
+.surface [data-reading-text] a { text-decoration: underline; }
+.surface [data-reading-text] mark[data-learner-highlight],
+.surface [data-reading-text] mark[data-learner-highlight] * {
+  background-color: #fde047 !important;
+  color: #111827 !important;
+}
+.surface:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }

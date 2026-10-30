@@ -1,0 +1,136 @@
+/* Presentation only: use the space remaining beside the coach navigation.
+   Keep calendar grids and table columns intact; scroll those locally. */
+@media screen {
+  .workspace-shell[data-workspace-role="coach"] {
+    height: 100dvh;
+  }
+
+  .workspace-shell[data-workspace-role="coach"] .workspace-content {
+    container: coach-content / inline-size;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace-shell[data-workspace-role="coach"] .workspace-main {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace-shell[data-workspace-role="coach"] .workspace-main > *,
+  .workspace-shell[data-workspace-role="coach"] .workspace-main :is(.grid, .flex) > :is(div, section, article),
+  .workspace-shell[data-workspace-role="coach"] .workspace-main :is(.ui-panel, .ui-data-table, .ui-filter-toolbar) {
+    min-width: 0;
+  }
+
+  .workspace-shell[data-workspace-role="coach"] .workspace-main div:has(> table) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .workspace-shell[data-workspace-role="coach"] .workspace-main :is(input, select, textarea) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace-shell[data-workspace-role="coach"] .workspace-main [role="listbox"] {
+    max-width: min(100%, calc(100vw - 2rem));
+  }
+
+  .workspace-shell[data-workspace-role="coach"] .coach-week-scroll {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .workspace-shell[data-workspace-role="coach"] .coach-week-scroll > div {
+    min-width: 56rem;
+  }
+
+  @container coach-content (max-width: 1000px) {
+    .workspace-shell[data-workspace-role="coach"] .ui-filter-toolbar > .flex {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .workspace-shell[data-workspace-role="coach"] .ui-filter-toolbar > .flex > div {
+      max-width: none;
+      margin-left: 0;
+      flex: none;
+    }
+  }
+
+  @container coach-content (max-width: 760px) {
+    .workspace-shell[data-workspace-role="coach"] .page-header > .flex {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .workspace-shell[data-workspace-role="coach"] .section-header {
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .workspace-shell[data-workspace-role="coach"] .workspace-main :is([class~="xl:grid-cols-4"], [class~="lg:grid-cols-4"]) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @container coach-content (max-width: 480px) {
+    .workspace-shell[data-workspace-role="coach"] .workspace-main .page-container {
+      padding: 0.75rem;
+    }
+    .workspace-shell[data-workspace-role="coach"] .workspace-main .page-header {
+      padding: 1rem;
+    }
+    .workspace-shell[data-workspace-role="coach"] .workspace-main h1 {
+      font-size: 1.5rem !important;
+    }
+    .workspace-shell[data-workspace-role="coach"] .workspace-main :is([class~="xl:grid-cols-4"], [class~="lg:grid-cols-4"], [class~="sm:grid-cols-2"]) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .workspace-shell[data-workspace-role="coach"] .ui-filter-toolbar > .flex > .flex > div {
+      flex: 1 1 10rem;
+    }
+    .workspace-shell[data-workspace-role="coach"] .workspace-main button:not([aria-haspopup]) {
+      white-space: normal;
+    }
+  }
+
+  @media (max-width: 767px) {
+    /* Legacy mobile rules force page roots to 100vw, underneath the vertical
+       scrollbar. Fit the content box instead so right-hand controls stay visible. */
+    .dashboard-theme.workspace-shell[data-workspace-role="coach"] .workspace-main,
+    .dashboard-theme.workspace-shell[data-workspace-role="coach"] .workspace-main > :is(.page-container, [class*="p-3"], [class*="p-4"], [class*="p-5"], [class*="p-6"]) {
+      width: 100% !important;
+      max-width: 100%;
+    }
+    .dashboard-theme.workspace-shell[data-workspace-role="coach"] .kbc-workspace-topbar {
+      height: auto;
+      min-height: 4.25rem;
+      padding-inline: 0.75rem;
+    }
+    .dashboard-theme.workspace-shell[data-workspace-role="coach"] .coach-header-search {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+    }
+    /* Drawers are portalled to body, outside the workspace role selector. */
+    body:has(.workspace-shell[data-workspace-role="coach"]) .workspace-drawer {
+      width: 100vw;
+      max-width: 100vw;
+      height: 100dvh;
+    }
+    body:has(.workspace-shell[data-workspace-role="coach"]) .workspace-drawer > .overflow-y-auto {
+      min-height: 0;
+      padding: 1rem;
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+    body:has(.workspace-shell[data-workspace-role="coach"]) .workspace-drawer-header {
+      gap: 0.75rem;
+      padding: 1rem;
+    }
+    body:has(.workspace-shell[data-workspace-role="coach"]) .workspace-drawer-header > button {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+    }
+  }
+}

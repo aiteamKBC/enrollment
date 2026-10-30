@@ -1,0 +1,190 @@
+/* Scoped to this review. Other curriculum alerts retain their existing styles. */
+.swal2-popup.teams-calendar-review {
+  display: flex !important;
+  flex-direction: column;
+  width: min(1120px, calc(100vw - 32px)) !important;
+  max-height: calc(100dvh - 40px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e4e7ec;
+  border-radius: 18px;
+  background: #fff;
+  color: #283244;
+  font-family: inherit;
+  box-shadow: 0 24px 80px rgb(15 23 42 / 25%);
+}
+
+.teams-calendar-review .teams-calendar-review-title {
+  flex: none;
+  padding: 22px 64px 20px 28px;
+  border-bottom: 1px solid #e9eaf0;
+  color: #263247;
+  font-size: 21px;
+  font-weight: 750;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.teams-calendar-review .teams-calendar-review-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  color: #667085;
+  font-size: 28px;
+}
+.teams-calendar-review .teams-calendar-review-close:hover { background: #f2f0f8; color: #5b21b6; }
+
+.teams-calendar-review .teams-calendar-review-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 22px 28px 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: #f8f9fc;
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: left;
+  scrollbar-gutter: stable;
+}
+
+.teams-review-content { min-width: 0; overflow-wrap: anywhere; }
+.teams-review-content h3, .teams-review-content p { margin: 0; }
+.teams-review-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.teams-review-eyebrow { color: #6b6386; font-size: 10px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.teams-review-summary h3 { margin-top: 3px; color: #202c40; font-size: 22px; font-weight: 750; line-height: 1.3; }
+.teams-review-zone { flex: none; padding: 8px 13px; border: 1px solid #e4e0ee; border-radius: 10px; background: #fff; }
+.teams-review-zone span { display: block; color: #667085; font-size: 10px; }
+.teams-review-zone strong { color: #51436f; font-size: 12px; font-weight: 650; }
+.teams-review-layout { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(285px, 1fr); gap: 18px; align-items: start; }
+.teams-review-main, .teams-review-sidebar { display: grid; min-width: 0; gap: 16px; }
+.teams-review-card { min-width: 0; overflow: hidden; border: 1px solid #e3e6ed; border-radius: 12px; background: #fff; }
+.teams-review-card-heading { display: flex; align-items: center; gap: 9px; padding: 15px 16px 12px; }
+.teams-review-card-heading h3, .teams-review-description h3 { color: #344054; font-size: 14px; font-weight: 750; }
+.teams-review-icon { flex: none; width: 18px; height: 18px; color: #796796; }
+.teams-review-count { margin-left: auto; padding: 3px 8px; border-radius: 6px; background: #f1edf9; color: #6543a0; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.teams-review-content .teams-review-time-help { padding: 0 16px 13px; color: #667085; font-size: 11px; }
+.teams-review-time-help strong { color: #475467; font-weight: 650; }
+.teams-review-schedule-scroll { max-height: 410px; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+/* index.css forces global table chrome with !important; override it only here. */
+.teams-calendar-review .teams-review-table { width: 100%; margin: 0; border: 0 !important; border-collapse: collapse !important; border-radius: 0 !important; background: #fff !important; box-shadow: none !important; font-size: 13px; }
+.teams-calendar-review .teams-review-table thead th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; border: 0; border-bottom: 1px solid #e7e8ee !important; background: #f3f4f8 !important; color: #667085 !important; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-align: left; white-space: nowrap; }
+.teams-calendar-review .teams-review-table tbody tr { background: #fff !important; }
+.teams-calendar-review .teams-review-table tbody tr:nth-child(even) { background: #fcfcfe !important; }
+.teams-calendar-review .teams-review-table tbody tr:hover { background: #f6f3fc !important; }
+.teams-calendar-review .teams-review-table tbody td { padding: 12px; border: 0; border-bottom: 1px solid #eef0f4 !important; color: #475467; vertical-align: top; text-align: left; }
+.teams-calendar-review .teams-review-table tbody tr:last-child td { border-bottom: 0 !important; }
+.teams-calendar-review .teams-review-table .teams-review-number { width: 52px; text-align: center; }
+.teams-review-number span { display: inline-flex; align-items: center; justify-content: center; min-width: 25px; height: 25px; border-radius: 7px; background: #f0f1f6; color: #667085; font-size: 11px; font-weight: 650; }
+.teams-review-date { min-width: 130px; font-weight: 550; }
+.teams-review-time { min-width: 174px; font-variant-numeric: tabular-nums; }
+.teams-review-time time { color: #344054; font-weight: 700; white-space: nowrap; }
+.teams-review-time-arrow { margin: 0 7px; color: #98a2b3; }
+.teams-review-time small, .teams-review-previous { display: block; margin-top: 4px; font-size: 10px; font-weight: 400; }
+.teams-review-previous { color: #9a6700; }
+.teams-review-duration { white-space: nowrap; font-size: 11px; }
+.teams-review-day { min-width: 100px; font-size: 11px; }
+.teams-review-card-content { padding: 0 16px 16px; }
+.teams-review-links .teams-review-series { margin-bottom: 12px; color: #667085; font-size: 11px; }
+.teams-review-links .teams-review-pending { margin-bottom: 3px; color: #475467; font-size: 12px; font-weight: 650; }
+.teams-review-links p { color: #667085; font-size: 12px; }
+.teams-review-links code { display: block; padding: 10px 12px; border: 1px solid #e9e6f1; border-radius: 8px; background: #f8f6fc; color: #604397; font-family: inherit; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; user-select: all; }
+.teams-review-link-item + .teams-review-link-item { margin-top: 12px; }
+.teams-review-link-item > strong { display: block; margin-bottom: 5px; font-size: 11px; }
+.teams-review-people { padding: 0 16px 14px; }
+.teams-review-role + .teams-review-role { margin-top: 12px; }
+.teams-review-role-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: #475467; font-size: 11px; }
+.teams-review-role-heading strong { font-weight: 650; }
+.teams-review-role-heading span { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 5px; background: #f0f1f5; color: #667085; font-size: 10px; }
+.teams-review-emails { display: grid; gap: 5px; max-height: 160px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.teams-review-emails li { padding: 5px 8px; border: 1px solid #ececf2; border-radius: 6px; background: #fafafe; color: #514d62; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.teams-review-empty { color: #667085; font-size: 11px; }
+.teams-review-privacy { display: flex; align-items: flex-start; gap: 9px; padding: 13px 16px; border-top: 1px solid #dfede7; background: #f1f9f5; }
+.teams-review-privacy .teams-review-icon { margin-top: 1px; color: #25815d; }
+.teams-review-privacy strong { color: #236448; font-size: 11px; font-weight: 700; }
+.teams-review-privacy p { margin-top: 3px; color: #44745f; font-size: 12px; line-height: 1.55; }
+.teams-review-settings { display: grid; gap: 11px; margin: 0; padding: 0 16px 16px; }
+.teams-review-settings > div { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; font-size: 12px; }
+.teams-review-settings dt { color: #667085; }
+.teams-review-settings dd { margin: 0; color: #344054; font-weight: 550; }
+.teams-review-description { padding: 16px; }
+.teams-review-description p { margin-top: 8px; white-space: pre-wrap; }
+.teams-review-content .teams-review-send-note { margin-top: 16px; color: #667085; font-size: 11px; }
+.teams-review-notify { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; padding: 13px 16px; border: 1px solid #e7def3; border-radius: 10px; background: #f8f5fd; cursor: pointer; text-align: left; }
+.teams-review-notify input { flex: none; width: 17px; height: 17px; margin: 1px 0 0; accent-color: var(--action-primary, #5b21b6); }
+.teams-review-notify strong { display: block; color: #392455; font-size: 12px; font-weight: 700; }
+.teams-review-notify small { display: block; margin-top: 3px; color: #655575; font-size: 11px; line-height: 1.55; }
+
+.teams-calendar-review .teams-calendar-review-consent { flex: none; align-items: flex-start; justify-content: flex-start; gap: 10px; margin: 0; padding: 17px 28px 8px; border-top: 1px solid #e9eaf0; background: #fff; color: #344054; font-size: 12px; line-height: 1.5; text-align: left; }
+.teams-calendar-review .teams-calendar-review-consent input { flex: none; width: 17px; height: 17px; margin: 1px 0 0; accent-color: var(--action-primary, #5b21b6); }
+.teams-calendar-review .teams-calendar-review-consent span { color: #344054; }
+.teams-calendar-review .teams-calendar-review-actions { flex: none; justify-content: flex-end; gap: 10px; width: auto; margin: 0; padding: 10px 28px 20px; }
+.teams-calendar-review .teams-calendar-review-confirm, .teams-calendar-review .teams-calendar-review-deny, .teams-calendar-review .teams-calendar-review-cancel { min-height: 42px; margin: 0; padding: 10px 18px; border: 1px solid transparent; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 700; line-height: 1.4; cursor: pointer; transition: background-color 120ms ease; }
+.teams-calendar-review .teams-calendar-review-confirm { background: var(--action-primary, #5b21b6); color: #fff; box-shadow: 0 3px 8px rgb(91 33 182 / 12%); }
+.teams-calendar-review .teams-calendar-review-confirm:hover { background: var(--action-primary-hover, #6d28d9); }
+.teams-calendar-review .teams-calendar-review-deny { border-color: #c7cad4; background: #f4f3f8; color: #44385d; }
+.teams-calendar-review .teams-calendar-review-deny:hover { background: #e9e6f0; }
+.teams-calendar-review .teams-calendar-review-cancel { border-color: #d8dce5; background: #fff; color: #475467; }
+.teams-calendar-review .teams-calendar-review-cancel:hover { background: #f4f3f8; transform: none; }
+.teams-calendar-review .teams-calendar-review-validation { flex: none; margin: 4px 28px; padding: 8px 12px; border-radius: 7px; background: #fff1f1; color: #a22929; font-size: 12px; }
+.teams-calendar-review :is(button, input, [tabindex]):focus-visible { outline: 3px solid #b59adf; outline-offset: 3px; box-shadow: none; }
+.teams-review-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 900px) {
+  .teams-review-layout { grid-template-columns: minmax(0, 1fr); }
+  .teams-review-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+
+@media (max-width: 600px) {
+  .swal2-popup.teams-calendar-review { width: calc(100vw - 16px) !important; max-height: calc(100dvh - 16px); border-radius: 14px; }
+  .teams-calendar-review .teams-calendar-review-title { padding: 18px 54px 17px 18px; font-size: 18px; }
+  .teams-calendar-review .teams-calendar-review-close { top: 10px; right: 10px; }
+  .teams-calendar-review .teams-calendar-review-body { padding: 16px 14px; }
+  .teams-review-summary { align-items: flex-start; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .teams-review-summary h3 { font-size: 20px; }
+  .teams-review-zone { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+  .teams-review-sidebar { grid-template-columns: minmax(0, 1fr); }
+  .teams-review-schedule-scroll { max-height: 330px; padding: 0 12px 12px; }
+  .teams-calendar-review .teams-review-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .teams-calendar-review .teams-review-table tbody { display: grid; gap: 8px; }
+  .teams-calendar-review .teams-review-table tbody tr { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 3px 10px; padding: 11px; border: 1px solid #e9eaf0; border-radius: 9px; }
+  .teams-calendar-review .teams-review-table tbody tr td { min-width: 0; padding: 0; border: 0 !important; }
+  .teams-calendar-review .teams-review-table tbody tr .teams-review-number { grid-column: 1; grid-row: 1 / span 4; width: auto; }
+  .teams-review-date, .teams-review-time, .teams-review-duration, .teams-review-day { grid-column: 2; }
+  .teams-review-date { font-size: 12px; }
+  .teams-review-time { font-size: 12px; }
+  .teams-review-duration::before { content: 'Duration: '; }
+  .teams-calendar-review .teams-calendar-review-consent { padding: 13px 18px 6px; font-size: 12px; }
+  .teams-calendar-review .teams-calendar-review-actions { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 10px 18px 16px; }
+  .teams-calendar-review .teams-calendar-review-confirm, .teams-calendar-review .teams-calendar-review-deny, .teams-calendar-review .teams-calendar-review-cancel { min-height: 44px; padding: 10px; font-size: 11px; }
+  .teams-calendar-review .teams-calendar-review-validation { margin: 4px 18px; font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .teams-calendar-review .teams-calendar-review-confirm, .teams-calendar-review .teams-calendar-review-deny, .teams-calendar-review .teams-calendar-review-cancel { transition: none; }
+}
+
+/* Completion is acknowledged explicitly; it has no auto-dismiss timer. */
+.swal2-popup.teams-calendar-result { width: min(560px, calc(100vw - 24px)) !important; max-height: calc(100dvh - 24px); overflow: auto; padding: 28px; border: 1px solid #e5e7ef; border-radius: 18px; background: #fff; font-family: inherit; box-shadow: 0 24px 80px rgb(15 23 42 / 24%); }
+.teams-calendar-result .teams-calendar-result-title { padding: 0 26px 18px 0; color: #273449; font-size: 21px; font-weight: 750; line-height: 1.35; text-align: left; }
+.teams-calendar-result .teams-calendar-result-body { margin: 0; overflow: visible; color: #667085; font-size: 13px; line-height: 1.6; text-align: left; overflow-wrap: anywhere; }
+.teams-calendar-result-mark { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: 16px; border-radius: 12px; background: #eaf7ef; color: #258154; font-size: 24px; font-weight: 700; }
+.teams-calendar-result-warning { background: #fff5dd; color: #936811; }
+.teams-calendar-result-module { margin: 0 0 18px; color: #344054; font-size: 17px; font-weight: 700; }
+.teams-calendar-result-facts { padding: 4px 16px; border: 1px solid #e5e7ef; border-radius: 10px; background: #f8f9fc; }
+.teams-calendar-result-facts > div { padding: 12px 0; }
+.teams-calendar-result-facts > div + div { border-top: 1px solid #e5e7ef; }
+.teams-calendar-result-facts span { display: block; color: #667085; font-size: 11px; }
+.teams-calendar-result-facts strong { display: block; margin-top: 3px; color: #344054; font-size: 13px; }
+.teams-calendar-result-note { padding: 12px; border: 1px solid #f0dda8; border-radius: 8px; background: #fffaf0; color: #826022; }
+.teams-calendar-result-help { margin: 14px 0 0; font-size: 11px; line-height: 1.7; }
+.teams-calendar-result .teams-calendar-result-actions { justify-content: flex-end; gap: 10px; width: 100%; margin: 24px 0 0; }
+.teams-calendar-result .teams-calendar-result-done, .teams-calendar-result .teams-calendar-result-retry { min-height: 44px; margin: 0; padding: 11px 20px; border: 1px solid #d9dce6; border-radius: 8px; background: #fff; color: #475467; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.teams-calendar-result .teams-calendar-result-done { border-color: #5b21b6; background: #5b21b6; color: #fff; }
+.teams-calendar-result .teams-calendar-result-close { top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 8px; color: #667085; }
+.teams-calendar-result button:focus-visible { outline: 3px solid #b59adf; outline-offset: 3px; }
+@media (max-width: 600px) { .swal2-popup.teams-calendar-result { padding: 22px 18px; } .teams-calendar-result .teams-calendar-result-title { font-size: 19px; } .teams-calendar-result .teams-calendar-result-actions { flex-wrap: wrap; } }

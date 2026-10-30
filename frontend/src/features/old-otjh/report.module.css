@@ -1,0 +1,169 @@
+.activityTableWrap { min-width: 0; overflow: hidden; }
+.activityTable, .signTable { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+:global(.dashboard-theme .workspace-main) table.activityTable,
+:global(.dashboard-theme .workspace-main) table.signTable { min-width: 0; width: 100%; white-space: normal; }
+.activityTable th, .signTable th { padding: 9px 10px; text-align: left; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--record-muted); background: var(--record-soft); }
+.activityTable td, .signTable td { padding: 10px; vertical-align: top; overflow-wrap: anywhere; border-top: 1px solid var(--record-border); }
+:global(.dashboard-theme .workspace-main) table.activityTable thead th,
+:global(.dashboard-theme .workspace-main) table.signTable thead th { background: var(--record-soft); color: var(--record-muted); padding: 9px 10px; }
+:global(.dashboard-theme .workspace-main) table.activityTable tbody td,
+:global(.dashboard-theme .workspace-main) table.signTable tbody td { height: auto; padding: 10px; border-color: var(--record-border); }
+.activityTable th:nth-child(1) { width: 9%; }
+.activityTable th:nth-child(2) { width: 9%; }
+.activityTable th:nth-child(3) { width: 48%; }
+.activityTable th:nth-child(4) { width: 14%; }
+.activityTable th:nth-child(5), .activityTable th:nth-child(6) { width: 10%; }
+.signTable th:nth-child(1) { width: 10%; }
+.signTable th:nth-child(2) { width: 40%; }
+.signTable th:nth-child(3) { width: 22%; }
+.signTable th:nth-child(4) { width: 12%; }
+.signTable th:nth-child(5) { width: 16%; }
+.activityTable .activityRow:nth-child(even) { background: var(--record-surface); }
+.activityTable .activityCell { min-width: 0; overflow-wrap: anywhere; }
+.activityDescription { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; min-width: 0; }
+.activityTrigger { display: inline-flex; align-items: flex-start; gap: 6px; text-align: left; max-width: 100%; padding-block: 2px; border-radius: 5px; }
+.activityTrigger span { min-width: 0; }
+:global(.dashboard-theme .workspace-main) .activityTable .activityTrigger { white-space: normal; overflow-wrap: anywhere; }
+.activityTrigger:hover { color: var(--record-brand); text-decoration: underline; }
+.activityBadges { display: flex; flex-wrap: wrap; gap: 4px; }
+.activityNotes { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; color: var(--record-muted); font-size: 11px; }
+.activityNotes > p { min-width: 0; }
+.activityTable .groupRow th { background: #eef0f1; padding: 8px 16px; text-align: left; font-weight: 600; }
+.groupRow h3 { display: inline; font-size: 10px; letter-spacing: .06em; }
+.groupRow h3 span { font-weight: 400; }
+.groupNote { margin-left: 10px; font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.activityTable .expansionRow td { white-space: normal; }
+.signatureCell { min-width: 0; }
+.signTable td { vertical-align: middle; }
+.signTable td[data-label='Status'] > span { text-transform: none; letter-spacing: 0; }
+.reportTableWrap { min-width: 0; overflow: hidden; border: 1px solid var(--record-border); border-radius: 6px; }
+.detailBadge { display: inline-flex; border-radius: 6px; background: var(--record-soft); border: 1px solid var(--record-ring); padding: 2px 6px; font-size: 10px; font-weight: 500; color: var(--record-deep); }
+.document { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 8px; margin-top: 2px; }
+.documentName { display: inline-flex; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.documentActions { display: inline-flex; gap: 8px; }
+.documentActions > :is(button, a) { color: var(--record-brand); font-size: 11px; font-weight: 500; }
+.documentActions > :is(button, a):hover { text-decoration: underline; }
+.actualValue { color: #087f75; }
+.ksbBadge { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 6px; background: #e8edf0; color: #456078; font-size: 9px; font-weight: 500; }
+.ksbBadge[data-kind='B'] { color: #9b641f; background: #fff3e1; }
+.ksbBadge[data-kind='S'] { color: #197969; background: #e7f2ed; }
+/* The workspace applies !important purple table styling globally. Keep these
+   overrides specific to the two journal tables. */
+:global(body .dashboard-theme .workspace-main) :is(table.activityTable, table.signTable) {
+  border: 0 !important; border-radius: 0 !important; border-collapse: collapse !important;
+  background: #fff !important; box-shadow: none !important; color: var(--record-ink);
+}
+:global(body .dashboard-theme .workspace-main) :is(table.activityTable, table.signTable) > thead > tr > th {
+  height: 40px; padding: 10px 16px; border-bottom: 1px solid var(--record-border) !important;
+  background: #a4adb7 !important; color: #263f54 !important; text-align: left; font-size: 10px;
+}
+:global(body .dashboard-theme .workspace-main) table.signTable > thead > tr > th { height: 32px; background: #f1f5f9 !important; font-size: 9px; }
+:global(body .dashboard-theme .workspace-main) :is(table.activityTable, table.signTable) > tbody > tr {
+  background: #fff !important; box-shadow: none;
+}
+:global(body .dashboard-theme .workspace-main) table.signTable > tbody > tr { background: #fcfbf7 !important; }
+:global(body .dashboard-theme .workspace-main) table.activityTable > tbody > tr.activityRow:hover { background: #f8fafc !important; }
+:global(body .dashboard-theme .workspace-main) :is(table.activityTable, table.signTable) > tbody > tr > td {
+  padding: 12px 16px; background: inherit !important; border-color: var(--record-border);
+  border-bottom: 1px solid var(--record-border) !important; color: var(--record-ink); text-align: left; font-size: 12px;
+}
+:global(body .dashboard-theme .workspace-main) table.activityTable > tbody > .groupRow > th {
+  width: auto; border-bottom: 1px solid #c9cdd0 !important; background: #eef0f1 !important; color: #304a61; padding: 7px 16px;
+}
+:global(body .dashboard-theme .workspace-main) table.activityTable .groupRow h3 { font-size: 10px; }
+:global(body .dashboard-theme .workspace-main) table.signTable > tbody > tr > td + td,
+:global(body .dashboard-theme .workspace-main) table.signTable > thead > tr > th + th { border-left: 1px solid var(--record-border); }
+.activityDescription > p { text-align: left; }
+.document { font-size: 11px; }
+.modalIntro { animation: reveal 180ms ease-out; }
+@keyframes reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Keep report tables on the journal's navy palette when the workspace theme
+   applies its default purple table treatment. */
+:global(body.dashboard-theme .workspace-main) .activityLog table.activityTable > thead > tr > th,
+:global(body.dashboard-theme .workspace-main) .signoff table.signTable > thead > tr > th {
+  background: #a4adb7 !important;
+  color: #263f54 !important;
+}
+
+:global(body.dashboard-theme .workspace-main) .activityLog table.activityTable > tbody > .groupRow > th {
+  background: #eef0f1 !important;
+  color: #304a61 !important;
+}
+
+/* The theme wrapper is not always mounted on body (it can be a root div), so
+   keep a wrapper-agnostic rule as well. */
+:global(.dashboard-theme .workspace-main) table.activityTable thead th,
+:global(.dashboard-theme .workspace-main) table.signTable thead th {
+  background: #a4adb7 !important;
+  color: #263f54 !important;
+}
+
+:global(html body .dashboard-theme .workspace-main) table.activityTable thead th,
+:global(html body .dashboard-theme .workspace-main) table.signTable thead th {
+  background: #a4adb7 !important;
+  color: #263f54 !important;
+}
+@media (prefers-reduced-motion: reduce) { .modalIntro { animation: none; } }
+@media (max-width: 1023px) {
+  /* The workspace's generic tables have a minimum width and fixed cell
+     heights. These two report tables reflow into cards instead. */
+  :global(.dashboard-theme .workspace-main) table.activityTable,
+  :global(.dashboard-theme .workspace-main) table.signTable { position: relative; min-width: 0; width: 100%; white-space: normal; }
+  .activityTable, .activityTable tbody, .signTable, .signTable tbody { display: block; }
+  .activityTable thead, .signTable thead { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .activityTable .activityRow, .signTable tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 12px; gap: 10px 14px; border-top: 1px solid var(--record-border); }
+  :global(.dashboard-theme .workspace-main) table.activityTable tbody td,
+  :global(.dashboard-theme .workspace-main) table.signTable tbody td { display: block; height: auto; padding: 0; border: 0; width: auto; min-width: 0; overflow-wrap: anywhere; }
+  :global(body .dashboard-theme .workspace-main) :is(table.activityTable, table.signTable) > tbody > tr > td { padding: 0; border: 0 !important; }
+  .activityTable td[data-label]::before, .signTable td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: oklch(var(--foreground-500)); }
+  .activityTable .activityCell { grid-column: 1 / -1; width: auto; order: -1; }
+  .activityTable .groupRow, .activityTable .groupRow th { display: block; width: 100%; }
+  .activityTable .expansionRow { display: block; padding: 8px; }
+  .signTable .signatureCell { grid-column: 1 / -1; order: 1; }
+  .documentName { max-width: 100%; }
+  .documentName > span { min-width: 0; }
+  .activityTrigger { min-height: 36px; align-items: center; }
+  .documentActions > :is(button, a) { display: inline-flex; align-items: center; min-height: 36px; }
+}
+@media (max-width: 639px) {
+  .activityTable .activityRow, .signTable tbody tr { padding: 10px; gap: 8px 10px; }
+  .activityTable td[data-label='Timestamp'] { grid-column: 1 / -1; }
+  .signTable td[data-label='Status'] { order: 1; }
+  .signTable td[data-label='Print name'] { order: 2; }
+  .signTable td[data-label='Date'] { order: 3; }
+  .signTable .signatureCell { order: 4; }
+  .document { grid-template-columns: minmax(0, 1fr); }
+  .activityTrigger, .documentActions > :is(button, a) { min-height: 40px; }
+}
+
+/* Record tables are shared with coach views; only the learner dark workspace
+   follows Attendance's navy cards. */
+:global(html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main) :is(table.activityTable, table.signTable) {
+  background: #182d48 !important;
+  color: #f6f8fb;
+}
+:global(html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main) :is(table.activityTable, table.signTable) > thead > tr > th,
+:global(html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main) table.activityTable > tbody > .groupRow > th {
+  background: #24405d !important;
+  color: #dce7f4 !important;
+  border-color: #3b526c !important;
+}
+:global(html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main) :is(table.activityTable, table.signTable) > tbody > tr {
+  background: #182d48 !important;
+}
+:global(html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main) :is(table.activityTable, table.signTable) > tbody > tr:nth-child(even) {
+  background: #1e344d !important;
+}
+:global(html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main) table.activityTable > tbody > tr.activityRow:hover {
+  background: #24405d !important;
+}
+:global(html[data-theme="dark"] body .dashboard-theme[data-workspace-role="learner"] .workspace-main) :is(table.activityTable, table.signTable) > tbody > tr > td {
+  border-color: #3b526c !important;
+  color: #f6f8fb;
+}
+:global(html[data-theme="dark"] .dashboard-theme[data-workspace-role="learner"]) :is(.ksbBadge, .detailBadge) {
+  background: #24405d;
+  border-color: #3b526c;
+  color: #dce7f4;
+}

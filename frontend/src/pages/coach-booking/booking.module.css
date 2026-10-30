@@ -1,0 +1,51 @@
+.page { min-height: 100vh; padding: 0 28px 24px; background: radial-gradient(ellipse at top right, #eee8fc, transparent 60%), #f8f7fc; color: #241638; }
+.container { width: 100%; max-width: 1200px; margin: 0 auto; }
+.brandBar { min-height: 112px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.brandBar img { width: 175px; height: 80px; object-fit: contain; object-position: left center; }
+.brandBar > span { display: inline-flex; align-items: center; gap: 9px; border: 1px solid #e5ddf1; background: #ffffffb3; padding: 10px 15px; border-radius: 24px; color: #614681; font-size: 13px; font-weight: 600; }
+.hero { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 40px; overflow: hidden; padding: 40px 44px; border-radius: 24px; background: linear-gradient(115deg, #341268 0%, #512293 70%, #6739a7 100%); box-shadow: 0 12px 30px #3f167414; }
+.heroCopy { position: relative; max-width: 760px; }
+.hero .eyebrow { margin: 0 0 14px; color: #e2c8ff; font-size: 11px; font-weight: 750; letter-spacing: 2px; }
+.hero h1 { margin: 0; color: white !important; font-size: clamp(26px, 3vw, 38px); font-weight: 750; letter-spacing: -.8px; line-height: 1.2; overflow-wrap: anywhere; }
+.heroCopy > p:not(.eyebrow) { margin: 17px 0 22px; color: #ece2f9; font-size: 15px; line-height: 1.8; max-width: 620px; }
+.accessNote { display: inline-flex; gap: 8px; align-items: center; color: #eee2ff; font-size: 12px; }
+.heroIcon { display: grid; place-items: center; flex: 0 0 126px; height: 126px; border-radius: 28px; border: 1px solid #ffffff30; background: #ffffff0c; transform: rotate(-8deg); color: #e9d7ff; }
+.heroIcon svg { width: 72px; height: 72px; }
+.sectionHeading { display: flex; align-items: center; gap: 14px; margin: 32px 0 18px; }
+.stepNumber { display: grid; place-items: center; flex: 0 0 36px; height: 36px; border: 1px solid #e1d4f4; border-radius: 12px; background: #f0e9fa; color: #64359e; font-size: 12px; font-weight: 750; }
+.sectionHeading h2 { margin: 0; color: #2d1945; font-size: 19px; font-weight: 750; }
+.sectionHeading p { margin: 5px 0 0; color: #72657f; font-size: 13px; line-height: 1.6; }
+.options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.option { display: flex; flex-direction: column; align-items: stretch; min-width: 0; padding: 22px; border: 1px solid #e5def0; border-radius: 18px; background: white; text-align: left; color: #3a2059; box-shadow: 0 3px 12px #36126304; transition: border-color .15s, box-shadow .15s, background .15s; cursor: pointer; }
+.option:hover:not(:disabled) { border-color: #9e77c8; box-shadow: 0 6px 20px #36126312; }
+.option[aria-pressed='true'] { border-color: #7038b8; background: #f5f0fc; box-shadow: inset 0 0 0 1px #7038b8; }
+.cardTop { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; color: #7038b8; }
+.optionIcon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: #f2ebfb; color: #7038b8; }
+.option[aria-pressed='true'] .optionIcon { background: #7038b8; color: white; }
+.optionTitle { font-size: 16px; font-weight: 750; }
+.optionDescription { flex: 1; margin: 10px 0 22px; font-size: 13px; line-height: 1.75; color: #74677f; }
+.optionAction { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 15px; border-top: 1px solid #ece5f4; font-size: 12px; font-weight: 700; color: #6733a5; }
+.option:disabled { cursor: not-allowed; background: #faf9fc; color: #82758d; }
+.option:disabled .optionIcon, .option:disabled .optionAction { color: #8e8299; }
+.booking { margin-top: 26px; overflow: hidden; background: white; border: 1px solid #e5def0; border-radius: 20px; box-shadow: 0 6px 24px #36126305; }
+.bookingHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; padding: 24px; }
+.bookingHeader .sectionHeading { margin: 0; }
+.openBooking { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 18px; border-radius: 12px; background: #6025a6; color: white !important; font-size: 13px; font-weight: 650; text-decoration: none; box-shadow: 0 4px 10px #6025a620; }
+.openBooking:hover { background: #471882; }
+.bookingNote { margin: 0; border-top: 1px solid #eee8f5; border-bottom: 1px solid #eee8f5; padding: 12px 24px; background: #faf8fd; color: #766382; font-size: 12px; line-height: 1.6; }
+.frame { display: block; width: 100%; min-height: 700px; border: 0; background: white; }
+.empty { display: flex; flex-direction: column; align-items: center; padding: 48px 24px; text-align: center; }
+.emptyIcon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 20px; background: #f3ecfc; color: #8656ba; margin-bottom: 20px; }
+.empty h2 { margin: 0; font-size: 19px; font-weight: 700; color: #3a2059; }
+.empty p { margin: 10px 0 0; color: #7c6e88; font-size: 13px; line-height: 1.7; }
+.footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 26px 4px; font-size: 11px; color: #81728e; }
+.footer > span:first-child { font-weight: 700; color: #614878; }
+.message { margin-top: 24px; padding: 24px; border: 1px solid #e5def0; border-radius: 16px; background: white; }
+.retry { margin-left: 16px; padding: 8px 16px; border: 1px solid #d8c7eb; border-radius: 8px; }
+.page button:focus-visible, .page a:focus-visible { outline: 3px solid #9861d0; outline-offset: 4px; }
+@media (max-width: 1000px) { .options { grid-template-columns: repeat(2, minmax(0, 1fr)); } .heroIcon { display: none; } }
+@media (max-width: 560px) {
+  .page { padding: 0 16px 16px; } .brandBar { min-height: 96px; gap: 10px; } .brandBar img { width: 138px; height: 66px; } .brandBar > span { font-size: 11px; padding: 8px 10px; }
+  .hero { padding: 28px 24px; border-radius: 20px; } .hero h1 { font-size: 28px; } .options { grid-template-columns: minmax(0, 1fr); } .option { padding: 20px; }
+  .cardTop { margin-bottom: 14px; } .bookingHeader { padding: 20px; } .openBooking { width: 100%; } .bookingNote { padding: 12px 20px; } .sectionHeading { align-items: flex-start; } .frame { min-height: 640px; }
+}

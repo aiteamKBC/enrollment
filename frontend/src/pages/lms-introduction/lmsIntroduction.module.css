@@ -1,0 +1,15 @@
+.form { display: grid; gap: 18px; padding: 24px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.field { display: grid; gap: 7px; font-size: 13px; font-weight: 650; color: #3a2059; }
+.field input, .field select, .field textarea { width: 100%; padding: 11px 13px; border: 1px solid #d8cbe8; border-radius: 10px; background: white; color: #241638; font: inherit; font-weight: 400; font-size: 14px; }
+.field textarea { min-height: 96px; resize: vertical; }
+.field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible { outline: 3px solid #9861d0; outline-offset: 2px; }
+.hint { margin: 0; color: #766382; font-size: 12px; line-height: 1.6; }
+.error { margin: 0; padding: 12px 14px; border: 1px solid #f1c4c4; border-radius: 10px; background: #fdf2f2; color: #8a1f1f; font-size: 13px; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.submit { display: inline-flex; align-items: center; gap: 10px; padding: 13px 20px; border: 0; border-radius: 12px; background: #6025a6; color: white; font-size: 14px; font-weight: 650; cursor: pointer; }
+.submit:hover:not(:disabled) { background: #471882; }
+.submit:disabled { opacity: .6; cursor: not-allowed; }
+.secondary { padding: 12px 18px; border: 1px solid #d8c7eb; border-radius: 12px; background: white; color: #4b2a78; font-size: 14px; font-weight: 600; cursor: pointer; }
+.summary { margin: 14px 0 0; color: #3a2059; font-size: 15px; font-weight: 650; }
+@media (max-width: 560px) { .form { padding: 20px; } .fields { grid-template-columns: minmax(0, 1fr); } .submit, .secondary { width: 100%; justify-content: center; } }
