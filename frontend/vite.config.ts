@@ -12,8 +12,10 @@ export default defineConfig(({ mode }) => {
   // Read the local backend address before configuring the dev proxy. All API
   // prefixes belong to the same Django application and must follow this target.
   const env = loadEnv(mode, __dirname, "VITE_API_");
-  const apiTarget = env.VITE_API_TARGET || env.VITE_API_PROXY || "http://127.0.0.1:8001";
+  const apiTarget = env.VITE_API_TARGET || env.VITE_API_PROXY || "http://127.0.0.1:8000";
   return {
+  // Keep optimized dependencies local even when node_modules is a shared junction.
+  cacheDir: resolve(__dirname, ".cache/vite"),
   define: {
     __BASE_PATH__: JSON.stringify(base),
     __IS_PREVIEW__: JSON.stringify(isPreview),
@@ -107,7 +109,8 @@ export default defineConfig(({ mode }) => {
     },
   },
     server: {
-    port: 3001,
+    port: 3000,
+    strictPort: true,
     host: "0.0.0.0",
     // Forward API calls to the Django backend so the browser sees them as
     // same-origin (no CORS). Override :8000 with VITE_API_TARGET when another

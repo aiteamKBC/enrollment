@@ -29,12 +29,13 @@ point this service at the original LMS database.
 In separate terminals:
 
 ```powershell
-backend/.venv/Scripts/python.exe backend/manage.py runserver 127.0.0.1:8001
+backend/.venv/Scripts/python.exe backend/manage.py runserver 127.0.0.1:8000
 npm --prefix frontend run dev
 ```
 
-Open http://localhost:3001. Vite proxies API requests to `VITE_API_TARGET`, normally
-http://127.0.0.1:8001. `/health/` is a liveness endpoint; it does not claim database or
+Open http://localhost:3000. The dev server requires port 3000 and stops if it is
+already in use. Vite proxies API requests to `VITE_API_TARGET`, normally
+http://127.0.0.1:8000. `/health/` is a liveness endpoint; it does not claim database or
 Microsoft availability. Existing account passwords are copied; browser sessions and
 password-reset sessions are independent. Production must use HTTPS and secure cookies.
 
@@ -127,7 +128,7 @@ daphne -b 127.0.0.1 -p 8002 enrollment_service.receiver_asgi:application
 
 Put the receiver behind a private HTTPS route ending `/handoff`; set that URL in the
 enrolment backend. Service runtime can use
-`daphne -b 127.0.0.1 -p 8001 enrollment_service.asgi:application` behind the frontend proxy.
+`daphne -b 127.0.0.1 -p 8000 enrollment_service.asgi:application` behind the frontend proxy.
 Supply environment files through the process manager; neither ASGI module loads the
 receiver's environment automatically.
 
