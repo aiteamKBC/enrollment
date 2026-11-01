@@ -326,6 +326,11 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
     ],
   },
   {
+    slug: 'programme-suitability',
+    label: 'Programme Suitability & Modules',
+    items: [],
+  },
+  {
     slug: 'cv-job',
     label: 'CV/Job Description',
     sectionStyle: 'section',

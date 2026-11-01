@@ -13,6 +13,7 @@ import { BUILTIN_ITEMS, BUILTIN_STEPS, isMovable, type BuiltinItemDef } from './
 import type { CustomAnswer, LayoutItem, LayoutStep, WizardLayout } from './types';
 import type { WizardDraft } from '../../types';
 import { cleanTexts } from './texts';
+import { SUITABILITY_STEP } from '@/features/programme-suitability/wizardStep';
 
 export function defaultLayout(): WizardLayout {
   return {
@@ -54,7 +55,10 @@ export function layoutForLearner(layout: WizardLayout, commercial: boolean): Wiz
 
 /** The published layout, made whole against the registry. */
 export function resolveLayout(saved: WizardLayout | null | undefined): WizardLayout {
-  if (!saved || !Array.isArray(saved.steps) || saved.steps.length === 0) return defaultLayout();
+  if (!saved || !Array.isArray(saved.steps) || saved.steps.length === 0) return {
+    ...defaultLayout(), ...(saved?.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
+    ...(saved?.programmeModules ? { programmeModules: saved.programmeModules } : {}),
+  };
 
   const known = new Set(BUILTIN_STEPS.map((s) => s.slug));
   const placed = new Set<string>();
@@ -82,8 +86,15 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
   // Built-in steps the layout doesn't mention go back at their default index.
   BUILTIN_STEPS.forEach((def, index) => {
     if (steps.some((s) => s.slug === def.slug)) return;
-    steps.splice(Math.min(index, steps.length), 0, { slug: def.slug, label: def.label, builtin: true, hidden: false, items: [] });
+    const cvIndex = steps.findIndex((s) => s.slug === 'cv-job');
+    const at = def.slug === SUITABILITY_STEP.slug && cvIndex >= 0 ? cvIndex : Math.min(index, steps.length);
+    steps.splice(at, 0, { slug: def.slug, label: def.label, builtin: true, hidden: false, items: [] });
   });
+
+  if (saved.programmeSuitability?.enabled) {
+    const assessment = steps.find((s) => s.slug === SUITABILITY_STEP.slug)!;
+    assessment.hidden = false;
+  }
 
   // Built-in items the layout doesn't mention go back into their home step,
   // after the registry item that precedes them.
@@ -99,7 +110,8 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
   }
 
   const texts = cleanTexts(saved.texts);
-  return texts ? { steps, texts } : { steps };
+  return { steps, ...(texts ? { texts } : {}), ...(saved.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
+    ...(saved.programmeModules ? { programmeModules: saved.programmeModules } : {}) };
 }
 
 /** The steps a learner walks through, in order. */

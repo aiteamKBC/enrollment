@@ -16,6 +16,10 @@ import { layoutForLearner, resolveLayout, visibleSteps } from './layout/resolve'
 import { WizardTextsContext } from './layout/textsContext';
 import type { CustomAnswer, LayoutStep, WizardLayout } from './layout/types';
 import { WIZARD_STEPS, type EnrolmentBoard, type IlrForm, type Ksb, type WizardDraft } from '../types';
+import { useSuitability } from '@/features/programme-suitability/useSuitability';
+import { useModulesConfiguration } from '@/features/programme-suitability/modules/useModulesConfiguration';
+import { moduleSelectionComplete, selectionFingerprint, type ProgrammeModuleSelection } from '@/features/programme-suitability/modules/configuration';
+import { saveModuleSelection } from '@/features/programme-suitability/modules/api';
 
 function emptyIlr(firstNames: string, surname: string): IlrForm {
   return {
@@ -130,6 +134,8 @@ function mergeSaved(prev: WizardDraft, res: ExtendedIlrResponse): WizardDraft {
   // The Inclusion status comes from the Safeguarding database on every open,
   // never from a saved draft, which the learner could have written themselves.
   next.inclusion = prev.inclusion;
+  next.programmeSuitability = prev.programmeSuitability;
+  next.programmeModulesCompletion = prev.programmeModulesCompletion;
   // Likewise the programme's KSB list: read from the curriculum, never saved.
   if (next.skillsRadar) next.skillsRadar = { ...next.skillsRadar, programmeKsbIds: prev.skillsRadar?.programmeKsbIds };
   return next;
@@ -174,6 +180,9 @@ export function WizardProvider({
     return { saved, filled: isCommercial ? saved : withRecordDefaults(saved, board) };
   });
   const [draft, setDraft] = useState<WizardDraft>(initial.filled);
+  const [savedModuleChoice, setSavedModuleChoice] = useState<ProgrammeModuleSelection | undefined>(initial.saved.programmeModules);
+  const [moduleEditVersion, setModuleEditVersion] = useState(0);
+  const [savedModuleEditVersion, setSavedModuleEditVersion] = useState(0);
   // Read by the hydration effect, which is keyed on the learner rather than on
   // every new board object.
   const boardRef = useRef(board);
@@ -194,12 +203,13 @@ export function WizardProvider({
   // wizard as it was before the builder existed — rather than blocking anyone.
   const [layoutPeek] = useState(() => (layoutOverride ? undefined : peekWizardLayout()));
   const [publishedLayout, setPublishedLayout] = useState<WizardLayout | null>(() => layoutPeek?.layout ?? null);
+  const [publishedVersion, setPublishedVersion] = useState<number | null>(layoutPeek?.version ?? null);
   const [layoutSettled, setLayoutSettled] = useState(Boolean(layoutOverride || layoutPeek));
   useEffect(() => {
     if (layoutOverride) return;
     let cancelled = false;
     fetchWizardLayout()
-      .then((res) => { if (!cancelled) setPublishedLayout(res.layout ?? null); })
+      .then((res) => { if (!cancelled) { setPublishedLayout(res.layout ?? null); setPublishedVersion(res.version); } })
       .catch(() => {
         // Not fatal: the default layout stays in place.
       })
@@ -211,6 +221,13 @@ export function WizardProvider({
     [layoutOverride, publishedLayout, isCommercial]
   );
   const steps = useMemo(() => visibleSteps(layout), [layout]);
+  const suitability = useSuitability(kindForSeed, userId, Boolean(layout.programmeSuitability), publishedVersion,
+    ['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) || layout.programmeSuitability?.enabled === false);
+  const modules = useModulesConfiguration(kindForSeed, userId, suitability.selectionConfirmed, publishedVersion);
+  const modulesRequired = !['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) && suitability.selectionConfirmed && suitability.state?.selectedProgramme === 'PCP_L6';
+  const modulesComplete = Boolean(modules.data && !modules.error && savedModuleChoice && moduleEditVersion === savedModuleEditVersion &&
+    selectionFingerprint(draft.programmeModules) === selectionFingerprint(savedModuleChoice) &&
+    moduleSelectionComplete(modules.data.configuration, savedModuleChoice, modules.data.configurationVersion));
 
   /**
    * The draft as it was last written to the server (or last read from it).
@@ -239,6 +256,7 @@ export function WizardProvider({
     fetchExtendedIlr(kind, userId)
       .then((res) => {
         if (cancelled || (!res.answers && !res.draft)) return;
+        setSavedModuleChoice(res.draft?.programmeModules);
         setDraft((prev) => {
           const merged = mergeSaved(prev, res);
           // What just came back from the server is, by definition, saved — so
@@ -380,9 +398,15 @@ export function WizardProvider({
       userId,
       isCommercial,
       board,
-      draft,
+      draft: suitability.enabled ? { ...draft, programmeSuitability: { required: suitability.required, status: suitability.status, selectionConfirmed: suitability.selectionConfirmed, selectedProgramme: suitability.state?.selectedProgramme },
+        programmeModulesCompletion: { required: modulesRequired, complete: modulesComplete } } : draft,
+      suitability,
+      modules,
       readOnly: readOnlyLearnerSteps,
-      setSection: (key, val) => setDraft((prev) => ({ ...prev, [key]: val })),
+      setSection: (key, val) => {
+        if (key === 'programmeModules') setModuleEditVersion((version) => version + 1);
+        setDraft((prev) => ({ ...prev, [key]: val }));
+      },
       setCustom: (fieldKey, val) => setDraft((prev) => ({ ...prev, custom: { ...(prev.custom ?? {}), [fieldKey]: val } })),
       layout,
       steps,
@@ -403,6 +427,8 @@ export function WizardProvider({
           const { ilr, ...rest } = saving;
           // Read from the Safeguarding database on every open; never stored.
           delete rest.inclusion;
+          delete rest.programmeSuitability;
+          delete rest.programmeModulesCompletion;
           // Read from the curriculum on every open; never stored.
           if (rest.skillsRadar) {
             const skillsRadar = { ...rest.skillsRadar };
@@ -410,6 +436,13 @@ export function WizardProvider({
             rest.skillsRadar = skillsRadar;
           }
           const res = await saveExtendedIlr(kind, userId, ilr, rest);
+          if (modules.data && rest.programmeModules && moduleEditVersion !== savedModuleEditVersion &&
+            moduleSelectionComplete(modules.data.configuration, rest.programmeModules, modules.data.configurationVersion)) {
+            const committed = await saveModuleSelection(kind, userId, rest.programmeModules);
+            rest.programmeModules = committed.selection;
+          }
+          setSavedModuleChoice(rest.programmeModules);
+          setSavedModuleEditVersion(moduleEditVersion);
           lastSavedDraft.current = saving;
           setIlrSavedAt(res.meta.updatedAt);
         } finally {
@@ -419,7 +452,7 @@ export function WizardProvider({
       ilrSaving,
       ilrSavedAt,
       hydrated,
-      ready: hydrated && ksbsSettled && layoutSettled && inclusionSettled,
+      ready: hydrated && ksbsSettled && layoutSettled && inclusionSettled && (!suitability.enabled || !suitability.loading) && (!modulesRequired || Boolean(modules.data || modules.error)),
       fileIlrDocument: async () => {
         setIlrFiling(true);
         try {
@@ -443,7 +476,7 @@ export function WizardProvider({
       ilrFiling,
       inclusionCheck,
     }),
-    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck]
+    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleEditVersion, savedModuleEditVersion]
   );
 
   return (

@@ -212,6 +212,16 @@ def extended_ilr(request, kind, learner_id):
         if answers is None and draft is None:
             return _error("Provide 'answers' and/or 'draft' to save.", 400)
 
+        if draft is not None and 'programmeModules' in draft:
+            from programme_suitability.configuration import ConfigurationError
+            from programme_suitability.modules_service import validate_choices
+            try:
+                draft['programmeModules'] = validate_choices(kind, int(learner_id), draft['programmeModules'])
+            except ConfigurationError as exc:
+                return _error(str(exc), 400)
+            except DatabaseError:
+                return _error('Could not verify module choices. Please retry.', 503)
+
         defaults = {"learner_name": learner_name}
         if answers is not None:
             # Signature/`completed` flags are derived from the answers, so they

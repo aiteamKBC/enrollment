@@ -20,6 +20,8 @@ import { ILR_SIGNATURE_LABEL } from './layout/registry';
 import { DEFAULT_LAYOUT, missingForLayoutStep, visibleSteps } from './layout/resolve';
 import type { WizardLayout } from './layout/types';
 import type { WizardDraft } from '../types';
+import { ASSESSMENT_LABEL } from '@/features/programme-suitability/useSuitability';
+import { SUITABILITY_STEP } from '@/features/programme-suitability/wizardStep';
 
 export { ILR_SIGNATURE_LABEL };
 
@@ -45,7 +47,13 @@ export function ilrDetailsMissing(d: WizardDraft, layout: WizardLayout = DEFAULT
  */
 export function missingForStep(stepIndex: number, draft: WizardDraft, layout: WizardLayout = DEFAULT_LAYOUT): string[] {
   const step = visibleSteps(layout)[stepIndex];
-  return step ? missingForLayoutStep(step, draft, layout) : [];
+  if (!step) return [];
+  const missing = missingForLayoutStep(step, draft, layout);
+  if (step.slug === SUITABILITY_STEP.slug && draft.programmeModulesCompletion?.required && !draft.programmeModulesCompletion.complete) missing.push('PCP pathway and modules (complete and save your selection)');
+  if (!layout.programmeSuitability?.enabled) return missing;
+  if (step.slug === 'cv-job') return missing.filter((label) => label !== 'Previous experience (or N/A)');
+  if (step.slug === SUITABILITY_STEP.slug && draft.programmeSuitability?.required !== false && (draft.programmeSuitability?.status !== 'SUBMITTED' || !draft.programmeSuitability.selectionConfirmed)) missing.push(ASSESSMENT_LABEL);
+  return missing;
 }
 
 export function isStepComplete(stepIndex: number, draft: WizardDraft, layout: WizardLayout = DEFAULT_LAYOUT): boolean {

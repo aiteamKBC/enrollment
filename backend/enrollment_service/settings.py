@@ -31,11 +31,18 @@ os.environ.setdefault('CHAT_DEMO_BOOTSTRAP_ENABLED', '0')
 
 from config.legacy_settings import *  # noqa: F401,F403,E402
 
+INSTALLED_APPS = [*INSTALLED_APPS, 'programme_suitability']
+
 ROOT_URLCONF = 'enrollment_service.urls'
 WSGI_APPLICATION = 'enrollment_service.wsgi.application'
 ASGI_APPLICATION = 'enrollment_service.asgi.application'
 SESSION_COOKIE_NAME = 'enrollment_django_session'
 CSRF_COOKIE_NAME = 'enrollment_csrftoken'
+if DEBUG:
+    # Local Vite must stay trusted even when a deployment-origin env override is present.
+    CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([
+        *CSRF_TRUSTED_ORIGINS, 'http://localhost:3000', 'http://127.0.0.1:3000',
+    ]))
 ENROLLMENT_SESSION_COOKIE_NAME = 'enrollment_session'
 LMS_URL = os.environ.get('LMS_URL', '').rstrip('/')
 ENROLLMENT_ONLY = True

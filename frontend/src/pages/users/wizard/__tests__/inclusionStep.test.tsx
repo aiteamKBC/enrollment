@@ -45,7 +45,7 @@ function Spy() {
   return null;
 }
 
-function renderWizard({ mode = 'learner', isCommercial = false, currentIndex = 8 }: { mode?: 'learner' | 'staff'; isCommercial?: boolean; currentIndex?: number } = {}) {
+function renderWizard({ mode = 'learner', isCommercial = false, currentIndex = defaultLayout().steps.findIndex((s) => s.slug === 'inclusion') }: { mode?: 'learner' | 'staff'; isCommercial?: boolean; currentIndex?: number } = {}) {
   const onNavigateStep = vi.fn();
   render(
     <ToastProvider>

@@ -1,0 +1,206 @@
+Editable Programme Modules and PCP Pathways
+Date: 2026-11-01
+Feature branch: CV-and-Programme-Suitability
+
+Result
+Modules are configured in the existing Enrolment form builder, on Programme
+Suitability & Modules. The assessment editor remains in place. There is no new
+top-level administration page and no module content in CV/Job Description.
+
+The administrator selects ME, MM, APM or PCP. Module names, sessions, credits,
+descriptions, order, active status and applicable learner-selectable flags are
+editable. Administrators can add modules, add nested submodules, deactivate or
+reactivate content and reorder it. PCP pathways additionally support editable
+titles, subtitles, descriptions, recognition text, target credits, order, active
+status and selection enablement. Additional pathways use stable generated IDs.
+Published content is deactivated rather than destructively deleted.
+
+Preview uses the same module renderer as the learner card. PCP preview choices
+are local state and never write to a learner. Credit totals are displayed, but
+target credits do not introduce mandatory validation or block wizard navigation.
+
+Publishing and draft storage
+The programmeModules key is part of the existing Wizard_Form_Layouts JSON and
+normal wizard publish transaction/baseVersion check. It is preserved by frontend
+layout resolution and existing builder operations. No second publishing system
+was introduced. Existing published content stays active while edits are drafts.
+
+The old builder had no persistent server draft. Save Draft now stores only the
+modules portion in a private ModuleConfigurationDraft record keyed to the
+authenticated administrator. Drafts carry the source wizard version; stale saves
+are rejected. Saved drafts can be explicitly restored and reviewed. An older
+saved draft is identified as such rather than automatically replacing edits.
+Publishing remains the existing Publish changes action for the wizard.
+
+Defaults and validation
+The original module lists and stable IDs have moved from frontend source to
+backend modules_defaults.json. This is idempotent fallback/seed content only;
+existing configurations are not overwritten and no layout is auto-published.
+Ordinary content changes require no future source-code edits.
+
+Configuration uses a version 1 schema with existing assessment programme codes
+ME_L4, MM_L6, APM_L4 and PCP_L6, not new programme catalogue records. Module IDs
+are unique within their containing programme/pathway (including nested items);
+the composite pathway/module identity preserves existing reused IDs such as pmp.
+
+Backend validation covers supported programmes, pathway association, stable IDs,
+duplicate IDs, parent/child trees and circular references, finite non-negative
+credits, non-negative integer sessions/order, boolean flags and schema versions.
+Absent PCP session values remain null. There is no fixed module/pathway count
+limit; existing request-size limits and a defensive nesting-depth guard apply.
+Content omitted from a new publication is retained as inactive. The entire
+configuration cannot be cleared with null to bypass historical retention.
+
+Permissions
+The existing enrolment authentication/access-grant gate and admissions staff
+policy protect defaults, private drafts and publication. Learners cannot write
+configuration through these APIs. Learner modules endpoints are read-only and
+scoped to the authenticated learner; another learner/employer is refused.
+Draft writes use CSRF protection and the existing CSRF retry mechanism.
+
+Historical learner content and selections
+Assessment now has nullable modules_configuration and
+modules_configuration_version fields. On the first modules access after confirmed
+programme selection, the current published modules configuration/version is
+copied into that existing learner assessment record. It remains immutable on
+later module reads. This follows the existing feature's snapshot/version policy
+at the beginning of the modules portion; an assessment's original question
+configuration/version and scores are not changed.
+
+Learners who already saved PCP choices before configurable modules existed are
+pinned to the original default content with version 0. This preserves original
+names, sessions, credits, hierarchy and IDs even if an administrator has already
+renamed or deactivated them in a later publication. Pinning is lazy and scoped;
+there was no bulk rewrite of historical submissions.
+
+PCP pathway/module IDs remain in the existing Extended_ILR.Wizard_draft JSON,
+alongside a configurationVersion marker. Other wizard answers remain in that
+same draft. Saves validate the confirmed selected programme, pinned version,
+available pathway, module IDs and selection flags. Existing unversioned choices
+remain readable and can be upgraded on normal saves. Only the selected pathway's
+choices are active; prior choices in other paths remain retained. Module content
+comes from the backend snapshot, with active flags/order applied dynamically.
+
+New module enrolments use the current published configuration. Existing module
+enrolments retain their pinned content after publishing and refreshing. ME/MM/APM
+continue as read-only lists. PCP uses an adaptive grid and supports arbitrary
+pathway IDs/counts. All displays use the confirmed selected programme, including
+permitted alternative programmes, rather than the recommendation alone.
+
+Existing assessment questions, weights, scoring, recommendation, alternative
+reason flow, confirmation, account synchronization, result card, Preview
+Assessment, read-only Show Answers, CV fields and qualification labels are reused
+without changing their business logic. Existing automatic navigation after
+programme confirmation remains intact.
+
+Database migration
+New migration: programme_suitability.0005_modules_configuration
+Depends only on 0004_assessment_alternative_selection_reason.
+Adds two nullable Assessment snapshot fields and the private draft table.
+Historical migrations were not edited. No learner/programme rows were duplicated.
+The migration was applied successfully to the configured project database with:
+  backend/.venv/Scripts/python.exe backend/manage.py migrate programme_suitability
+    0005_modules_configuration --noinput
+Existing assessment/selection data was not updated by a data migration.
+showmigrations confirms 0001 through 0005 applied; makemigrations --check reports
+no model changes. No real wizard configuration was published for verification.
+
+Shared production files modified for this task (paths relative to enrollment/)
+backend/enrolment_api/wizard_layout.py
+  Validate/preserve the modules layout key, supply missing legacy defaults on
+  reads and enforce configuration publish permissions.
+backend/enrolment_api/extended_ilr.py
+  Validate the modules section before the existing wizard draft write.
+frontend/src/pages/users/wizard/layout/types.ts
+  Add the optional typed configuration key.
+frontend/src/pages/users/wizard/layout/resolve.ts
+  Preserve that key while resolving default and saved layouts.
+frontend/src/pages/users/wizard-builder/page.tsx
+  Host ModulesAdmin on the existing suitability step, pass the existing version,
+  update the draft configuration and prevent publication of locally invalid data.
+
+Existing feature files modified
+backend/programme_suitability/models.py
+backend/programme_suitability/urls.py
+backend/programme_suitability/test_modules_persistence.py
+frontend/src/features/programme-suitability/api.ts
+frontend/src/features/programme-suitability/modules/configuration.ts
+frontend/src/features/programme-suitability/modules/ProgrammeModulesCard.tsx
+frontend/src/features/programme-suitability/__tests__/modules.test.tsx
+frontend/src/features/programme-suitability/__tests__/modulesPersistence.test.tsx
+frontend/src/features/programme-suitability/__tests__/cvFieldsLock.test.tsx
+frontend/src/pages/users/wizard-builder/__tests__/wizardBuilder.test.tsx
+
+Files created
+backend/programme_suitability/modules_defaults.json
+backend/programme_suitability/modules_configuration.py
+backend/programme_suitability/modules_service.py
+backend/programme_suitability/modules_views.py
+backend/programme_suitability/migrations/0005_modules_configuration.py
+backend/programme_suitability/test_modules_configuration.py
+backend/programme_suitability/MODULES_BUILDER_REPORT.txt
+frontend/src/features/programme-suitability/modules/api.ts
+frontend/src/features/programme-suitability/modules/useModulesConfiguration.ts
+frontend/src/features/programme-suitability/modules/ModulesAdmin.tsx
+frontend/src/features/programme-suitability/modules/ModuleRowEditor.tsx
+frontend/src/features/programme-suitability/modules/PathwayEditor.tsx
+frontend/src/features/programme-suitability/modules/editorOps.ts
+frontend/src/features/programme-suitability/__tests__/modulesAdmin.test.tsx
+frontend/src/features/programme-suitability/__tests__/modulesFixtures.ts
+frontend/src/features/programme-suitability/__tests__/modules-defaults.json
+The frontend JSON is a test fixture, never a learner production fallback.
+
+Tests
+Backend feature suite: 103 passed using isolated in-memory test settings.
+  backend/.venv/Scripts/python.exe backend/manage.py test programme_suitability
+    --settings=programme_suitability.test_settings --noinput
+Shared backend regressions: 217 passed.
+  backend/.venv/Scripts/python.exe tools/run_backend_checks.py enrolment_api
+    enrollment_service.tests
+Frontend full suite: 438 passed across 55 test files.
+Focused editor/publish suites also passed (7 and 32 tests respectively). Reports are in ignored frontend/.cache:
+  modules-builder-regression.json, modules-publish-tests.json,
+  modules-editor-tests.json, modules-admin-focused.json
+  npm --prefix frontend test -- src/features/programme-suitability src/pages/users
+    src/pages/learner/onboarding --maxWorkers=2
+TypeScript type-check, ESLint, production build, Django system checks,
+makemigrations --check --dry-run and git diff --check passed.
+
+Chrome verification passed five grouped end-to-end UI scenarios with actual
+components/WizardProvider and isolated mocked APIs (no production learner writes):
+1. Private draft save/preview leaves published module content unchanged.
+2. Edit sessions/names, add a nested Chartered item and a fourth PCP pathway,
+   then publish through the existing wizard API client.
+3. Old PCP and ME records retain content and selected modules after publish/reload.
+4. New PCP receives the new pathway/module; selection persists after reload;
+   mobile has no horizontal overflow.
+5. New ME/MM/APM display published modules; Preview Assessment and disabled
+   Show Answers remain functional.
+No browser page errors. Results/screenshots are in ignored frontend/.cache;
+temporary harness files were removed. Backend permissions/version/storage are
+tested separately with real feature models on an isolated test database; browser
+fixtures do not replace that validation.
+
+Merge/integration coordination
+Highest textual-conflict risk: the five shared production files listed above
+and the shared wizardBuilder.test.tsx. The model, feature URLs/API and modules
+renderer also need coordination if another branch edits the same feature.
+No shared navigation, progress, step registration, CV body or scoring code was
+changed by this request. Earlier dirty/untracked work was preserved.
+
+Merge the frontend key preservation, editor, backend validation/API and migration
+together. Dropping the key during layout normalization would make publication
+appear successful without saving modules. Bypassing snapshot reads or validation
+would break historical names or allow invalid selections. Keep stable IDs and
+the configurationVersion marker when changing future serialization.
+
+Coordinate any competing programme_suitability migration numbered 0005 before
+merging. This migration has been applied locally; do not blindly rename or edit
+applied migration history. Deploy/apply its schema before serving the new backend
+model code. No migration dependency on another developer's app was introduced.
+
+No commit, push, merge, rebase or branch switch was performed. No unresolved
+implementation failure remains in the tested scope. Cross-tab concurrent edits
+retain the existing wizard draft save model; wizard publication itself keeps the
+existing baseVersion conflict check. Target-credit enforcement is intentionally
+not implemented. This report supersedes the earlier static-modules report.

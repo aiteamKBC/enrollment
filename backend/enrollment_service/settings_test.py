@@ -11,6 +11,7 @@ INSTALLED_APPS = [
     'login', 'learner_api', 'enrolment_api', 'coach_api', 'curriculum_api',
     'audit_api', 'manual_audit_api', 'engagement_api', 'quiz_api', 'chat',
     'read_models', 'old_otjh', 'system_audit', 'progress_reviews_api', 'knowledge_base', 'mobile_comms',
+    'programme_suitability',
 ]
 DATABASES = {name: {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'} for name in ('default', 'enrolment')}
 DATABASE_ROUTERS = ['learner_api.routers.EnrolmentRouter']

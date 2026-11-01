@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { SuitabilityAdmin } from '@/features/programme-suitability/SuitabilityAdmin';
+import { ModulesAdmin } from '@/features/programme-suitability/modules/ModulesAdmin';
+import { configurationErrors } from '@/features/programme-suitability/modules/configuration';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
@@ -143,7 +146,7 @@ export default function WizardBuilderPage() {
               <button type="button" className={btnSecondary} disabled={!dirty || publishing} onClick={() => published && setLayout(clone(published))}>
                 <AppIcon className="ri-arrow-go-back-line" />Discard changes
               </button>
-              <button type="button" className={btnPrimary} disabled={!dirty || publishing} onClick={() => setConfirming(true)}>
+              <button type="button" className={btnPrimary} disabled={!dirty || publishing || Boolean(layout?.programmeModules && configurationErrors(layout.programmeModules).length)} onClick={() => setConfirming(true)}>
                 <AppIcon className="ri-upload-cloud-2-line" />Publish changes
               </button>
             </div>
@@ -184,6 +187,7 @@ export default function WizardBuilderPage() {
               />
               {step && (
                 <StepEditor
+                  version={version}
                   key={step.slug}
                   layout={layout}
                   step={step}
@@ -264,12 +268,14 @@ function StepList({
 }
 
 function StepEditor({
+  version,
   layout,
   step,
   editing,
   setEditing,
   edit,
 }: {
+  version: number | null;
   layout: WizardLayout;
   step: LayoutStep;
   editing: string | 'new' | null;
@@ -306,7 +312,7 @@ function StepEditor({
           <input id="builder-step-name" className={`${inputClass} mt-1`} value={step.label} onChange={(e) => edit((l) => updateStep(l, step.slug, { label: e.target.value }))} />
         </label>
         <label className="flex items-center gap-2 pb-2 text-[12px] font-medium text-foreground-700">
-          <input type="checkbox" className="accent-primary-500" checked={!step.hidden} onChange={(e) => edit((l) => updateStep(l, step.slug, { hidden: !e.target.checked }))} />
+          <input type="checkbox" className="accent-primary-500" checked={!step.hidden} disabled={step.slug === 'programme-suitability' && layout.programmeSuitability?.enabled} onChange={(e) => edit((l) => updateStep(l, step.slug, { hidden: !e.target.checked }))} />
           Show this step to learners
         </label>
       </div>
@@ -327,6 +333,12 @@ function StepEditor({
       )}
       {!step.label.trim() && <p role="alert" className="mx-5 mt-3 text-[12px] text-red-600">Give the step a name before publishing.</p>}
 
+      {step.slug === 'programme-suitability' && <SuitabilityAdmin value={layout.programmeSuitability} onChange={(configuration) => edit((l) => ({
+        ...l, programmeSuitability: configuration,
+        steps: l.steps.map((s) => s.slug === 'programme-suitability' && configuration.enabled ? { ...s, hidden: false } : s),
+      }))} />}
+      {step.slug === 'programme-suitability' && <ModulesAdmin version={version} value={layout.programmeModules}
+        onChange={(programmeModules) => edit((l) => ({ ...l, programmeModules }))} />}
       <ol className="space-y-2 p-5" aria-label={`Items on ${step.label}`}>
         {shown.length === 0 && <li className="rounded-xl border border-dashed border-foreground-200 p-4 text-center text-[12px] text-foreground-400">Nothing on this step yet. Add a field below.</li>}
         {shown.map((item, i) => (

@@ -1,0 +1,109 @@
+Step 6 Programme Modules implementation
+Date: 2026-11-01
+Branch: CV-and-Programme-Suitability
+
+Behaviour
+- A single Programme Modules card renders below the existing assessment and
+  Preview Assessment button, only after a submitted, confirmed selection.
+- Its data comes from the confirmed selectedProgramme, including MM -> ME and
+  PCP -> APM alternatives. It never substitutes the recommendation.
+- ME, MM and APM display the supplied module titles and session counts without
+  selection controls. PCP displays Operational, Strategic and Chartered cards,
+  with one active pathway and individually selectable modules/submodules.
+- PCP session counts are nullable in configuration and display an em dash.
+  No authoritative programme module session counts were found in the inspected
+  repository configuration/models; scheduled curriculum sessions are not used
+  to invent programme module session counts. Credits remain visible.
+- The three PCP cards sit side by side on desktop and stack on mobile. Chartered
+  has a distinct purple border and the supplied APM recognition wording.
+- Six-credit subtitles are displayed without adding a new credit-validation or
+  wizard-completion requirement, as requested. No modules are auto-selected.
+- Staff can review saved choices with disabled controls. Switching pathways
+  retains earlier choices in storage but only the selected pathway is active.
+- Preview Assessment remains the existing assessment-only modal.
+- Existing automatic continuation to CV after programme confirmation is retained.
+  The modules card is available when returning to the confirmed step. Navigation,
+  assessment confirmation and scoring were not modified to hold the learner here.
+
+Persistence
+Uses the existing WizardContext setSection/saveIlr and Extended ILR API, not a
+second learner/programme record or an assessment write after submission.
+An optional draft.programmeModules field is stored inside the existing
+enrolment."Extended_ILR"."Wizard_draft" JSON column:
+
+  programme: PCP_L6
+  pathway: operational | strategic | chartered
+  modulesByPathway: map of pathway -> stable selected module identifiers
+
+Choices autosave with a short debounce through the existing draft save function.
+Module autosaves are serialized to keep slow earlier writes ahead of newer
+choices. Failed saves keep the current selection and offer Retry. Hydration and
+staff review do not trigger writes. Existing CV/other draft answers accompany
+normal wizard saves and are retained. Existing drafts need no backfill.
+No database migration, model change, new endpoint or production backend edit was
+needed. The new backend test exercises the existing JSON round-trip boundary
+with mocked storage; it does not write to a live learner database.
+
+Files modified (relative to enrollment/)
+frontend/src/pages/users/types.ts
+  Add one optional typed programmeModules field to WizardDraft.
+frontend/src/features/programme-suitability/ProgrammeSuitabilityStep.tsx
+  Mount the card below the assessment, preserving the assessment's original
+  width while allowing the PCP card grid to use more space.
+
+Files created
+frontend/src/features/programme-suitability/modules/configuration.ts
+  Structured programme/pathway/module data, sessions, credits, selectable flags,
+  nested Chartered items, stable IDs and active-selection filtering.
+frontend/src/features/programme-suitability/modules/ProgrammeModulesCard.tsx
+  Tables, programme confirmation guard, PCP controls, responsive cards and
+  read-only staff presentation.
+frontend/src/features/programme-suitability/modules/useModuleSelectionSave.ts
+  Existing wizard-draft autosave integration with serialization and retry.
+frontend/src/features/programme-suitability/__tests__/modules.test.tsx
+frontend/src/features/programme-suitability/__tests__/modulesPersistence.test.tsx
+backend/programme_suitability/test_modules_persistence.py
+frontend/src/features/programme-suitability/modules/MODULES_IMPLEMENTATION_REPORT.txt
+
+Validation
+- Frontend assessment/wizard/CV/admin regression suite: 428 passed, 54 files.
+  npm --prefix frontend test -- src/features/programme-suitability
+    src/pages/users src/pages/learner/onboarding --maxWorkers=2
+- Focused final module suites: 15 passed, including slow overlapping autosaves,
+  reopening with saved choices, existing CV preservation, staff read-only,
+  unknown/inactive IDs, save failure/retry and confirmed alternatives.
+- Backend programme_suitability suite: 91 passed (90 existing + 1 JSON storage
+  boundary test), using programme_suitability.test_settings.
+- Shared backend regressions: 217 passed using
+  backend/.venv/Scripts/python.exe tools/run_backend_checks.py enrolment_api
+    enrollment_service.tests
+- TypeScript type-check, ESLint and production build passed.
+- git diff --check passed.
+- Headless Chrome: 12 passed (four confirmed programmes and both alternatives,
+  at 1440px and 390px). The actual WizardProvider and step/components were used
+  with isolated mocked API responses. Verified placement, one card, table row
+  counts, responsive grid/stacking, pathway/module autosave and reload, inactive
+  choices, preserved CV text, Preview Assessment and disabled Show Answers.
+  No horizontal overflow or browser page errors were observed. These browser
+  checks are not a live authenticated end-to-end backend test.
+- Temporary browser harness files were removed. Results/screenshots are in the
+  ignored frontend/.cache/modules-*.json and modules-*.png files.
+
+Merge coordination
+The only shared production file changed for this request is users/types.ts;
+the change is an optional WizardDraft property. The step integration file is
+dedicated to Programme Suitability, but coordinate if a teammate also edits it.
+No shared wizard registration, navigation, completion, CV, builder, scoring,
+programme recommendation or account synchronization code changed in this task.
+
+Keep the optional type, card, configuration and autosave hook together during
+merging. Preserve the programmeModules draft property in any future explicit
+draft serialization/allowlist; the current serializer retains it automatically.
+Module IDs and pathway IDs are persisted data keys: preserve them when changing
+display titles. Any future editor/session values should update the structured
+configuration instead of duplicating lists in JSX. Credit enforcement or making
+module selection block navigation would be a separate behavioural change.
+
+The working tree was already dirty at task start. Earlier changes and untracked
+feature files were preserved. No commit, push, merge, rebase or branch switch
+was performed. No live learner data or published wizard layout was changed.

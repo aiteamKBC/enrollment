@@ -46,6 +46,8 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from .auth import enrolment_login_required
+from programme_suitability.wizard_step import with_suitability_step
+from programme_suitability.modules_configuration import with_modules
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,7 @@ BUILTIN_STEP_TABLES = {
     "ilr-details": ("Wizard_Ilr_Learner_Details", "wizard_ilr_learner_details_learner_uniq", False),
     "ilr": ("Extended_ILR", "extended_ilr_learner_uniq", False),
     "cv-job": ("Wizard_Cv_Job", "wizard_cv_job_learner_uniq", False),
+    "programme-suitability": ("Wizard_Programme_Suitability", "wizard_programme_suitability_learner_uniq", True),
     "plr": ("Wizard_Plr", "wizard_plr_learner_uniq", False),
     "skills-radar": ("Wizard_Skills_Radar", "wizard_skills_radar_learner_uniq", False),
     "introduction": ("Wizard_Introduction", "wizard_introduction_learner_uniq", True),
@@ -88,6 +91,7 @@ BUILTIN_STEP_LABELS = {
     "personal-details": "Personal Details",
     "ilr-details": "ILR",
     "ilr": "Extended ILR",
+    "programme-suitability": "Programme Suitability & Modules",
     "cv-job": "CV/Job Description",
     "plr": "Personal Learning Record",
     "skills-radar": "Skills Radar",
@@ -162,7 +166,7 @@ def current_layout():
     """The published layout as a dict, or None when nothing is published."""
     with connections[CONN].cursor() as cursor:
         current = read_current(cursor)
-    return current[1] if current else None
+    return with_modules(with_suitability_step(current[1])) if current else None
 
 
 def _payload(current):
@@ -170,7 +174,7 @@ def _payload(current):
         return {"layout": None, "version": None, "updatedAt": "", "updatedBy": ""}
     version, layout, created_at, created_by = current
     return {
-        "layout": layout,
+        "layout": with_modules(with_suitability_step(layout)),
         "version": version,
         "updatedAt": created_at.isoformat() if created_at else "",
         "updatedBy": created_by or "",
@@ -343,7 +347,14 @@ def normalize_layout(raw, previous):
     layout = {"steps": steps}
     if texts:
         layout["texts"] = texts
-    return layout, plan
+    from programme_suitability.configuration import ConfigurationError, integrate_layout
+    try:
+        integrate_layout(raw, previous, layout)
+        from programme_suitability.modules_configuration import integrate_layout as integrate_modules
+        integrate_modules(raw, previous, layout)
+    except ConfigurationError as exc:
+        raise LayoutError(str(exc)) from exc
+    return with_suitability_step(layout), plan
 
 
 def _clean_texts(raw):
@@ -554,6 +565,11 @@ def publish_wizard_layout(request):
         return _error("Request body must be valid JSON.", 400)
     if not isinstance(body, dict):
         return _error("Request body must be a JSON object.", 400)
+    from programme_suitability.permissions import is_staff
+    if isinstance(body.get('layout'), dict) and 'programmeModules' in body['layout'] and not is_staff(request):
+        return _error('Admissions staff access required to publish modules configuration.', 403)
+    if isinstance(body.get("layout"), dict) and "programmeSuitability" in body["layout"] and not is_staff(request):
+        return _error("Admissions staff access required to publish suitability configuration.", 403)
     base_version = body.get("baseVersion")
     if base_version is not None and not isinstance(base_version, int):
         return _error("'baseVersion' must be a number or null.", 400)

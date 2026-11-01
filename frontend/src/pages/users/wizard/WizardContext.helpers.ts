@@ -39,6 +39,8 @@ export function ageFromDob(iso?: string): number | undefined {
 
 
 export interface WizardContextValue {
+  modules?: import('@/features/programme-suitability/modules/useModulesConfiguration').ModulesController;
+  suitability?: import('@/features/programme-suitability/useSuitability').SuitabilityController;
   userId: string;
   /** Which table this learner lives in — decides where wizard edits are saved. */
   isCommercial: boolean;

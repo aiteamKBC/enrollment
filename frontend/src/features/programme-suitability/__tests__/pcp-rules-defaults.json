@@ -1,0 +1,377 @@
+{
+  "schemaVersion": 2,
+  "programmes": [
+    {
+      "id": "ME_L4",
+      "title": "Marketing Executive — Level 4",
+      "modules": [
+        {
+          "id": "marketing-impact",
+          "title": "Marketing Impact and Planning",
+          "sessions": 16,
+          "selectable": false,
+          "description": "",
+          "order": 0,
+          "active": true
+        },
+        {
+          "id": "social-media",
+          "title": "Social Media",
+          "sessions": 14,
+          "selectable": false,
+          "description": "",
+          "order": 1,
+          "active": true
+        },
+        {
+          "id": "martech",
+          "title": "Marketing Technology (MarTech)",
+          "sessions": 14,
+          "selectable": false,
+          "description": "",
+          "order": 2,
+          "active": true
+        }
+      ],
+      "pathways": []
+    },
+    {
+      "id": "MM_L6",
+      "title": "Marketing Manager — Level 6",
+      "modules": [
+        {
+          "id": "marketing-strategy",
+          "title": "Marketing Strategy and Planning",
+          "sessions": 16,
+          "selectable": false,
+          "description": "",
+          "order": 0,
+          "active": true
+        },
+        {
+          "id": "customer-journey",
+          "title": "Customer Journey Optimisation",
+          "sessions": 14,
+          "selectable": false,
+          "description": "",
+          "order": 1,
+          "active": true
+        },
+        {
+          "id": "commercial-intelligence",
+          "title": "Commercial Intelligence",
+          "sessions": 14,
+          "selectable": false,
+          "description": "",
+          "order": 2,
+          "active": true
+        },
+        {
+          "id": "ai-marketing",
+          "title": "AI in Marketing",
+          "sessions": 14,
+          "selectable": false,
+          "description": "",
+          "order": 3,
+          "active": true
+        }
+      ],
+      "pathways": []
+    },
+    {
+      "id": "APM_L4",
+      "title": "Associate Project Manager — Level 4",
+      "modules": [
+        {
+          "id": "pmp",
+          "title": "Project Management Professional",
+          "sessions": 28,
+          "selectable": false,
+          "description": "",
+          "order": 0,
+          "active": true
+        },
+        {
+          "id": "ai-project-management",
+          "title": "AI in Project Management",
+          "sessions": 14,
+          "selectable": false,
+          "description": "",
+          "order": 1,
+          "active": true
+        }
+      ],
+      "pathways": []
+    },
+    {
+      "id": "PCP_L6",
+      "title": "Project Controls Professional — Level 6",
+      "modules": [],
+      "pathways": [
+        {
+          "id": "operational",
+          "title": "Operational Pathway",
+          "subtitle": "Select 6 credits",
+          "modules": [
+            {
+              "id": "pmp",
+              "title": "Project Management Professional (PMP)",
+              "sessions": null,
+              "credits": 2,
+              "selectable": true,
+              "description": "",
+              "order": 0,
+              "active": true,
+              "isMandatory": true
+            },
+            {
+              "id": "ai-project-control",
+              "title": "AI in Project Management/Control",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 1,
+              "active": true,
+              "isMandatory": true
+            },
+            {
+              "id": "risk-apm",
+              "title": "Risk Management (APM)",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 2,
+              "active": true,
+              "isMandatory": true
+            },
+            {
+              "id": "planning-control",
+              "title": "Project Planning and Control (APMG Qualification)",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 3,
+              "active": true,
+              "isMandatory": false
+            },
+            {
+              "id": "earned-value",
+              "title": "Earned Value Management (EVM)",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 4,
+              "active": true,
+              "isMandatory": false
+            },
+            {
+              "id": "pmi-sp",
+              "title": "PMI-SP",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 5,
+              "active": true,
+              "isMandatory": false
+            }
+          ],
+          "description": "Ideal for professionals involved in day-to-day project delivery, including planning, scheduling, risk management, and monitoring project performance.",
+          "recognition": "",
+          "targetCredits": 6,
+          "order": 0,
+          "active": true,
+          "allowModuleSelection": true,
+          "requiredOptionalModulesCount": 2
+        },
+        {
+          "id": "strategic",
+          "title": "Strategic Pathway",
+          "subtitle": "Select 6 credits",
+          "modules": [
+            {
+              "id": "pmp",
+              "title": "Project Management Professional (PMP)",
+              "sessions": null,
+              "credits": 2,
+              "selectable": true,
+              "description": "",
+              "order": 0,
+              "active": true,
+              "isMandatory": true
+            },
+            {
+              "id": "ai-project-control",
+              "title": "AI in Project Management/Control",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 1,
+              "active": true,
+              "isMandatory": true
+            },
+            {
+              "id": "risk-apm",
+              "title": "Risk Management (APM)",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 2,
+              "active": true,
+              "isMandatory": true
+            },
+            {
+              "id": "pmi-pmo",
+              "title": "PMI (PMO)",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 3,
+              "active": true,
+              "isMandatory": false
+            },
+            {
+              "id": "portfolio",
+              "title": "Portfolio Management (APMG)",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 4,
+              "active": true,
+              "isMandatory": false
+            },
+            {
+              "id": "successful-programmes",
+              "title": "Managing Successful Programmes",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 5,
+              "active": true,
+              "isMandatory": false
+            }
+          ],
+          "description": "Ideal for professionals involved in programme or portfolio management, PMO leadership, governance, and strategic decision-making.",
+          "recognition": "",
+          "targetCredits": 6,
+          "order": 1,
+          "active": true,
+          "allowModuleSelection": true,
+          "requiredOptionalModulesCount": 2
+        },
+        {
+          "id": "chartered",
+          "title": "Chartered Pathway",
+          "subtitle": "Recognized assessment by APM for Chartered Project Professional",
+          "modules": [
+            {
+              "id": "certified-pmo",
+              "title": "Certified PMO Professional Level 6",
+              "sessions": null,
+              "selectable": false,
+              "items": [
+                {
+                  "id": "pmo-planning-control",
+                  "title": "Project Planning and Control",
+                  "sessions": null,
+                  "credits": 1,
+                  "selectable": true,
+                  "description": "",
+                  "order": 0,
+                  "active": true,
+                  "isMandatory": true
+                },
+                {
+                  "id": "pmo-stakeholders",
+                  "title": "Stakeholder Engagement and Communication",
+                  "sessions": null,
+                  "credits": 1,
+                  "selectable": true,
+                  "description": "",
+                  "order": 1,
+                  "active": true,
+                  "isMandatory": true
+                },
+                {
+                  "id": "pmo-risk-quality",
+                  "title": "Risk, Quality and Issue Management",
+                  "sessions": null,
+                  "credits": 1,
+                  "selectable": true,
+                  "description": "",
+                  "order": 2,
+                  "active": true,
+                  "isMandatory": true
+                },
+                {
+                  "id": "pmo-office",
+                  "title": "Project Management Office",
+                  "sessions": null,
+                  "credits": 1,
+                  "selectable": true,
+                  "description": "",
+                  "order": 3,
+                  "active": true,
+                  "isMandatory": true
+                }
+              ],
+              "description": "",
+              "order": 0,
+              "active": true,
+              "isMandatory": false
+            },
+            {
+              "id": "ai-project-management",
+              "title": "AI in Project Management",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 1,
+              "active": true,
+              "isMandatory": true
+            },
+            {
+              "id": "portfolio",
+              "title": "Portfolio Management (APMG)",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 2,
+              "active": true,
+              "isMandatory": false
+            },
+            {
+              "id": "earned-value",
+              "title": "Earned Value Management (APMG)",
+              "sessions": null,
+              "credits": 1,
+              "selectable": true,
+              "description": "",
+              "order": 3,
+              "active": true,
+              "isMandatory": false
+            }
+          ],
+          "description": "Designed for professionals seeking to combine hands-on project delivery with strategic leadership, developing a broader professional skill set while supporting progression towards Chartered Project Professional (ChPP) recognition.",
+          "recognition": "",
+          "targetCredits": 6,
+          "order": 2,
+          "active": true,
+          "allowModuleSelection": true,
+          "requiredOptionalModulesCount": 1
+        }
+      ]
+    }
+  ]
+}
