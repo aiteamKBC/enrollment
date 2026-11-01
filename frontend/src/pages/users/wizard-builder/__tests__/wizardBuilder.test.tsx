@@ -23,7 +23,7 @@ vi.mock('@/api/wizardLayout', () => ({
 
 import WizardBuilderPage from '../page';
 import { addCustomField, moveItem, moveItemToStep, removeItem } from '../builderOps';
-import { defaultLayout } from '../../wizard/layout/resolve';
+import { defaultLayout, resolveLayout } from '../../wizard/layout/resolve';
 import type { WizardLayout } from '../../wizard/layout/types';
 
 beforeAll(() => {
@@ -39,6 +39,17 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 const stepItems = (layout: WizardLayout, slug: string) => layout.steps.find((s) => s.slug === slug)!.items;
 
 describe('layout edits', () => {
+  it('resolves the three legacy CV questions as multi-line fields', () => {
+    const layout = defaultLayout();
+    layout.steps.find((s) => s.slug === 'cv-job')!.items.push(
+      { key: 'cf_understanding', builtin: false, hidden: false, label: 'What is your understanding of the programme you are applying for?', type: 'text' },
+      { key: 'cf_career', builtin: false, hidden: false, label: 'How will this programme help you in your career development/aspirations, and/or with your progression?', type: 'text' },
+      { key: 'cf_role', builtin: false, hidden: false, label: 'Please explain how your current job role relates to the apprenticeship programme you are applying for. In your answer, include your job title, main duties, and how this programme will help you develop new knowledge, skills and behaviours in your role.', type: 'text' },
+    );
+    const cv = resolveLayout(layout).steps.find((s) => s.slug === 'cv-job')!;
+    expect(cv.items.slice(-3).map((item) => item.type)).toEqual(['multi_line', 'multi_line', 'multi_line']);
+  });
+
   it('moves an item past the next shown one, skipping removed items', () => {
     let layout = defaultLayout();
     layout = removeItem(layout, 'pd.lastName');

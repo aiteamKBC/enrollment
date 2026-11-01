@@ -115,6 +115,16 @@ class NormalizeLayoutTests(SimpleTestCase):
         with self.assertRaisesMessage(wl.LayoutError, "type cannot change"):
             wl.normalize_layout(retyped, first)
 
+    def test_legacy_text_field_can_be_upgraded_to_multi_line(self):
+        first, _ = wl.normalize_layout({"steps": [step("cv-job", [custom("Long answer")])]}, None)
+        upgraded = json.loads(json.dumps(first))
+        upgraded["steps"][0]["items"][0]["type"] = "multi_line"
+        second, plan = wl.normalize_layout(upgraded, first)
+        item = second["steps"][0]["items"][0]
+        self.assertEqual(item["type"], "multi_line")
+        self.assertEqual(item["column"], "Custom_long_answer")
+        self.assertEqual(plan["Wizard_Cv_Job"]["columns"], {"Custom_long_answer": "text"})
+
     def test_a_field_left_out_of_the_layout_is_kept_hidden_with_its_column(self):
         first, _ = wl.normalize_layout({"steps": [step("cv-job", [custom("Years in role", "number")])]}, None)
         second, plan = wl.normalize_layout({"steps": [step("cv-job", [])]}, first)

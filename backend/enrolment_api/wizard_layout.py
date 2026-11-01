@@ -395,7 +395,11 @@ def _normalize_custom(raw_item, step_slug, step_table, step_label, prev_fields, 
     if prior:
         # Storage is fixed once assigned; so is the type, since it decides the
         # column's SQL type and the answers already stored in it.
-        if field_type != prior.get("type"):
+        # Legacy text fields used the same PostgreSQL text storage as the new
+        # explicit text types. Allow those fields to be upgraded in place so
+        # their existing answers and columns are preserved.
+        legacy_text_upgrade = prior.get("type") == "text" and field_type in {"single_line", "multi_line"}
+        if field_type != prior.get("type") and not legacy_text_upgrade:
             raise LayoutError(
                 f"'{label}' was published as a {prior.get('type')} field; its type cannot change. "
                 "Remove it and add a new field instead."
