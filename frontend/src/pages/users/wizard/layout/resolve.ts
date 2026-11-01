@@ -10,7 +10,7 @@
  * longer knows is dropped.
  */
 import { BUILTIN_ITEMS, BUILTIN_STEPS, isMovable, type BuiltinItemDef } from './registry';
-import type { CustomAnswer, LayoutItem, LayoutStep, WizardLayout } from './types';
+import { isContentFieldType, type CustomAnswer, type LayoutItem, type LayoutStep, type WizardLayout } from './types';
 import type { WizardDraft } from '../../types';
 import { cleanTexts } from './texts';
 
@@ -195,7 +195,11 @@ export function dropdownOptions(item: LayoutItem): string[] | null {
 }
 
 export function itemLabel(item: LayoutItem): string {
-  return item.builtin ? BUILTIN_ITEMS[item.key]?.label ?? item.key : item.label || 'Untitled field';
+  if (item.builtin) return BUILTIN_ITEMS[item.key]?.label ?? item.key;
+  if (item.type === 'divider') return 'Divider';
+  if (item.type === 'heading') return item.label || 'Heading';
+  if (item.type === 'description') return item.label || 'Description';
+  return item.label || 'Untitled field';
 }
 
 export function isBlankAnswer(value: CustomAnswer | undefined): boolean {
@@ -206,6 +210,7 @@ export function isBlankAnswer(value: CustomAnswer | undefined): boolean {
 
 /** What one custom field is still missing. */
 export function customMissing(item: LayoutItem, draft: WizardDraft): string[] {
+  if (isContentFieldType(item.type)) return [];
   const label = itemLabel(item);
   const value = draft.custom?.[item.key];
   if (isBlankAnswer(value)) return isRequired(item) ? [label] : [];
@@ -213,6 +218,12 @@ export function customMissing(item: LayoutItem, draft: WizardDraft): string[] {
     return [`${label} — Enter a number`];
   }
   if (item.type === 'dropdown' && typeof value === 'string' && item.options && !item.options.includes(value)) {
+    return isRequired(item) ? [label] : [];
+  }
+  if (item.type === 'radio' && typeof value === 'string' && item.options && !item.options.includes(value)) {
+    return isRequired(item) ? [label] : [];
+  }
+  if (item.type === 'checkbox' && Array.isArray(value) && value.some((option) => typeof option !== 'string' || !item.options?.includes(option))) {
     return isRequired(item) ? [label] : [];
   }
   return [];

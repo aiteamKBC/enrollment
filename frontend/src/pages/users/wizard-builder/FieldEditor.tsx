@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { btnPrimary, btnSecondary, inputClass } from '../components/ui';
 import { itemLabel } from '../wizard/layout/resolve';
-import { fieldTypeOptions, type CustomFieldType, type LayoutItem, type WizardLayout } from '../wizard/layout/types';
+import { answerFieldTypeOptions, fieldTypeOptions, isChoiceFieldType, isContentFieldType, type CustomFieldType, type LayoutItem, type WizardLayout } from '../wizard/layout/types';
 import { BUILTIN_ITEMS } from '../wizard/layout/registry';
 import { conditionSources, existingFollowUps, type FollowUpDraft } from './builderOps';
 import { fieldDraftFrom, type FieldDraft } from './fieldDraft';
@@ -66,6 +66,14 @@ export function FieldEditor({
   const setRow = (id: string, patch: Partial<OptionRow>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const setFollow = (id: string, patch: Partial<OptionRow['follow']>) =>
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, follow: { ...r.follow, ...patch } } : r)));
+  const moveRow = (id: string, delta: -1 | 1) => setRows((rs) => {
+    const index = rs.findIndex((row) => row.id === id);
+    const target = index + delta;
+    if (index < 0 || target < 0 || target >= rs.length) return rs;
+    const next = [...rs];
+    [next[index], next[target]] = [next[target], next[index]];
+    return next;
+  });
   const [tried, setTried] = useState(false);
   const [optionFilter, setOptionFilter] = useState('');
   const published = Boolean(item?.column);
@@ -74,20 +82,24 @@ export function FieldEditor({
   const sources = useMemo(() => conditionSources(layout, item?.key), [layout, item?.key]);
   const source = draft.condition ? sources.find((s) => s.item.key === draft.condition!.field) : undefined;
   const isDropdown = draft.type === 'dropdown';
+  const isChoice = isChoiceFieldType(draft.type);
+  const isOptionField = isDropdown || isChoice;
+  const isContent = isContentFieldType(draft.type);
+  const isDescription = draft.type === 'description';
   const filled = rows.filter((r) => r.value.trim());
   const options = filled.map((r) => r.value.trim());
   const duplicates = new Set(options.filter((o, i) => options.indexOf(o) !== i));
 
   const errors: string[] = [];
-  if (!draft.label.trim()) errors.push('Enter a label for the field.');
-  if (isDropdown && options.length === 0) errors.push('Add at least one dropdown option.');
-  if (isDropdown && duplicates.size) errors.push(`Each option must be different (${[...duplicates].join(', ')}).`);
+  if (!isContent && draft.type !== 'divider' && !draft.label.trim()) errors.push('Enter a label for the field.');
+  if (isOptionField && options.length === 0) errors.push(`Add at least one ${isDropdown ? 'dropdown ' : ''}option.`);
+  if (isOptionField && duplicates.size) errors.push(`Each option must be different (${[...duplicates].join(', ')}).`);
   if (isDropdown && filled.some((r) => r.follow.on && !r.follow.label.trim())) errors.push('Write the follow-up question for each ticked option.');
   const followOptions = (r: OptionRow) => r.follow.options.map((o) => o.trim()).filter(Boolean);
   const dropdownFollowUps = isDropdown ? filled.filter((r) => r.follow.on && r.follow.type === 'dropdown') : [];
   if (dropdownFollowUps.some((r) => followOptions(r).length === 0)) errors.push('Add at least one option to each follow-up dropdown.');
   if (dropdownFollowUps.some((r) => new Set(followOptions(r)).size !== followOptions(r).length)) errors.push('Each option of a follow-up dropdown must be different.');
-  if (draft.condition && (!source || draft.condition.values.length === 0)) {
+  if (!isContent && draft.condition && (!source || draft.condition.values.length === 0)) {
     errors.push('Choose the dropdown and at least one answer that shows this field.');
   }
 
@@ -109,7 +121,7 @@ export function FieldEditor({
       ...draft,
       label: draft.label.trim(),
       helpText: draft.helpText.trim(),
-      options: isDropdown ? options : [],
+      options: isOptionField ? options : [],
       followUps,
       removedFollowUps: initialFollowUps.filter((k) => !kept.has(k)),
     });
@@ -138,17 +150,37 @@ export function FieldEditor({
     <div className="rounded-xl border border-primary-200 bg-primary-50/40 p-4" role="group" aria-label={item ? `Edit ${itemLabel(item)}` : 'New field'}>
       <p className="mb-3 text-[13px] font-semibold text-foreground-900">{item ? 'Edit field' : 'New field'}</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-[12px] font-medium text-foreground-600 sm:col-span-2" htmlFor={`${idPrefix}-label`}>
-          Question / label
-          <input
-            id={`${idPrefix}-label`}
-            className={`${inputClass} mt-1`}
-            value={draft.label}
-            onChange={(e) => set({ label: e.target.value })}
-            aria-invalid={tried && !draft.label.trim() ? true : undefined}
-            placeholder="e.g. How many years have you worked in this role?"
-          />
-        </label>
+        {draft.type === 'divider' ? (
+          <p className="sm:col-span-2 rounded-lg border border-dashed border-foreground-200 bg-background-50 px-3 py-2 text-[12px] text-foreground-500">
+            Divider fields have no text or learner response.
+          </p>
+        ) : (
+          <label className="block text-[12px] font-medium text-foreground-600 sm:col-span-2" htmlFor={`${idPrefix}-label`}>
+            {isDescription ? 'Description / instructions' : draft.type === 'heading' ? 'Heading text' : 'Question / label'}
+            {isDescription ? (
+              <textarea
+                id={`${idPrefix}-label`}
+                rows={4}
+                maxLength={20_000}
+                className={`${inputClass} mt-1`}
+                value={draft.label}
+                onChange={(e) => set({ label: e.target.value })}
+                aria-invalid={tried && !draft.label.trim() ? true : undefined}
+                placeholder="e.g. Please provide the information below."
+              />
+            ) : (
+              <input
+                id={`${idPrefix}-label`}
+                maxLength={300}
+                className={`${inputClass} mt-1`}
+                value={draft.label}
+                onChange={(e) => set({ label: e.target.value })}
+                aria-invalid={tried && !draft.label.trim() ? true : undefined}
+                placeholder={draft.type === 'heading' ? 'e.g. GCSEs' : 'e.g. How many years have you worked in this role?'}
+              />
+            )}
+          </label>
+        )}
         <label className="block text-[12px] font-medium text-foreground-600" htmlFor={`${idPrefix}-type`}>
           Field type
           <select
@@ -162,13 +194,13 @@ export function FieldEditor({
           </select>
           {published && <span className="mt-1 block text-[11px] font-normal text-foreground-400">Published fields keep their type — remove it and add a new field to change it.</span>}
         </label>
-        <label className="flex items-center gap-2 self-end pb-2 text-[12px] font-medium text-foreground-700">
+        {!isContent && <label className="flex items-center gap-2 self-end pb-2 text-[12px] font-medium text-foreground-700">
           <input type="checkbox" className="accent-primary-500" checked={draft.required} onChange={(e) => set({ required: e.target.checked })} />
           Mandatory — learners must answer before moving on
-        </label>
-        {draft.type === 'dropdown' && (
+        </label>}
+        {isOptionField && (
           <fieldset className="sm:col-span-2">
-            <legend className="text-[12px] font-medium text-foreground-600">Dropdown options</legend>
+            <legend className="text-[12px] font-medium text-foreground-600">{isDropdown ? 'Dropdown options' : 'Answer options'}</legend>
             <ol className="mt-1 space-y-2">
               {rows.map((row, i) => {
                 const optionId = `${idPrefix}-option-${row.id}`;
@@ -185,7 +217,7 @@ export function FieldEditor({
                         aria-invalid={tried && (!row.value.trim() || duplicates.has(row.value.trim())) ? true : undefined}
                         onChange={(e) => setRow(row.id, { value: e.target.value })}
                       />
-                      <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-foreground-700">
+                      {isDropdown && <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-foreground-700">
                         <input
                           type="checkbox"
                           className="accent-primary-500"
@@ -193,7 +225,25 @@ export function FieldEditor({
                           onChange={(e) => setFollow(row.id, { on: e.target.checked })}
                         />
                         Ask a follow-up question when this is chosen
-                      </label>
+                      </label>}
+                      <button
+                        type="button"
+                        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground-400 hover:bg-background-100 hover:text-foreground-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Move option ${i + 1} up`}
+                        disabled={i === 0}
+                        onClick={() => moveRow(row.id, -1)}
+                      >
+                        <AppIcon className="ri-arrow-up-s-line" />
+                      </button>
+                      <button
+                        type="button"
+                        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground-400 hover:bg-background-100 hover:text-foreground-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Move option ${i + 1} down`}
+                        disabled={i === rows.length - 1}
+                        onClick={() => moveRow(row.id, 1)}
+                      >
+                        <AppIcon className="ri-arrow-down-s-line" />
+                      </button>
                       <button
                         type="button"
                         className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground-400 hover:bg-background-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
@@ -204,7 +254,7 @@ export function FieldEditor({
                         <AppIcon className="ri-delete-bin-line" />
                       </button>
                     </div>
-                    {row.follow.on && (
+                    {isDropdown && row.follow.on && (
                       <div className="mt-2 grid gap-2 border-l-2 border-primary-200 pl-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
                         <label className="block text-[11.5px] font-medium text-foreground-600">
                           Follow-up question for “{name}”
@@ -224,7 +274,7 @@ export function FieldEditor({
                             disabled={row.follow.published}
                             onChange={(e) => setFollow(row.id, { type: e.target.value as CustomFieldType })}
                           >
-                            {fieldTypeOptions(row.follow.type).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            {answerFieldTypeOptions(row.follow.type).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                           </select>
                         </label>
                         <label className="flex items-center gap-1.5 pb-2 text-[12px] text-foreground-700">
@@ -290,12 +340,14 @@ export function FieldEditor({
             </p>
           </fieldset>
         )}
-        <label className="block text-[12px] font-medium text-foreground-600 sm:col-span-2" htmlFor={`${idPrefix}-help`}>
-          Help text (optional)
-          <input id={`${idPrefix}-help`} className={`${inputClass} mt-1`} value={draft.helpText} onChange={(e) => set({ helpText: e.target.value })} />
-        </label>
+        {!isContent && (
+          <label className="block text-[12px] font-medium text-foreground-600 sm:col-span-2" htmlFor={`${idPrefix}-help`}>
+            Help text (optional)
+            <input id={`${idPrefix}-help`} className={`${inputClass} mt-1`} value={draft.helpText} onChange={(e) => set({ helpText: e.target.value })} />
+          </label>
+        )}
 
-        <div className="sm:col-span-2 rounded-lg border border-foreground-100 bg-background-50 p-3">
+        {!isContent && <div className="sm:col-span-2 rounded-lg border border-foreground-100 bg-background-50 p-3">
           <label className="flex items-center gap-2 text-[12px] font-medium text-foreground-700">
             <input
               type="checkbox"
@@ -342,7 +394,7 @@ export function FieldEditor({
               )}
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {tried && errors.length > 0 && (

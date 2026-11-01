@@ -5,7 +5,7 @@
  */
 import { BUILTIN_ITEMS, isMovable } from '../wizard/layout/registry';
 import { dropdownOptions, itemLabel } from '../wizard/layout/resolve';
-import type { CustomFieldType, LayoutItem, LayoutStep, WizardLayout } from '../wizard/layout/types';
+import { isContentFieldType, type CustomFieldType, type LayoutItem, type LayoutStep, type WizardLayout } from '../wizard/layout/types';
 
 const mapSteps = (layout: WizardLayout, fn: (s: LayoutStep) => LayoutStep): WizardLayout => ({ steps: layout.steps.map(fn) });
 
@@ -161,7 +161,7 @@ export function existingFollowUps(layout: WizardLayout, key: string): LayoutItem
  * only shown because of it loses that condition.
  */
 export function removeItem(layout: WizardLayout, key: string): WizardLayout {
-  const unpublished = (it: LayoutItem) => !it.builtin && !it.column;
+  const unpublished = (it: LayoutItem) => !it.builtin && !it.column && !isContentFieldType(it.type);
   return mapSteps(layout, (s) => ({
     ...s,
     items: s.items
@@ -191,7 +191,9 @@ export function conditionSources(layout: WizardLayout, exceptKey?: string): { it
 
 /** What publishing would change in the database: new columns, per table. */
 export function pendingColumns(layout: WizardLayout): { label: string; type: string }[] {
-  return layout.steps.flatMap((s) => s.items.filter((it) => !it.builtin && !it.column).map((it) => ({ label: itemLabel(it), type: it.type ?? 'text' })));
+  return layout.steps.flatMap((s) => s.items
+    .filter((it) => !it.builtin && !it.column && !isContentFieldType(it.type))
+    .map((it) => ({ label: itemLabel(it), type: it.type ?? 'text' })));
 }
 
 /**

@@ -8,7 +8,7 @@ import { roleNavMap } from '@/mocks/navigation';
 import { fetchWizardLayout, publishWizardLayout } from '@/api/wizardLayout';
 import { btnPrimary, btnSecondary, iconBtn, inputClass } from '../components/ui';
 import { builtinDef, isRequired, itemLabel, resolveLayout } from '../wizard/layout/resolve';
-import type { LayoutItem, LayoutStep, WizardLayout } from '../wizard/layout/types';
+import { isChoiceFieldType, isContentFieldType, type LayoutItem, type LayoutStep, type WizardLayout } from '../wizard/layout/types';
 import { FieldEditor } from './FieldEditor';
 import { TextEditor } from './TextEditor';
 import { TEXT_SLOTS_BY_ITEM, textFor } from '../wizard/layout/texts';
@@ -44,6 +44,11 @@ const TYPE_LABEL: Record<string, string> = {
   number: 'Number',
   dropdown: 'Dropdown',
   upload: 'File upload',
+  heading: 'Heading',
+  description: 'Description',
+  divider: 'Divider',
+  radio: 'Radio (single choice)',
+  checkbox: 'Checkbox (multiple choice)',
 };
 
 const clone = (layout: WizardLayout): WizardLayout => JSON.parse(JSON.stringify(layout)) as WizardLayout;
@@ -292,10 +297,10 @@ function StepEditor({
     const fields: Partial<LayoutItem> = {
       label: draft.label,
       type: draft.type,
-      options: draft.type === 'dropdown' ? draft.options : undefined,
-      helpText: draft.helpText || undefined,
-      required: draft.required,
-      condition: draft.condition,
+      options: draft.type === 'dropdown' || isChoiceFieldType(draft.type) ? draft.options : undefined,
+      helpText: isContentFieldType(draft.type) ? undefined : draft.helpText || undefined,
+      required: isContentFieldType(draft.type) ? false : draft.required,
+      condition: isContentFieldType(draft.type) ? null : draft.condition,
     };
     if (editing) {
       const key = editing === 'new' ? null : editing;
@@ -443,7 +448,7 @@ function ItemRow({
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {item.builtin ? KIND_LABEL[def?.kind ?? 'field'] : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
-            {!item.builtin && !item.column && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
+            {!item.builtin && !item.column && !isContentFieldType(item.type) && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
             {onIlr && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800"><AppIcon className="ri-file-text-line mr-0.5" />On ILR document</span>}
             {condition && trigger && (
               <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">
@@ -455,7 +460,7 @@ function ItemRow({
           </div>
         </div>
 
-        {requirable && (
+        {requirable && !isContentFieldType(item.type) && (
           <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-foreground-700">
             <input
               type="checkbox"

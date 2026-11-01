@@ -14,7 +14,7 @@ import { FieldError } from '../stepErrors';
 import { missingMessage, useMissing } from "../stepErrors.helpers";
 import { useWizard } from "../WizardContext.helpers";
 import { isRequired, itemLabel } from './resolve';
-import type { CustomUploadRef, LayoutItem } from './types';
+import { isChoiceFieldType, type CustomUploadRef, type LayoutItem } from './types';
 
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,.doc,.docx';
 
@@ -34,6 +34,10 @@ export function CustomField({ item }: { item: LayoutItem }) {
   const raw = draft.custom?.[item.key];
   const value = typeof raw === 'string' ? raw : '';
   const helper = item.helpText || undefined;
+
+  if (item.type === 'heading') return <h3 className="border-b border-foreground-200 pb-1.5 pt-4 text-[16px] font-semibold text-foreground-900">{label}</h3>;
+  if (item.type === 'description') return <div className="whitespace-pre-line py-2.5 text-[13px] leading-relaxed text-foreground-600">{label}</div>;
+  if (item.type === 'divider') return <hr className="my-3 border-0 border-t border-foreground-200" />;
 
   if (item.type === 'upload') return <CustomUploadField item={item} label={label} required={required} />;
 
@@ -68,6 +72,10 @@ export function CustomField({ item }: { item: LayoutItem }) {
     );
   }
 
+  if (isChoiceFieldType(item.type)) {
+    return <CustomChoiceField item={item} label={label} required={required} helper={helper} />;
+  }
+
   return (
     <LabeledInput
       label={label}
@@ -79,6 +87,59 @@ export function CustomField({ item }: { item: LayoutItem }) {
       maxLength={item.type === 'single_line' ? 500 : undefined}
       onChange={(v) => setCustom(item.key, v)}
     />
+  );
+}
+
+function CustomChoiceField({ item, label, required, helper }: { item: LayoutItem; label: string; required: boolean; helper?: string }) {
+  const { draft, setCustom } = useWizard();
+  const missing = useMissing(label);
+  const options = item.options ?? [];
+  const raw = draft.custom?.[item.key];
+  const selected = item.type === 'checkbox'
+    ? (Array.isArray(raw) ? raw.filter((value): value is string => typeof value === 'string') : [])
+    : typeof raw === 'string' ? raw : '';
+  const multiple = item.type === 'checkbox';
+
+  const toggle = (option: string) => {
+    if (!multiple) {
+      setCustom(item.key, option);
+      return;
+    }
+    const values = selected as string[];
+    setCustom(item.key, values.includes(option) ? values.filter((value) => value !== option) : [...values, option]);
+  };
+
+  return (
+    <fieldset className="grid grid-cols-1 gap-2 border-b border-foreground-100 py-2.5 last:border-0 sm:grid-cols-[minmax(0,240px)_1fr] sm:gap-4">
+      <legend className="text-[12px] font-medium text-foreground-500 sm:pt-1.5">
+        {label}{required && <span className="ml-0.5 text-red-500">*</span>}
+      </legend>
+      <div
+        role={multiple ? 'group' : 'radiogroup'}
+        aria-label={label}
+        className={`space-y-1.5${missing ? ' rounded-lg border border-red-500 p-2' : ''}`}
+      >
+        {options.map((option) => {
+          const checked = multiple ? (selected as string[]).includes(option) : selected === option;
+          return (
+            <label key={option} className="flex cursor-pointer items-center gap-2 text-[13px] text-foreground-700">
+              <input
+                type={multiple ? 'checkbox' : 'radio'}
+                name={multiple ? `${item.key}-${option}` : item.key}
+                value={option}
+                checked={checked}
+                onChange={() => toggle(option)}
+                aria-invalid={missing ? true : undefined}
+                className="accent-primary-500"
+              />
+              {option}
+            </label>
+          );
+        })}
+      </div>
+      {missing && <FieldError message={missingMessage(missing, label, label, 'choose')} />}
+      {helper && !missing && <p className="text-[11px] text-foreground-400 sm:col-start-2">{helper}</p>}
+    </fieldset>
   );
 }
 
@@ -96,7 +157,9 @@ function CustomUploadField({ item, label, required }: { item: LayoutItem; label:
   const syncDraft = (next: CustomUpload[]) => {
     const refs: CustomUploadRef[] = next.map((f) => ({ id: f.id, filename: f.filename }));
     const current = draft.custom?.[item.key];
-    const same = Array.isArray(current) && current.length === refs.length && current.every((r, i) => r.id === refs[i].id);
+    const same = Array.isArray(current)
+      && current.length === refs.length
+      && current.every((r, i) => typeof r === 'object' && r !== null && 'id' in r && r.id === refs[i].id);
     if (!same) setCustom(item.key, refs);
   };
 

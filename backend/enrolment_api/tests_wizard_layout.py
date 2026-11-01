@@ -50,6 +50,30 @@ def step(slug, items, label=None, builtin=True, **extra):
 
 
 class NormalizeLayoutTests(SimpleTestCase):
+    def test_content_blocks_have_no_answer_storage(self):
+        layout, plan = wl.normalize_layout({"steps": [step("cv-job", [
+            custom("GCSEs", "heading"),
+            custom("Please provide your qualification details.\nUse one line per qualification.", "description"),
+            custom("", "divider"),
+        ])]}, None)
+        items = layout["steps"][0]["items"]
+        self.assertEqual([item["type"] for item in items], ["heading", "description", "divider"])
+        self.assertEqual([item["required"] for item in items], [False, False, False])
+        self.assertTrue(all("table" not in item and "column" not in item for item in items))
+        self.assertEqual(plan, {})
+
+    def test_radio_and_checkbox_fields_use_their_answer_storage(self):
+        layout, plan = wl.normalize_layout({"steps": [step("cv-job", [
+            custom("Preferred route", "radio", options=["Online", "In person"]),
+            custom("Subjects completed", "checkbox", options=["English", "Maths"]),
+        ])]}, None)
+        items = layout["steps"][0]["items"]
+        self.assertEqual([item["type"] for item in items], ["radio", "checkbox"])
+        self.assertEqual(plan["Wizard_Cv_Job"]["columns"], {
+            "Custom_preferred_route": "text",
+            "Custom_subjects_completed": "jsonb",
+        })
+
     def test_new_text_types_share_text_storage(self):
         layout, plan = wl.normalize_layout(
             {"steps": [step("cv-job", [custom("Short answer", "single_line"), custom("Long answer", "multi_line")])]},
@@ -282,6 +306,20 @@ class ProjectCustomFieldsTests(SimpleTestCase):
         ])]}
         executed = self._project({"custom": {"cf_short": "s" * 600, "cf_long": "l" * 10_500}}, layout=layout)
         self.assertEqual(executed[0][1], ["apprenticeship", 41, "s" * 500, "l" * 10_000])
+
+    def test_radio_and_checkbox_answers_are_projected_with_validation(self):
+        layout = {"steps": [step("cv-job", [
+            custom("Preferred route", "radio", key="cf_route", options=["Online", "In person"], table="Wizard_Cv_Job", column="Custom_route"),
+            custom("Subjects completed", "checkbox", key="cf_subjects", options=["English", "Maths"], table="Wizard_Cv_Job", column="Custom_subjects"),
+        ])]}
+        executed = self._project({"custom": {
+            "cf_route": "In person",
+            "cf_subjects": ["Maths", "English", "Maths", "Invalid"],
+        }}, layout=layout)
+        self.assertEqual(executed[0][1], ["apprenticeship", 41, "In person", '["Maths", "English"]'])
+
+        invalid = self._project({"custom": {"cf_route": "Postal", "cf_subjects": ["Invalid"]}}, layout=layout)
+        self.assertEqual(invalid[0][1], ["apprenticeship", 41, None, None])
 
     def test_upserts_each_tables_answers(self):
         executed = self._project({

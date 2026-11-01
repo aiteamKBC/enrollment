@@ -108,6 +108,7 @@ describe('the builder page', () => {
     const type = screen.getByLabelText('Field type');
     expect(within(type).getAllByRole('option').map((o) => o.textContent)).toEqual([
       'Single-line text', 'Multi-line text', 'Number', 'Dropdown', 'File upload',
+      'Heading', 'Description', 'Divider', 'Radio (single choice)', 'Checkbox (multiple choice)',
     ]);
     await userEvent.type(screen.getByLabelText('Question / label'), 'Additional details');
     await userEvent.selectOptions(type, 'multi_line');
@@ -161,6 +162,33 @@ describe('the builder page', () => {
     expect(success).toHaveBeenCalledWith('Wizard published', expect.any(String));
   });
 
+  it('creates content blocks and choice fields with reorderable options', async () => {
+    renderBuilder();
+    await openStep('CV/Job Description');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add field' }));
+    await userEvent.selectOptions(screen.getByLabelText('Field type'), 'heading');
+    await userEvent.type(screen.getByLabelText('Heading text'), 'GCSEs');
+    await userEvent.click(screen.getByRole('button', { name: /^Add field$/ }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add field' }));
+    await userEvent.selectOptions(screen.getByLabelText('Field type'), 'radio');
+    await userEvent.type(screen.getByLabelText('Question / label'), 'Which route do you prefer?');
+    await userEvent.type(screen.getByLabelText('Option 1'), 'Online');
+    await userEvent.type(screen.getByLabelText('Option 2'), 'In person');
+    await userEvent.click(screen.getByRole('button', { name: 'Move option 2 up' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Add field$/ }));
+
+    expect(screen.getAllByText('GCSEs').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Radio \(single choice\)/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
+    await waitFor(() => expect(publishWizardLayout).toHaveBeenCalled());
+    const custom = stepItems(publishWizardLayout.mock.calls[0][0] as WizardLayout, 'cv-job').filter((i) => !i.builtin);
+    expect(custom).toContainEqual(expect.objectContaining({ label: 'GCSEs', type: 'heading' }));
+    expect(custom).toContainEqual(expect.objectContaining({ label: 'Which route do you prefer?', type: 'radio', options: ['In person', 'Online'] }));
+  });
+
   it('adds a follow-up question from an option’s checkbox, placed under the dropdown', async () => {
     renderBuilder();
     await openStep('CV/Job Description');
@@ -206,7 +234,10 @@ describe('the builder page', () => {
     await userEvent.type(screen.getByLabelText(/Follow-up question for “Yes”/), 'Licence type');
 
     const type = screen.getByLabelText('Answer type');
-    expect(within(type).getAllByRole('option').map((o) => o.textContent)).toEqual(['Single-line text', 'Multi-line text', 'Number', 'Dropdown', 'File upload']);
+    expect(within(type).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Single-line text', 'Multi-line text', 'Number', 'Dropdown', 'File upload',
+      'Radio (single choice)', 'Checkbox (multiple choice)',
+    ]);
     await userEvent.selectOptions(type, 'dropdown');
 
     // A dropdown follow-up cannot be saved without choices of its own.
