@@ -493,7 +493,7 @@ function ItemRow({
               title="Edit wording"
               onClick={() => setShowWording((v) => !v)}
             >
-              <AppIcon className="ri-text" />
+              <AppIcon className="ri-pencil-line" />
             </button>
           )}
           {!item.builtin && (
