@@ -15,6 +15,7 @@ import Ilr from './steps/Ilr';
 import Plr from './steps/Plr';
 import CvJob from './steps/CvJob';
 import Policies from './steps/Policies';
+import InitialAssessments from './steps/InitialAssessments';
 import NextSteps from './steps/NextSteps';
 import { StepHeading } from './steps/fields';
 import { StepItems } from './layout/StepItems';
@@ -35,6 +36,7 @@ const BODIES_BY_SLUG: Record<string, ComponentType> = {
   'skills-radar': SkillsRadar,
   inclusion: Inclusion,
   policies: Policies,
+  'initial-assessments': InitialAssessments,
   'next-steps': NextSteps,
 };
 
@@ -54,7 +56,7 @@ export const STEP_BODIES: ComponentType[] = WIZARD_STEPS.map((step) => {
  * Policies, …). Those blocks can be moved, so these steps render whatever the
  * layout now puts on them rather than their original component.
  */
-const BLOCK_STEPS = new Set(['introduction', 'before-you-begin', 'plr', 'skills-radar', 'inclusion', 'policies', 'next-steps']);
+const BLOCK_STEPS = new Set(['introduction', 'before-you-begin', 'plr', 'skills-radar', 'inclusion', 'policies', 'initial-assessments', 'next-steps']);
 
 /** A step added in the wizard builder, or a block step: its items, in layout order. */
 function LayoutStepBody({ slug, label, custom }: { slug: string; label: string; custom: boolean }) {

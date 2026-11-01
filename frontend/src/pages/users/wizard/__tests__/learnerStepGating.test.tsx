@@ -375,8 +375,8 @@ describe('learner step gating', () => {
     // Details is still unanswered. Next Steps is not counted: it only counts
     // once the learner has reached it with every earlier step done, and the
     // Inclusion assessment has not been answered.
-    await waitFor(() => expect(screen.getByText(/5 of 11 steps complete/i)).toBeInTheDocument());
-    expect(screen.getByText('45%')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/6 of 12 steps complete/i)).toBeInTheDocument());
+    expect(screen.getByText('50%')).toBeInTheDocument();
   });
 
   it('claims no progress until the programme competencies have seeded either', async () => {
@@ -413,8 +413,8 @@ describe('learner step gating', () => {
 
     // Now measurable — and the Skills Radar is correctly outstanding, so the
     // count settles at 4 (the PLR has nothing required), never having shown 5.
-    await waitFor(() => expect(screen.getByText(/4 of 11 steps complete/i)).toBeInTheDocument());
-    expect(screen.queryByText(/5 of 11 steps complete/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/5 of 12 steps complete/i)).toBeInTheDocument());
+    expect(screen.queryByText(/6 of 12 steps complete/i)).not.toBeInTheDocument();
   });
 
   it('does not gate the staff wizard, and keeps its Save progress button', async () => {

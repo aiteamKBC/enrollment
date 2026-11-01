@@ -631,5 +631,6 @@ export const WIZARD_STEPS: WizardStepDef[] = [
   { slug: 'skills-radar', label: 'Skills Radar' },
   { slug: 'inclusion', label: 'Inclusion' },
   { slug: 'policies', label: 'Policies' },
+  { slug: 'initial-assessments', label: 'Initial Assessments' },
   { slug: 'next-steps', label: 'What Happens Now?' },
 ];

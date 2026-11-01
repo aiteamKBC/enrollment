@@ -79,6 +79,7 @@ BUILTIN_STEP_TABLES = {
     "before-you-begin": ("Wizard_Before_You_Begin", "wizard_before_you_begin_learner_uniq", True),
     "inclusion": ("Wizard_Inclusion", "wizard_inclusion_learner_uniq", True),
     "policies": ("Wizard_Policies", "wizard_policies_learner_uniq", True),
+    "initial-assessments": ("Wizard_Initial_Assessments", "wizard_initial_assessments_learner_uniq", True),
     "next-steps": ("Wizard_Next_Steps", "wizard_next_steps_learner_uniq", True),
 }
 
@@ -93,6 +94,7 @@ BUILTIN_STEP_LABELS = {
     "skills-radar": "Skills Radar",
     "inclusion": "Inclusion",
     "policies": "Policies",
+    "initial-assessments": "Initial Assessments",
     "next-steps": "What Happens Now?",
 }
 

@@ -429,6 +429,11 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
     }],
   },
   {
+    slug: 'initial-assessments',
+    label: 'Initial Assessments',
+    items: [page('block.initialAssessments', 'English and Maths initial assessments')],
+  },
+  {
     slug: 'next-steps',
     label: 'What Happens Now?',
     items: [page('block.nextSteps', 'Next steps and compliance meeting booking')],

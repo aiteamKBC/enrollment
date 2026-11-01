@@ -175,7 +175,7 @@ async function send<T>(path: string, init?: globalThis.RequestInit): Promise<T> 
       throw new AuthError('Your session took too long to load. Please try again.', 0, 'timeout');
     }
     throw new AuthError(
-      'Could not reach the server. Is the backend running on port 8000?',
+      'Could not reach the server. Is the backend running on port 8001?',
       0,
       'network',
     );
