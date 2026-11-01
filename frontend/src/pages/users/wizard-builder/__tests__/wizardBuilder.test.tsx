@@ -6,7 +6,7 @@
  */
 import type { ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -22,7 +22,7 @@ vi.mock('@/api/wizardLayout', () => ({
 }));
 
 import WizardBuilderPage from '../page';
-import { addCustomField, moveItem, moveItemToStep, removeItem } from '../builderOps';
+import { addCustomField, duplicateItem, moveItem, moveItemAfter, moveItemBefore, moveItemToStep, removeItem } from '../builderOps';
 import { defaultLayout, resolveLayout } from '../../wizard/layout/resolve';
 import type { WizardLayout } from '../../wizard/layout/types';
 
@@ -58,6 +58,23 @@ describe('layout edits', () => {
     expect(keys.slice(0, 3)).toEqual(['pd.email', 'pd.lastName', 'pd.firstName']);
   });
 
+  it('moves an item before another shown item and duplicates custom fields without storage', () => {
+    let layout = defaultLayout();
+    const added = addCustomField(layout, 'cv-job', { label: 'Original question', type: 'single_line', required: true, table: 'Wizard_Cv_Job', column: 'Custom_original_question' });
+    layout = moveItemBefore(added.layout, 'cv-job', added.key, 'cv.experience');
+    const cv = stepItems(layout, 'cv-job');
+    expect(cv.findIndex((item) => item.key === added.key)).toBeLessThan(cv.findIndex((item) => item.key === 'cv.experience'));
+    const movedAfter = moveItemAfter(layout, 'cv-job', added.key, 'cv.experience');
+    const afterItems = stepItems(movedAfter, 'cv-job');
+    expect(afterItems.findIndex((item) => item.key === added.key)).toBeGreaterThan(afterItems.findIndex((item) => item.key === 'cv.experience'));
+
+    const result = duplicateItem(layout, 'cv-job', added.key)!;
+    const copy = stepItems(result.layout, 'cv-job').find((item) => item.key === result.key)!;
+    expect(copy).toMatchObject({ label: 'Original question', type: 'single_line', required: true, builtin: false, hidden: false });
+    expect(copy.column).toBeUndefined();
+    expect(copy.key).not.toBe(added.key);
+  });
+
   it('hides a built-in or published field but drops one never published', () => {
     let layout = defaultLayout();
     const added = addCustomField(layout, 'cv-job', { label: 'Draft', type: 'text' });
@@ -89,6 +106,14 @@ function renderBuilder() {
 const openStep = async (name: string) => {
   const nav = await screen.findByRole('navigation', { name: 'Wizard steps' });
   await userEvent.click(within(nav).getByRole('button', { name }));
+};
+
+const dragFieldBefore = (sourceLabel: string, targetLabel: string) => {
+  const source = screen.getByText(sourceLabel).closest('li')!;
+  const target = screen.getByText(targetLabel).closest('li')!;
+  const dataTransfer = { effectAllowed: '', dropEffect: '', setData: vi.fn(), getData: vi.fn(() => sourceLabel) };
+  fireEvent.dragStart(source, { dataTransfer });
+  fireEvent.drop(target, { dataTransfer });
 };
 
 describe('the builder page', () => {
@@ -187,6 +212,28 @@ describe('the builder page', () => {
     const custom = stepItems(publishWizardLayout.mock.calls[0][0] as WizardLayout, 'cv-job').filter((i) => !i.builtin);
     expect(custom).toContainEqual(expect.objectContaining({ label: 'GCSEs', type: 'heading' }));
     expect(custom).toContainEqual(expect.objectContaining({ label: 'Which route do you prefer?', type: 'radio', options: ['In person', 'Online'] }));
+  });
+
+  it('duplicates a custom field and supports dragging a field before another', async () => {
+    renderBuilder();
+    await openStep('CV/Job Description');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add field' }));
+    await userEvent.type(screen.getByLabelText('Question / label'), 'Copy me');
+    await userEvent.click(screen.getByRole('button', { name: /^Add field$/ }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicate Copy me' }));
+    expect(screen.getByDisplayValue('Copy me')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    const list = screen.getByRole('list', { name: 'Items on CV/Job Description' });
+    const source = screen.getAllByText('Copy me')[1].closest('li')!;
+    const target = screen.getByText('CV upload').closest('li')!;
+    const dataTransfer = { effectAllowed: '', dropEffect: '', setData: vi.fn(), getData: vi.fn(() => source.querySelector('p')?.textContent ?? '') };
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+    expect(Array.from(list.querySelectorAll(':scope > li')).findIndex((li) => li.textContent?.includes('Copy me')))
+      .toBeLessThan(Array.from(list.querySelectorAll(':scope > li')).findIndex((li) => li.textContent?.includes('CV upload')));
   });
 
   it('adds a follow-up question from an option’s checkbox, placed under the dropdown', async () => {
@@ -368,7 +415,7 @@ describe('the builder page', () => {
     publishWizardLayout.mockRejectedValue(new Error('Someone else has published the wizard since you opened it.'));
     renderBuilder();
     await openStep('Personal Details');
-    await userEvent.click(screen.getByRole('button', { name: 'Move Last Name up' }));
+    dragFieldBefore('Last Name', 'First Name');
     await userEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
     await waitFor(() => expect(error).toHaveBeenCalledWith('Could not publish the wizard', expect.stringContaining('Someone else')));
@@ -379,7 +426,7 @@ describe('the builder page', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderBuilder();
     await openStep('Personal Details');
-    await userEvent.click(screen.getByRole('button', { name: 'Move Last Name up' }));
+    dragFieldBefore('Last Name', 'First Name');
     await userEvent.click(screen.getByRole('button', { name: /Back to users/ }));
     expect(confirm).toHaveBeenCalled();
     expect(screen.queryByText('User directory')).not.toBeInTheDocument();

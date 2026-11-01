@@ -17,7 +17,9 @@ import {
   addStep,
   canChangeStep,
   dependents,
-  moveItem,
+  duplicateItem,
+  moveItemBefore,
+  moveItemAfter,
   moveItemToStep,
   moveStep,
   pendingColumns,
@@ -291,6 +293,7 @@ function StepEditor({
   const shown = step.items.filter((it) => !it.hidden);
   const removed = step.items.filter((it) => it.hidden);
   const [showRemoved, setShowRemoved] = useState(false);
+  const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const addRef = useRef<HTMLButtonElement>(null);
 
   const saveField = (draft: FieldDraft) => {
@@ -339,10 +342,45 @@ function StepEditor({
       )}
       {!step.label.trim() && <p role="alert" className="mx-5 mt-3 text-[12px] text-red-600">Give the step a name before publishing.</p>}
 
-      <ol className="space-y-2 p-5" aria-label={`Items on ${step.label}`}>
+      <ol
+        className="space-y-2 p-5"
+        aria-label={`Items on ${step.label}`}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDraggedKey(null);
+        }}
+      >
         {shown.length === 0 && <li className="rounded-xl border border-dashed border-foreground-200 p-4 text-center text-[12px] text-foreground-400">Nothing on this step yet. Add a field below.</li>}
-        {shown.map((item, i) => (
-          <li key={item.key}>
+        {shown.map((item) => (
+          <li
+            key={item.key}
+            draggable={editing !== item.key}
+            onDragStart={(e) => {
+              setDraggedKey(item.key);
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', item.key);
+            }}
+            onDragEnd={() => setDraggedKey(null)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const sourceKey = draggedKey || e.dataTransfer.getData('text/plain');
+              if (sourceKey && sourceKey !== item.key) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const placeAfter = typeof e.clientY === 'number' && e.clientY > rect.top + rect.height / 2;
+                edit((l) => placeAfter
+                  ? moveItemAfter(l, step.slug, sourceKey, item.key)
+                  : moveItemBefore(l, step.slug, sourceKey, item.key));
+              }
+              setDraggedKey(null);
+            }}
+            className={draggedKey === item.key ? 'opacity-50' : undefined}
+          >
             {editing === item.key ? (
               <FieldEditor layout={layout} item={item} onSave={saveField} onCancel={() => setEditing(null)} />
             ) : (
@@ -350,10 +388,14 @@ function StepEditor({
                 layout={layout}
                 step={step}
                 item={item}
-                first={i === 0}
-                last={i === shown.length - 1}
                 edit={edit}
                 onEdit={() => setEditing(item.key)}
+                onDuplicate={() => {
+                  const result = duplicateItem(layout, step.slug, item.key);
+                  if (!result) return;
+                  edit(() => result.layout);
+                  setEditing(result.key);
+                }}
               />
             )}
           </li>
@@ -398,18 +440,16 @@ function ItemRow({
   layout,
   step,
   item,
-  first,
-  last,
   edit,
   onEdit,
+  onDuplicate,
 }: {
   layout: WizardLayout;
   step: LayoutStep;
   item: LayoutItem;
-  first: boolean;
-  last: boolean;
   edit: (fn: (l: WizardLayout) => WizardLayout) => void;
   onEdit: () => void;
+  onDuplicate: () => void;
 }) {
   const def = builtinDef(item);
   const label = itemLabel(item);
@@ -483,12 +523,9 @@ function ItemRow({
           </select>
         )}
         <div className="flex shrink-0 items-center">
-          <button type="button" className={iconBtn} disabled={first} aria-label={`Move ${label} up`} onClick={() => edit((l) => moveItem(l, step.slug, item.key, -1))}>
-            <AppIcon className="ri-arrow-up-line" />
-          </button>
-          <button type="button" className={iconBtn} disabled={last} aria-label={`Move ${label} down`} onClick={() => edit((l) => moveItem(l, step.slug, item.key, 1))}>
-            <AppIcon className="ri-arrow-down-line" />
-          </button>
+          <span className="flex h-8 w-8 cursor-grab items-center justify-center text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
+            <AppIcon className="ri-drag-move-2-line" />
+          </span>
           {slots.length > 0 && (
             <button
               type="button"
@@ -502,9 +539,14 @@ function ItemRow({
             </button>
           )}
           {!item.builtin && (
-            <button type="button" className={iconBtn} aria-label={`Edit ${label}`} onClick={onEdit}>
-              <AppIcon className="ri-pencil-line" />
-            </button>
+            <>
+              <button type="button" className={iconBtn} aria-label={`Edit ${label}`} onClick={onEdit}>
+                <AppIcon className="ri-pencil-line" />
+              </button>
+              <button type="button" className={iconBtn} aria-label={`Duplicate ${label}`} title="Duplicate field" onClick={onDuplicate}>
+                <AppIcon className="ri-file-copy-line" />
+              </button>
+            </>
           )}
           <button type="button" className={`${iconBtn} hover:!text-red-600`} aria-label={`Remove ${label}`} onClick={remove}>
             <AppIcon className="ri-delete-bin-line" />
