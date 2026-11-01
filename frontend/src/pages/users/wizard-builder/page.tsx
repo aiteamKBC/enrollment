@@ -477,8 +477,12 @@ function ItemRow({
   };
 
   return (
-    <div className="rounded-xl border border-foreground-100 bg-background-50 px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex overflow-hidden rounded-xl border border-foreground-100 bg-background-50">
+      <span className="flex w-14 shrink-0 cursor-grab items-center justify-center border-r border-foreground-100 bg-background-100/40 text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
+        <AppIcon className="ri-drag-move-2-line text-[20px]" />
+      </span>
+      <div className="min-w-0 flex-1 px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-medium text-foreground-900">{label}</p>
           {slots.length > 0 && !wordy && (
@@ -523,9 +527,6 @@ function ItemRow({
           </select>
         )}
         <div className="flex shrink-0 items-center">
-          <span className="flex h-8 w-8 cursor-grab items-center justify-center text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
-            <AppIcon className="ri-drag-move-2-line" />
-          </span>
           {slots.length > 0 && (
             <button
               type="button"
@@ -568,6 +569,7 @@ function ItemRow({
           <AppIcon className="ri-error-warning-line mr-1" />Optional now: if a learner leaves this blank, it prints blank on the ILR document.
         </p>
       )}
+      </div>
     </div>
   );
 }
