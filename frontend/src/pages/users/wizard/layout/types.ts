@@ -10,14 +10,26 @@
  * enrolment_api/wizard_layout.py) — the client never chooses storage.
  */
 
-export type CustomFieldType = 'text' | 'number' | 'upload' | 'dropdown';
+/**
+ * `text` is retained for layouts published before the text fields were split.
+ * New fields should use the explicit single-line or multi-line type.
+ */
+export type CustomFieldType = 'text' | 'single_line' | 'multi_line' | 'number' | 'upload' | 'dropdown';
 
 export const CUSTOM_FIELD_TYPES: { value: CustomFieldType; label: string }[] = [
-  { value: 'text', label: 'Text' },
+  { value: 'single_line', label: 'Single-line text' },
+  { value: 'multi_line', label: 'Multi-line text' },
   { value: 'number', label: 'Number' },
   { value: 'dropdown', label: 'Dropdown' },
   { value: 'upload', label: 'File upload' },
 ];
+
+/** Keep an already-published legacy `text` field selectable without offering it for new fields. */
+export function fieldTypeOptions(current?: CustomFieldType): { value: CustomFieldType; label: string }[] {
+  return current === 'text'
+    ? [{ value: 'text', label: 'Single-line text (existing)' }, ...CUSTOM_FIELD_TYPES]
+    : CUSTOM_FIELD_TYPES;
+}
 
 /** Show an item only while a dropdown answer is one of `values`. */
 export interface LayoutCondition {

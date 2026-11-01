@@ -15,6 +15,7 @@ export function LabeledInput({
   helper,
   readOnly,
   missingKey,
+  maxLength,
 }: {
   label: string;
   type?: string;
@@ -27,6 +28,7 @@ export function LabeledInput({
   readOnly?: boolean;
   /** This field's label in the step's validation list: red once Next is pressed while it is outstanding. */
   missingKey?: string;
+  maxLength?: number;
 }) {
   // Complain only after the learner has left the field, so an address isn't
   // marked invalid while it is still being typed — or once they press Next.
@@ -49,6 +51,7 @@ export function LabeledInput({
         placeholder={placeholder ?? (type === 'email' ? 'name@example.com' : type === 'tel' ? '07123 456789' : undefined)}
         inputMode={type === 'tel' ? 'tel' : type === 'email' ? 'email' : undefined}
         autoComplete={type === 'email' ? 'email' : type === 'tel' ? 'tel' : undefined}
+        maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
         onBlur={() => setTouched(true)}
         aria-invalid={error ? true : undefined}
@@ -107,6 +110,8 @@ export function LabeledTextarea({
   rows = 3,
   required,
   missingKey,
+  helper,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -114,6 +119,8 @@ export function LabeledTextarea({
   rows?: number;
   required?: boolean;
   missingKey?: string;
+  helper?: ReactNode;
+  maxLength?: number;
 }) {
   const missing = useMissing(missingKey);
   return (
@@ -122,10 +129,12 @@ export function LabeledTextarea({
         rows={rows}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        maxLength={maxLength}
         aria-invalid={missing ? true : undefined}
         className={`${inputClass}${missing ? invalidClass : ''}`}
       />
       {missing && <FieldError message={missingMessage(missing, missingKey!, label, 'enter')} />}
+      {helper && !missing && <p className="text-[11px] text-foreground-400 mt-1">{helper}</p>}
     </FieldRow>
   );
 }

@@ -37,7 +37,14 @@ const KIND_LABEL: Record<string, string> = {
   block: 'Block',
 };
 
-const TYPE_LABEL: Record<string, string> = { text: 'Text', number: 'Number', dropdown: 'Dropdown', upload: 'File upload' };
+const TYPE_LABEL: Record<string, string> = {
+  text: 'Single-line text (existing)',
+  single_line: 'Single-line text',
+  multi_line: 'Multi-line text',
+  number: 'Number',
+  dropdown: 'Dropdown',
+  upload: 'File upload',
+};
 
 const clone = (layout: WizardLayout): WizardLayout => JSON.parse(JSON.stringify(layout)) as WizardLayout;
 

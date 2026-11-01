@@ -57,12 +57,20 @@ MAX_LAYOUT_BYTES = 512 * 1024
 MAX_STEPS = 40
 MAX_ITEMS_PER_STEP = 200
 MAX_OPTIONS = 200
-MAX_TEXT_ANSWER = 10_000
+MAX_SINGLE_LINE_ANSWER = 500
+MAX_MULTILINE_ANSWER = 10_000
 
-FIELD_TYPES = {"text", "number", "upload", "dropdown"}
+FIELD_TYPES = {"text", "single_line", "multi_line", "number", "upload", "dropdown"}
 
 #: SQL type of each custom field's column.
-COLUMN_TYPES = {"text": "text", "dropdown": "text", "number": "numeric", "upload": "jsonb"}
+COLUMN_TYPES = {
+    "text": "text",  # Legacy single-line fields published before the split.
+    "single_line": "text",
+    "multi_line": "text",
+    "dropdown": "text",
+    "number": "numeric",
+    "upload": "jsonb",
+}
 
 #: Built-in steps -> (their table, its one-row-per-learner unique index, whether
 #: this module may create the table). The first six already exist (see
@@ -382,7 +390,7 @@ def _normalize_custom(raw_item, step_slug, step_table, step_label, prev_fields, 
     label = _clean_text(raw_item.get("label"), f"A field on '{step_label}' needs a label;", 300)
     field_type = raw_item.get("type")
     if field_type not in FIELD_TYPES:
-        raise LayoutError(f"'{label}' needs a type: text, number, upload or dropdown.")
+        raise LayoutError(f"'{label}' needs a type: single_line, multi_line, number, upload or dropdown.")
 
     if prior:
         # Storage is fixed once assigned; so is the type, since it decides the
@@ -640,7 +648,8 @@ def _column_value(item, value):
         return number if number.is_finite() else None
     if not isinstance(value, str):
         return None
-    text = value.strip()[:MAX_TEXT_ANSWER]
+    limit = MAX_SINGLE_LINE_ANSWER if field_type == "single_line" else MAX_MULTILINE_ANSWER
+    text = value.strip()[:limit]
     if not text:
         return None
     if field_type == "dropdown" and text not in (item.get("options") or []):

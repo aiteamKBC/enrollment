@@ -9,7 +9,7 @@ import {
   type CustomUpload,
 } from '@/api/wizardLayout';
 import { EmptyState, FieldRow } from '../../components/ui';
-import { LabeledInput, LabeledSelect } from '../steps/fields';
+import { LabeledInput, LabeledSelect, LabeledTextarea } from '../steps/fields';
 import { FieldError } from '../stepErrors';
 import { missingMessage, useMissing } from "../stepErrors.helpers";
 import { useWizard } from "../WizardContext.helpers";
@@ -53,6 +53,21 @@ export function CustomField({ item }: { item: LayoutItem }) {
     );
   }
 
+  if (item.type === 'multi_line') {
+    return (
+      <LabeledTextarea
+        label={label}
+        rows={5}
+        required={required}
+        missingKey={label}
+        value={value}
+        helper={helper}
+        maxLength={10_000}
+        onChange={(v) => setCustom(item.key, v)}
+      />
+    );
+  }
+
   return (
     <LabeledInput
       label={label}
@@ -61,6 +76,7 @@ export function CustomField({ item }: { item: LayoutItem }) {
       missingKey={label}
       value={value}
       helper={helper}
+      maxLength={item.type === 'single_line' ? 500 : undefined}
       onChange={(v) => setCustom(item.key, v)}
     />
   );

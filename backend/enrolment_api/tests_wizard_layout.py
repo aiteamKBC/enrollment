@@ -50,6 +50,18 @@ def step(slug, items, label=None, builtin=True, **extra):
 
 
 class NormalizeLayoutTests(SimpleTestCase):
+    def test_new_text_types_share_text_storage(self):
+        layout, plan = wl.normalize_layout(
+            {"steps": [step("cv-job", [custom("Short answer", "single_line"), custom("Long answer", "multi_line")])]},
+            None,
+        )
+        items = layout["steps"][0]["items"]
+        self.assertEqual([item["type"] for item in items], ["single_line", "multi_line"])
+        self.assertEqual(plan["Wizard_Cv_Job"]["columns"], {
+            "Custom_short_answer": "text",
+            "Custom_long_answer": "text",
+        })
+
     def test_new_custom_field_gets_a_column_in_its_steps_table(self):
         layout, plan = wl.normalize_layout(
             {"steps": [step("cv-job", [{"key": "cv.experience", "builtin": True, "hidden": False},
@@ -247,11 +259,19 @@ LAYOUT = {"steps": [
 
 
 class ProjectCustomFieldsTests(SimpleTestCase):
-    def _project(self, draft, answers=None):
+    def _project(self, draft, answers=None, layout=LAYOUT):
         cursor = FakeCursor()
         with patch.object(wl, "connections", FakeConnections(cursor)):
-            wl.project_custom_fields("apprenticeship", 41, draft, answers=answers, layout=LAYOUT)
+            wl.project_custom_fields("apprenticeship", 41, draft, answers=answers, layout=layout)
         return cursor.executed
+
+    def test_single_line_and_multi_line_answers_have_separate_limits(self):
+        layout = {"steps": [step("cv-job", [
+            custom("Short", "single_line", key="cf_short", table="Wizard_Cv_Job", column="Custom_short"),
+            custom("Long", "multi_line", key="cf_long", table="Wizard_Cv_Job", column="Custom_long"),
+        ])]}
+        executed = self._project({"custom": {"cf_short": "s" * 600, "cf_long": "l" * 10_500}}, layout=layout)
+        self.assertEqual(executed[0][1], ["apprenticeship", 41, "s" * 500, "l" * 10_000])
 
     def test_upserts_each_tables_answers(self):
         executed = self._project({

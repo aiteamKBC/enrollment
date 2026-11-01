@@ -89,6 +89,27 @@ describe('the builder page', () => {
     expect(screen.getByText('First Name')).toBeInTheDocument();
   });
 
+  it('offers separate single-line and multi-line text fields', async () => {
+    renderBuilder();
+    await openStep('CV/Job Description');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add field' }));
+    const type = screen.getByLabelText('Field type');
+    expect(within(type).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Single-line text', 'Multi-line text', 'Number', 'Dropdown', 'File upload',
+    ]);
+    await userEvent.type(screen.getByLabelText('Question / label'), 'Additional details');
+    await userEvent.selectOptions(type, 'multi_line');
+    await userEvent.click(screen.getByRole('button', { name: /^Add field$/ }));
+
+    expect(screen.getByText(/Multi-line text/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
+    await waitFor(() => expect(publishWizardLayout).toHaveBeenCalled());
+    const custom = stepItems(publishWizardLayout.mock.calls[0][0] as WizardLayout, 'cv-job').filter((i) => !i.builtin);
+    expect(custom).toContainEqual(expect.objectContaining({ label: 'Additional details', type: 'multi_line' }));
+  });
+
   it('adds a dropdown and a follow-up shown for one answer, and publishes them', async () => {
     renderBuilder();
     await openStep('CV/Job Description');
@@ -122,7 +143,7 @@ describe('the builder page', () => {
     const custom = stepItems(sent, 'cv-job').filter((i) => !i.builtin);
     expect(custom.map((i) => [i.label, i.type, i.required])).toEqual([
       ['Shift pattern', 'dropdown', true],
-      ['Night allowance', 'text', false],
+      ['Night allowance', 'single_line', false],
     ]);
     expect(custom[0].options).toEqual(['Day', 'Night']);
     expect(custom[1].condition).toEqual({ field: custom[0].key, values: ['Night'] });
@@ -174,7 +195,7 @@ describe('the builder page', () => {
     await userEvent.type(screen.getByLabelText(/Follow-up question for “Yes”/), 'Licence type');
 
     const type = screen.getByLabelText('Answer type');
-    expect(within(type).getAllByRole('option').map((o) => o.textContent)).toEqual(['Text', 'Number', 'Dropdown', 'File upload']);
+    expect(within(type).getAllByRole('option').map((o) => o.textContent)).toEqual(['Single-line text', 'Multi-line text', 'Number', 'Dropdown', 'File upload']);
     await userEvent.selectOptions(type, 'dropdown');
 
     // A dropdown follow-up cannot be saved without choices of its own.

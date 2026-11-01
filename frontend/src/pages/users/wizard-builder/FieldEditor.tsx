@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { btnPrimary, btnSecondary, inputClass } from '../components/ui';
 import { itemLabel } from '../wizard/layout/resolve';
-import { CUSTOM_FIELD_TYPES, type CustomFieldType, type LayoutItem, type WizardLayout } from '../wizard/layout/types';
+import { fieldTypeOptions, type CustomFieldType, type LayoutItem, type WizardLayout } from '../wizard/layout/types';
 import { BUILTIN_ITEMS } from '../wizard/layout/registry';
 import { conditionSources, existingFollowUps, type FollowUpDraft } from './builderOps';
 import { fieldDraftFrom, type FieldDraft } from './fieldDraft';
@@ -27,7 +27,7 @@ let rowSeq = 0;
 const newRow = (value: string, follow?: Partial<OptionRow['follow']>): OptionRow => ({
   id: `row-${(rowSeq += 1)}`,
   value,
-  follow: { on: false, label: '', type: 'text', required: false, published: false, options: ['', ''], ...follow },
+  follow: { on: false, label: '', type: 'single_line', required: false, published: false, options: ['', ''], ...follow },
 });
 
 /** One row per option, with the follow-up the option already has (if any). */
@@ -35,7 +35,7 @@ function initialRows(layout: WizardLayout, item?: LayoutItem): OptionRow[] {
   const existing = item ? existingFollowUps(layout, item.key) : [];
   const rows = (item?.options ?? []).map((option) => {
     const f = existing.find((it) => it.condition?.values[0] === option);
-    return newRow(option, f ? { on: true, key: f.key, label: f.label ?? '', type: f.type ?? 'text', required: Boolean(f.required), published: Boolean(f.column), options: f.options?.length ? f.options : ['', ''] } : undefined);
+    return newRow(option, f ? { on: true, key: f.key, label: f.label ?? '', type: f.type ?? 'single_line', required: Boolean(f.required), published: Boolean(f.column), options: f.options?.length ? f.options : ['', ''] } : undefined);
   });
   return rows.length ? rows : [newRow(''), newRow('')];
 }
@@ -158,7 +158,7 @@ export function FieldEditor({
             disabled={published}
             onChange={(e) => set({ type: e.target.value as CustomFieldType })}
           >
-            {CUSTOM_FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            {fieldTypeOptions(draft.type).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
           {published && <span className="mt-1 block text-[11px] font-normal text-foreground-400">Published fields keep their type — remove it and add a new field to change it.</span>}
         </label>
@@ -224,7 +224,7 @@ export function FieldEditor({
                             disabled={row.follow.published}
                             onChange={(e) => setFollow(row.id, { type: e.target.value as CustomFieldType })}
                           >
-                            {CUSTOM_FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            {fieldTypeOptions(row.follow.type).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                           </select>
                         </label>
                         <label className="flex items-center gap-1.5 pb-2 text-[12px] text-foreground-700">
