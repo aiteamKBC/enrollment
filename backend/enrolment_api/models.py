@@ -235,3 +235,38 @@ class WizardPolicyAck(_LearnerScoped):
     class Meta:
         managed = False
         db_table = 'enrolment"."Wizard_Policy_Acks'
+
+
+class BksbInitialAssessment(models.Model):
+    """The local, additive read model for a learner's BKSB assessment state.
+
+    BKSB's user/session identifiers are provider identifiers, not foreign keys
+    to our learner table.  The learner pair is therefore deliberately retained
+    in the same form as the other unmanaged enrolment records.  ``attempts``
+    is a small provider-session history, kept as JSON so both legacy integer
+    session ids and V5 UUIDs can be recorded without a destructive migration.
+    """
+
+    id = models.AutoField(primary_key=True, db_column="id")
+    learner_kind = models.TextField(db_column="Learner_kind")
+    learner_id = models.BigIntegerField(db_column="Learner_id")
+    subject = models.TextField(db_column="Subject")  # english | maths
+    bksb_user_id = models.BigIntegerField(db_column="Bksb_user_id", null=True, blank=True)
+    bksb_username = models.TextField(db_column="Bksb_username", null=True, blank=True)
+    course_subject = models.TextField(db_column="Course_subject", null=True, blank=True)
+    course_name = models.TextField(db_column="Course_name", null=True, blank=True)
+    course_is_reforms = models.BooleanField(db_column="Course_is_reforms", null=True, blank=True)
+    status = models.TextField(db_column="Status", default="not_started")
+    provider_session_id = models.TextField(db_column="Provider_session_id", null=True, blank=True)
+    result = models.TextField(db_column="Result", null=True, blank=True)
+    level = models.TextField(db_column="Level", null=True, blank=True)
+    assessment_date = models.DateTimeField(db_column="Assessment_date", null=True, blank=True)
+    last_synced_at = models.DateTimeField(db_column="Last_synced_at", null=True, blank=True)
+    last_error = models.TextField(db_column="Last_error", null=True, blank=True)
+    attempts = SafeJSONField(db_column="Attempts", default=list, blank=True)
+    created_at = models.DateTimeField(db_column="Created_at", auto_now_add=True)
+    updated_at = models.DateTimeField(db_column="Updated_at", auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'enrolment"."Bksb_Initial_Assessments'

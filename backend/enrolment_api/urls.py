@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import cv_job_documents, documents, eligibility_form, eligibility_layout, extended_ilr, ilr_eligibility_evidence, ilr_employer_details, ilr_learner_record, plr_evidence, policy_documents, postcode_lookup, views, wizard_bootstrap, wizard_custom_uploads, wizard_inclusion, wizard_layout
+from . import bksb, cv_job_documents, documents, eligibility_form, eligibility_layout, extended_ilr, ilr_eligibility_evidence, ilr_employer_details, ilr_learner_record, plr_evidence, policy_documents, postcode_lookup, views, wizard_bootstrap, wizard_custom_uploads, wizard_inclusion, wizard_layout
 
 urlpatterns = [
     path('health/', views.health, name='enrolment-health'),
@@ -30,6 +30,14 @@ urlpatterns = [
     # The wizard builder: the published layout (read by every wizard) and its publish (enrolment staff)
     # The Inclusion step: whether the learner has answered the assessment on the Safeguarding site
     path('wizard/<str:kind>/<int:learner_id>/inclusion/', wizard_inclusion.wizard_inclusion, name='wizard-inclusion'),
+    # BKSB LIVE 2 initial English/Maths assessments. Credentials and provider
+    # calls stay in enrolment_api.bksb; launch URLs are short-lived and are not
+    # persisted or logged.
+    path('bksb/test/', bksb.bksb_connection_test, name='bksb-connection-test'),
+    path('bksb/courses/', bksb.bksb_courses, name='bksb-courses'),
+    path('wizard/<str:kind>/<int:learner_id>/initial-assessments/', bksb.initial_assessments, name='wizard-initial-assessments'),
+    path('wizard/<str:kind>/<int:learner_id>/initial-assessments/bksb-account/', bksb.auto_login_account, name='wizard-bksb-auto-login'),
+    path('wizard/<str:kind>/<int:learner_id>/initial-assessments/<str:subject>/launch/', bksb.launch_initial_assessment, name='wizard-initial-assessment-launch'),
     path('wizard-layout/', wizard_layout.wizard_layout, name='wizard-layout'),
     path('wizard-layout/publish/', wizard_layout.publish_wizard_layout, name='wizard-layout-publish'),
     # Files on the builder's custom upload fields (Azure-backed, path in the field's own column)

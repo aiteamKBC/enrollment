@@ -895,6 +895,8 @@ _default_csrf_trusted_origins = [
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
+    'http://localhost:3002',
+    'http://127.0.0.1:3002',
     'https://lms.kentbusinesscollege.net',
     'https://api.kentbusinesscollege.net',
 ]
@@ -1123,6 +1125,9 @@ try:  # pragma: no cover - depends on the installed environment
 except ImportError:
     pass
 
+_BKSB_LOG_DIR = BASE_DIR / 'logs'
+_BKSB_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -1142,6 +1147,18 @@ LOGGING = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'filters': ['request_context'],
+            'formatter': 'plain' if DEBUG else 'json',
+        },
+        # The BKSB client emits only sanitised endpoint/status breadcrumbs.
+        # The repository ignores *.log, so this local diagnostic trail never
+        # becomes a commit or an artifact containing provider credentials.
+        'bksb_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(_BKSB_LOG_DIR / 'bksb.log'),
+            'maxBytes': 1_000_000,
+            'backupCount': 3,
+            'encoding': 'utf-8',
             'filters': ['request_context'],
             'formatter': 'plain' if DEBUG else 'json',
         },
@@ -1191,6 +1208,24 @@ LOGGING = {
         'daphne.server': {
             'handlers': ['console'],
             'level': 'ERROR',
+            'propagate': False,
+        },
+        # httpx's default INFO line includes query strings.  BKSB lookups can
+        # contain learner emails/usernames, so keep provider diagnostics in the
+        # sanitised enrolment_api.bksb breadcrumbs instead.
+        'httpx': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'httpcore': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'enrolment_api.bksb': {
+            'handlers': ['console', 'bksb_file'],
+            'level': 'INFO',
             'propagate': False,
         },
     },

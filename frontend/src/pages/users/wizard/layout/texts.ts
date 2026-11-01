@@ -162,6 +162,15 @@ const SLOTS: Record<string, Def[]> = {
     ['block.policies.group', 'Group heading', 'line', 'Kent Business College'],
     ['block.policies.acknowledge', 'Acknowledgement', 'line', 'I have read and understood this document'],
   ],
+  'block.initialAssessments': [
+    ['block.initialAssessments.title', 'Heading', 'line', 'Initial Assessments'],
+    ['block.initialAssessments.what', 'What is an Initial Assessment?', 'line', 'What is an Initial Assessment?'],
+    ['block.initialAssessments.whatBody', 'What is an Initial Assessment? text', 'paragraph', 'An initial assessment helps us understand your current English and maths skills at the start of your apprenticeship.'],
+    ['block.initialAssessments.why', 'Why Is This Important?', 'line', 'Why Is This Important?'],
+    ['block.initialAssessments.whyBody', 'Why Is This Important? text', 'paragraph', 'The results help us identify additional support, track progress, and provide the best possible learning experience.'],
+    ['block.initialAssessments.completing', 'Completing Your Initial Assessment', 'line', 'Completing Your Initial Assessment'],
+    ['block.initialAssessments.completingBody', 'Completing Your Initial Assessment text', 'paragraph', 'You will complete your English and Maths assessments through the BKSB platform.'],
+  ],
 
   // ── Personal Details ──
   'pd.firstName': [['pd.firstName.label', 'Label', 'line', 'First Name']],

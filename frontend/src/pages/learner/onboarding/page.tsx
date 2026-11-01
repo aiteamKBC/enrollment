@@ -17,6 +17,7 @@ import { maxReachableStep, missingAcrossWizard } from '@/pages/users/wizard/vali
 import { ONBOARDING_REVIEWS_ROUTE } from '@/hooks/useOnboardingRedirect';
 import { markEnrolmentSubmitted } from '@/hooks/useLearnerNavGate';
 import { RowsSkeleton } from '@/components/feature/Skeletons';
+import { shouldRedirectLearnerWizardStep } from './navigation';
 
 const learnerNav = roleNavMap.learner;
 
@@ -48,7 +49,7 @@ function LearnerWizard({ stepSlug, onDone }: { stepSlug: string | undefined; onD
   const reachable = maxReachableStep(draft, steps.length, layout);
   const reachableSlug = steps[reachable]?.slug;
   useEffect(() => {
-    if (ready && currentIndex > reachable && reachableSlug) {
+    if (shouldRedirectLearnerWizardStep({ ready, currentIndex, reachable }) && reachableSlug) {
       navigate(`/learner/onboarding/${reachableSlug}`, { replace: true });
     }
   }, [ready, currentIndex, reachable, reachableSlug, navigate]);
