@@ -1,4 +1,4 @@
-"""Pin published module content; the wizard continues owning learner choices."""
+"""Published modules and isolated choices on the existing assessment record."""
 from django.db import transaction
 
 from .configuration import ConfigurationError
@@ -29,48 +29,55 @@ def published_modules(validate_rules=True):
     return (current[0], validate(current[1].get(KEY) or defaults(), publishing=validate_rules)) if current else (None, validate(defaults()))
 
 
-def saved_choices(kind, learner_id):
+def saved_choices(kind, learner_id, assessment=None):
+    row = assessment if assessment is not None else Assessment.objects.filter(learner_id=learner_id).only('modules_selection').first()
+    if row is not None and row.modules_selection is not None:
+        return row.modules_selection
+    # Read-only compatibility for choices saved before isolated module storage.
     from enrolment_api.models import ExtendedIlr
     row = ExtendedIlr.objects.filter(learner_kind=kind, learner_id=learner_id).only('wizard_draft').first()
     return (row.wizard_draft or {}).get(KEY) if row else None
 
 
+def _pin_configuration(row):
+    if row is None or not row.confirmed_at or not row.selection_confirmed_at:
+        raise ConfigurationError('Confirm your programme before choosing modules.')
+    stored = saved_choices(row.learner_kind, row.learner_id, row) if row.selected_programme == 'PCP_L6' else None
+    changed = []
+    if row.modules_configuration is None:
+        legacy = stored
+        # Choices predating configurable modules refer to the original names,
+        # credits and hierarchy, not whatever was published subsequently.
+        version, config = (0, validate(legacy_defaults())) if _enrolment_finalized(row.learner_id) and legacy and 'configurationVersion' not in legacy else published_modules()
+        row.modules_configuration = config
+        row.modules_configuration_version = version
+        changed = ['modules_configuration', 'modules_configuration_version']
+    elif row.selected_programme == 'PCP_L6' and not _has_complete_rules(row, stored) and not _enrolment_finalized(row.learner_id):
+        version, config = published_modules()
+        if version != row.modules_configuration_version:
+            row.history = [*row.history, {'action': 'MODULE_CONFIGURATION_REFRESH',
+                'fromVersion': row.modules_configuration_version, 'toVersion': version,
+                'configuration': row.modules_configuration}]
+            row.modules_configuration = config
+            row.modules_configuration_version = version
+            changed = ['modules_configuration', 'modules_configuration_version', 'history']
+    if row.modules_selection is None and isinstance(stored, dict):
+        row.modules_selection = stored
+        changed.append('modules_selection')
+    return changed
+
+
 def pinned_configuration(kind, learner_id):
     with transaction.atomic():
         row = Assessment.objects.select_for_update().filter(learner_id=learner_id).first()
-        if row is None or not row.confirmed_at or not row.selection_confirmed_at:
-            raise ConfigurationError('Confirm your programme before choosing modules.')
-        stored = saved_choices(row.learner_kind, learner_id) if row.selected_programme == 'PCP_L6' else None
-        historical = _enrolment_finalized(learner_id)
-        if row.modules_configuration is None:
-            legacy = stored
-            # Choices predating configurable modules refer to the original names,
-            # credits and hierarchy, not whatever was published subsequently.
-            version, config = (0, validate(legacy_defaults())) if historical and legacy and 'configurationVersion' not in legacy else published_modules()
-            row.modules_configuration = config
-            row.modules_configuration_version = version
-            row.save(update_fields=['modules_configuration', 'modules_configuration_version'])
-        elif row.selected_programme == 'PCP_L6' and not historical and not _has_complete_rules(row, stored):
-            version, config = published_modules()
-            if version != row.modules_configuration_version:
-                row.history = [*row.history, {'action': 'MODULE_CONFIGURATION_REFRESH',
-                    'fromVersion': row.modules_configuration_version, 'toVersion': version,
-                    'configuration': row.modules_configuration}]
-                row.modules_configuration = config
-                row.modules_configuration_version = version
-                row.save(update_fields=['modules_configuration', 'modules_configuration_version', 'history'])
+        changed = _pin_configuration(row)
+        if changed:
+            row.save(update_fields=changed)
         return row, row.modules_configuration_version, row.modules_configuration
 
 
 def _selectable(items):
-    out = set()
-    for item in items:
-        if not item['active']:
-            continue
-        if item['selectable']:
-            out.add(item['id'])
-        out.update(_selectable(item.get('items', [])))
-    return out
+    return {item['id'] for item in available_modules(items)}
 
 
 def validate_choices(kind, learner_id, raw, complete=False):
@@ -131,19 +138,30 @@ def selection_complete(row, choice):
         return False
 
 
-def save_selection(kind, learner_id, raw):
-    """Strict selection commit, atomically merging only modules into the draft.
+class ModuleSelectionConflict(ConfigurationError):
+    pass
 
-    Both tables are in the same configured database; use the assessment's alias
-    for this transaction rather than splitting it across Django aliases.
-    """
-    from enrolment_api.models import ExtendedIlr
+
+def save_selection(kind, learner_id, raw):
+    """One short transaction; no Extended ILR writes or projection/audit signals."""
+    expected = raw.get('expectedRevision') if isinstance(raw, dict) else None
+    if type(expected) is not int or expected < 0:
+        raise ConfigurationError('Provide the saved module selection revision.')
     with transaction.atomic(using='default'):
-        canonical = validate_choices(kind, learner_id, raw, complete=True)
-        assessment = Assessment.objects.get(learner_id=learner_id)
-        record, _ = ExtendedIlr.objects.using('default').select_for_update().get_or_create(
-            learner_kind=assessment.learner_kind, learner_id=learner_id,
-            defaults={'wizard_draft': {}})
-        record.wizard_draft = {**(record.wizard_draft or {}), KEY: canonical}
-        record.save(using='default', update_fields=['wizard_draft', 'updated_at'])
-        return canonical
+        row = Assessment.objects.select_for_update(nowait=True).filter(learner_id=learner_id).first()
+        changed = _pin_configuration(row)
+        if row.selected_programme != 'PCP_L6':
+            raise ConfigurationError('Module choices do not match your confirmed programme.')
+        if 'configurationVersion' not in raw:
+            raise ConfigurationError('Provide the module configuration version.')
+        canonical = validate_snapshot_choices(raw, row.modules_configuration_version, row.modules_configuration)
+        if row.modules_selection != canonical:
+            if expected != row.modules_revision:
+                raise ModuleSelectionConflict('Module choices changed in another session. Review your choices and retry.')
+            row.modules_selection = canonical
+            row.modules_revision += 1
+            changed += ['modules_selection', 'modules_revision']
+        if changed:
+            row.save(update_fields=changed)
+        return {'selection': canonical, 'selectionRevision': row.modules_revision,
+                'selectionComplete': selection_complete(row, canonical)}

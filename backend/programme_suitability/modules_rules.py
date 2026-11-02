@@ -2,6 +2,7 @@
 from decimal import Decimal
 
 from .configuration import ConfigurationError
+from .module_items import is_group
 
 
 def available_modules(items):
@@ -9,14 +10,14 @@ def available_modules(items):
     for item in items:
         if not item.get('active', True):
             continue
-        if item.get('selectable'):
+        if not is_group(item) and item.get('selectable'):
             out.append(item)
         out.extend(available_modules(item.get('items', [])))
     return out
 
 
 def credits(items):
-    return sum((Decimal(str(item.get('credits', 0))) for item in items), Decimal(0))
+    return sum((Decimal(str(item.get('credits', 0))) for item in items if not is_group(item)), Decimal(0))
 
 
 def validate_pathway_rules(path):

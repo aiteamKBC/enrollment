@@ -90,7 +90,7 @@ it('blocks impossible rule configurations and keeps parent headings without mand
   expect(screen.getByRole('button', { name: 'Save Draft' })).toBeDisabled();
   expect(screen.getByRole('alert')).toHaveTextContent('Required optional module count exceeds');
   await userEvent.selectOptions(screen.getByLabelText('PCP pathway'), 'chartered');
-  const parent = screen.getByRole('group', { name: 'Edit module Certified PMO Professional Level 6' });
+  const parent = screen.getByRole('group', { name: 'Edit group Certified PMO Professional Level 6' });
   expect(within(parent).getAllByLabelText('Mandatory Module')).toHaveLength(4);
 });
 

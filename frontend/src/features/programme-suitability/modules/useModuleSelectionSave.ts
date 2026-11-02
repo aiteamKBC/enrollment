@@ -1,45 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWizard } from '@/pages/users/wizard/WizardContext.helpers';
 import type { ProgrammeModuleSelection } from './configuration';
+import { ModuleSaveQueue, type ModuleSaveStatus } from './moduleSaveQueue';
 
-/** Autosave through the existing wizard draft API, serialising rapid changes. */
 export function useModuleSelectionSave() {
-  const { draft, setSection, saveIlr, hydrated, readOnly, modules } = useWizard();
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const { draft, setSection, saveModules, hydrated, readOnly, modules, moduleSaveQueue } = useWizard();
+  const [status, setStatus] = useState<ModuleSaveStatus>('idle');
   const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
-  const pending = useRef<ProgrammeModuleSelection | undefined>(undefined);
-  const queue = useRef<Promise<void>>(Promise.resolve());
-  const save = useRef(saveIlr);
+  const save = useRef(saveModules);
   const refresh = useRef(modules?.retry);
-  useEffect(() => { save.current = saveIlr; }, [saveIlr]);
+  useEffect(() => { save.current = saveModules; }, [saveModules]);
   useEffect(() => { refresh.current = modules?.retry; }, [modules?.retry]);
-
-  const selection = draft.programmeModules;
+  const [queue] = useState(() => moduleSaveQueue ?? new ModuleSaveQueue((selection) => save.current(selection), () => {}));
   useEffect(() => {
-    // Hydration and a staff review must never overwrite a learner's selections.
-    if (!hydrated || readOnly || !pending.current || pending.current !== selection) return;
-    let active = true;
-    const saveSnapshot = save.current;
-    const timer = setTimeout(() => {
-      queue.current = queue.current.catch(() => {}).then(async () => {
-        try {
-          await saveSnapshot();
-          if (active) { setStatus('saved'); setError(''); }
-        } catch (e) {
-          if (e instanceof Error && /configuration version/i.test(e.message)) refresh.current?.();
-          if (active) { setStatus('error'); setError(e instanceof Error ? e.message : 'Could not save module choices.'); }
-        }
-      });
-    }, 200);
-    return () => { active = false; clearTimeout(timer); };
-  }, [selection, hydrated, readOnly, attempt]);
-
-  return { selection, status, error,
+    const unsubscribe = queue.subscribe((next, failure) => {
+      setStatus(next);
+      setError(next === 'error' ? failure instanceof Error ? failure.message : 'Unable to save changes. Retry.' : '');
+      if ((failure && typeof failure === 'object' && 'status' in failure && failure.status === 409)
+        || (failure instanceof Error && /configuration version/i.test(failure.message))) refresh.current?.();
+    });
+    return () => { unsubscribe(); queue.flushOnLeave(); };
+  }, [queue]);
+  return { selection: draft.programmeModules, status, error,
     update: (next: ProgrammeModuleSelection) => {
       if (readOnly || !hydrated) return;
-      pending.current = next; setStatus('saving'); setError(''); setSection('programmeModules', next);
+      setSection('programmeModules', next);
+      queue.enqueue(next);
     },
-    retry: () => { setStatus('saving'); setError(''); setAttempt((n) => n + 1); },
+    retry: () => queue.retry(),
   };
 }

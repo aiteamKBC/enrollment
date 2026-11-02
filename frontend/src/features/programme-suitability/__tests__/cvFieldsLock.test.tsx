@@ -39,7 +39,7 @@ function Harness({ enabled = true, legacy = false, staff = false, hasQualificati
     draft: { cvJob: cv, custom: { 'custom-cv-choice': 'Saved choice' } } as unknown as WizardDraft,
     setSection: (key, value) => { change(key, value); if (key === 'cvJob') setCv(value as CvJobForm); },
     setCustom: change, layout, steps: layout.steps, completed: [], markComplete: vi.fn(),
-    saveIlr: vi.fn(), ilrSaving: false, ilrSavedAt: '', hydrated: true, ready: !suitability.loading,
+    saveIlr: vi.fn(), saveModules: vi.fn(), ilrSaving: false, ilrSavedAt: '', hydrated: true, ready: !suitability.loading,
     fileIlrDocument: vi.fn(), ilrFiling: false, inclusionCheck: { checking: false, error: null, refresh: vi.fn() },
   };
   return <WizardContext.Provider value={value}><WizardTextsContext.Provider value={texts}><div data-testid="cv-fields"><CvJob /></div>{assessment && <ProgrammeSuitabilityStep />}</WizardTextsContext.Provider></WizardContext.Provider>;

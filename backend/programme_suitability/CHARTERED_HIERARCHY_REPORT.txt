@@ -1,0 +1,71 @@
+﻿Chartered Pathway Module Hierarchy — Implementation Report
+
+Root cause
+The nested JSON relationship was already correct: certified-pmo had exactly four children; ai-project-management, portfolio and earned-value were root-level Chartered modules. This was verified against defaults, published wizard version 11 and the single existing private modules draft.
+The learner table placed the group header, its children and later root modules in one tbody. Its rowgroup header therefore also scoped later independent modules. In addition, global table first-cell padding was 1.25rem, exactly the old pl-5 child padding, so children had no visible additional indentation.
+No database/configuration correction was needed. Published data, private drafts, assessment snapshots and saved learner choices were not rewritten in this task.
+
+Implementation
+- ProgrammeModulesCard now scopes each root group to a separate tbody containing only its header and actual nested children. Consecutive root modules remain together outside that rowgroup.
+- Only nested module labels get extra indentation and a subtle vertical guide. A subtle top divider and spacing separate the following independent root modules.
+- Group detection uses explicit GROUP metadata or the existing structural fallback for old snapshots. Module titles/positions are not used to infer relationships.
+- The existing Admin module editor exposes Parent group for actual modules where groups exist. None (pathway level) clears the parent; the choice uses stable group IDs and nested JSON, with no new database mapping or Admin page.
+- Parent reassignment preserves all module settings and IDs, changes only the JSON location and destination display order, and keeps edits in the existing private Draft/Publish workflow.
+- Fixed publication retention: moved module IDs are recognised throughout the same pathway, so moving a module does not reintroduce an inactive copy under its old parent. Truly omitted modules/groups are still retained as inactive. Historical configurations are never mutated.
+- No credit, optional selection, assessment, programme recommendation, step completion or navigation logic changed. Other PCP pathways contain no groups, so their existing controls/rendering remain as before.
+
+Exact files changed by this hierarchy task
+frontend/src/features/programme-suitability/modules/ProgrammeModulesCard.tsx
+frontend/src/features/programme-suitability/modules/ModuleRowEditor.tsx
+frontend/src/features/programme-suitability/modules/editorOps.ts
+backend/programme_suitability/modules_configuration.py
+backend/programme_suitability/test_module_groups.py
+frontend/src/features/programme-suitability/__tests__/moduleHierarchy.test.tsx (new)
+backend/programme_suitability/CHARTERED_HIERARCHY_REPORT.txt (new; this report)
+All pre-existing uncommitted changes from earlier PMO work were preserved. The previous PMO completion report remains unchanged as a record of that earlier task.
+
+Automated checks
+PASS — backend/manage.py test programme_suitability --settings=programme_suitability.test_settings --noinput
+127 tests, including three additional hierarchy/publication regression cases.
+PASS — tools/run_backend_checks.py enrolment_api enrollment_service.tests
+217 tests.
+PASS — targeted Frontend group/hierarchy/Admin/PCP tests
+22 tests across 4 files.
+PASS — npm --prefix frontend test -- src/features/programme-suitability src/pages/users src/pages/learner/onboarding --maxWorkers=2 --reporter=json --outputFile=.cache/hierarchy-regression.json
+458 tests across 59 files.
+PASS — npm --prefix frontend run type-check
+PASS — npm --prefix frontend run lint
+PASS — npm --prefix frontend run build
+PASS — git diff --check (only Git's LF/CRLF conversion notices).
+No models or migrations changed; the existing JSON hierarchy is reused.
+
+Regression coverage
+- Four initial mandatory PMO children; three independently configured root modules; group has no sessions/credits.
+- Learner rowgroup contains exactly five rows: group heading plus four child module rows. Other modules remain outside it.
+- Parent/child appearance survives configuration cloning/reopening and group renaming/reordering.
+- Mandatory credits remain 5; exactly one optional module produces 6; the second optional selection is prohibited.
+- Existing backend rejection of group IDs, inactive/invalid module selections and invalid counts continues passing.
+- Admin can assign and clear a module's parent, save/reload a draft and preview the resulting hierarchy.
+- Publication supports child-to-root and root-to-group moves without duplicate IDs; removed groups do not duplicate children moved elsewhere.
+- Saved selection IDs remain valid through publication round trips. Operational/Strategic configurations remain unchanged.
+
+Chrome verification
+PASS — real ProgrammeModulesView and ModulesAdmin components using app CSS and a read-only copy of the actual version-11 published configuration.
+Desktop 1440px and mobile 390px: child checkbox indentation is 26px beyond root-level modules; there is no mobile horizontal overflow. The same hierarchy remains clear with dashboard-theme CSS enabled.
+Verified four children only, separate independent modules, 5 mandatory credits, 6 after one optional selection, disabled second optional, reload, parent assignment/clearing, private draft save/reload and preview. No browser page errors.
+Browser draft calls were intercepted and selection reload used harness-only localStorage. This was component-level browser verification rather than an authenticated live-account end-to-end test. Backend persistence/publication were covered by the automated suites. Temporary harness files were removed; no live draft/learner writes occurred.
+
+Local evidence (ignored artifacts)
+frontend/.cache/hierarchy-regression.json
+frontend/.cache/hierarchy-targeted.json
+frontend/.cache/hierarchy-browser-results.json
+frontend/.cache/chartered-hierarchy-desktop.png
+frontend/.cache/chartered-hierarchy-mobile.png
+frontend/.cache/chartered-hierarchy-admin.png
+
+Git / merge considerations
+Branch remained CV-and-Programme-Suitability. No reset, switch, merge, rebase, commit or push.
+Feature-shared conflict risks are limited to ProgrammeModulesCard.tsx, ModuleRowEditor.tsx, editorOps.ts and modules_configuration.py, plus test_module_groups.py if teammates edit the same feature.
+Coordinate the publication-retention change with any teammate changing module hierarchy: moving an existing stable ID is distinct from deleting/deactivating it.
+No wizard registration/navigation/progress files, assessment logic, CV/Job Description files, historical migrations or unrelated shared styles were edited.
+No new data migration or published version is required because the actual current relationships were already correct.

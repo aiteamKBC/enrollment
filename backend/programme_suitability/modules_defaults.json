@@ -275,9 +275,8 @@
           "modules": [
             {
               "id": "certified-pmo",
+              "itemType": "GROUP",
               "title": "Certified PMO Professional Level 6",
-              "sessions": null,
-              "selectable": false,
               "items": [
                 {
                   "id": "pmo-planning-control",
@@ -326,8 +325,7 @@
               ],
               "description": "",
               "order": 0,
-              "active": true,
-              "isMandatory": false
+              "active": true
             },
             {
               "id": "ai-project-management",

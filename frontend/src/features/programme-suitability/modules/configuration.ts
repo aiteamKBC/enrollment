@@ -1,8 +1,8 @@
 import type { ProgrammeId } from '../types';
 
 export interface ProgrammeModule {
-  id: string; title: string; sessions: number | null; credits?: number;
-  description: string; order: number; active: boolean; selectable: boolean; isMandatory?: boolean; items?: ProgrammeModule[];
+  id: string; title: string; itemType?: 'GROUP' | 'MODULE'; sessions?: number | null; credits?: number;
+  description: string; order: number; active: boolean; selectable?: boolean; isMandatory?: boolean; items?: ProgrammeModule[];
 }
 export interface ModulePathway {
   id: string; title: string; subtitle: string; description: string; recognition: string;
@@ -19,11 +19,15 @@ export interface ProgrammeModuleSelection {
   configurationVersion?: number | null;
 }
 export interface ModulesState { configuration: ModulesConfiguration; configurationVersion: number | null; selectedProgramme: ProgrammeId;
-  selectionComplete?: boolean; savedSelection?: ProgrammeModuleSelection | null }
+  selectionComplete?: boolean; savedSelection?: ProgrammeModuleSelection | null; selectionRevision?: number }
+
+export interface ModuleSelectionCommit { selection: ProgrammeModuleSelection; selectionComplete: boolean; selectionRevision: number }
 
 export const ordered = <T extends { order: number }>(items: T[]): T[] => [...items].sort((a, b) => a.order - b.order);
+/** Older snapshots used nested items before explicit GROUP metadata existed. */
+export const isModuleGroup = (item: ProgrammeModule): boolean => item.itemType === 'GROUP' || (item.itemType === undefined && Array.isArray(item.items));
 export function selectableModules(modules: ProgrammeModule[]): ProgrammeModule[] {
-  return modules.filter((item) => item.active).flatMap((item) => [...(item.selectable ? [item] : []), ...selectableModules(item.items ?? [])]);
+  return modules.filter((item) => item.active).flatMap((item) => [...(!isModuleGroup(item) && item.selectable ? [item] : []), ...selectableModules(item.items ?? [])]);
 }
 export function selectedModuleIds(selection: ProgrammeModuleSelection | undefined, pathway: ModulePathway): string[] {
   if (selection?.programme !== 'PCP_L6' || selection.pathway !== pathway.id || !pathway.active) return [];
@@ -91,10 +95,12 @@ export function configurationErrors(config: ModulesConfiguration): string[] {
     if (!item.title.trim()) errors.push('Give every module a name.');
     if (seen.has(item.id)) errors.push('Module identifiers must be unique within a pathway.');
     seen.add(item.id);
-    if (item.sessions !== null && (!Number.isInteger(item.sessions) || item.sessions < 0)) errors.push('Sessions must be non-negative integers.');
+    if (isModuleGroup(item) && (item.sessions != null || item.credits != null || item.selectable || item.isMandatory)) errors.push('Module groups cannot have sessions, credits, selectable or mandatory settings.');
+    if (!isModuleGroup(item) && item.sessions != null && (!Number.isInteger(item.sessions) || item.sessions < 0)) errors.push('Sessions must be non-negative integers.');
     if (item.credits !== undefined && (!Number.isFinite(item.credits) || item.credits < 0)) errors.push('Credits must be non-negative numbers.');
     if (!Number.isInteger(item.order) || item.order < 0) errors.push('Order must be a non-negative integer.');
-    if (item.isMandatory && (!item.selectable || item.items?.length)) errors.push('Only selectable actual modules can be mandatory.');
+    if (item.isMandatory && (!item.selectable || isModuleGroup(item))) errors.push('Only selectable actual modules can be mandatory.');
+    if (item.itemType === 'MODULE' && item.items) errors.push('Only GROUP items may contain child modules.');
     modules(item.items ?? [], seen);
   });
   config.programmes.forEach((programme) => {

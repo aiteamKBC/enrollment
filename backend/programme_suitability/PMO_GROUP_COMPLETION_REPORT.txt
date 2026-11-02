@@ -1,0 +1,94 @@
+﻿Certified PMO Professional Level 6 — Completion and Verification Report
+
+Branch: CV-and-Programme-Suitability
+Working tree contained the existing unfinished PMO changes. They were preserved.
+No branch switch, reset, merge, rebase, commit or push was performed.
+
+Recovered implementation
+- Explicit GROUP metadata for certified-pmo, with structural compatibility for older nested snapshots.
+- Learner full-width group header (colSpan=2), no parent Sessions cell/dash, credits, checkbox or Mandatory badge; indented actual child modules.
+- Admin group metadata controls only: name, description, display order, active status. Child module controls remain independent.
+- Backend group exclusion from selectable IDs and credits; strict group configuration validation; existing mandatory/optional rules retained.
+- Default configuration correction and version-guarded, append-only correct_pmo_group management command.
+- Component, rule, configuration, command and historical compatibility tests.
+
+Remaining work at resumption
+Final browser verification, inspection of completed regression results, rechecking the already-applied configuration correction, and this report.
+
+Completed during resumption
+- Reviewed actual Git status/diffs and retained all existing source changes.
+- Confirmed completed Vitest JSON report: 454/454 tests passed across 58 test files (including 4 dedicated group cases).
+- Ran Chrome against the real ProgrammeModulesView and ModulesAdmin components in a temporary harness using existing app CSS and initial module configuration.
+- Verified desktop (1440px) and mobile (390px), no horizontal overflow, no browser page errors.
+- Verified full-width parent metadata-only heading; all four children locked selected and individually worth 1 credit; AI mandatory; initial 5 credits; one optional selection gives 6 and disables the second option.
+- Verified browser reload restores the harness selection; admin edits group title and child Sessions independently; Save Draft request, draft reload and preview preserve GROUP metadata and unchanged Operational/Strategic data.
+- Inspected screenshots. Removed temporary HTML/TSX/script/config harness files; screenshots remain ignored under frontend/.cache.
+- Re-ran correction preview: baseVersion=11, changed=false. No duplicate correction/publication was created.
+- No further production source changes were required in the resumed session.
+
+Automated validation for the implementation
+PASS: backend/manage.py test programme_suitability --settings=programme_suitability.test_settings --noinput
+      124 tests, including 6 new group tests.
+PASS: tools/run_backend_checks.py enrolment_api enrollment_service.tests
+      217 tests.
+PASS: npm --prefix frontend test -- src/features/programme-suitability src/pages/users src/pages/learner/onboarding --maxWorkers=2 --reporter=json --outputFile=.cache/group-regression.json
+      454 tests / 58 files. Report was completed before resumption and verified during resumption.
+PASS: npm --prefix frontend run type-check
+PASS: npm --prefix frontend run lint
+PASS: npm --prefix frontend run build
+PASS: backend/manage.py makemigrations programme_suitability --check --dry-run --settings=programme_suitability.test_settings
+      No changes detected; no new migrations or historical migration changes.
+PASS: git diff --check (Git emits only existing LF/CRLF conversion notices).
+
+Test coverage and data safety
+- New backend tests reject selected parent IDs, empty/over-limit optional choices, invalid GROUP sessions/credits/mandatory/selectable values, and MODULE records with children.
+- Mandatory children are automatically included. Legacy parent flags cannot make a group selectable or credited.
+- Correction is idempotent, version guarded and append-only; other programmes, other PCP paths, child IDs/content and historical input remain unchanged.
+- Existing regression suites cover private drafts, wizard publication, pinned snapshots, learner choice persistence, assessment and alternative-selection flows.
+- There is no separate module-session aggregation introduced by this change. GROUP canonical data has no sessions property and is excluded from actual-module traversal; configured child Sessions still render and remain editable.
+
+Published configuration
+The original implementation appended wizard version 11 from version 10.
+A read-only comparison verified that only the certified-pmo parent metadata changed:
+itemType=GROUP; sessions/selectable/isMandatory removed (credits was already absent).
+No child module, other pathway, wizard step, assessment data or saved learner selection was rewritten.
+Versions 10 and 11 were both retained. The parent has four mandatory children worth 4 credits, mandatory AI adds 1, optional count is 1, and target is 6.
+Historical snapshots remain persisted unchanged; legacy nested groups render with compatibility handling.
+A later preview at resumption reported version 11 and no required changes.
+
+Exact modified existing files (all changes from the continued task)
+backend/programme_suitability/modules_configuration.py
+backend/programme_suitability/modules_defaults.json
+backend/programme_suitability/modules_rules.py
+backend/programme_suitability/modules_service.py
+backend/programme_suitability/test_pcp_selection_fix.py
+frontend/src/features/programme-suitability/modules/ModuleRowEditor.tsx
+frontend/src/features/programme-suitability/modules/ProgrammeModulesCard.tsx
+frontend/src/features/programme-suitability/modules/configuration.ts
+frontend/src/features/programme-suitability/modules/editorOps.ts
+frontend/src/features/programme-suitability/__tests__/modulesAdmin.test.tsx
+frontend/src/features/programme-suitability/__tests__/pcpRules.test.tsx
+
+New files
+backend/programme_suitability/module_items.py
+backend/programme_suitability/management/commands/correct_pmo_group.py
+backend/programme_suitability/test_module_groups.py
+frontend/src/features/programme-suitability/__tests__/moduleGroups.test.tsx
+backend/programme_suitability/PMO_GROUP_COMPLETION_REPORT.txt (this report; added during resumption)
+
+Merge/integration risks
+No shared wizard step registration, navigation, progress/completion, assessment, CV/Job Description or historical migration files changed.
+Feature-shared files that may conflict with teammates' module work: modules_configuration.py, modules_defaults.json, modules_rules.py, modules_service.py, ModuleRowEditor.tsx, ProgrammeModulesCard.tsx, configuration.ts and editorOps.ts, plus the three adjusted existing test files listed above.
+Coordinate GROUP metadata support across frontend/backend: groups intentionally omit sessions/selectable/isMandatory; callers must use group detection/actual-module traversal rather than direct required-field indexing.
+Preserve stable certified-pmo and child IDs during merging. Deploy frontend/backend together. Database version 11 is environment-specific and must not be hardcoded into application logic.
+For another environment, preview manage.py correct_pmo_group, then apply with that environment's current --base-version only if correction is needed. No schema migration dependency exists.
+
+Limits / manual verification
+No known failing checks or unfinished implementation remain.
+Chrome used the production components in isolation; its draft endpoint was intercepted and selection persistence used a harness-only localStorage key. It was not a full authenticated learner/admin login-to-live-API end-to-end test.
+Real backend persistence and publication were exercised by automated tests; the narrowly scoped real configuration correction was separately audited. A full signed-in learner/admin smoke test remains a manual integration check before deployment.
+
+Browser evidence (ignored local artifacts)
+frontend/.cache/pmo-group-learner-desktop.png
+frontend/.cache/pmo-group-learner-mobile.png
+frontend/.cache/pmo-group-admin.png

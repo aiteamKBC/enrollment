@@ -22,6 +22,8 @@ class Assessment(models.Model):
     selection_confirmed_at = models.DateTimeField(null=True, blank=True)
     modules_configuration = models.JSONField(null=True, blank=True)
     modules_configuration_version = models.BigIntegerField(null=True, blank=True)
+    modules_selection = models.JSONField(null=True, blank=True)
+    modules_revision = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

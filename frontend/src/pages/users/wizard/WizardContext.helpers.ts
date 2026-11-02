@@ -39,6 +39,7 @@ export function ageFromDob(iso?: string): number | undefined {
 
 
 export interface WizardContextValue {
+  moduleSaveQueue?: import('@/features/programme-suitability/modules/moduleSaveQueue').ModuleSaveQueue;
   modules?: import('@/features/programme-suitability/modules/useModulesConfiguration').ModulesController;
   suitability?: import('@/features/programme-suitability/useSuitability').SuitabilityController;
   userId: string;
@@ -67,6 +68,8 @@ export interface WizardContextValue {
   readOnly: boolean;
   /** Persist the Extended ILR answers to enrolment."Extended_ILR". */
   saveIlr: () => Promise<void>;
+  /** Persist only module choices through their revision-checked endpoint. */
+  saveModules: (selection: import('@/features/programme-suitability/modules/configuration').ProgrammeModuleSelection) => Promise<void>;
   ilrSaving: boolean;
   /** Last successful save (ISO), or '' if nothing saved this session. */
   ilrSavedAt: string;

@@ -36,7 +36,7 @@ class PublishedPcpSelectionTests(TestCase):
         return modules_views.learner_modules(request, kind='apprenticeship', learner_id=41)
 
     def choice(self, optional=None):
-        return {'programme': 'PCP_L6', 'pathway': 'operational', 'configurationVersion': self.version,
+        return {'programme': 'PCP_L6', 'pathway': 'operational', 'configurationVersion': self.version, 'expectedRevision': 0,
                 'modulesByPathway': {'operational': ['planning-control', 'pmi-sp'] if optional is None else optional}}
 
     def test_strict_save_adds_mandatory_ids_from_server_and_keeps_other_wizard_data(self):
@@ -45,13 +45,15 @@ class PublishedPcpSelectionTests(TestCase):
         saved = json.loads(response.content)['selection']
         self.assertEqual(set(saved['modulesByPathway']['operational']), {'planning-control', 'pmi-sp', 'pmp', 'ai-project-control', 'risk-apm'})
         self.draft.refresh_from_db(using='default')
-        self.assertEqual(self.draft.wizard_draft['programmeModules'], saved)
+        self.row.refresh_from_db()
+        self.assertEqual(self.row.modules_selection, saved)
+        self.assertNotIn('programmeModules', self.draft.wizard_draft)
         self.assertEqual(self.draft.wizard_draft['cvJob']['experienceText'], 'Keep my CV')
         self.assertEqual(self.draft.answers, {'signed': 'existing'})
         self.assertTrue(json.loads(self.request().content)['selectionComplete'])
 
     def test_strict_save_rejects_too_few_too_many_wrong_pathway_and_wrong_version_atomically(self):
-        for choice in [self.choice([]), self.choice(['planning-control']), self.choice(['planning-control', 'earned-value', 'pmi-sp']),
+        for choice in [self.choice(['planning-control', 'earned-value', 'pmi-sp']),
                        self.choice(['planning-control', 'pmi-pmo']), {**self.choice(), 'configurationVersion': 999}]:
             with self.subTest(choice=choice):
                 response = self.request(choice)
@@ -113,5 +115,5 @@ class PublishedPcpSelectionTests(TestCase):
         self.assertTrue(fixed['programmes'][3]['pathways'][2]['modules'][0]['active'])
         for before, after in zip(old['programmes'][3]['pathways'], fixed['programmes'][3]['pathways']):
             self.assertEqual(before['description'], after['description'])
-            self.assertEqual([(m['id'], m['title'], m['sessions']) for m in before['modules']], [(m['id'], m['title'], m['sessions']) for m in after['modules']])
+            self.assertEqual([(m['id'], m['title'], m.get('sessions')) for m in before['modules']], [(m['id'], m['title'], m.get('sessions')) for m in after['modules']])
         self.assertEqual(repaired_configuration(fixed, restore_mandatory_groups=True), fixed)

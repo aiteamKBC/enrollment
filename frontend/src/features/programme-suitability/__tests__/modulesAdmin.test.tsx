@@ -58,8 +58,8 @@ it('edits PCP paths and nested Chartered modules, and supports adding a fourth p
   render(<Harness />);
   await userEvent.selectOptions(screen.getByLabelText('Programme'), 'PCP_L6');
   await userEvent.selectOptions(screen.getByLabelText('PCP pathway'), 'chartered');
-  const parent = within(screen.getByRole('group', { name: 'Edit module Certified PMO Professional Level 6' }));
-  await userEvent.click(parent.getAllByRole('button', { name: 'Add submodule' })[0]);
+  const parent = within(screen.getByRole('group', { name: 'Edit group Certified PMO Professional Level 6' }));
+  await userEvent.click(parent.getByRole('button', { name: 'Add child module' }));
   const pcp = edited.programmes.find((p) => p.id === 'PCP_L6')!;
   expect(pcp.pathways.find((p) => p.id === 'chartered')!.modules[0].items).toHaveLength(5);
   await userEvent.type(screen.getByLabelText('Recognition / accreditation information'), 'Provided recognition wording');

@@ -20,6 +20,7 @@ import { useSuitability } from '@/features/programme-suitability/useSuitability'
 import { useModulesConfiguration } from '@/features/programme-suitability/modules/useModulesConfiguration';
 import { moduleSelectionComplete, selectionFingerprint, type ProgrammeModuleSelection } from '@/features/programme-suitability/modules/configuration';
 import { saveModuleSelection } from '@/features/programme-suitability/modules/api';
+import { ModuleSaveQueue } from '@/features/programme-suitability/modules/moduleSaveQueue';
 
 function emptyIlr(firstNames: string, surname: string): IlrForm {
   return {
@@ -183,6 +184,13 @@ export function WizardProvider({
   const [savedModuleChoice, setSavedModuleChoice] = useState<ProgrammeModuleSelection | undefined>(initial.saved.programmeModules);
   const [moduleEditVersion, setModuleEditVersion] = useState(0);
   const [savedModuleEditVersion, setSavedModuleEditVersion] = useState(0);
+  const moduleEditRef = useRef(0);
+  const moduleSavedEditRef = useRef(0);
+  const moduleRevisionRef = useRef(0);
+  const moduleServerLoaded = useRef(false);
+  const moduleWriter = useRef<(selection: ProgrammeModuleSelection) => Promise<void>>(async () => {});
+  const [moduleSaveQueue] = useState(() => new ModuleSaveQueue((selection) => moduleWriter.current(selection), () => {}));
+  useEffect(() => () => { moduleSaveQueue.flushOnLeave(); }, [moduleSaveQueue]);
   // Read by the hydration effect, which is keyed on the learner rather than on
   // every new board object.
   const boardRef = useRef(board);
@@ -224,15 +232,27 @@ export function WizardProvider({
   const suitability = useSuitability(kindForSeed, userId, Boolean(layout.programmeSuitability), publishedVersion,
     ['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) || layout.programmeSuitability?.enabled === false);
   const modules = useModulesConfiguration(kindForSeed, userId, suitability.selectionConfirmed, publishedVersion);
+  useEffect(() => {
+    if (!modules.data) return;
+    moduleServerLoaded.current = true;
+    moduleRevisionRef.current = modules.data.selectionRevision ?? 0;
+    // A focus refresh may acknowledge another tab; keep this tab's unsaved edits.
+    if (moduleEditRef.current !== moduleSavedEditRef.current) return;
+    const saved = modules.data.savedSelection ?? undefined;
+    setSavedModuleChoice(saved);
+    setDraft((previous) => selectionFingerprint(previous.programmeModules) === selectionFingerprint(saved)
+      ? previous : { ...previous, programmeModules: saved });
+  }, [modules.data]);
   const modulesRequired = !['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) && suitability.selectionConfirmed && suitability.state?.selectedProgramme === 'PCP_L6';
-  const modulesComplete = Boolean(modules.data && !modules.error && savedModuleChoice && moduleEditVersion === savedModuleEditVersion &&
+  const modulesComplete = Boolean(modules.data && modules.data.selectionComplete && !modules.error && savedModuleChoice && moduleEditVersion === savedModuleEditVersion &&
+    selectionFingerprint(modules.data.savedSelection ?? undefined) === selectionFingerprint(savedModuleChoice) &&
     selectionFingerprint(draft.programmeModules) === selectionFingerprint(savedModuleChoice) &&
     moduleSelectionComplete(modules.data.configuration, savedModuleChoice, modules.data.configurationVersion));
 
   /**
    * The draft as it was last written to the server (or last read from it).
    *
-   * saveIlr writes the whole 8-step draft in one row, so without this every
+   * saveIlr writes the other wizard answers in one row, so without this every
    * step change fired a full write even when the learner had typed nothing —
    * a step with no inputs at all (Introduction, Next Steps) would still spin
    * "Saving…" on the way out of it. Reference equality is the whole test:
@@ -256,9 +276,9 @@ export function WizardProvider({
     fetchExtendedIlr(kind, userId)
       .then((res) => {
         if (cancelled || (!res.answers && !res.draft)) return;
-        setSavedModuleChoice(res.draft?.programmeModules);
         setDraft((prev) => {
           const merged = mergeSaved(prev, res);
+          if (moduleServerLoaded.current) merged.programmeModules = prev.programmeModules;
           // What just came back from the server is, by definition, saved — so
           // opening the wizard and paging through it writes nothing. Values
           // filled in from the learner's record are the exception: they are not
@@ -402,9 +422,10 @@ export function WizardProvider({
         programmeModulesCompletion: { required: modulesRequired, complete: modulesComplete } } : draft,
       suitability,
       modules,
+      moduleSaveQueue,
       readOnly: readOnlyLearnerSteps,
       setSection: (key, val) => {
-        if (key === 'programmeModules') setModuleEditVersion((version) => version + 1);
+        if (key === 'programmeModules') { moduleEditRef.current += 1; setModuleEditVersion(moduleEditRef.current); }
         setDraft((prev) => ({ ...prev, [key]: val }));
       },
       setCustom: (fieldKey, val) => setDraft((prev) => ({ ...prev, custom: { ...(prev.custom ?? {}), [fieldKey]: val } })),
@@ -412,23 +433,38 @@ export function WizardProvider({
       steps,
       completed,
       markComplete: (index, done) => setCompleted((prev) => prev.map((c, i) => (i === index ? done : c))),
+      saveModules: async (selection) => {
+        if (readOnlyLearnerSteps || !hydrated || !modules.data) throw new Error('Module settings are still loading. Please retry.');
+        const editing = moduleEditRef.current;
+        const committed = await saveModuleSelection(kind, userId, selection, moduleRevisionRef.current);
+        moduleRevisionRef.current = Math.max(moduleRevisionRef.current, committed.selectionRevision);
+        moduleSavedEditRef.current = editing;
+        setSavedModuleChoice(committed.selection);
+        setSavedModuleEditVersion(editing);
+        modules.acceptSaved(committed);
+        // Canonical mandatory IDs must not replace a newer local selection.
+        setDraft((previous) => selectionFingerprint(previous.programmeModules) === selectionFingerprint(selection)
+          ? { ...previous, programmeModules: committed.selection } : previous);
+      },
       saveIlr: async () => {
         // Nothing has changed since the last write — moving off a step the
         // learner didn't touch costs no request and shows no spinner.
-        if (draft === lastSavedDraft.current) return;
+        if (lastSavedDraft.current && Object.keys(draft).every((key) =>
+          key === 'programmeModules' || key === 'programmeModulesCompletion' || draft[key as keyof WizardDraft] === lastSavedDraft.current?.[key as keyof WizardDraft])) return;
         // Captured before the await: the learner can keep typing while the
         // request is in flight, and marking *that* newer draft saved would
         // silently drop the edits made during the round-trip.
         const saving = draft;
         setIlrSaving(true);
         try {
-          // Save every step, not just the ILR — the other steps have no storage
-          // of their own, so without this they would be lost on close.
+          // Modules use their own endpoint; the remaining answers keep the
+          // existing wizard persistence and projection workflow.
           const { ilr, ...rest } = saving;
           // Read from the Safeguarding database on every open; never stored.
           delete rest.inclusion;
           delete rest.programmeSuitability;
           delete rest.programmeModulesCompletion;
+          delete rest.programmeModules;
           // Read from the curriculum on every open; never stored.
           if (rest.skillsRadar) {
             const skillsRadar = { ...rest.skillsRadar };
@@ -436,13 +472,6 @@ export function WizardProvider({
             rest.skillsRadar = skillsRadar;
           }
           const res = await saveExtendedIlr(kind, userId, ilr, rest);
-          if (modules.data && rest.programmeModules && moduleEditVersion !== savedModuleEditVersion &&
-            moduleSelectionComplete(modules.data.configuration, rest.programmeModules, modules.data.configurationVersion)) {
-            const committed = await saveModuleSelection(kind, userId, rest.programmeModules);
-            rest.programmeModules = committed.selection;
-          }
-          setSavedModuleChoice(rest.programmeModules);
-          setSavedModuleEditVersion(moduleEditVersion);
           lastSavedDraft.current = saving;
           setIlrSavedAt(res.meta.updatedAt);
         } finally {
@@ -476,8 +505,9 @@ export function WizardProvider({
       ilrFiling,
       inclusionCheck,
     }),
-    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleEditVersion, savedModuleEditVersion]
+    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue]
   );
+  moduleWriter.current = value.saveModules;
 
   return (
     <WizardContext.Provider value={value}>

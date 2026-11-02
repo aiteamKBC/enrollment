@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from .configuration import ConfigurationError, PROGRAMMES
+from .module_items import is_group, corrected_pmo_group
 
 KEY = 'programmeModules'
 IDENTIFIER = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$')
@@ -65,18 +66,31 @@ def _modules(raw, seen=None, ancestors=None, depth=0):
         seen.add(mid)
         if any(key in item for key in ('parentId', 'programmeId', 'pathwayId')):
             raise ConfigurationError('Module associations must use their containing programme/pathway and nested items.')
+        if 'itemType' in item and item['itemType'] not in ('GROUP', 'MODULE'):
+            raise ConfigurationError('Item type must be GROUP or MODULE.')
+        if is_group(item):
+            if item.get('sessions') is not None or item.get('credits') is not None or _flag(item, 'selectable', False) or _flag(item, 'isMandatory', False):
+                raise ConfigurationError('Module groups cannot have sessions, credits, selectable or mandatory settings.')
+            out.append({'id': mid, 'itemType': 'GROUP', 'title': _text(item.get('title'), 'Group name', True),
+                        'description': _text(item.get('description', ''), 'Group description'),
+                        'order': _number(item.get('order', len(out)), 'Group order', integer=True, nullable=False),
+                        'active': _flag(item, 'active', True),
+                        'items': _modules(item.get('items', []), seen, ancestors | {id(item)}, depth + 1)})
+            continue
+        if 'items' in item:
+            raise ConfigurationError('Only GROUP items may contain child modules.')
         value = {'id': mid, 'title': _text(item.get('title'), 'Module name', True),
                  'description': _text(item.get('description', ''), 'Module description'),
                  'sessions': _number(item.get('sessions'), 'Sessions', integer=True),
                  'order': _number(item.get('order', len(out)), 'Order', integer=True, nullable=False),
                  'active': _flag(item, 'active', True), 'selectable': _flag(item, 'selectable', False),
                  'isMandatory': _flag(item, 'isMandatory', False)}
+        if item.get('itemType') == 'MODULE':
+            value['itemType'] = 'MODULE'
         if value['isMandatory'] and (not value['selectable'] or item.get('items')):
             raise ConfigurationError('Only selectable actual modules can be mandatory; group headings cannot be mandatory.')
         if item.get('credits') is not None:
             value['credits'] = _number(item['credits'], 'Credits', nullable=False)
-        if 'items' in item:
-            value['items'] = _modules(item['items'], seen, ancestors | {id(item)}, depth + 1)
         out.append(value)
     return out
 
@@ -118,7 +132,7 @@ def validate(raw, publishing=False):
             if paths[-1]['active'] and paths[-1]['requiredOptionalModulesCount'] is not None:
                 def check_groups(items):
                     for item in items:
-                        if item.get('items') and (item['selectable'] or item.get('credits', 0) != 0):
+                        if is_group(item) and (item.get('selectable') or item.get('credits', 0) != 0):
                             raise ConfigurationError('Parent group headings must not be selectable or credited modules.')
                         check_groups(item.get('items', []))
                 check_groups(paths[-1]['modules'])
@@ -131,15 +145,28 @@ def validate(raw, publishing=False):
     return {'schemaVersion': raw['schemaVersion'], 'programmes': programmes}
 
 
-def _retain_modules(previous, current):
+def _retain_modules(previous, current, placed=None):
+    if placed is None:
+        def identifiers(items):
+            return {mid for item in items for mid in [item['id'], *identifiers(item.get('items', []))]}
+        placed = identifiers(current)
+
+    def retained_branch(item):
+        value = copy.deepcopy(item)
+        if 'items' in value:
+            value['items'] = [retained_branch(child) for child in value['items'] if child['id'] not in placed]
+        return value
+
     by_id = {item['id']: item for item in current}
     for old in previous:
         if old['id'] not in by_id:
-            current.append({**copy.deepcopy(old), 'active': False})
+            # A moved module already exists elsewhere in this same pathway.
+            if old['id'] not in placed:
+                current.append({**retained_branch(old), 'active': False})
         elif old.get('items'):
             item = by_id[old['id']]
             item.setdefault('items', [])
-            _retain_modules(old['items'], item['items'])
+            _retain_modules(old['items'], item['items'], placed)
 
 
 def integrate_layout(raw, previous, layout):
@@ -149,7 +176,8 @@ def integrate_layout(raw, previous, layout):
     if value is None:
         return
     config = validate(value, publishing=True)
-    old = validate((previous or {}).get(KEY) or defaults())
+    # Retention must still work when correcting an older misconfigured parent.
+    old = validate(corrected_pmo_group((previous or {}).get(KEY) or defaults()))
     for programme in config['programmes']:
         prior = next(p for p in old['programmes'] if p['id'] == programme['id'])
         _retain_modules(prior['modules'], programme['modules'])
@@ -159,7 +187,7 @@ def integrate_layout(raw, previous, layout):
                 programme['pathways'].append({**copy.deepcopy(path), 'active': False})
             else:
                 _retain_modules(path['modules'], by_id[path['id']]['modules'])
-    layout[KEY] = config
+    layout[KEY] = validate(config, publishing=True)
 
 
 def with_modules(layout):

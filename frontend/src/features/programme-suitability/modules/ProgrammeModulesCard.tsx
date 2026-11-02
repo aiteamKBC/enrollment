@@ -1,19 +1,32 @@
-import { Fragment } from 'react';
+import { Fragment, useId } from 'react';
 import { useWizard } from '@/pages/users/wizard/WizardContext.helpers';
 import { btnSecondary } from '@/pages/users/components/ui';
 import { selectionConfirmed } from '../useSuitability';
 import type { ProgrammeId } from '../types';
-import { ordered, selectableModules, selectedModuleIds, mandatoryIds, pathwaySelectionError, selectionFingerprint, moduleSelectionComplete, type ProgrammeModule, type ProgrammeModuleSelection, type ModulesConfiguration } from './configuration';
+import { ordered, isModuleGroup, selectableModules, selectedModuleIds, mandatoryIds, pathwaySelectionError, selectionFingerprint, moduleSelectionComplete, type ProgrammeModule, type ProgrammeModuleSelection, type ModulesConfiguration } from './configuration';
 import { useModuleSelectionSave } from './useModuleSelectionSave';
 import { useModulesConfiguration } from './useModulesConfiguration';
 
 function ModuleTable({ modules, selected = [], disabled = true, limitReached = false, onToggle }: {
   modules: ProgrammeModule[]; selected?: string[]; disabled?: boolean; limitReached?: boolean; onToggle?: (id: string) => void;
 }) {
+  const tableId = useId();
+  // Keep group row headers scoped to their own children, not later root modules.
+  const sections: ProgrammeModule[][] = [];
+  for (const item of ordered(modules).filter((module) => module.active)) {
+    const previous = sections[sections.length - 1];
+    if (!previous || isModuleGroup(item) || isModuleGroup(previous[0])) sections.push([item]);
+    else previous.push(item);
+  }
   const rows = (items: ProgrammeModule[], nested = false) => ordered(items).filter((item) => item.active).map((item) => <Fragment key={item.id}>
+    {isModuleGroup(item) ? <tr className="border-t border-foreground-200 bg-primary-50/50">
+      <th id={`${tableId}-${item.id}`} scope="rowgroup" colSpan={2} className="py-3 pl-5 pr-3 font-semibold text-foreground-800">
+        {item.title}{item.description && <span className="mt-1 block text-xs font-normal text-foreground-600">{item.description}</span>}
+      </th>
+    </tr> :
     <tr className="border-t border-foreground-100 align-top">
       <td className={`py-3 pr-3 ${nested ? 'pl-5' : ''}`}>
-        <label className={`flex items-start gap-2 ${item.items ? 'font-semibold' : ''}`}>
+        <label className={`flex items-start gap-2 ${nested ? 'ml-3 border-l-2 border-primary-200 pl-3' : ''}`}>
           {item.selectable && onToggle && <input type="checkbox" className="mt-1 shrink-0 accent-primary-500" disabled={disabled || item.isMandatory || (limitReached && !selected.includes(item.id))}
             aria-label={item.title} checked={selected.includes(item.id)} onChange={() => onToggle(item.id)} />}
           <span className="min-w-0 [overflow-wrap:anywhere]">{item.title}
@@ -23,13 +36,18 @@ function ModuleTable({ modules, selected = [], disabled = true, limitReached = f
           </span>
         </label>
       </td>
-      <td className="py-3 text-right text-foreground-600">{item.sessions === null ? '—' : `${item.sessions} Sessions`}</td>
-    </tr>
+      <td className="py-3 text-right text-foreground-600">{item.sessions == null ? '—' : `${item.sessions} Sessions`}</td>
+    </tr>}
     {item.items && rows(item.items, true)}
   </Fragment>);
   return <table className="w-full text-left text-sm">
     <thead><tr><th scope="col" className="pb-2 pr-3 font-medium">Module</th><th scope="col" className="pb-2 text-right font-medium">Sessions</th></tr></thead>
-    <tbody>{rows(modules)}</tbody>
+    {sections.map((section, index) => <tbody key={section[0].id}
+      aria-labelledby={isModuleGroup(section[0]) ? `${tableId}-${section[0].id}` : undefined}
+      className={index > 0 && isModuleGroup(sections[index - 1][0])
+        ? '[&>tr:first-child>td]:border-t-2 [&>tr:first-child>td]:border-primary-200 [&>tr:first-child>td]:pt-5' : undefined}>
+      {rows(section)}
+    </tbody>)}
   </table>;
 }
 
@@ -102,7 +120,7 @@ function SavedModules({ configuration, programmeId, version }: { configuration: 
     {!readOnly && canSaveReview && <button type="button" className={`${btnSecondary} mt-3`} disabled={status === 'saving' || !hydrated}
       onClick={() => update(reviewed)}>Save reviewed module selection</button>}
     {!readOnly && programmeId === 'PCP_L6' && <p role="status" aria-live="polite" className="mt-3 text-xs text-foreground-600">
-      {status === 'saving' ? 'Saving module choices…' : status === 'saved' ? 'Module choices saved.' : 'Choose a pathway, then choose your modules. Your choices save automatically.'}
+      {status === 'saving' ? 'Saving…' : status === 'saved' ? 'All changes saved.' : status === 'error' ? 'Unable to save changes. Retry.' : 'Choose a pathway, then choose your modules. Your choices save automatically.'}
     </p>}
     {status === 'error' && <div role="alert" className="mt-3 text-sm text-red-700"><p>{error}</p>
       <button type="button" className={`${btnSecondary} mt-2`} onClick={retry}>Retry saving module choices</button>
