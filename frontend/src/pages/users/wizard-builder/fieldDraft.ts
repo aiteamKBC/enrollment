@@ -18,7 +18,7 @@ export interface FieldDraft {
 export function fieldDraftFrom(item?: LayoutItem): FieldDraft {
   return {
     label: item?.label ?? '',
-    type: item?.type ?? 'text',
+    type: item?.type ?? 'single_line',
     options: item?.options ?? [],
     helpText: item?.helpText ?? '',
     required: item?.required ?? false,

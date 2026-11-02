@@ -5,7 +5,7 @@
  */
 import { BUILTIN_ITEMS, isMovable } from '../wizard/layout/registry';
 import { dropdownOptions, itemLabel } from '../wizard/layout/resolve';
-import type { CustomFieldType, LayoutItem, LayoutStep, WizardLayout } from '../wizard/layout/types';
+import { isContentFieldType, type CustomFieldType, type LayoutItem, type LayoutStep, type WizardLayout } from '../wizard/layout/types';
 
 const mapSteps = (layout: WizardLayout, fn: (s: LayoutStep) => LayoutStep): WizardLayout => ({ ...layout, steps: layout.steps.map(fn) });
 
@@ -47,6 +47,35 @@ export function moveItem(layout: WizardLayout, slug: string, key: string, delta:
   });
 }
 
+function moveItemRelative(layout: WizardLayout, slug: string, key: string, targetKey: string, after: boolean): WizardLayout {
+  return mapSteps(layout, (s) => {
+    if (s.slug !== slug || key === targetKey) return s;
+    const visible = s.items.filter((it) => !it.hidden);
+    const from = visible.findIndex((it) => it.key === key);
+    const to = visible.findIndex((it) => it.key === targetKey);
+    if (from === -1 || to === -1) return s;
+    const reordered = [...visible];
+    const [moving] = reordered.splice(from, 1);
+    const targetIndex = reordered.findIndex((it) => it.key === targetKey);
+    reordered.splice(targetIndex + (after ? 1 : 0), 0, moving);
+    let nextVisible = 0;
+    return {
+      ...s,
+      items: s.items.map((it) => (it.hidden ? it : reordered[nextVisible++])),
+    };
+  });
+}
+
+/** Move one shown item before another shown item, preserving removed-item slots. */
+export function moveItemBefore(layout: WizardLayout, slug: string, key: string, beforeKey: string): WizardLayout {
+  return moveItemRelative(layout, slug, key, beforeKey, false);
+}
+
+/** Move one shown item after another shown item, preserving removed-item slots. */
+export function moveItemAfter(layout: WizardLayout, slug: string, key: string, afterKey: string): WizardLayout {
+  return moveItemRelative(layout, slug, key, afterKey, true);
+}
+
 export function updateItem(layout: WizardLayout, key: string, patch: Partial<LayoutItem>): WizardLayout {
   return mapSteps(layout, (s) => ({ ...s, items: s.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) }));
 }
@@ -70,6 +99,24 @@ export function addCustomField(layout: WizardLayout, slug: string, field: Omit<L
   const key = `new_${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`;
   const item: LayoutItem = { ...field, key, builtin: false, hidden: false };
   return { layout: mapSteps(layout, (s) => (s.slug === slug ? { ...s, items: [...s.items, item] } : s)), key };
+}
+
+/** Duplicate a custom item after itself as a new, unpublished field. */
+export function duplicateItem(layout: WizardLayout, slug: string, key: string): { layout: WizardLayout; key: string } | null {
+  let duplicateKey: string | null = null;
+  const next = mapSteps(layout, (s) => {
+    if (s.slug !== slug) return s;
+    const index = s.items.findIndex((it) => it.key === key && !it.builtin);
+    if (index === -1) return s;
+    const source = s.items[index];
+    const { key: _sourceKey, table: _table, column: _column, ...copy } = source;
+    duplicateKey = `new_${Date.now().toString(36)}${Math.floor(Math.random() * 100000)}`;
+    const duplicate: LayoutItem = { ...copy, key: duplicateKey, builtin: false, hidden: false };
+    const items = [...s.items];
+    items.splice(index + 1, 0, duplicate);
+    return { ...s, items };
+  });
+  return duplicateKey ? { layout: next, key: duplicateKey } : null;
 }
 
 /** A follow-up question asked only when the dropdown is answered `option`. */
@@ -161,7 +208,7 @@ export function existingFollowUps(layout: WizardLayout, key: string): LayoutItem
  * only shown because of it loses that condition.
  */
 export function removeItem(layout: WizardLayout, key: string): WizardLayout {
-  const unpublished = (it: LayoutItem) => !it.builtin && !it.column;
+  const unpublished = (it: LayoutItem) => !it.builtin && !it.column && !isContentFieldType(it.type);
   return mapSteps(layout, (s) => ({
     ...s,
     items: s.items
@@ -191,7 +238,9 @@ export function conditionSources(layout: WizardLayout, exceptKey?: string): { it
 
 /** What publishing would change in the database: new columns, per table. */
 export function pendingColumns(layout: WizardLayout): { label: string; type: string }[] {
-  return layout.steps.flatMap((s) => s.items.filter((it) => !it.builtin && !it.column).map((it) => ({ label: itemLabel(it), type: it.type ?? 'text' })));
+  return layout.steps.flatMap((s) => s.items
+    .filter((it) => !it.builtin && !it.column && !isContentFieldType(it.type))
+    .map((it) => ({ label: itemLabel(it), type: it.type ?? 'text' })));
 }
 
 /**

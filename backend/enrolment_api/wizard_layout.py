@@ -59,12 +59,26 @@ MAX_LAYOUT_BYTES = 512 * 1024
 MAX_STEPS = 40
 MAX_ITEMS_PER_STEP = 200
 MAX_OPTIONS = 200
-MAX_TEXT_ANSWER = 10_000
+MAX_SINGLE_LINE_ANSWER = 500
+MAX_MULTILINE_ANSWER = 10_000
+MAX_HEADING_LENGTH = 300
+MAX_DESCRIPTION_LENGTH = 20_000
 
-FIELD_TYPES = {"text", "number", "upload", "dropdown"}
+CONTENT_FIELD_TYPES = {"heading", "description", "divider"}
+CHOICE_FIELD_TYPES = {"radio", "checkbox"}
+FIELD_TYPES = {"text", "single_line", "multi_line", "number", "upload", "dropdown", *CONTENT_FIELD_TYPES, *CHOICE_FIELD_TYPES}
 
 #: SQL type of each custom field's column.
-COLUMN_TYPES = {"text": "text", "dropdown": "text", "number": "numeric", "upload": "jsonb"}
+COLUMN_TYPES = {
+    "text": "text",  # Legacy single-line fields published before the split.
+    "single_line": "text",
+    "multi_line": "text",
+    "dropdown": "text",
+    "radio": "text",
+    "checkbox": "jsonb",
+    "number": "numeric",
+    "upload": "jsonb",
+}
 
 #: Built-in steps -> (their table, its one-row-per-learner unique index, whether
 #: this module may create the table). The first six already exist (see
@@ -225,9 +239,9 @@ def _clean_condition(raw):
     return clean
 
 
-def _clean_options(raw):
+def _clean_options(raw, kind="dropdown"):
     if not isinstance(raw, list):
-        raise LayoutError("A dropdown needs a list of options.")
+        raise LayoutError(f"A {kind} needs a list of options.")
     seen, out = set(), []
     for option in raw:
         text = _clean_text(option, "A dropdown option", 300, required=False)
@@ -235,9 +249,9 @@ def _clean_options(raw):
             seen.add(text)
             out.append(text)
     if not out:
-        raise LayoutError("A dropdown needs at least one option.")
+        raise LayoutError(f"A {kind} needs at least one option.")
     if len(out) > MAX_OPTIONS:
-        raise LayoutError(f"A dropdown can have at most {MAX_OPTIONS} options.")
+        raise LayoutError(f"A {kind} can have at most {MAX_OPTIONS} options.")
     return out
 
 
@@ -342,6 +356,8 @@ def normalize_layout(raw, previous):
         for item in step["items"]:
             if item.get("builtin"):
                 continue
+            if item.get("type") in CONTENT_FIELD_TYPES:
+                continue
             table = item["table"]
             index, create = _table_meta(table, step_tables)
             entry = plan.setdefault(table, {"index": index, "create": create, "columns": {}})
@@ -392,50 +408,77 @@ def _table_meta(table, step_tables):
 def _normalize_custom(raw_item, step_slug, step_table, step_label, prev_fields, used_keys, used_columns):
     key = raw_item.get("key")
     prior = prev_fields.get(key)[0] if key in prev_fields else None
-    label = _clean_text(raw_item.get("label"), f"A field on '{step_label}' needs a label;", 300)
     field_type = raw_item.get("type")
     if field_type not in FIELD_TYPES:
-        raise LayoutError(f"'{label}' needs a type: text, number, upload or dropdown.")
+        raise LayoutError(f"A field on '{step_label}' needs a type: single_line, multi_line, number, upload, dropdown, heading, description, divider, radio or checkbox.")
+
+    content_type = field_type in CONTENT_FIELD_TYPES
+    if field_type == "divider":
+        label = ""
+    else:
+        label = _clean_text(
+            raw_item.get("label"),
+            f"A field on '{step_label}' needs a label;",
+            MAX_DESCRIPTION_LENGTH if field_type == "description" else MAX_HEADING_LENGTH,
+        )
 
     if prior:
+        prior_type = prior.get("type")
+        prior_content = prior_type in CONTENT_FIELD_TYPES
         # Storage is fixed once assigned; so is the type, since it decides the
         # column's SQL type and the answers already stored in it.
-        if field_type != prior.get("type"):
+        # Legacy text fields used the same PostgreSQL text storage as the new
+        # explicit text types. Allow those fields to be upgraded in place so
+        # their existing answers and columns are preserved.
+        legacy_text_upgrade = prior_type == "text" and field_type in {"single_line", "multi_line"}
+        if field_type != prior_type and not legacy_text_upgrade and not (prior_content and content_type):
             raise LayoutError(
-                f"'{label}' was published as a {prior.get('type')} field; its type cannot change. "
+                f"'{label or prior.get('label') or 'This field'}' was published as a {prior_type} field; its type cannot change. "
                 "Remove it and add a new field instead."
             )
-        table, column = prior.get("table"), prior.get("column")
+        if prior_content and not content_type:
+            table = step_table
+            column, n = f"Custom_{_slug(label)}", 2
+            while (table, column) in used_columns:
+                column, n = f"Custom_{_slug(label)}_{n}", n + 1
+            used_columns.add((table, column))
+        else:
+            table, column = prior.get("table"), prior.get("column")
     else:
         stem = _slug(label)
         key, n = f"cf_{stem}", 2
         while key in used_keys:
             key, n = f"cf_{stem}_{n}", n + 1
         used_keys.add(key)
-        table = step_table
-        column, n = f"Custom_{key[3:]}", 2
-        while (table, column) in used_columns:
-            column, n = f"Custom_{key[3:]}_{n}", n + 1
-        used_columns.add((table, column))
+        table, column = step_table, None
+        if not content_type:
+            column, n = f"Custom_{key[3:]}", 2
+            while (table, column) in used_columns:
+                column, n = f"Custom_{key[3:]}_{n}", n + 1
+            used_columns.add((table, column))
 
-    if not (isinstance(table, str) and TABLE_RE.match(table)) or not (isinstance(column, str) and COLUMN_RE.match(column)):
+    if not (isinstance(table, str) and TABLE_RE.match(table)):
+        raise LayoutError(f"'{label}' has invalid storage.")
+    if not content_type and not (isinstance(column, str) and COLUMN_RE.match(column)):
         raise LayoutError(f"'{label}' has invalid storage.")
 
     item = {
         "key": key,
         "builtin": False,
         "hidden": bool(raw_item.get("hidden")),
-        "required": bool(raw_item.get("required")),
+        "required": False if content_type else bool(raw_item.get("required")),
         "label": label,
         "type": field_type,
-        "table": table,
-        "column": column,
     }
+    if not content_type:
+        item["table"] = table
+        item["column"] = column
     help_text = _clean_text(raw_item.get("helpText"), "Help text", 500, required=False)
     if help_text:
         item["helpText"] = help_text
-    if field_type == "dropdown":
-        item["options"] = _clean_options(raw_item.get("options"))
+    if field_type == "dropdown" or field_type in CHOICE_FIELD_TYPES:
+        kind = "choice field" if field_type in CHOICE_FIELD_TYPES else "dropdown"
+        item["options"] = _clean_options(raw_item.get("options"), kind)
     condition = _clean_condition(raw_item.get("condition"))
     if condition:
         item["condition"] = condition
@@ -647,6 +690,15 @@ def _is_shown(item, ctx, draft, answers, depth=0):
 
 def _column_value(item, value):
     field_type = item.get("type")
+    if field_type == "checkbox":
+        if not isinstance(value, list):
+            return None
+        options = item.get("options") or []
+        selected = []
+        for option in value:
+            if isinstance(option, str) and option in options and option not in selected:
+                selected.append(option)
+        return selected or None
     if field_type == "number":
         text = str(value).strip() if value is not None else ""
         if not text:
@@ -658,10 +710,11 @@ def _column_value(item, value):
         return number if number.is_finite() else None
     if not isinstance(value, str):
         return None
-    text = value.strip()[:MAX_TEXT_ANSWER]
+    limit = MAX_SINGLE_LINE_ANSWER if field_type == "single_line" else MAX_MULTILINE_ANSWER
+    text = value.strip()[:limit]
     if not text:
         return None
-    if field_type == "dropdown" and text not in (item.get("options") or []):
+    if field_type in {"dropdown", "radio"} and text not in (item.get("options") or []):
         return None
     return text
 
@@ -694,26 +747,33 @@ def project_custom_fields(kind, learner_id, draft, answers=None, layout=None):
     ctx = (fields, {key: slug for key, (_item, slug) in indexed.items()}, hidden_steps, hidden_builtin)
 
     by_table = {}
+    by_table_types = {}
     for key, value in custom.items():
         item = fields.get(key)
         # Removed fields (and fields on removed steps) keep what they hold.
-        if item is None or item.get("hidden") or ctx[1].get(key) in hidden_steps or item.get("type") == "upload":
+        if item is None or item.get("hidden") or ctx[1].get(key) in hidden_steps or item.get("type") in {"upload", *CONTENT_FIELD_TYPES}:
             continue
         table, column = item.get("table"), item.get("column")
         if not (isinstance(table, str) and TABLE_RE.match(table) and isinstance(column, str) and COLUMN_RE.match(column)):
             continue
         shown = _is_shown(item, ctx, draft, answers)
         by_table.setdefault(table, {})[column] = _column_value(item, value) if shown else None
+        by_table_types.setdefault(table, {})[column] = item.get("type")
 
     with connections[CONN].cursor() as cursor:
         for table, columns in by_table.items():
             names = list(columns)
             quoted = [_q(c, COLUMN_RE) for c in names]
+            placeholders = ["%s::jsonb" if by_table_types[table].get(c) == "checkbox" else "%s" for c in names]
+            values = [
+                json.dumps(columns[c]) if by_table_types[table].get(c) == "checkbox" and columns[c] is not None else columns[c]
+                for c in names
+            ]
             cursor.execute(
                 f'INSERT INTO enrolment.{_q(table, TABLE_RE)} ("Learner_kind", "Learner_id", {", ".join(quoted)}) '
-                f"VALUES (%s, %s, {', '.join(['%s'] * len(names))}) "
+                f"VALUES (%s, %s, {', '.join(placeholders)}) "
                 'ON CONFLICT ("Learner_kind", "Learner_id") DO UPDATE SET '
                 + ", ".join(f"{q} = EXCLUDED.{q}" for q in quoted)
                 + ', "Updated_at" = now()',
-                [kind, learner_id, *[columns[c] for c in names]],
+                [kind, learner_id, *values],
             )

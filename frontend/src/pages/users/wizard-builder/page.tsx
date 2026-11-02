@@ -11,7 +11,7 @@ import { roleNavMap } from '@/mocks/navigation';
 import { fetchWizardLayout, publishWizardLayout } from '@/api/wizardLayout';
 import { btnPrimary, btnSecondary, iconBtn, inputClass } from '../components/ui';
 import { builtinDef, isRequired, itemLabel, resolveLayout } from '../wizard/layout/resolve';
-import type { LayoutItem, LayoutStep, WizardLayout } from '../wizard/layout/types';
+import { isChoiceFieldType, isContentFieldType, type LayoutItem, type LayoutStep, type WizardLayout } from '../wizard/layout/types';
 import { FieldEditor } from './FieldEditor';
 import { TextEditor } from './TextEditor';
 import { TEXT_SLOTS_BY_ITEM, textFor } from '../wizard/layout/texts';
@@ -20,7 +20,9 @@ import {
   addStep,
   canChangeStep,
   dependents,
-  moveItem,
+  duplicateItem,
+  moveItemBefore,
+  moveItemAfter,
   moveItemToStep,
   moveStep,
   pendingColumns,
@@ -40,7 +42,19 @@ const KIND_LABEL: Record<string, string> = {
   block: 'Block',
 };
 
-const TYPE_LABEL: Record<string, string> = { text: 'Text', number: 'Number', dropdown: 'Dropdown', upload: 'File upload' };
+const TYPE_LABEL: Record<string, string> = {
+  text: 'Single-line text (existing)',
+  single_line: 'Single-line text',
+  multi_line: 'Multi-line text',
+  number: 'Number',
+  dropdown: 'Dropdown',
+  upload: 'File upload',
+  heading: 'Heading',
+  description: 'Description',
+  divider: 'Divider',
+  radio: 'Radio (single choice)',
+  checkbox: 'Checkbox (multiple choice)',
+};
 
 const clone = (layout: WizardLayout): WizardLayout => JSON.parse(JSON.stringify(layout)) as WizardLayout;
 
@@ -285,16 +299,17 @@ function StepEditor({
   const shown = step.items.filter((it) => !it.hidden);
   const removed = step.items.filter((it) => it.hidden);
   const [showRemoved, setShowRemoved] = useState(false);
+  const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const addRef = useRef<HTMLButtonElement>(null);
 
   const saveField = (draft: FieldDraft) => {
     const fields: Partial<LayoutItem> = {
       label: draft.label,
       type: draft.type,
-      options: draft.type === 'dropdown' ? draft.options : undefined,
-      helpText: draft.helpText || undefined,
-      required: draft.required,
-      condition: draft.condition,
+      options: draft.type === 'dropdown' || isChoiceFieldType(draft.type) ? draft.options : undefined,
+      helpText: isContentFieldType(draft.type) ? undefined : draft.helpText || undefined,
+      required: isContentFieldType(draft.type) ? false : draft.required,
+      condition: isContentFieldType(draft.type) ? null : draft.condition,
     };
     if (editing) {
       const key = editing === 'new' ? null : editing;
@@ -339,10 +354,45 @@ function StepEditor({
       }))} />}
       {step.slug === 'programme-suitability' && <ModulesAdmin version={version} value={layout.programmeModules}
         onChange={(programmeModules) => edit((l) => ({ ...l, programmeModules }))} />}
-      <ol className="space-y-2 p-5" aria-label={`Items on ${step.label}`}>
+      <ol
+        className="space-y-2 p-5"
+        aria-label={`Items on ${step.label}`}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDraggedKey(null);
+        }}
+      >
         {shown.length === 0 && <li className="rounded-xl border border-dashed border-foreground-200 p-4 text-center text-[12px] text-foreground-400">Nothing on this step yet. Add a field below.</li>}
-        {shown.map((item, i) => (
-          <li key={item.key}>
+        {shown.map((item) => (
+          <li
+            key={item.key}
+            draggable={editing !== item.key}
+            onDragStart={(e) => {
+              setDraggedKey(item.key);
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', item.key);
+            }}
+            onDragEnd={() => setDraggedKey(null)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const sourceKey = draggedKey || e.dataTransfer.getData('text/plain');
+              if (sourceKey && sourceKey !== item.key) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const placeAfter = typeof e.clientY === 'number' && e.clientY > rect.top + rect.height / 2;
+                edit((l) => placeAfter
+                  ? moveItemAfter(l, step.slug, sourceKey, item.key)
+                  : moveItemBefore(l, step.slug, sourceKey, item.key));
+              }
+              setDraggedKey(null);
+            }}
+            className={draggedKey === item.key ? 'opacity-50' : undefined}
+          >
             {editing === item.key ? (
               <FieldEditor layout={layout} item={item} onSave={saveField} onCancel={() => setEditing(null)} />
             ) : (
@@ -350,10 +400,14 @@ function StepEditor({
                 layout={layout}
                 step={step}
                 item={item}
-                first={i === 0}
-                last={i === shown.length - 1}
                 edit={edit}
                 onEdit={() => setEditing(item.key)}
+                onDuplicate={() => {
+                  const result = duplicateItem(layout, step.slug, item.key);
+                  if (!result) return;
+                  edit(() => result.layout);
+                  setEditing(result.key);
+                }}
               />
             )}
           </li>
@@ -398,18 +452,16 @@ function ItemRow({
   layout,
   step,
   item,
-  first,
-  last,
   edit,
   onEdit,
+  onDuplicate,
 }: {
   layout: WizardLayout;
   step: LayoutStep;
   item: LayoutItem;
-  first: boolean;
-  last: boolean;
   edit: (fn: (l: WizardLayout) => WizardLayout) => void;
   onEdit: () => void;
+  onDuplicate: () => void;
 }) {
   const def = builtinDef(item);
   const label = itemLabel(item);
@@ -437,8 +489,12 @@ function ItemRow({
   };
 
   return (
-    <div className="rounded-xl border border-foreground-100 bg-background-50 px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex overflow-hidden rounded-xl border border-foreground-100 bg-background-50">
+      <span className="flex w-14 shrink-0 cursor-grab items-center justify-center border-r border-foreground-100 bg-background-100/40 text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
+        <AppIcon className="ri-drag-move-2-line text-[20px]" />
+      </span>
+      <div className="min-w-0 flex-1 px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-medium text-foreground-900">{label}</p>
           {slots.length > 0 && !wordy && (
@@ -448,7 +504,7 @@ function ItemRow({
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {item.builtin ? KIND_LABEL[def?.kind ?? 'field'] : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
-            {!item.builtin && !item.column && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
+            {!item.builtin && !item.column && !isContentFieldType(item.type) && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
             {onIlr && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800"><AppIcon className="ri-file-text-line mr-0.5" />On ILR document</span>}
             {condition && trigger && (
               <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">
@@ -460,7 +516,7 @@ function ItemRow({
           </div>
         </div>
 
-        {requirable && (
+        {requirable && !isContentFieldType(item.type) && (
           <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-foreground-700">
             <input
               type="checkbox"
@@ -483,12 +539,6 @@ function ItemRow({
           </select>
         )}
         <div className="flex shrink-0 items-center">
-          <button type="button" className={iconBtn} disabled={first} aria-label={`Move ${label} up`} onClick={() => edit((l) => moveItem(l, step.slug, item.key, -1))}>
-            <AppIcon className="ri-arrow-up-line" />
-          </button>
-          <button type="button" className={iconBtn} disabled={last} aria-label={`Move ${label} down`} onClick={() => edit((l) => moveItem(l, step.slug, item.key, 1))}>
-            <AppIcon className="ri-arrow-down-line" />
-          </button>
           {slots.length > 0 && (
             <button
               type="button"
@@ -498,13 +548,18 @@ function ItemRow({
               title="Edit wording"
               onClick={() => setShowWording((v) => !v)}
             >
-              <AppIcon className="ri-text" />
+              <AppIcon className="ri-pencil-line" />
             </button>
           )}
           {!item.builtin && (
-            <button type="button" className={iconBtn} aria-label={`Edit ${label}`} onClick={onEdit}>
-              <AppIcon className="ri-pencil-line" />
-            </button>
+            <>
+              <button type="button" className={iconBtn} aria-label={`Edit ${label}`} onClick={onEdit}>
+                <AppIcon className="ri-pencil-line" />
+              </button>
+              <button type="button" className={iconBtn} aria-label={`Duplicate ${label}`} title="Duplicate field" onClick={onDuplicate}>
+                <AppIcon className="ri-file-copy-line" />
+              </button>
+            </>
           )}
           <button type="button" className={`${iconBtn} hover:!text-red-600`} aria-label={`Remove ${label}`} onClick={remove}>
             <AppIcon className="ri-delete-bin-line" />
@@ -526,6 +581,7 @@ function ItemRow({
           <AppIcon className="ri-error-warning-line mr-1" />Optional now: if a learner leaves this blank, it prints blank on the ILR document.
         </p>
       )}
+      </div>
     </div>
   );
 }

@@ -10,14 +10,61 @@
  * enrolment_api/wizard_layout.py) — the client never chooses storage.
  */
 
-export type CustomFieldType = 'text' | 'number' | 'upload' | 'dropdown';
+/**
+ * `text` is retained for layouts published before the text fields were split.
+ * New fields should use the explicit single-line or multi-line type.
+ */
+export type CustomFieldType =
+  | 'text'
+  | 'single_line'
+  | 'multi_line'
+  | 'number'
+  | 'upload'
+  | 'dropdown'
+  | 'heading'
+  | 'description'
+  | 'divider'
+  | 'radio'
+  | 'checkbox';
 
 export const CUSTOM_FIELD_TYPES: { value: CustomFieldType; label: string }[] = [
-  { value: 'text', label: 'Text' },
+  { value: 'single_line', label: 'Single-line text' },
+  { value: 'multi_line', label: 'Multi-line text' },
   { value: 'number', label: 'Number' },
   { value: 'dropdown', label: 'Dropdown' },
   { value: 'upload', label: 'File upload' },
+  { value: 'heading', label: 'Heading' },
+  { value: 'description', label: 'Description' },
+  { value: 'divider', label: 'Divider' },
+  { value: 'radio', label: 'Radio (single choice)' },
+  { value: 'checkbox', label: 'Checkbox (multiple choice)' },
 ];
+
+/** Keep an already-published legacy `text` field selectable without offering it for new fields. */
+export function fieldTypeOptions(current?: CustomFieldType): { value: CustomFieldType; label: string }[] {
+  return current === 'text'
+    ? [{ value: 'text', label: 'Single-line text (existing)' }, ...CUSTOM_FIELD_TYPES]
+    : CUSTOM_FIELD_TYPES;
+}
+
+export const CONTENT_FIELD_TYPES: CustomFieldType[] = ['heading', 'description', 'divider'];
+export const CHOICE_FIELD_TYPES: CustomFieldType[] = ['radio', 'checkbox'];
+
+export function isContentFieldType(type?: CustomFieldType): boolean {
+  return Boolean(type && CONTENT_FIELD_TYPES.includes(type));
+}
+
+export function answerFieldTypeOptions(current?: CustomFieldType): { value: CustomFieldType; label: string }[] {
+  return fieldTypeOptions(current).filter((option) => !isContentFieldType(option.value));
+}
+
+export function isChoiceFieldType(type?: CustomFieldType): boolean {
+  return Boolean(type && CHOICE_FIELD_TYPES.includes(type));
+}
+
+export function storesCustomAnswer(type?: CustomFieldType): boolean {
+  return Boolean(type && !isContentFieldType(type));
+}
 
 /** Show an item only while a dropdown answer is one of `values`. */
 export interface LayoutCondition {
@@ -85,4 +132,4 @@ export interface CustomUploadRef {
   filename: string;
 }
 
-export type CustomAnswer = string | CustomUploadRef[] | null;
+export type CustomAnswer = string | string[] | CustomUploadRef[] | null;

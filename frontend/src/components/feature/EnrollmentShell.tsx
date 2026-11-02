@@ -28,7 +28,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
     ['/learner/first-session', 'First learning session'], ['/lms?self=1', 'Continue to LMS'],
   ] : employer ? [[`/employers/${auth.account?.subjectId}/documents`, 'Documents to sign']] : [
     ['/users', 'Learners & contacts'], ['/users/coach-directory', 'Coach directory'], ['/users/first-sessions', 'First-session bookings'],
-    ['/users/wizard-builder', 'Enrolment form builder'], ['/users/eligibility-builder', 'Eligibility form builder'], ['/lms', 'Open LMS'],
+    ['/users/eligibility-builder', 'Eligibility form builder'], ['/users/wizard-builder', 'Enrolment form builder'], ['/lms', 'Open LMS'],
     ...(auth.account && hasOwnEnrolment(auth.account) ? [['/learner/home?self=1', 'My enrolment']] : []),
   ];
   return <div className="min-h-screen bg-background-200 text-foreground-900">

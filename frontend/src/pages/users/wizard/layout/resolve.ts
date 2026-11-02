@@ -10,7 +10,7 @@
  * longer knows is dropped.
  */
 import { BUILTIN_ITEMS, BUILTIN_STEPS, isMovable, type BuiltinItemDef } from './registry';
-import type { CustomAnswer, LayoutItem, LayoutStep, WizardLayout } from './types';
+import { isContentFieldType, type CustomAnswer, type LayoutItem, type LayoutStep, type WizardLayout } from './types';
 import type { WizardDraft } from '../../types';
 import { cleanTexts } from './texts';
 import { SUITABILITY_STEP } from '@/features/programme-suitability/wizardStep';
@@ -30,6 +30,25 @@ export function defaultLayout(): WizardLayout {
 export const DEFAULT_LAYOUT: WizardLayout = defaultLayout();
 
 const isCustomItem = (item: LayoutItem) => !item.builtin;
+
+/**
+ * These CV/Job Description questions were published before text fields were
+ * split into single-line and multi-line types. Their existing columns are
+ * already PostgreSQL text columns, so they can safely use the new multi-line
+ * presentation without changing stored answers.
+ */
+const LEGACY_MULTILINE_LABELS = new Set([
+  'what is your understanding of the programme you are applying for?',
+  'how will this programme help you in your career development/aspirations, and/or with your progression?',
+  'please explain how your current job role relates to the apprenticeship programme you are applying for. in your answer, include your job title, main duties, and how this programme will help you develop new knowledge, skills and behaviours in your role.',
+]);
+
+function resolveLegacyCustomType(item: LayoutItem): LayoutItem {
+  if (item.builtin || item.type !== 'text') return item;
+  const label = item.label?.replace(/\s+/g, ' ').trim().toLowerCase();
+  const isLegacyMultiline = Boolean(label && LEGACY_MULTILINE_LABELS.has(label));
+  return isLegacyMultiline ? { ...item, type: 'multi_line' } : item;
+}
 
 /** Steps, and blocks wherever they sit, that only apprenticeship learners take. */
 const APPRENTICESHIP_ONLY_STEPS = new Set(['inclusion']);
@@ -78,7 +97,7 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
         if (!isMovable(def) && def.step !== raw.slug) continue;
       }
       placed.add(item.key);
-      items.push({ ...item, hidden: Boolean(item.hidden) });
+      items.push({ ...resolveLegacyCustomType(item), hidden: Boolean(item.hidden) });
     }
     steps.push({ ...raw, label: raw.label || raw.slug, hidden: Boolean(raw.hidden), items });
   }
@@ -188,7 +207,11 @@ export function dropdownOptions(item: LayoutItem): string[] | null {
 }
 
 export function itemLabel(item: LayoutItem): string {
-  return item.builtin ? BUILTIN_ITEMS[item.key]?.label ?? item.key : item.label || 'Untitled field';
+  if (item.builtin) return BUILTIN_ITEMS[item.key]?.label ?? item.key;
+  if (item.type === 'divider') return 'Divider';
+  if (item.type === 'heading') return item.label || 'Heading';
+  if (item.type === 'description') return item.label || 'Description';
+  return item.label || 'Untitled field';
 }
 
 export function isBlankAnswer(value: CustomAnswer | undefined): boolean {
@@ -199,6 +222,7 @@ export function isBlankAnswer(value: CustomAnswer | undefined): boolean {
 
 /** What one custom field is still missing. */
 export function customMissing(item: LayoutItem, draft: WizardDraft): string[] {
+  if (isContentFieldType(item.type)) return [];
   const label = itemLabel(item);
   const value = draft.custom?.[item.key];
   if (isBlankAnswer(value)) return isRequired(item) ? [label] : [];
@@ -206,6 +230,12 @@ export function customMissing(item: LayoutItem, draft: WizardDraft): string[] {
     return [`${label} — Enter a number`];
   }
   if (item.type === 'dropdown' && typeof value === 'string' && item.options && !item.options.includes(value)) {
+    return isRequired(item) ? [label] : [];
+  }
+  if (item.type === 'radio' && typeof value === 'string' && item.options && !item.options.includes(value)) {
+    return isRequired(item) ? [label] : [];
+  }
+  if (item.type === 'checkbox' && Array.isArray(value) && value.some((option) => typeof option !== 'string' || !item.options?.includes(option))) {
     return isRequired(item) ? [label] : [];
   }
   return [];
