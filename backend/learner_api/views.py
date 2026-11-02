@@ -967,6 +967,15 @@ def enrolment_user_detail(request, pk):
                         pk, ", ".join(rejected),
                     )
             fields = write_fields(payload)
+            if (getattr(request, "learner_self_write", False)
+                    and str(fields.get("onboarding_status", "")).strip().lower() in {"submitted", "completed"}):
+                from programme_suitability.completion import submission_error
+                try:
+                    message = submission_error(user)
+                except DatabaseError:
+                    return _error("Could not verify assessment completion. Please retry.", 503)
+                if message:
+                    return _error(message, 409)
             validate_learner_dates(fields, user)
             _check_employer_id(fields)
         except ValidationError as exc:

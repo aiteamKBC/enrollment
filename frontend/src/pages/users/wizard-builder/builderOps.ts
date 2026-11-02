@@ -7,7 +7,7 @@ import { BUILTIN_ITEMS, isMovable } from '../wizard/layout/registry';
 import { dropdownOptions, itemLabel } from '../wizard/layout/resolve';
 import { isContentFieldType, type CustomFieldType, type LayoutItem, type LayoutStep, type WizardLayout } from '../wizard/layout/types';
 
-const mapSteps = (layout: WizardLayout, fn: (s: LayoutStep) => LayoutStep): WizardLayout => ({ steps: layout.steps.map(fn) });
+const mapSteps = (layout: WizardLayout, fn: (s: LayoutStep) => LayoutStep): WizardLayout => ({ ...layout, steps: layout.steps.map(fn) });
 
 const swap = <T,>(list: T[], from: number, to: number): T[] => {
   if (to < 0 || to >= list.length || from === to) return list;
@@ -18,7 +18,7 @@ const swap = <T,>(list: T[], from: number, to: number): T[] => {
 
 export function moveStep(layout: WizardLayout, slug: string, delta: -1 | 1): WizardLayout {
   const i = layout.steps.findIndex((s) => s.slug === slug);
-  return i === -1 ? layout : { steps: swap(layout.steps, i, i + delta) };
+  return i === -1 ? layout : { ...layout, steps: swap(layout.steps, i, i + delta) };
 }
 
 export function updateStep(layout: WizardLayout, slug: string, patch: Partial<LayoutStep>): WizardLayout {
@@ -28,7 +28,7 @@ export function updateStep(layout: WizardLayout, slug: string, patch: Partial<La
 /** A new, empty step at the end. Its slug is temporary — the server assigns the real one. */
 export function addStep(layout: WizardLayout, label: string): { layout: WizardLayout; slug: string } {
   const slug = `new-step-${Date.now().toString(36)}`;
-  return { layout: { steps: [...layout.steps, { slug, label, builtin: false, hidden: false, items: [] }] }, slug };
+  return { layout: { ...layout, steps: [...layout.steps, { slug, label, builtin: false, hidden: false, items: [] }] }, slug };
 }
 
 /**
@@ -251,8 +251,9 @@ export function setText(layout: WizardLayout, key: string, value: string | undef
   const texts = { ...(layout.texts ?? {}) };
   if (value === undefined) delete texts[key];
   else texts[key] = value;
-  const next: WizardLayout = { steps: layout.steps };
+  const next: WizardLayout = { ...layout };
   if (Object.keys(texts).length) next.texts = texts;
+  else delete next.texts;
   return next;
 }
 

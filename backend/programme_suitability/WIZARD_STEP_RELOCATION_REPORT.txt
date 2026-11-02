@@ -1,0 +1,169 @@
+Programme Suitability wizard-step relocation
+Date: 2026-11-01
+Branch: CV-and-Programme-Suitability
+
+RESULT
+The default apprenticeship wizard has 12 steps. Programme Suitability & Modules
+is step 6, after Extended ILR; the existing CV/Job Description route is step 7.
+The new stable slug is programme-suitability. Existing step slugs remain intact.
+Modules functionality has not been implemented.
+
+IMPLEMENTATION
+ProgrammeSuitabilityStep renders the existing CvSuitabilityPanel without
+duplicating or renaming its implementation. Its modal, scoring, recommendations,
+selection restrictions, alternative reasons, account synchronization, result
+card, preview and read-only answers are reused unchanged.
+
+Assessment completion and programme confirmation now gate the new step. Next,
+sidebar access, direct-route validation and final server submission use this
+policy. Confirmation advances to the next visible configured step (CV by
+default), independently of missing CV answers. Closing an unconfirmed result
+keeps the assessment step incomplete. CV validation still runs when leaving CV.
+The existing optional CV experience rule for enabled assessments is preserved.
+
+CV renders its existing fields without an assessment panel or the obsolete
+disabled/inert field wrapper. Its dynamic qualification label still reads the
+globally loaded saved assessment pathway; its answer mapping is unchanged.
+
+The existing assessment editor is hosted on the new step in the builder. An
+enabled assessment step cannot be hidden. Enabling an assessment also makes
+that step visible. Other step visibility controls are unchanged. Existing
+disabled/unconfigured and already submitted/completed enrolment exemptions
+remain as before. Hiding CV no longer bypasses the server assessment guard.
+
+DATA AND CONFIGURATION
+Old published layouts acquire the missing step during resolution/read, before
+CV (or after Extended ILR if CV is absent), without changing their stored rows,
+version numbers, assessment configuration, wording or answers. Repeated
+resolution is idempotent. Existing saved step positions and custom questions
+are retained. New publications recognize the stable slug as a built-in step.
+There was no publication, learner update, assessment recreation or data rewrite
+performed for this task. Confirmed saved assessments complete the new step
+without a retake. No assessment API/model changes were needed.
+
+No new migrations were created; no historical migrations were edited.
+The built-in table registration only permits the existing builder mechanism to
+create storage if an administrator later publishes custom fields on this step;
+adding the empty step itself creates no table or columns.
+
+SHARED PRODUCTION FILES MODIFIED FOR THIS TASK (paths relative to enrollment/)
+1. frontend/src/pages/users/types.ts
+   Add the new default step definition.
+2. frontend/src/pages/users/wizard/layout/registry.ts
+   Register an empty built-in step; other field registrations are unchanged.
+3. frontend/src/pages/users/wizard/layout/resolve.ts
+   Restore the missing step before CV and enforce enabled-step visibility.
+4. frontend/src/pages/users/wizard/WizardShell.tsx
+   Register the dedicated body; move assessment navigation guards and the
+   confirmation continuation from the CV slug to the new stable slug.
+5. frontend/src/pages/users/wizard/validation.ts
+   Move assessment completion requirements to the new step, retaining CV rules.
+6. frontend/src/pages/users/wizard/steps/CvJob.tsx
+   Remove assessment hosting and the obsolete field lock; keep its fields.
+7. frontend/src/pages/users/wizard-builder/page.tsx
+   Move the existing editor and enforce mandatory visibility when enabled.
+8. backend/enrolment_api/wizard_layout.py
+   Register the built-in identity/storage metadata and call compatibility
+   resolution for reads/publications, without rewriting layout history.
+
+SHARED TEST FILES MODIFIED
+9. backend/enrolment_api/tests_wizard_layout.py
+   Locate CV by slug instead of assuming it is the first stored step.
+10. frontend/src/pages/users/wizard/__tests__/wizardStepOrder.test.ts
+11. frontend/src/pages/users/wizard/__tests__/ilrLearnerDetailsStep.test.tsx
+12. frontend/src/pages/users/wizard/__tests__/inclusionStep.test.tsx
+13. frontend/src/pages/users/wizard/__tests__/learnerStepGating.test.tsx
+14. frontend/src/pages/users/wizard/__tests__/recordPrefillAndNextSteps.test.tsx
+15. frontend/src/pages/users/wizard/__tests__/skillsRadarStaleKsbs.test.tsx
+    Update step-order/index/progress expectations for the additional step.
+16. frontend/src/pages/users/wizard-builder/__tests__/wizardBuilder.test.tsx
+    Test old-layout compatibility, editor relocation, mandatory visibility,
+    unchanged CV questions and no automatic publication.
+
+DEDICATED FEATURE FILES CREATED
+frontend/src/features/programme-suitability/ProgrammeSuitabilityStep.tsx
+frontend/src/features/programme-suitability/wizardStep.ts
+frontend/src/features/programme-suitability/__tests__/wizardStep.test.ts
+backend/programme_suitability/wizard_step.py
+backend/programme_suitability/test_wizard_step.py
+backend/programme_suitability/WIZARD_STEP_RELOCATION_REPORT.txt
+
+EXISTING FEATURE FILES MODIFIED
+backend/programme_suitability/completion.py
+frontend/src/features/programme-suitability/__tests__/continuation.test.tsx
+frontend/src/features/programme-suitability/__tests__/cvFieldsLock.test.tsx
+The historical cvFieldsLock test filename is retained; its obsolete locking
+assertions now verify relocation, interactive CV fields and saved labels.
+
+PRE-EXISTING WORK
+The working tree was already dirty, including the programme_suitability feature
+directories and shared settings/context/API integrations. That work was retained.
+The file lists above describe this task's changes, not every pre-existing
+uncommitted file shown by git status. No branch switch, commit, push, merge or
+rebase was performed.
+
+VALIDATION RESULTS
+1. Frontend regression suite: 413 passed across 52 test files, 0 failures.
+   npm --prefix frontend test -- src/features/programme-suitability
+     src/pages/users src/pages/learner/onboarding --maxWorkers=2
+   JSON output: frontend/.cache/suitability-relocation-tests.json (ignored).
+2. Programme suitability backend suite: 90 passed, including saved assessments,
+   scoring, confirmation/reasons, programme synchronization and new step policy.
+   backend/.venv/Scripts/python.exe backend/manage.py test programme_suitability
+     --settings=programme_suitability.test_settings --noinput
+3. Shared backend regressions: 217 passed.
+   backend/.venv/Scripts/python.exe tools/run_backend_checks.py enrolment_api
+     enrollment_service.tests
+4. npm --prefix frontend run type-check: passed.
+5. npm --prefix frontend run lint: passed.
+6. npm --prefix frontend run build: passed.
+7. makemigrations programme_suitability --check --dry-run using the feature test
+   settings: no changes detected.
+8. git diff --check: passed.
+9. Headless Chrome: all 6 scenarios passed using actual frontend components
+   against isolated mocked API responses; no production learner writes.
+   ME L4, MM L6, APM L4, PCP L6, MM -> ME and PCP -> APM.
+   Verified Start, pathway answers, Submit, pending confirmation blocking,
+   mandatory alternative reason, automatic navigation to CV, no assessment or
+   lock in CV, CV required-field validation, saved Yes/No and experience,
+   persisted labels after reload, confirmed preview, disabled read-only answers,
+   hidden score/disclaimer and exactly one submission and confirmation per flow.
+   Browser page errors: none. Temporary harness files were removed.
+   Results/screenshots remain in ignored frontend/.cache/relocation-* and
+   frontend/.cache/relocated-*.png.
+   These browser runs are not a live authenticated end-to-end backend test;
+   backend scoring/storage/synchronization are covered separately by the backend
+   suites above.
+
+MERGE AND INTEGRATION COORDINATION
+Text conflicts are most likely in types.ts, layout/registry.ts, WizardShell.tsx,
+validation.ts, layout/resolve.ts, CvJob.tsx, the builder page and backend
+wizard_layout.py. The shared test changes can also overlap teammates' work.
+Each production edit is limited to registration, relocation, visibility or
+assessment gating; other developers' step bodies were not changed.
+
+Merge registration, component files, layout compatibility and completion guards
+together. A textual merge that loses any one of these can hide the component,
+duplicate a step, restore the old CV gate or allow assessment bypass.
+Keep the slug programme-suitability consistent between frontend and backend.
+Coordinate the step position if another developer also adds/reorders steps.
+Use slugs and visible configured steps for navigation; update tests/external
+integrations that assume the old 11-step positions. Existing CV URLs remain valid.
+For previously reordered layouts, compatibility inserts before the existing CV;
+it does not reorder other developers' steps. Explicit saved positions of the
+new step are retained to preserve builder ordering.
+
+No new migration dependency is introduced by this relocation. If main does not
+yet contain the existing assessment feature, its already-existing migrations
+0001_initial -> 0002_assessment_programme_selection_source ->
+0003_assessment_selection_confirmed_at ->
+0004_assessment_alternative_selection_reason must accompany the feature and be
+applied normally. Those dependencies are internal to programme_suitability.
+Do not rewrite or renumber them to resolve a merge. Coordinate any competing
+migrations in that same app before merging. The feature directories were
+untracked at the start; ensure all necessary feature files accompany the merge.
+
+After resolving teammates' changes, rerun the frontend/backend commands above
+and check builder ordering, old published-layout resolution, existing confirmed
+assessments, direct routes and Next/Back from their neighboring steps.
+No unresolved implementation failures remain in the tested scope.

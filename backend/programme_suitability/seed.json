@@ -1,0 +1,1053 @@
+{
+  "schemaVersion": 1,
+  "enabled": true,
+  "introduction": "Select only responsibilities you actually perform. This preliminary matching guidance is supplied by the project team and is not a final eligibility or admissions decision.",
+  "programmes": [
+    {
+      "id": "ME_L4",
+      "title": "Marketing Executive",
+      "level": 4,
+      "pathway": "marketing",
+      "description": "Marketing Executive Level 4",
+      "summary": "Campaign planning and delivery; digital and offline marketing; marketing content and materials; customer and competitor research; campaign performance monitoring; campaign evaluation and improvement; stakeholder collaboration; marketing project and event coordination; budget monitoring; CRM/CMS and marketing technology; compliance and quality; ownership of defined marketing activities.",
+      "responsibilities": [
+        "Campaign planning and delivery",
+        "digital and offline marketing",
+        "marketing content and materials",
+        "customer and competitor research",
+        "campaign performance monitoring",
+        "campaign evaluation and improvement",
+        "stakeholder collaboration",
+        "marketing project and event coordination",
+        "budget monitoring",
+        "CRM/CMS and marketing technology",
+        "compliance and quality",
+        "ownership of defined marketing activities"
+      ],
+      "active": true,
+      "order": 0,
+      "catalogueId": null
+    },
+    {
+      "id": "MM_L6",
+      "title": "Marketing Manager",
+      "level": 6,
+      "pathway": "marketing",
+      "description": "Marketing Manager Level 6",
+      "summary": "Marketing strategy development; integrated strategic marketing planning; strategic decision-making; senior stakeholder influence; marketing budget planning and investment management; return on investment; business case development; advanced customer and market analysis; KPI management; commercial growth opportunities; marketing risk management; cross-functional leadership; agency and supplier management; marketing technology and process improvement; strategic professional advice; strategic evaluation and continuous improvement.",
+      "responsibilities": [
+        "Marketing strategy development",
+        "integrated strategic marketing planning",
+        "strategic decision-making",
+        "senior stakeholder influence",
+        "marketing budget planning and investment management",
+        "return on investment",
+        "business case development",
+        "advanced customer and market analysis",
+        "KPI management",
+        "commercial growth opportunities",
+        "marketing risk management",
+        "cross-functional leadership",
+        "agency and supplier management",
+        "marketing technology and process improvement",
+        "strategic professional advice",
+        "strategic evaluation and continuous improvement"
+      ],
+      "active": true,
+      "order": 1,
+      "catalogueId": null
+    },
+    {
+      "id": "APM_L4",
+      "title": "Associate Project Manager",
+      "level": 4,
+      "pathway": "project-controls",
+      "description": "Associate Project Manager Level 4",
+      "summary": "Support project planning, coordination and delivery; develop and monitor project schedules and milestones; monitor budgets and resource allocations; identify and manage project risks and issues; communicate with stakeholders; prepare progress reports; support governance and change control; coordinate resources and quality activities; maintain documentation and compliance; participate in project reviews and continuous improvement.",
+      "responsibilities": [
+        "Support project planning, coordination and delivery",
+        "develop and monitor project schedules and milestones",
+        "monitor budgets and resource allocations",
+        "identify and manage project risks and issues",
+        "communicate with stakeholders",
+        "prepare progress reports",
+        "support governance and change control",
+        "coordinate resources and quality activities",
+        "maintain documentation and compliance",
+        "participate in project reviews and continuous improvement"
+      ],
+      "active": true,
+      "order": 2,
+      "catalogueId": null
+    },
+    {
+      "id": "PCP_L6",
+      "title": "Project Controls Professional",
+      "level": 6,
+      "pathway": "project-controls",
+      "description": "Project Controls Professional Level 6",
+      "summary": "Develop and oversee project and programme plans; establish and apply project controls and governance procedures; monitor budgets and conduct cost forecasting; analyse project risks and their impact on cost and schedules; manage schedules and baselines; analyse project performance and recommend decisions; evaluate changes to scope, costs, resources and timelines; advise senior stakeholders; improve project controls systems, processes and assurance.",
+      "responsibilities": [
+        "Develop and oversee project and programme plans",
+        "establish and apply project controls and governance procedures",
+        "monitor budgets and conduct cost forecasting",
+        "analyse project risks and their impact on cost and schedules",
+        "manage schedules and baselines",
+        "analyse project performance and recommend decisions",
+        "evaluate changes to scope, costs, resources and timelines",
+        "advise senior stakeholders",
+        "improve project controls systems, processes and assurance"
+      ],
+      "active": true,
+      "order": 3,
+      "catalogueId": null
+    }
+  ],
+  "questions": [
+    {
+      "id": "M01",
+      "slug": "marketing-strategy-and-decision-making",
+      "pathway": "marketing",
+      "title": "Marketing Strategy and Decision-Making",
+      "description": "Which responsibilities do you currently have in setting or implementing marketing strategy?",
+      "weight": 10,
+      "order": 0,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": true,
+      "criticalProgramme": "MM_L6",
+      "answers": [
+        {
+          "id": "M01_A",
+          "text": "I carry out marketing activities based on strategies set by others.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M01_B",
+          "text": "I make tactical delivery decisions and recommend improvements to agreed marketing plans.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M01_C",
+          "text": "I contribute to developing marketing strategies and influence marketing priorities.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M01_D",
+          "text": "I lead or materially influence marketing strategy and strategic investment decisions.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "M02",
+      "slug": "campaign-planning-and-delivery",
+      "pathway": "marketing",
+      "title": "Campaign Planning and Delivery",
+      "description": "How are you involved in planning and delivering marketing activities?",
+      "weight": 8,
+      "order": 1,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "M02_A",
+          "text": "I organise assigned campaign tasks and schedules.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M02_B",
+          "text": "I coordinate campaigns across channels, deadlines and team members.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M02_C",
+          "text": "I develop integrated marketing plans for different audiences, services or channels.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M02_D",
+          "text": "I set strategic campaign priorities and determine the overall marketing approach.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "M03",
+      "slug": "marketing-budgets-investment-and-roi",
+      "pathway": "marketing",
+      "title": "Marketing Budgets, Investment and ROI",
+      "description": "Which budget and investment responsibilities are part of your role?",
+      "weight": 10,
+      "order": 2,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": true,
+      "criticalProgramme": "MM_L6",
+      "answers": [
+        {
+          "id": "M03_A",
+          "text": "I record marketing expenditure and report spending information.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M03_B",
+          "text": "I monitor campaign spending against an agreed budget and escalate variances.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M03_C",
+          "text": "I prepare budget forecasts, evaluate ROI and recommend resource allocations.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M03_D",
+          "text": "I make or significantly influence marketing investment decisions and justify business cases.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "M04",
+      "slug": "market-research-and-commercial-opportunities",
+      "pathway": "marketing",
+      "title": "Market Research and Commercial Opportunities",
+      "description": "How do you use market and customer information in your work?",
+      "weight": 8,
+      "order": 3,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "M04_A",
+          "text": "I collect customer feedback and basic market information.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M04_B",
+          "text": "I analyse customer, competitor and campaign information to improve delivery.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M04_C",
+          "text": "I analyse wider market trends and recommend commercial or growth opportunities.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M04_D",
+          "text": "I lead market opportunity assessments and influence business growth strategy.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "M05",
+      "slug": "marketing-performance-and-kpis",
+      "pathway": "marketing",
+      "title": "Marketing Performance and KPIs",
+      "description": "What responsibilities do you have for measuring and improving marketing performance?",
+      "weight": 8,
+      "order": 4,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "M05_A",
+          "text": "I update campaign performance reports and dashboards.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M05_B",
+          "text": "I analyse campaign KPIs and recommend operational improvements.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M05_C",
+          "text": "I interpret performance across multiple initiatives and advise on marketing priorities.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M05_D",
+          "text": "I use KPIs, financial outcomes and ROI to influence strategic marketing decisions.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "M06",
+      "slug": "stakeholder-engagement-and-leadership",
+      "pathway": "marketing",
+      "title": "Stakeholder Engagement and Leadership",
+      "description": "How do you collaborate with and influence stakeholders?",
+      "weight": 9,
+      "order": 5,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": true,
+      "criticalProgramme": "MM_L6",
+      "answers": [
+        {
+          "id": "M06_A",
+          "text": "I work with colleagues and suppliers to complete assigned marketing activities.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M06_B",
+          "text": "I coordinate campaign approvals, agency tasks and stakeholder communications.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M06_C",
+          "text": "I present marketing recommendations to senior stakeholders and influence decisions.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M06_D",
+          "text": "I lead cross-functional marketing initiatives and influence senior management priorities.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "M07",
+      "slug": "marketing-channels-content-and-technology",
+      "pathway": "marketing",
+      "title": "Marketing Channels, Content and Technology",
+      "description": "What is your involvement in marketing content, channels and systems?",
+      "weight": 5,
+      "order": 6,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "M07_A",
+          "text": "I create or update marketing content using existing tools and guidelines.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M07_B",
+          "text": "I coordinate content calendars, marketing platforms and compliance checks.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M07_C",
+          "text": "I evaluate marketing channels, technology and processes and propose improvements.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M07_D",
+          "text": "I determine strategic channel approaches and lead improvements to marketing technology or processes.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "M08",
+      "slug": "marketing-projects-events-and-agencies",
+      "pathway": "marketing",
+      "title": "Marketing Projects, Events and Agencies",
+      "description": "What responsibilities do you have for marketing projects and external partners?",
+      "weight": 6,
+      "order": 7,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "M08_A",
+          "text": "I support marketing events and campaign logistics.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M08_B",
+          "text": "I coordinate deadlines, deliverables, suppliers and assigned campaign projects.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M08_C",
+          "text": "I oversee agency performance, deliverables and commercial expectations.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M08_D",
+          "text": "I lead strategic marketing programmes and make significant decisions about external partnerships.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "M09",
+      "slug": "marketing-risk-and-continuous-improvement",
+      "pathway": "marketing",
+      "title": "Marketing Risk and Continuous Improvement",
+      "description": "How do you manage marketing risks and improvements?",
+      "weight": 7,
+      "order": 8,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "M09_A",
+          "text": "I follow established quality, data-protection and marketing procedures.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.4
+          }
+        },
+        {
+          "id": "M09_B",
+          "text": "I evaluate marketing activities and report compliance or delivery issues.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "ME_L4": 0.8
+          }
+        },
+        {
+          "id": "M09_C",
+          "text": "I assess marketing operational, reputational and commercial risks and recommend improvements.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "MM_L6": 0.6
+          }
+        },
+        {
+          "id": "M09_D",
+          "text": "I lead strategic marketing improvements and make risk-informed recommendations to senior decision-makers.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "MM_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P01",
+      "slug": "project-planning-and-scheduling",
+      "pathway": "project-controls",
+      "title": "Project Planning and Scheduling",
+      "description": "Which planning and scheduling activities are part of your role?",
+      "weight": 9,
+      "order": 9,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "P01_A",
+          "text": "I update assigned project tasks, deadlines and milestones.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P01_B",
+          "text": "I coordinate project plans, schedules, resources and deliverables.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P01_C",
+          "text": "I develop or review integrated schedules and analyse project baselines.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P01_D",
+          "text": "I oversee project or programme plans and use schedule assurance to influence major decisions.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "slug": "project-controls-and-governance",
+      "pathway": "project-controls",
+      "title": "Project Controls and Governance",
+      "description": "What level of responsibility do you have for project controls and governance?",
+      "weight": 10,
+      "order": 10,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": true,
+      "criticalProgramme": "PCP_L6",
+      "answers": [
+        {
+          "id": "P02_A",
+          "text": "I maintain project documents and governance records.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P02_B",
+          "text": "I support governance reviews, scope control and established project procedures.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P02_C",
+          "text": "I establish or improve project controls procedures, monitoring and assurance arrangements.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P02_D",
+          "text": "I oversee project controls frameworks and governance assurance across projects or programmes.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P03",
+      "slug": "budgeting-cost-management-and-forecasting",
+      "pathway": "project-controls",
+      "title": "Budgeting, Cost Management and Forecasting",
+      "description": "What cost and financial responsibilities do you perform?",
+      "weight": 10,
+      "order": 11,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": true,
+      "criticalProgramme": "PCP_L6",
+      "answers": [
+        {
+          "id": "P03_A",
+          "text": "I record project expenditure and financial information.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P03_B",
+          "text": "I monitor budgets and identify spending variances within an agreed project plan.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P03_C",
+          "text": "I prepare cost forecasts, analyse variances and recommend corrective actions.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P03_D",
+          "text": "I lead or significantly influence cost-control decisions, forecasting and financial trade-offs.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P04",
+      "slug": "project-risk-and-issue-management",
+      "pathway": "project-controls",
+      "title": "Project Risk and Issue Management",
+      "description": "How are you involved in managing project risks and issues?",
+      "weight": 8,
+      "order": 12,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "P04_A",
+          "text": "I update risk registers and report identified issues.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P04_B",
+          "text": "I assess assigned risks and coordinate agreed mitigation actions.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P04_C",
+          "text": "I evaluate how project risks could affect cost, schedules and delivery performance.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P04_D",
+          "text": "I oversee risk-based project controls and provide assurance or recommendations to management.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P05",
+      "slug": "project-change-control",
+      "pathway": "project-controls",
+      "title": "Project Change Control",
+      "description": "What responsibilities do you have for assessing project changes?",
+      "weight": 8,
+      "order": 13,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "P05_A",
+          "text": "I record project change requests and update relevant documentation.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P05_B",
+          "text": "I coordinate change approvals and update project schedules and plans.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P05_C",
+          "text": "I analyse the potential cost, timeline, scope and resource impacts of changes.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P05_D",
+          "text": "I provide significant project controls recommendations that influence major change decisions.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P06",
+      "slug": "project-performance-analysis-and-reporting",
+      "pathway": "project-controls",
+      "title": "Project Performance Analysis and Reporting",
+      "description": "What role do you play in project performance reporting?",
+      "weight": 8,
+      "order": 14,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "P06_A",
+          "text": "I collect progress information and prepare routine project updates.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P06_B",
+          "text": "I analyse progress against project milestones and prepare reports.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P06_C",
+          "text": "I produce forecasts, analyse exceptions and recommend actions using project controls data.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P06_D",
+          "text": "I define performance reporting approaches and use project controls analysis to advise senior leaders.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P07",
+      "slug": "stakeholder-engagement-and-strategic-decision-making",
+      "pathway": "project-controls",
+      "title": "Stakeholder Engagement and Strategic Decision-Making",
+      "description": "How does your work influence project and programme decisions?",
+      "weight": 9,
+      "order": 15,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": true,
+      "criticalProgramme": "PCP_L6",
+      "answers": [
+        {
+          "id": "P07_A",
+          "text": "I communicate progress and task information to project team members.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P07_B",
+          "text": "I coordinate stakeholder communications and escalate project delivery issues.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P07_C",
+          "text": "I advise project managers or senior stakeholders using cost, schedule and risk analysis.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P07_D",
+          "text": "I materially influence senior governance or strategic decisions through project controls recommendations.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P08",
+      "slug": "resources-quality-and-documentation",
+      "pathway": "project-controls",
+      "title": "Resources, Quality and Documentation",
+      "description": "How are you involved in project resources, quality and documentation?",
+      "weight": 5,
+      "order": 16,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "P08_A",
+          "text": "I maintain project records, documentation and quality information.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P08_B",
+          "text": "I coordinate project resources, assigned activities and quality requirements.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P08_C",
+          "text": "I analyse resource constraints and their effects on project performance and forecasts.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P08_D",
+          "text": "I influence resource control standards, assurance processes and wider project delivery improvements.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "P09",
+      "slug": "project-controls-improvement-and-lessons-learned",
+      "pathway": "project-controls",
+      "title": "Project Controls Improvement and Lessons Learned",
+      "description": "What involvement do you have in improving project delivery or controls?",
+      "weight": 6,
+      "order": 17,
+      "active": true,
+      "required": true,
+      "multiple": true,
+      "critical": false,
+      "criticalProgramme": null,
+      "answers": [
+        {
+          "id": "P09_A",
+          "text": "I participate in project reviews and lessons-learned activities.",
+          "order": 0,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.4
+          }
+        },
+        {
+          "id": "P09_B",
+          "text": "I implement agreed improvements to project delivery procedures.",
+          "order": 1,
+          "active": true,
+          "affinities": {
+            "APM_L4": 0.8
+          }
+        },
+        {
+          "id": "P09_C",
+          "text": "I identify and recommend evidence-based improvements to project controls systems and reporting.",
+          "order": 2,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 0.6
+          }
+        },
+        {
+          "id": "P09_D",
+          "text": "I lead or significantly influence improvements to project controls processes, methodology or governance.",
+          "order": 3,
+          "active": true,
+          "affinities": {
+            "PCP_L6": 1.0
+          }
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "minimumScore": 60,
+    "minimumDifference": 15,
+    "minimumCoverage": 80,
+    "minimumCriticalIndicators": 2,
+    "criticalStrength": 0.6,
+    "mixedQuestionThreshold": 50,
+    "mixedAffinityThreshold": 0.6
+  }
+}

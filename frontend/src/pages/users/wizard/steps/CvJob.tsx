@@ -161,7 +161,7 @@ function DocumentField({ label, docKind, store }: { label: string; docKind: CvDo
 }
 
 export default function CvJob() {
-  const { draft, setSection, board, userId, isCommercial } = useWizard();
+  const { draft, setSection, board, userId, isCommercial, layout, suitability } = useWizard();
   const cv = draft.cvJob;
   const set = (patch: Partial<typeof cv>) => setSection('cvJob', { ...cv, ...patch });
   const kind: LearnerKind = isCommercial ? 'commercial' : 'apprenticeship';
@@ -177,8 +177,12 @@ export default function CvJob() {
     const text = t(key);
     return text === TEXT_SLOTS[key]?.default ? standard : text.split('{field}').join(field);
   };
+  const assessmentPathway = suitability?.status === 'SUBMITTED' ? suitability.state?.pathway : undefined;
+  const assessmentQualificationLabel = assessmentPathway === 'marketing' ? 'Do you have any marketing qualifications?'
+    : assessmentPathway === 'project-controls' ? 'Do you have any project management qualifications?' : undefined;
   const fieldLabels = {
-    hasFieldQualification: fieldText('cv.fieldQualification.label', standardField.hasFieldQualification),
+    hasFieldQualification: assessmentQualificationLabel ?? (layout?.programmeSuitability?.enabled
+      ? fieldQualificationLabels().hasFieldQualification : fieldText('cv.fieldQualification.label', standardField.hasFieldQualification)),
     highestFieldQualification: fieldText('cv.fieldQualification.named', standardField.highestFieldQualification),
   };
 
@@ -199,7 +203,7 @@ export default function CvJob() {
     ),
     'cv.cvUpload': () => <DocumentField label={t('cv.cvUpload.label')} docKind="cv" store={store} />,
     'cv.experience': ({ required }) => (
-      <FieldRow label={t('cv.experience.label')} required={required}>
+      <FieldRow label={t('cv.experience.label')} required={required && !layout?.programmeSuitability?.enabled}>
         <textarea
           rows={4}
           value={cv.experienceText ?? ''}

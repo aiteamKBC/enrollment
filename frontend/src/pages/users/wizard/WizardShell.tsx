@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { useToast } from "@/hooks/useToast.helpers";
 import { WIZARD_STEPS } from '../types';
 import { btnDestructive, btnPrimary, btnSuccess, btnSecondary } from '../components/ui';
@@ -15,9 +15,13 @@ import Ilr from './steps/Ilr';
 import Plr from './steps/Plr';
 import CvJob from './steps/CvJob';
 import Policies from './steps/Policies';
+import InitialAssessments from './steps/InitialAssessments';
 import NextSteps from './steps/NextSteps';
 import { StepHeading } from './steps/fields';
 import { StepItems } from './layout/StepItems';
+import { REQUIRED_MESSAGE } from '@/features/programme-suitability/useSuitability';
+import ProgrammeSuitabilityStep from '@/features/programme-suitability/ProgrammeSuitabilityStep';
+import { SUITABILITY_STEP } from '@/features/programme-suitability/wizardStep';
 
 /**
  * The step bodies are mode-agnostic — every one reads and writes only through
@@ -30,11 +34,13 @@ const BODIES_BY_SLUG: Record<string, ComponentType> = {
   'personal-details': PersonalDetails,
   'ilr-details': IlrLearnerDetails,
   ilr: Ilr,
+  [SUITABILITY_STEP.slug]: ProgrammeSuitabilityStep,
   'cv-job': CvJob,
   plr: Plr,
   'skills-radar': SkillsRadar,
   inclusion: Inclusion,
   policies: Policies,
+  'initial-assessments': InitialAssessments,
   'next-steps': NextSteps,
 };
 
@@ -54,7 +60,7 @@ export const STEP_BODIES: ComponentType[] = WIZARD_STEPS.map((step) => {
  * Policies, …). Those blocks can be moved, so these steps render whatever the
  * layout now puts on them rather than their original component.
  */
-const BLOCK_STEPS = new Set(['introduction', 'before-you-begin', 'plr', 'skills-radar', 'inclusion', 'policies', 'next-steps']);
+const BLOCK_STEPS = new Set(['introduction', 'before-you-begin', 'plr', 'skills-radar', 'inclusion', 'policies', 'initial-assessments', 'next-steps']);
 
 /** A step added in the wizard builder, or a block step: its items, in layout order. */
 function LayoutStepBody({ slug, label, custom }: { slug: string; label: string; custom: boolean }) {
@@ -96,7 +102,12 @@ export function WizardShell({
   header?: ReactNode;
   sidebar?: ReactNode;
 }) {
-  const { draft, hydrated, ready, saveIlr, ilrSaving, layout, steps } = useWizard();
+  const { draft, hydrated, ready, saveIlr, ilrSaving, layout, steps, suitability } = useWizard();
+  const continuedAssessment = useRef(0);
+  const assessmentIndex = steps.findIndex((step) => step.slug === SUITABILITY_STEP.slug);
+  const assessmentMissing = Boolean(layout.programmeSuitability?.enabled && draft.programmeSuitability?.required !== false && (draft.programmeSuitability?.status !== 'SUBMITTED' || !draft.programmeSuitability.selectionConfirmed));
+  const modulesMissing = Boolean(draft.programmeModulesCompletion?.required && !draft.programmeModulesCompletion.complete);
+  const moduleMessage = 'Please complete and save your PCP pathway and module choices before continuing.';
   const { success, error } = useToast();
   // Learners save by moving on — Next writes the step as it advances, so a
   // separate Save progress button would only be a second name for the same
@@ -186,7 +197,7 @@ export function WizardShell({
    * flight; each sends the whole draft, so the loser of that race only costs a
    * redundant request. The last thing they do always writes the current draft.
    */
-  const navigateTo = (target: number) => {
+  const navigateTo = useCallback((target: number) => {
     if (target < 0 || target >= steps.length) return;
     /** Write this step behind the move; a failure is reported, never blocking. */
     const saveInBackground = () =>
@@ -200,8 +211,23 @@ export function WizardShell({
       return;
     }
 
+    if (mode === 'learner' && currentIndex === assessmentIndex && !ready) {
+      error('Loading enrolment', 'Please wait for your saved enrolment information to finish loading.');
+      return;
+    }
+
+    if (mode === 'learner' && assessmentIndex >= 0 && target > assessmentIndex && assessmentMissing) {
+      setShowErrors(true);
+      error('Assessment required', REQUIRED_MESSAGE);
+      if (currentIndex === assessmentIndex) suitability?.start();
+      return;
+    }
+    if (mode === 'learner' && assessmentIndex >= 0 && target > assessmentIndex && modulesMissing) {
+      setShowErrors(true); error('Module choices required', moduleMessage); return;
+    }
+
     if (gated) {
-      const blocking = blockingStep(target);
+      const blocking = stepComplete.slice(0, target).findIndex((complete) => !complete);
       if (blocking === currentIndex) {
         setShowErrors(true);
         setBlockedAttempt((n) => n + 1);
@@ -218,7 +244,7 @@ export function WizardShell({
 
     saveInBackground();
     onNavigateStep(target);
-  };
+  }, [steps, saveIlr, error, currentIndex, mode, hydrated, assessmentIndex, ready, assessmentMissing, modulesMissing, suitability, gated, stepComplete, onNavigateStep]);
 
   const currentStep = steps[Math.min(currentIndex, steps.length - 1)];
   const BuiltinBody = currentStep && currentStep.builtin && !BLOCK_STEPS.has(currentStep.slug) ? BODIES_BY_SLUG[currentStep.slug] : undefined;
@@ -250,14 +276,41 @@ export function WizardShell({
 
   const scrollTabs = (dir: number) => tabScrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
 
-  const finish = async () => {
+  const finish = useCallback(async () => {
     setSubmitting(true);
     try {
+      if (mode === 'learner' && assessmentMissing && assessmentIndex >= 0) {
+        error('Assessment required', REQUIRED_MESSAGE);
+        if (currentIndex === assessmentIndex) suitability?.start();
+        else onNavigateStep(assessmentIndex);
+        return;
+      }
+      if (mode === 'learner' && modulesMissing && assessmentIndex >= 0) {
+        error('Module choices required', moduleMessage); onNavigateStep(assessmentIndex); return;
+      }
       await onFinish();
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [mode, assessmentMissing, modulesMissing, assessmentIndex, error, currentIndex, suitability, onNavigateStep, onFinish]);
+
+  useEffect(() => {
+    const token = suitability?.continueToken ?? 0;
+    if (!token || token === continuedAssessment.current) return;
+    if (!ready) return;
+    continuedAssessment.current = token;
+    if (mode !== 'learner' || currentStep?.slug !== SUITABILITY_STEP.slug || suitability?.status !== 'SUBMITTED' || !suitability.selectionConfirmed) return;
+    if (suitability.state?.selectedProgramme === 'PCP_L6' && draft.programmeModulesCompletion?.required) return;
+    if (isLast) { void finish(); return; }
+    navigateTo(currentIndex + 1);
+  }, [suitability?.continueToken, suitability?.status, suitability?.selectionConfirmed, suitability?.state?.selectedProgramme, draft.programmeModulesCompletion?.required, mode, currentStep?.slug, isLast, currentIndex, navigateTo, finish, ready]);
+
+  if (mode === 'learner' && assessmentIndex >= 0 && currentIndex > assessmentIndex && (assessmentMissing || modulesMissing)) return (
+    <div role="alert" className="rounded-xl border border-primary-200 bg-primary-50 p-4">
+      <p>{assessmentMissing ? REQUIRED_MESSAGE : moduleMessage}</p>
+      <button type="button" className={`${btnPrimary} mt-3`} onClick={() => onNavigateStep(assessmentIndex)}>Return to {SUITABILITY_STEP.label}</button>
+    </div>
+  );
 
   return (
     <div className={mode === 'staff' ? 'min-h-full bg-background-200' : ''}>
@@ -473,9 +526,7 @@ export function WizardShell({
                   {ilrSaving ? <><AppIcon className="ri-loader-4-line animate-spin" />Saving…</> : <><AppIcon className="ri-save-line" />Save progress</>}
                 </button>
               )}
-              {/* Next always reads Next and always moves: the save runs behind
-                  the navigation (see navigateTo), so the button never turns into
-                  a "Saving…" spinner the learner has to wait out. */}
+              {/* Assessment submission is independent; ordinary step data saves behind navigation. */}
               {isLast ? (
                 <button onClick={finish} disabled={submitting} className={btnSuccess}>
                   {submitting ? <><AppIcon className="ri-loader-4-line animate-spin" />Submitting…</> : <><AppIcon className="ri-check-double-line" />{finishLabel}</>}

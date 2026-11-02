@@ -584,6 +584,12 @@ export interface PoliciesState {
 }
 
 export interface WizardDraft {
+  /** Derived from published rules and the last successful wizard save. */
+  programmeModulesCompletion?: { required: boolean; complete: boolean };
+  /** PCP module choices, persisted in the existing wizard draft JSON. */
+  programmeModules?: import('@/features/programme-suitability/modules/configuration').ProgrammeModuleSelection;
+  /** Server-derived assessment completion; never persisted as a wizard answer. */
+  programmeSuitability?: import('@/features/programme-suitability/types').SuitabilityCompletion;
   personalDetails: PersonalDetails;
   ilrDetails: IlrLearnerDetails;
   skillsRadar: SkillsRadarState;
@@ -626,10 +632,12 @@ export const WIZARD_STEPS: WizardStepDef[] = [
   { slug: 'personal-details', label: 'Personal Details' },
   { slug: 'ilr-details', label: 'ILR' },
   { slug: 'ilr', label: 'Extended ILR' },
+  { slug: 'programme-suitability', label: 'Programme Suitability & Modules' },
   { slug: 'cv-job', label: 'CV/Job Description' },
   { slug: 'plr', label: 'Personal Learning Record' },
   { slug: 'skills-radar', label: 'Skills Radar' },
   { slug: 'inclusion', label: 'Inclusion' },
   { slug: 'policies', label: 'Policies' },
+  { slug: 'initial-assessments', label: 'Initial Assessments' },
   { slug: 'next-steps', label: 'What Happens Now?' },
 ];

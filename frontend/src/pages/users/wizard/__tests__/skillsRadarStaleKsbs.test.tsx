@@ -59,7 +59,7 @@ function renderWizard() {
   render(
     <ToastProvider>
       <WizardProvider userId="20" board={BOARD}>
-        <WizardShell currentIndex={7} mode="learner" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
+        <WizardShell currentIndex={8} mode="learner" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
         <Spy />
       </WizardProvider>
     </ToastProvider>,

@@ -49,6 +49,10 @@ def step(slug, items, label=None, builtin=True, **extra):
     return {"slug": slug, "label": label or slug, "builtin": builtin, "hidden": False, "items": items, **extra}
 
 
+def cv_step(layout):
+    return next(s for s in layout["steps"] if s["slug"] == "cv-job")
+
+
 class NormalizeLayoutTests(SimpleTestCase):
     def test_content_blocks_have_no_answer_storage(self):
         layout, plan = wl.normalize_layout({"steps": [step("cv-job", [
@@ -92,7 +96,7 @@ class NormalizeLayoutTests(SimpleTestCase):
                                        custom("Years in role", "number", required=True)])]},
             None,
         )
-        item = layout["steps"][0]["items"][1]
+        item = cv_step(layout)["items"][1]
         self.assertEqual(item["key"], "cf_years_in_role")
         self.assertEqual(item["table"], "Wizard_Cv_Job")
         self.assertEqual(item["column"], "Custom_years_in_role")
@@ -128,14 +132,14 @@ class NormalizeLayoutTests(SimpleTestCase):
     def test_published_field_keeps_its_key_and_column_and_type(self):
         first, _ = wl.normalize_layout({"steps": [step("cv-job", [custom("Years in role", "number")])]}, None)
         renamed = json.loads(json.dumps(first))
-        renamed["steps"][0]["items"][0]["label"] = "Years in current role"
+        cv_step(renamed)["items"][0]["label"] = "Years in current role"
         second, _ = wl.normalize_layout(renamed, first)
-        item = second["steps"][0]["items"][0]
+        item = cv_step(second)["items"][0]
         self.assertEqual((item["key"], item["column"]), ("cf_years_in_role", "Custom_years_in_role"))
         self.assertEqual(item["label"], "Years in current role")
 
         retyped = json.loads(json.dumps(first))
-        retyped["steps"][0]["items"][0]["type"] = "text"
+        cv_step(retyped)["items"][0]["type"] = "text"
         with self.assertRaisesMessage(wl.LayoutError, "type cannot change"):
             wl.normalize_layout(retyped, first)
 
@@ -152,7 +156,7 @@ class NormalizeLayoutTests(SimpleTestCase):
     def test_a_field_left_out_of_the_layout_is_kept_hidden_with_its_column(self):
         first, _ = wl.normalize_layout({"steps": [step("cv-job", [custom("Years in role", "number")])]}, None)
         second, plan = wl.normalize_layout({"steps": [step("cv-job", [])]}, first)
-        kept = second["steps"][0]["items"]
+        kept = cv_step(second)["items"]
         self.assertEqual(len(kept), 1)
         self.assertTrue(kept[0]["hidden"])
         self.assertEqual(kept[0]["column"], "Custom_years_in_role")
@@ -161,7 +165,7 @@ class NormalizeLayoutTests(SimpleTestCase):
 
     def test_same_label_twice_gets_distinct_columns(self):
         layout, _ = wl.normalize_layout({"steps": [step("cv-job", [custom("Notes"), custom("Notes")])]}, None)
-        cols = [i["column"] for i in layout["steps"][0]["items"]]
+        cols = [i["column"] for i in cv_step(layout)["items"]]
         self.assertEqual(cols, ["Custom_notes", "Custom_notes_2"])
 
     def test_dropdown_needs_options(self):
@@ -177,18 +181,18 @@ class NormalizeLayoutTests(SimpleTestCase):
         first, _ = wl.normalize_layout({"steps": [step("cv-job", [trigger])]}, None)
         follow = custom("Night allowance", condition={"field": "cf_shift", "values": ["Weekend"]})
         with self.assertRaisesMessage(wl.LayoutError, "does not offer: Weekend"):
-            wl.normalize_layout({"steps": [step("cv-job", [first["steps"][0]["items"][0], follow])]}, first)
+            wl.normalize_layout({"steps": [step("cv-job", [cv_step(first)["items"][0], follow])]}, first)
 
         follow["condition"]["values"] = ["Night"]
-        layout, _ = wl.normalize_layout({"steps": [step("cv-job", [first["steps"][0]["items"][0], follow])]}, first)
-        self.assertEqual(layout["steps"][0]["items"][1]["condition"], {"field": "cf_shift", "values": ["Night"]})
+        layout, _ = wl.normalize_layout({"steps": [step("cv-job", [cv_step(first)["items"][0], follow])]}, first)
+        self.assertEqual(cv_step(layout)["items"][1]["condition"], {"field": "cf_shift", "values": ["Night"]})
 
     def test_condition_on_a_field_added_in_the_same_publish_follows_its_new_key(self):
         layout, _ = wl.normalize_layout({"steps": [step("cv-job", [
             custom("Shift", "dropdown", key="new_1", options=["Day", "Night"]),
             custom("Night allowance", condition={"field": "new_1", "values": ["Night"]}),
         ])]}, None)
-        items = layout["steps"][0]["items"]
+        items = cv_step(layout)["items"]
         self.assertEqual(items[0]["key"], "cf_shift")
         self.assertEqual(items[1]["condition"]["field"], "cf_shift")
 
@@ -206,7 +210,7 @@ class NormalizeLayoutTests(SimpleTestCase):
         first, _ = wl.normalize_layout({"steps": [step("cv-job", [custom("Plain")])]}, None)
         with self.assertRaisesMessage(wl.LayoutError, "only depend on a dropdown"):
             wl.normalize_layout({"steps": [step("cv-job", [
-                first["steps"][0]["items"][0], custom("Y", condition={"field": "cf_plain", "values": ["a"]}),
+                cv_step(first)["items"][0], custom("Y", condition={"field": "cf_plain", "values": ["a"]}),
             ])]}, first)
 
     def test_condition_on_a_builtin_dropdown_needs_its_answer_path(self):
@@ -383,7 +387,7 @@ class PublishViewTests(SimpleTestCase):
         self.assertEqual(res.status_code, 200, res.content)
         data = json.loads(res.content)
         self.assertEqual(data["version"], 7)
-        self.assertEqual(data["layout"]["steps"][0]["items"][0]["column"], "Custom_years_in_role")
+        self.assertEqual(cv_step(data["layout"])["items"][0]["column"], "Custom_years_in_role")
         sql = [s for s, _ in cursor.executed]
         self.assertTrue(any("ADD COLUMN IF NOT EXISTS \"Custom_years_in_role\" numeric" in s for s in sql))
         self.assertTrue(any(s.startswith('INSERT INTO enrolment."Wizard_Form_Layouts"') for s in sql))

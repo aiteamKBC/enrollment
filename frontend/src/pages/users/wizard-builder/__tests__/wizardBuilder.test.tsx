@@ -1,3 +1,5 @@
+import { modulesConfiguration } from '@/features/programme-suitability/__tests__/modulesFixtures';
+vi.mock('@/features/programme-suitability/modules/api', () => ({ getModuleDefaults: async () => ({ configuration: modulesConfiguration }), getModulesDraft: async () => ({ configuration: null, baseVersion: null }), saveModulesDraft: vi.fn() }));
 /**
  * The "Edit apprenticeship wizard" builder: reachable from User Management,
  * edits a copy of the published layout, and publishes it in one go — adding
@@ -25,6 +27,7 @@ import WizardBuilderPage from '../page';
 import { addCustomField, duplicateItem, moveItem, moveItemAfter, moveItemBefore, moveItemToStep, removeItem } from '../builderOps';
 import { defaultLayout, resolveLayout } from '../../wizard/layout/resolve';
 import type { WizardLayout } from '../../wizard/layout/types';
+import { configuration } from '@/features/programme-suitability/__tests__/fixtures';
 
 beforeAll(() => {
   (globalThis as Record<string, unknown>).AppIcon = ({ className }: { className?: string }) => <i className={className} />;
@@ -117,6 +120,42 @@ const dragFieldBefore = (sourceLabel: string, targetLabel: string) => {
 };
 
 describe('the builder page', () => {
+  it('publishes edited modules with the existing wizard version and preserves assessment configuration', async () => {
+    const layout = { ...defaultLayout(), programmeSuitability: configuration, programmeModules: structuredClone(modulesConfiguration) };
+    fetchWizardLayout.mockResolvedValue({ layout, version: 7, updatedAt: '', updatedBy: 'Admin' });
+    renderBuilder(); await openStep('Programme Suitability & Modules');
+    const row = within(screen.getByRole('group', { name: 'Edit module Social Media' }));
+    const sessions = row.getByLabelText('Sessions');
+    await userEvent.clear(sessions); await userEvent.type(sessions, '18');
+    expect(layout.programmeModules.programmes[0].modules[1].sessions).toBe(14);
+    await userEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Publish the wizard?' })).getByRole('button', { name: /^Publish$/ }));
+    await waitFor(() => expect(publishWizardLayout).toHaveBeenCalledTimes(1));
+    const [published, version] = publishWizardLayout.mock.calls[0] as [WizardLayout, number];
+    expect(version).toBe(7);
+    expect(published.programmeModules!.programmes[0].modules[1].sessions).toBe(18);
+    expect(published.programmeSuitability).toEqual(configuration);
+  });
+
+  it('adapts old layouts and hosts the existing assessment editor only on the new sixth step without publishing', async () => {
+    const layout = { ...defaultLayout(), programmeSuitability: configuration };
+    layout.steps = layout.steps.filter((s) => s.slug !== 'programme-suitability');
+    const original = structuredClone(layout);
+    fetchWizardLayout.mockResolvedValue({ layout, version: 7, updatedAt: '', updatedBy: 'Admin' });
+    renderBuilder();
+    await openStep('Programme Suitability & Modules');
+    expect(screen.getByRole('region', { name: 'Programme Suitability Assessment configuration' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Show this step to learners')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole('tab', { name: 'Marketing Assessment' }));
+    expect(screen.getByDisplayValue('marketing responsibilities')).toBeInTheDocument();
+    await openStep('CV/Job Description');
+    expect(screen.queryByRole('region', { name: 'Programme Suitability Assessment configuration' })).toBeNull();
+    expect(screen.getByText('Highest-level qualification')).toBeInTheDocument();
+    expect(publishWizardLayout).not.toHaveBeenCalled();
+    expect(layout).toEqual(original);
+  });
+
   it('starts from the standard wizard and cannot publish until something changes', async () => {
     renderBuilder();
     await openStep('Personal Details');

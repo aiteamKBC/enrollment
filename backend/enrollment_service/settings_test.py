@@ -11,6 +11,7 @@ INSTALLED_APPS = [
     'login', 'learner_api', 'enrolment_api', 'coach_api', 'curriculum_api',
     'audit_api', 'manual_audit_api', 'engagement_api', 'quiz_api', 'chat',
     'read_models', 'old_otjh', 'system_audit', 'progress_reviews_api', 'knowledge_base', 'mobile_comms',
+    'programme_suitability',
 ]
 DATABASES = {name: {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'} for name in ('default', 'enrolment')}
 DATABASE_ROUTERS = ['learner_api.routers.EnrolmentRouter']
@@ -31,6 +32,15 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_NAME = 'enrollment_csrftoken'
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    'http://localhost:3002',
+    'http://127.0.0.1:3002',
+]
 CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 AZURE_STORAGE_ACCOUNT = ''

@@ -1,0 +1,152 @@
+PCP published Mandatory/Optional enforcement fix
+Date: 2026-11-01
+Branch: CV-and-Programme-Suitability
+
+Confirmed root cause (read-only audit of the configured project database)
+1. Published wizard version 9 had schemaVersion 1. isMandatory flags WERE saved
+   correctly in the existing camelCase format: Operational/Strategic had three
+   flags each; Chartered had five. This was not a snake_case serialization bug.
+2. requiredOptionalModulesCount was null on all three published pathways.
+   Chartered targetCredits was also null. Version 1 configuration validation
+   allowed these omissions, so the learner cap was absent and legacy completion
+   validation skipped the optional-count/credit requirement.
+3. Chartered's nonselectable certified-pmo parent had active=false, hiding its
+   four active mandatory children. Raw mandatory-flag counts alone concealed this.
+4. A confirmed PCP assessment retained a version 7 modules snapshot. Snapshots
+   were pinned at first access and never refreshed, even with no valid completed
+   module selection. Republishing the Admin flags therefore did not reach this
+   unfinished module enrolment. Frontend metadata was also only loaded on mount.
+
+Published data repair performed
+After reviewing a dry run and validating the repair, created append-only wizard
+version 10 from version 9 using the existing layout validation/storage mechanism:
+  backend/.venv/Scripts/python.exe backend/manage.py repair_pcp_rules
+    --restore-mandatory-groups --apply --base-version 9
+The command requires a matching base version and supports dry-run by default.
+The original version 9 and all prior layout rows remain intact.
+
+Verified exact definition changes (nothing else in the layout changed):
+- Operational requiredOptionalModulesCount: null -> 2.
+- Strategic requiredOptionalModulesCount: null -> 2.
+- Chartered requiredOptionalModulesCount: null -> 1.
+- Chartered targetCredits: null -> 6.
+- Chartered certified-pmo group active: false -> true.
+- Module configuration schemaVersion: 1 -> 2.
+Names, sessions, credits, notes, assessment configuration and other wizard fields
+were compared across versions and were unchanged. No learner choices or snapshots
+were bulk rewritten. A second repair preview reported changes=[].
+
+Verified published v10 effective rules
+Operational: 3 mandatory modules / 4 mandatory credits + exactly 2 optional = 6.
+Strategic:   3 mandatory modules / 4 mandatory credits + exactly 2 optional = 6.
+Chartered:   5 mandatory modules / 5 mandatory credits + exactly 1 optional = 6.
+The Chartered group is only a heading and does not add a sixth mandatory module.
+
+Code fixes
+- Publishing/saving an Admin draft can no longer combine mandatory modules with
+  an omitted optional count, including a version 1 payload. Missing rule fields
+  no longer permit an in-progress learner to complete module selection.
+- Only unfinished/incomplete PCP module snapshots receive applicable new published
+  versions. Strictly valid saved selections retain their original configuration;
+  already submitted/completed enrolments retain historical versions as well.
+  Superseded unfinished definitions are retained in the assessment's existing
+  history as MODULE_CONFIGURATION_REFRESH, without changing scores or answers.
+- Learner metadata refreshes when the wizard publication key changes, on window
+  focus/visibility and after a version-conflict save error. Slow older responses
+  cannot overwrite a newer refresh. Reads use the existing no-store API client.
+- Mandatory checkboxes and badges use the applicable published isMandatory flag,
+  never names/order. Mandatory credits are counted from actual module rows.
+  The toggle handler itself refuses mandatory removal and optional overflow,
+  in addition to native disabled controls. Only unselected optional choices are
+  disabled at the cap; selected options remain available for deselection.
+- Refreshing applicable rules preserves the learner's draft choices for review.
+  A Save reviewed module selection action is offered when existing options can
+  satisfy the new rules after adding mandatory IDs/updating the version. No
+  optional choice is invented, and nothing is silently committed on a read.
+
+Authoritative saving and validation
+GET /enrolment_api/programme-suitability/<kind>/<id>/modules/ continues to return
+the applicable published configuration/version. The same existing endpoint now
+accepts a CSRF-protected PUT for a strict final module selection.
+The server resolves active mandatory IDs and inserts them into the canonical
+selection independently of browser serialization. It rejects unavailable IDs,
+active-path modules from another pathway, duplicates, wrong versions, too many
+or too few optional choices and incorrect target credits. Credit/status/mandatory
+claims supplied by the client are ignored; calculation uses server definitions.
+
+The strict commit locks and merges only programmeModules into the existing
+Extended_ILR wizard JSON, within one transaction with the assessment snapshot.
+The project's default/enrolment aliases were verified to address the same database;
+the strict commit uses one alias for atomicity. CV/ILR and other draft values are
+preserved. No duplicate learner or programme records are created.
+
+Incomplete progress may still be stored through the existing wizard draft API.
+That is intentionally distinct from a valid final selection. The frontend uses
+the strict commit before acknowledging a valid module edit. The latest edit must
+be acknowledged before Step 6 is Complete. The final enrolment API independently
+reconciles unfinished published versions and validates stored complete selections;
+neither a partial draft nor a client completion flag can bypass it. Inactive
+pathway histories are retained but never count toward the active selection.
+
+Assessment questions, scoring, programme confirmation/reasons/synchronization,
+PCP notes, module names/sessions, ME/MM/APM lists and CV fields were not changed.
+
+Files modified for this request (relative to enrollment/)
+backend/programme_suitability/modules_configuration.py
+backend/programme_suitability/modules_rules.py
+backend/programme_suitability/modules_service.py
+backend/programme_suitability/modules_views.py
+backend/programme_suitability/completion.py
+backend/programme_suitability/test_runner.py
+backend/programme_suitability/test_modules_configuration.py
+backend/programme_suitability/test_pcp_rules.py
+frontend/src/features/programme-suitability/modules/api.ts
+frontend/src/features/programme-suitability/modules/configuration.ts
+frontend/src/features/programme-suitability/modules/ProgrammeModulesCard.tsx
+frontend/src/features/programme-suitability/modules/useModulesConfiguration.ts
+frontend/src/features/programme-suitability/modules/useModuleSelectionSave.ts
+frontend/src/features/programme-suitability/__tests__/modulesPersistence.test.tsx
+frontend/src/pages/users/wizard/WizardContext.tsx
+
+Files created
+backend/programme_suitability/management/commands/repair_pcp_rules.py
+backend/programme_suitability/test_pcp_selection_fix.py
+backend/programme_suitability/PCP_RULES_FIX_REPORT.txt
+frontend/src/features/programme-suitability/__tests__/pcpPublishedRules.test.tsx
+
+Verification
+Backend feature suite: 118 passed. Includes real isolated module API commits,
+mandatory insertion with only optional IDs supplied, too few/many/wrong-path/
+wrong-version rejection, rollback without partial writes, unchanged CV/ILR,
+private drafts, refreshed unfinished versions and protected valid/history states.
+Shared backend regression suite: 217 passed.
+Frontend full regression: 450 passed across 57 files.
+Focused review-save tests also passed. Reports are in ignored frontend/.cache/pcp-fix-*.json.
+TypeScript type-check, ESLint, production build and git diff --check passed.
+makemigrations --check --dry-run: no changes. No new migration or historical
+migration edit was required. ExtendedIlr was added only to the isolated test
+runner schema so atomic writes exercise its actual existing model/table shape.
+
+Chrome: all 3 pathways passed against definitions exported from published v10:
+locked/checked mandatory rows, required optional cap, deselect/reselect, exactly
+6 credits, incomplete Next refusal, strict commit acknowledgement, CV navigation
+and reload persistence. Chartered mobile had no horizontal overflow. Browser
+API writes were isolated mocks; real backend atomic validation was covered by
+the separate model/API tests above. No browser page errors. Temporary harness
+and audit scripts were removed; ignored results/screenshots remain in .cache.
+
+Merge safety and limits
+The shared production file changed is WizardContext.tsx: retain its existing
+wizard draft save while preserving strict module acknowledgement, semantic
+selection comparison and publication-aware loading. The feature completion
+helper is shared with the final learner submission backstop and must merge with
+the module service. Other conflicts may occur in feature configuration, metadata
+hook/API and renderer files if teammates edit them. No shared step registration,
+wizard step order, CV body or assessment algorithm file was changed.
+Merge backend canonicalization/strict commit, frontend acknowledgement and
+version refresh together. A UI-only fix would leave direct API bypass/stale rules.
+Do not remove the historical snapshot protections or rewrite old saved choices.
+The source branch and the database definition change are separate: published
+version 10 is already in the configured database, independent of a future Git
+merge. No commit, push, merge, rebase or branch switch was performed. Existing
+uncommitted work was retained. No unresolved failure remains in the tested scope.

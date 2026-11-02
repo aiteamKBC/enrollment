@@ -108,6 +108,8 @@ export interface LayoutStep {
 }
 
 export interface WizardLayout {
+  programmeModules?: import('@/features/programme-suitability/modules/configuration').ModulesConfiguration;
+  programmeSuitability?: import('@/features/programme-suitability/types').Configuration;
   steps: LayoutStep[];
   /**
    * Edited wording, by text slot (see texts.ts). A slot not listed here shows

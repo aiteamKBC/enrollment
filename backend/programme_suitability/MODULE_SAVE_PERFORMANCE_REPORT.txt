@@ -1,0 +1,119 @@
+﻿PCP Module Saving — Lock Isolation, Reliability and Performance Report
+
+Branch: CV-and-Programme-Suitability
+Existing uncommitted PMO group/hierarchy changes were inspected and preserved.
+No Git reset, branch switch, commit, push, merge or rebase was performed.
+
+Root cause and evidence
+1. useModuleSelectionSave called WizardContext.saveIlr after a 200ms debounce. That method sent ILR answers and every other wizard section through the Extended ILR endpoint, which update_or_create locked Extended_ILR and ran per-step projections and their audit hooks inside its transaction.
+2. For a complete PCP selection, saveIlr then sent a second PUT to the dedicated modules endpoint. That endpoint locked Assessment and then locked/wrote Extended_ILR again to merge programmeModules into the wizard JSON.
+3. Module edits therefore entered long, unrelated ILR transactions twice. Navigation also called saveIlr independently; the hook's local queue did not serialise navigation writes, and it queued captured snapshots instead of replacing obsolete pending work.
+4. Real development PostgreSQL query instrumentation confirmed both Extended_ILR SELECT FOR UPDATE statements and UPDATE statements. No PostgreSQL triggers were registered on Extended_ILR/Assessment. ExtendedIlr has audit pre/post-save listeners; Assessment has none. The database aliases use separate connections to the same database identity (their PORT settings differed in representation).
+5. Initial pg_stat_activity inspection had no active blocker, so the original production blocking PID/request cannot be identified retrospectively. The application lock path is confirmed. A controlled PostgreSQL test held the synthetic ILR row, observed one blocking backend via pg_blocking_pids, and reproduced the old FOR UPDATE lock failure. The new module endpoint saved successfully while that same ILR row remained locked.
+
+Measured baseline before implementation
+Synthetic owned learner/assessment/ILR rows; real PostgreSQL queries and ORM signals/projections; RequestFactory invoked the actual endpoint functions. Learner lookup/auth middleware were replaced with test ownership fixtures, so these are endpoint/service measurements, not full browser-to-network latency or a production SLA.
+Full wizard PUT: 8703.7ms, 51 queries, 1 Extended_ILR write and 1 row-lock query.
+Following modules PUT: 2177.2ms, 10 queries, 1 Extended_ILR write and 1 row-lock query.
+Traced complete-selection path: 2 PUTs, 61 queries, about 10.88 seconds combined. The full-wizard fixture included initial per-step projection inserts; warmed existing records may differ. Real payloads with many KSB/PLR rows may differ as well.
+No active production transaction was terminated or unlocked.
+
+Backend changes
+- Reused Assessment, its published modules snapshot and the existing modules GET/PUT endpoint. Added modules_selection and modules_revision to that record; no parallel modules table or dual-write system.
+- Assessment.modules_selection is authoritative. Legacy programmeModules JSON remains a compatibility source until copied, and old learner data is not deleted/reset.
+- Module saving never writes or row-locks Extended_ILR and never invokes other-step projections, ILR signature updates or ExtendedIlr audit signals.
+- One short default-alias transaction locks only Assessment with NOWAIT, validates published snapshot rules, includes mandatory IDs, and updates only feature fields when data changes. No nested pinning savepoint/redundant assessment fetch in the save path.
+- Revision comparison rejects distinct stale edits with 409. Identical retries acknowledge the current revision without a write. Concurrent lock ownership returns a safe 503 immediately rather than waiting for a statement timeout.
+- Partial pathway/module choices autosave as incomplete. Only server-validated complete choices can complete Step 6. Existing count, credit, hierarchy and mandatory rules are unchanged.
+- Logs include learner ID, revision, duration and SQLSTATE on failure; responses contain a user-friendly error without PostgreSQL tuple/query details. There is no unbounded database retry loop and no production timeout increase.
+- Completion uses the same saved_choices service, now reading authoritative Assessment data. Legacy reads remain available; refreshed module settings and historical pinned configurations retain their existing behaviour.
+
+Frontend changes
+- Immediate local checkbox/credits updates, with a 500ms debounce.
+- One provider-owned save queue per wizard learner, surviving module-step unmount/remount. At most one request is in flight; newer pending edits replace obsolete snapshots rather than accumulating a FIFO backlog.
+- Module-only PUTs use expectedRevision; saveIlr no longer sends/commits module selections. Module-only edits do not make the generic wizard save dirty.
+- Saved responses cannot replace newer local choices. Background refreshes cannot replace unsaved choices or regress an acknowledged revision.
+- Revision conflicts refresh server metadata while keeping local choices for explicit retry. Configuration-version failures refresh settings and preserve the existing review-and-save action.
+- Saving…, All changes saved., and an actionable error/Retry reflect actual acknowledgement. A failure never marks the selection saved or Step 6 complete.
+- Queue failures stop until a new edit or explicit retry; merely leaving an errored step does not start an automatic retry loop. Pending successful-path work flushes on step departure.
+- Extended ILR hydration cannot overwrite the module endpoint's authoritative selection.
+
+Migrations and preservation
+Added and applied:
+0006_assessment_modules_selection (depends on 0005_modules_configuration): two feature fields.
+0007_preserve_legacy_module_choices (depends on 0006): copies existing legacy module JSON into Assessment only where modules_selection is NULL; does not update Extended_ILR.
+A read-only audit after migration found zero mismatches for existing revision-zero legacy choices.
+The service also adopts legacy choices lazily for imports/records arriving after migration.
+No historical migrations were edited. No answers, signatures, CV fields or other wizard tables were migrated or reset.
+
+Measured final PostgreSQL results
+First synthetic legacy-compatible save: 1175.0ms / 5 queries, including 1 read of legacy Extended_ILR; 0 ILR writes/row locks.
+Warmed changed saves: 658.4ms, 654.3ms, 641.1ms / 2 queries each (Assessment row lock and feature-field update); 0 ILR reads, writes or row locks.
+Identical retry: 516.6ms / 1 query, no write.
+Stale second-session edit: 409 in 404.9ms / 1 query.
+Assessment already locked by another connection: safe 503 in 653.5ms, using NOWAIT; subsequent explicit retry succeeded.
+Old ILR row-lock query under the controlled lock: SQLSTATE 55P03 after 1759.9ms. Only the test transaction set a 1500ms lock_timeout to bound this deliberate failure; production timeouts were unchanged.
+A complete new normal sequence uses 1 PUT instead of the traced old 2 PUTs. Browser verification observed 1 PUT for a rapid pathway/two-option sequence, maximum 1 overlapping module request, and 0 Extended ILR PUTs.
+Add the 500ms debounce and actual browser/auth/network overhead to endpoint times; these measurements do not guarantee a fixed response time for every environment.
+
+PostgreSQL regression command
+backend/manage.py verify_module_saving
+Uses unique owned synthetic rows and always cleans them up. It verifies actual PostgreSQL row-lock isolation, pg_blocking_pids, idempotency, revision conflicts, NOWAIT, retry after lock release, persisted completion and unchanged entire ILR row (including timestamps/answers/draft).
+Passed on the configured development PostgreSQL database. No synthetic rows remained. Final read-only activity check showed zero lock waiters.
+
+Automated checks
+PASS: programme_suitability Django suite — 133 tests.
+PASS: tools/run_backend_checks.py enrolment_api enrollment_service.tests — 217 tests.
+PASS: full frontend wizard/feature/onboarding regression suite — 466 tests across 60 files.
+PASS: final focused queue/persistence suite — 13 tests, including the additional publication-version recovery case added after that full run.
+PASS: frontend type-check (including final new test), lint and production build.
+PASS: makemigrations programme_suitability --check --dry-run with isolated settings — no missing model migration.
+PASS: showmigrations — 0006 and 0007 both applied.
+PASS: git diff --check (only Git's LF/CRLF notices).
+The final runtime change after the full suite was a predicate restoring refresh on configuration-version errors; its focused recovery test passed. Later edits to runtime code were comments only.
+
+Browser checks
+Chrome ran real WizardProvider, ProgrammeModulesCard, module API client and save queue on an isolated local Vite server. Controlled API fixtures tested request count, immediate UI, delayed in-flight response, switching pathways while saving, leaving/reopening the module step, failure/retry, saved reload and acknowledgement-based completion. No browser page errors.
+The held response was a concurrency test, not a performance measurement. Browser API fixtures were intercepted; PostgreSQL performance/locking was measured separately against real database operations. A complete signed-in live-account HTTP smoke test was not performed.
+Temporary browser harness files were removed, and the Vite server started only for these checks was stopped.
+
+Exact files changed in this saving task
+backend/programme_suitability/models.py
+backend/programme_suitability/modules_service.py
+backend/programme_suitability/modules_views.py
+backend/programme_suitability/test_pcp_selection_fix.py
+backend/programme_suitability/test_modules_save_isolation.py (new)
+backend/programme_suitability/migrations/0006_assessment_modules_selection.py (new)
+backend/programme_suitability/migrations/0007_preserve_legacy_module_choices.py (new)
+backend/programme_suitability/management/commands/verify_module_saving.py (new)
+frontend/src/features/programme-suitability/modules/configuration.ts
+frontend/src/features/programme-suitability/modules/api.ts
+frontend/src/features/programme-suitability/modules/useModulesConfiguration.ts
+frontend/src/features/programme-suitability/modules/useModuleSelectionSave.ts
+frontend/src/features/programme-suitability/modules/moduleSaveQueue.ts (new)
+frontend/src/features/programme-suitability/modules/ProgrammeModulesCard.tsx (save status only in this task)
+frontend/src/pages/users/wizard/WizardContext.tsx
+frontend/src/pages/users/wizard/WizardContext.helpers.ts
+frontend/src/features/programme-suitability/__tests__/modulesPersistence.test.tsx
+frontend/src/features/programme-suitability/__tests__/modules.test.tsx
+frontend/src/features/programme-suitability/__tests__/cvFieldsLock.test.tsx (required context mock method only)
+frontend/src/features/programme-suitability/__tests__/moduleSaveQueue.test.ts (new)
+backend/programme_suitability/MODULE_SAVE_PERFORMANCE_REPORT.txt (new; this report)
+Earlier uncommitted group/hierarchy files remain present and were not reset or rebuilt.
+
+Merge/deployment coordination and remaining risks
+- WizardContext.tsx and WizardContext.helpers.ts are the only newly changed shared wizard infrastructure. Coordinate these with teammates: generic wizard saves omit programmeModules, and Step 6 uses its isolated queue/server acknowledgement.
+- Feature-shared models, modules_service, modules_views, API types/hooks and tests may conflict with simultaneous work on this same feature.
+- Coordinate migration numbering/dependencies if a teammate also adds programme_suitability migration 0006/0007. Keep their dependencies intact; do not edit historical migrations or fake-apply conflicting histories.
+- Apply the two migrations before serving the new code, and deploy frontend/backend together. The modules PUT now requires expectedRevision; refresh old browser bundles. There is no Extended_ILR schema change.
+- The remaining deliberate row lock is on Assessment. A concurrent assessment/module writer can cause a fast retryable 503 or a stale-revision 409; it cannot make this save wait on Extended_ILR. Users' unsaved choices remain visible. No system can guarantee zero database/network failures.
+- The original blocking production request was not present during diagnosis; its identity is unknown. The problematic application lock dependency was reproduced and removed, rather than increasing timeouts or cancelling somebody else's transaction.
+- No assessment question/scoring/recommendation, programme confirmation/sync, Admin configuration, PCP notes, module hierarchy, credit/optional rules, CV fields or other wizard step behaviour was changed.
+
+Ignored local evidence
+frontend/.cache/module-save-before.jsonl
+frontend/.cache/module-save-postgres.json
+frontend/.cache/module-save-regression.json
+frontend/.cache/module-save-final-targeted.json
+frontend/.cache/module-saving-browser-results.json
+frontend/.cache/module-saving-browser.png

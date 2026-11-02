@@ -1,0 +1,176 @@
+PCP mandatory modules, optional rules and editable pathway notes
+Date: 2026-11-01
+Branch: CV-and-Programme-Suitability
+
+Implemented
+The original Operational, Strategic and Chartered notes are stored exactly as
+provided in each pathway's existing description field. Admin labels this field
+Pathway Note; no duplicate note field was introduced. Notes appear immediately
+below the title, on selected and unselected cards, with wrapping mobile text.
+Notes can be edited, blanked, privately saved, previewed and published using the
+existing builder workflow. No ChPP guarantee or automatic accreditation was added.
+
+Modules now support isMandatory. Pathways support
+requiredOptionalModulesCount, alongside the existing targetCredits field.
+Module order and display names do not determine mandatory status. Selectable
+actual modules have a Yes/No Mandatory Module control. Parent headings do not.
+Adding submodules converts their parent into an uncredited, nonselectable group.
+
+Initial version 2 defaults
+Operational: PMP, AI and Risk are mandatory (4 credits); exactly two of the
+three remaining modules are required, for exactly 6 credits.
+Strategic: PMP, AI and Risk are mandatory (4 credits); exactly two of the
+three remaining modules are required, for exactly 6 credits.
+Chartered: all four Certified PMO child modules plus AI are mandatory (5 credits);
+exactly one of Portfolio/Earned Value is required, for exactly 6 credits.
+Certified PMO Professional Level 6 is a group heading and is not double-counted.
+Mandatory controls are checked and locked only within the chosen pathway.
+Optional controls stop additional choices at the configured count; deselecting
+an optional choice makes another available. Mandatory badges and credit totals
+remain visible. Inactive pathways' retained choices never count toward the
+active pathway's totals.
+
+Validation and persistence
+The backend validates mandatory inclusion, module/pathway IDs and membership,
+duplicate IDs, pinned published version, maximum optional count and credits.
+Mandatory removal, extra options and invalid IDs are rejected on save.
+Incomplete valid progress is autosaved as a draft so it survives refresh; that
+draft is not a completed module selection. Exact count/target validation is
+required for final completion and the server enrolment-submission backstop.
+No optional modules are invented automatically for old or new learners.
+
+Publishing validation rejects negative/fractional optional counts, missing
+required counts in active version 2 pathways, missing targets, mandatory credits
+above target, insufficient optional modules, impossible exact-count credit
+combinations, credited/selectable parent headings and mandatory nonselectable
+nodes. Exact Decimal arithmetic is used for backend credit feasibility. A
+defensive combination-state guard rejects unusually complex administrator
+configurations rather than doing unbounded subset work. No fixed module count
+limit was added. Zero optional modules is supported, including mandatory-only
+paths with optional selection disabled, when credits match the target.
+
+The existing snapshot/version mechanism remains authoritative. Module choices
+continue in Extended_ILR.Wizard_draft, and content/rules remain in the assessment's
+existing modules_configuration snapshot. No new model or migration is needed.
+No historical migration was edited. makemigrations --check found no changes.
+
+Wizard completion
+Confirmed PCP stays on Programme Suitability & Modules instead of automatically
+advancing past the module choices. The assessment's scoring, confirmation and
+programme/account synchronization still run unchanged.
+Step 6 is complete only when the assessment is submitted/confirmed, a valid PCP
+path/module set exists, and the latest module edit has been successfully saved.
+The client tracks the acknowledgement of the latest edit, including quick
+deselect/reselect sequences, rather than trusting a temporary checkbox state.
+The completion marker is derived and is excluded from persisted wizard answers.
+
+Next, sidebar, direct-route rendering and progress/completeness use the PCP gate.
+The server final-submission guard reads saved choices and the pinned configuration,
+never a client completion flag. Disabling assessment requirements does not bypass
+the module requirement for an already confirmed PCP selection. Previously
+submitted/completed enrolment exemptions remain intact.
+ME, MM and APM keep their earlier module lists, completion and continuation.
+
+Historical compatibility and rollout
+Configuration schema version 1 remains readable. Its original optional-selection
+behaviour is retained for pinned historical records; no rules or notes are
+silently written into learner snapshots. The earlier default JSON is archived
+as modules_legacy_defaults.json for static-era selections pinned as version 0.
+New baseline defaults use schema version 2 and contain the requested rules/notes.
+
+For an existing published version 1 configuration, open the existing Step 6
+Modules editor and click:
+  Apply PCP mandatory-module defaults to draft
+Review the settings (including any additional custom pathways) and then use:
+  Publish changes
+This explicit action populates the original pathways by stable IDs, preserving
+module titles, sessions, credits, order and custom notes. Missing targets get the
+default target. Custom pathways need their own valid count/target settings.
+Existing learner snapshots retain their original version; newly applicable module
+enrolments get the newly published version. The agent did not publish a live
+configuration or rewrite any learner choices for this task.
+
+Files modified for this request (relative to enrollment/)
+backend/programme_suitability/modules_defaults.json
+backend/programme_suitability/modules_configuration.py
+backend/programme_suitability/modules_service.py
+backend/programme_suitability/modules_views.py
+backend/programme_suitability/completion.py
+backend/programme_suitability/test_modules_configuration.py
+backend/programme_suitability/tests.py
+frontend/src/features/programme-suitability/types.ts
+frontend/src/features/programme-suitability/modules/configuration.ts
+frontend/src/features/programme-suitability/modules/ProgrammeModulesCard.tsx
+frontend/src/features/programme-suitability/modules/ModuleRowEditor.tsx
+frontend/src/features/programme-suitability/modules/PathwayEditor.tsx
+frontend/src/features/programme-suitability/modules/ModulesAdmin.tsx
+frontend/src/features/programme-suitability/modules/useModulesConfiguration.ts
+frontend/src/features/programme-suitability/__tests__/modulesAdmin.test.tsx
+frontend/src/features/programme-suitability/__tests__/modulesPersistence.test.tsx
+frontend/src/features/programme-suitability/__tests__/continuation.test.tsx
+frontend/src/pages/users/types.ts
+frontend/src/pages/users/wizard/WizardContext.helpers.ts
+frontend/src/pages/users/wizard/WizardContext.tsx
+frontend/src/pages/users/wizard/WizardShell.tsx
+frontend/src/pages/users/wizard/validation.ts
+
+Files created
+backend/programme_suitability/modules_legacy_defaults.json
+backend/programme_suitability/modules_rules.py
+backend/programme_suitability/test_pcp_rules.py
+backend/programme_suitability/PCP_RULES_REPORT.txt
+frontend/src/features/programme-suitability/modules/upgrade.ts
+frontend/src/features/programme-suitability/__tests__/pcpRules.test.tsx
+frontend/src/features/programme-suitability/__tests__/pcp-rules-defaults.json
+
+Validation executed
+Backend feature suite: 110 passed, including all existing scoring, recommendation,
+confirmation, alternative reason, ownership and programme synchronization tests.
+  backend/.venv/Scripts/python.exe backend/manage.py test programme_suitability
+    --settings=programme_suitability.test_settings --noinput
+Shared backend suite: 217 passed.
+  backend/.venv/Scripts/python.exe tools/run_backend_checks.py enrolment_api
+    enrollment_service.tests
+Frontend complete wizard regression suite: 447 passed across 56 files.
+Focused saved-completion/navigation tests also passed. Reports are in ignored
+frontend/.cache/pcp-regression-tests.json and pcp-final-focused.json reports.
+  npm --prefix frontend test -- src/features/programme-suitability src/pages/users
+    src/pages/learner/onboarding --maxWorkers=2
+TypeScript type-check, ESLint, production build, Django system checks,
+makemigrations --check --dry-run and git diff --check passed.
+
+Chrome verification: five grouped scenarios passed with real WizardProvider,
+WizardShell, module components and admin editor, using isolated mocked APIs:
+- Operational mandatory count, optional cap, target credits, partial save/reload,
+  direct-route/Next blocking and progression only after the valid save.
+- Strategic equivalent rules and persistence/navigation checks.
+- Chartered five mandatory children/modules, one option, no group double count,
+  mobile note wrapping/no horizontal overflow and read-only assessment preview.
+- Historical version 1 selection remains readable and keeps its earlier rules.
+- Admin edits/previews/saves a private note; impossible optional count disables
+  draft saving. Preview changes do not affect a real learner.
+No browser page errors. Screenshots/results are in ignored frontend/.cache.
+Temporary browser harness files were removed. These are not live authenticated
+end-to-end backend requests; backend rules and API submission policy were tested
+separately against isolated feature models and boundary fixtures.
+
+Merge and integration coordination
+The shared production files modified are users/types.ts, WizardContext.helpers.ts,
+WizardContext.tsx, WizardShell.tsx and validation.ts. These are the main textual
+conflict risks; retain teammates' other-step logic while preserving the PCP-only
+completion marker and route guards. No CV body, step order, layout registration,
+assessment weights or recommendation algorithm was modified by this request.
+
+The backend completion policy and module configuration/service/renderer/editor
+files need coordination if another branch edits the same feature. Integrate
+backend rule checks, frontend mandatory generation, published schema handling
+and completion gates together. Keeping only the disabled checkboxes would allow
+API bypass; keeping only backend strict checks would lose usable draft saving.
+Never persist or trust the client-derived programmeModulesCompletion marker.
+
+No new migration dependency was introduced. Keep version 1 support and the legacy
+default archive when merging, and keep the explicit version 2 draft upgrade out
+of learner snapshot reads. Existing prior migration 0005 remains unchanged.
+The working tree was already dirty; that work was retained. No commit, push,
+merge, rebase, branch switch or real publication was performed. No unresolved
+implementation failure remains within the tested scope.
