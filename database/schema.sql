@@ -2362,6 +2362,51 @@ ALTER SEQUENCE enrolment."Wizard_Form_Layouts_id_seq" OWNED BY enrolment."Wizard
 
 
 --
+-- Name: Bksb_Initial_Assessments; Type: TABLE; Schema: enrolment; Owner: -
+--
+
+CREATE TABLE enrolment."Bksb_Initial_Assessments" (
+    id bigint NOT NULL,
+    "Learner_kind" character varying(32) NOT NULL,
+    "Learner_id" bigint NOT NULL,
+    "Subject" character varying(16) NOT NULL,
+    "Bksb_user_id" bigint,
+    "Bksb_username" text,
+    "Course_subject" text,
+    "Course_name" text,
+    "Course_is_reforms" boolean,
+    "Status" character varying(32) DEFAULT 'not_started'::character varying NOT NULL,
+    "Provider_session_id" text,
+    "Result" text,
+    "Level" text,
+    "Assessment_date" timestamp with time zone,
+    "Last_synced_at" timestamp with time zone,
+    "Last_error" text,
+    "Attempts" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "Created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "Updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: Bksb_Initial_Assessments_id_seq; Type: SEQUENCE; Schema: enrolment; Owner: -
+--
+
+CREATE SEQUENCE enrolment."Bksb_Initial_Assessments_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE enrolment."Bksb_Initial_Assessments_id_seq" OWNED BY enrolment."Bksb_Initial_Assessments".id;
+ALTER TABLE ONLY enrolment."Bksb_Initial_Assessments" ALTER COLUMN id SET DEFAULT nextval('enrolment."Bksb_Initial_Assessments_id_seq"'::regclass);
+CREATE UNIQUE INDEX bksb_initial_assessment_learner_subject_uniq ON enrolment."Bksb_Initial_Assessments" USING btree ("Learner_kind", "Learner_id", "Subject");
+CREATE INDEX idx_bksb_initial_assessment_provider_user ON enrolment."Bksb_Initial_Assessments" USING btree ("Bksb_user_id");
+
+
+--
 -- Name: Wizard_Ilr_Learner_Details; Type: TABLE; Schema: enrolment; Owner: -
 --
 

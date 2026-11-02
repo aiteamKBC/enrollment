@@ -13,6 +13,7 @@ import Plr from '../steps/Plr';
 import SkillsRadar from '../steps/SkillsRadar';
 import Inclusion from '../steps/Inclusion';
 import Policies from '../steps/Policies';
+import InitialAssessments from '../steps/InitialAssessments';
 import NextSteps from '../steps/NextSteps';
 
 describe('wizard step order', () => {
@@ -30,6 +31,7 @@ describe('wizard step order', () => {
       // Added 2026-10: the inclusion assessment, before the policies are read.
       ['inclusion', 'Inclusion'],
       ['policies', 'Policies'],
+      ['initial-assessments', 'Initial Assessments'],
       ['next-steps', 'What Happens Now?'],
     ]);
   });
@@ -51,6 +53,7 @@ describe('wizard step order', () => {
     expect(bodyFor('skills-radar')).toBe(SkillsRadar);
     expect(bodyFor('inclusion')).toBe(Inclusion);
     expect(bodyFor('policies')).toBe(Policies);
+    expect(bodyFor('initial-assessments')).toBe(InitialAssessments);
     expect(bodyFor('next-steps')).toBe(NextSteps);
   });
 });

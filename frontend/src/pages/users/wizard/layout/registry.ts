@@ -113,6 +113,11 @@ const heading = (key: string, label: string): Def => ({ key, kind: 'heading', la
 const content = (key: string, label: string): Def => ({ key, kind: 'content', label, requirable: false, defaultRequired: false });
 const page = (key: string, label: string): Def => ({ key, kind: 'block', label, requirable: false, defaultRequired: false });
 
+// Temporary test switch: set back to false/remove the development env flag
+// after the Inclusion/Safeguarding connection is configured. The normal rule
+// remains required everywhere else.
+const TEMPORARILY_OPTIONAL_INCLUSION = import.meta.env.VITE_INCLUSION_OPTIONAL === 'true';
+
 /** A plain field: required by default unless `optional`. */
 function field(key: string, label: string, missing: Def['missing'], extra: Partial<Def> = {}): Def {
   return { key, kind: 'field', label, requirable: true, defaultRequired: true, missing, ...extra };
@@ -403,7 +408,7 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
       kind: 'block',
       label: 'Inclusion assessment (Safeguarding site)',
       requirable: true,
-      defaultRequired: true,
+      defaultRequired: !TEMPORARILY_OPTIONAL_INCLUSION,
       /**
        * Done once the Safeguarding database holds a response for one of the
        * learner's emails (draft.inclusion, read when the wizard opens). Until
@@ -432,6 +437,11 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
         return outstanding > 0 ? [`${outstanding} ${outstanding === 1 ? 'document' : 'documents'} not acknowledged`] : [];
       },
     }],
+  },
+  {
+    slug: 'initial-assessments',
+    label: 'Initial Assessments',
+    items: [page('block.initialAssessments', 'English and Maths initial assessments')],
   },
   {
     slug: 'next-steps',

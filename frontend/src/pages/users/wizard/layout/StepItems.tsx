@@ -6,6 +6,7 @@ import Plr from '../steps/Plr';
 import SkillsRadar from '../steps/SkillsRadar';
 import Inclusion from '../steps/Inclusion';
 import Policies from '../steps/Policies';
+import InitialAssessments from '../steps/InitialAssessments';
 import NextSteps from '../steps/NextSteps';
 import { CustomField } from './CustomField';
 import { BUILTIN_ITEMS, BUILTIN_STEP_BY_SLUG } from './registry';
@@ -28,6 +29,7 @@ const BLOCKS: Record<string, ComponentType> = {
   'block.skillsRadar': SkillsRadar,
   'block.inclusion': Inclusion,
   'block.policies': Policies,
+  'block.initialAssessments': InitialAssessments,
   'block.nextSteps': NextSteps,
 };
 

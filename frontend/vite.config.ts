@@ -113,7 +113,7 @@ export default defineConfig(({ mode }) => {
     strictPort: true,
     host: "0.0.0.0",
     // Forward API calls to the Django backend so the browser sees them as
-    // same-origin (no CORS). Override :8000 with VITE_API_TARGET when another
+    // same-origin (no CORS). Override :8001 with VITE_API_TARGET when another
     // checkout already uses it, for example in .env.development.local.
     proxy: {
       "/curriculum_api": {
