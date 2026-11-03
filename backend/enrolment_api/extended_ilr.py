@@ -24,6 +24,7 @@ from learner_api.models import CommercialUser, EnrolmentUser
 
 from .auth import enrolment_login_required
 from .models import ExtendedIlr
+from .skills_radar.catalogue import CatalogueError
 from .wizard_steps import (
     ILR_DETAILS_KEY,
     project_draft,
@@ -153,6 +154,13 @@ def _read_extended_ilr_row(kind, learner_id, learner_name):
     # from the per-step tables so nothing looks lost in the wizard.
     if not payload["draft"]:
         payload["draft"] = read_projection(kind, int(learner_id))
+    elif 'skillsRadar' not in payload['draft']:
+        # Older partial draft writers may have left radar answers only in the
+        # per-step tables. Recover them without replacing other saved sections.
+        from .skills_radar.service import read_legacy_radar
+        radar = read_legacy_radar(kind, int(learner_id))
+        if radar is not None:
+            payload['draft'] = {**payload['draft'], 'skillsRadar': radar}
     return payload
 
 
@@ -235,6 +243,19 @@ def extended_ilr(request, kind, learner_id):
             defaults["wizard_draft"] = without_ilr_details(draft)
         try:
             with transaction.atomic(using="enrolment"):
+                if draft is not None:
+                    # Serialise first answers even when no Extended ILR row
+                    # exists yet; an existing saved catalogue pin always wins.
+                    learner = model.objects.select_for_update().get(pk=learner_id)
+                    stored_row = ExtendedIlr.objects.filter(learner_kind=kind, learner_id=learner_id).first()
+                    stored = stored_row.wizard_draft if stored_row else None
+                    if 'skillsRadar' in draft and (not stored or 'skillsRadar' not in stored):
+                        from .skills_radar.service import read_legacy_radar
+                        radar = read_legacy_radar(kind, int(learner_id))
+                        stored = {**(stored or {}), **({'skillsRadar': radar} if radar is not None else {})}
+                    from .skills_radar.service import prepare_answers
+                    prepare_answers(kind, learner, draft, stored)
+                    defaults['wizard_draft'] = without_ilr_details(draft)
                 row, _ = ExtendedIlr.objects.update_or_create(
                     learner_kind=kind,
                     learner_id=learner_id,
@@ -249,6 +270,8 @@ def extended_ilr(request, kind, learner_id):
                     project_custom_fields(kind, int(learner_id), draft, answers=row.answers)
         except DatabaseError as exc:
             return _error(f"Database error: {exc}", 502)
+        except CatalogueError as exc:
+            return _error(str(exc), 409)
 
         return JsonResponse(_payload(row))
 

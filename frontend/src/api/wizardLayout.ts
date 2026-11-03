@@ -8,6 +8,7 @@
 import type { LearnerKind } from './extendedIlr';
 import { createCachedResource } from './cachedRequest';
 import type { CustomUploadRef, WizardLayout, WizardLayoutResponse } from '@/pages/users/wizard/layout/types';
+import { prefetchAssessmentSecurity } from '@/features/programme-suitability/api';
 
 const BASE = '/enrolment_api/wizard-layout';
 
@@ -51,9 +52,10 @@ export function peekWizardLayout(): WizardLayoutResponse | undefined {
  * silently overwriting their changes.
  */
 export async function publishWizardLayout(layout: WizardLayout, baseVersion: number | null): Promise<WizardLayoutResponse> {
+  const security = layout.skillsRadarCatalogues ? { 'X-CSRFToken': (await prefetchAssessmentSecurity()).csrfToken } : {};
   const saved = await send<WizardLayoutResponse>(`${BASE}/publish/`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...security },
     body: JSON.stringify({ layout, baseVersion }),
   });
   layoutResource.prime('current', saved);

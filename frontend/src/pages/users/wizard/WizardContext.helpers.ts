@@ -39,6 +39,7 @@ export function ageFromDob(iso?: string): number | undefined {
 
 
 export interface WizardContextValue {
+  radarCatalogue?: import('@/features/programme-suitability/skills-radar/catalogue/types').ManagedRadar;
   moduleSaveQueue?: import('@/features/programme-suitability/modules/moduleSaveQueue').ModuleSaveQueue;
   modules?: import('@/features/programme-suitability/modules/useModulesConfiguration').ModulesController;
   suitability?: import('@/features/programme-suitability/useSuitability').SuitabilityController;

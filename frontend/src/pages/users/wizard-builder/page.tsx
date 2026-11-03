@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SuitabilityAdmin } from '@/features/programme-suitability/SuitabilityAdmin';
 import { ModulesAdmin } from '@/features/programme-suitability/modules/ModulesAdmin';
+import { CatalogueAdmin } from '@/features/programme-suitability/skills-radar/catalogue/CatalogueAdmin';
 import { configurationErrors } from '@/features/programme-suitability/modules/configuration';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
@@ -354,6 +355,8 @@ function StepEditor({
       }))} />}
       {step.slug === 'programme-suitability' && <ModulesAdmin version={version} value={layout.programmeModules}
         onChange={(programmeModules) => edit((l) => ({ ...l, programmeModules }))} />}
+      {step.items.some((item) => item.key === 'block.skillsRadar') && <CatalogueAdmin layout={layout} version={version}
+        onChange={(configuration) => edit((l) => ({ ...l, ...configuration }))} />}
       <ol
         className="space-y-2 p-5"
         aria-label={`Items on ${step.label}`}
@@ -604,6 +607,7 @@ function PublishDialog({ layout, publishing, onCancel, onConfirm }: { layout: Wi
           Every learner who has not yet submitted their enrolment will see these changes the next time they open the wizard.
           Enrolments already submitted are not reopened.
         </p>
+        {layout.skillsRadarCatalogues && <p className="mt-2 text-[13px] text-foreground-600">Skills Radar assessments already started keep their saved catalogue version and answers.</p>}
         {columns.length > 0 && (
           <div className="mt-3 rounded-lg border border-foreground-100 bg-background-100/60 p-3 text-[12px] text-foreground-700">
             <p className="font-medium">New database columns ({columns.length}) will be added to the step tables in the enrolment schema:</p>

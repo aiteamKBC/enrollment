@@ -1,0 +1,1070 @@
+{
+  "_about": "Source-derived reference mapping for implementing PCP Level 6 Skills Radar. This is not a replacement for the source workbook or existing database IDs.",
+  "source_workbook": "Project_Controls_Level6_KSB_Mapping (1).xlsx",
+  "source_sheets": {
+    "exact_text": "KSB source (A=code,B=type,C=exact text,D=topic), rows 9-79",
+    "owner_mapping": "Coverage (A=code,K=Operational,L=Strategic,M=Chartered), rows 9-79",
+    "module_identity": "Module map, rows 13-30"
+  },
+  "standard": {
+    "code": "ST0845",
+    "level": 6,
+    "expected_ksb_count": 71,
+    "types": {
+      "Knowledge": 31,
+      "Skill": 29,
+      "Behaviour": 11
+    }
+  },
+  "note": "Use the actual published programme module IDs for mapping; workbook group keys are semantic references, NOT database primary keys. Strategic and Operational share owner-group assignments, but their optional module titles can differ.",
+  "group_to_module_reference": {
+    "operational": {
+      "PMP": {
+        "excel_module_name": "Project Management Professional (PMP)",
+        "module_role": "mandatory"
+      },
+      "AI": {
+        "excel_module_name": "AI in Project Controls & Management",
+        "module_role": "mandatory"
+      },
+      "RISK": {
+        "excel_module_name": "Risk Management (APM)",
+        "module_role": "mandatory"
+      },
+      "PPC": {
+        "excel_module_name": "Project Planning and Control (APMG)",
+        "module_role": "optional"
+      },
+      "FINANCE": {
+        "excel_module_name": "Earned Value Management (EVM)",
+        "module_role": "optional"
+      },
+      "SCHEDULE": {
+        "excel_module_name": "PMI-SP",
+        "module_role": "optional"
+      }
+    },
+    "strategic": {
+      "PMP": {
+        "excel_module_name": "Project Management Professional (PMP)",
+        "module_role": "mandatory"
+      },
+      "AI": {
+        "excel_module_name": "AI in Project Controls & Management",
+        "module_role": "mandatory"
+      },
+      "RISK": {
+        "excel_module_name": "Risk Management (APM)",
+        "module_role": "mandatory"
+      },
+      "PPC": {
+        "excel_module_name": "PMI PMO Certified Professional",
+        "module_role": "optional"
+      },
+      "FINANCE": {
+        "excel_module_name": "Portfolio Management (APMG)",
+        "module_role": "optional"
+      },
+      "SCHEDULE": {
+        "excel_module_name": "Managing Successful Programmes (MSP)",
+        "module_role": "optional"
+      }
+    },
+    "chartered": {
+      "CH_PLAN": {
+        "excel_module_name": "Planning, Scheduling & Integrated Controls (Certified PMO)",
+        "current_ui_child_label_hint": "Project Planning and Control",
+        "parent_group": "Certified PMO Professional Level 6",
+        "module_role": "mandatory"
+      },
+      "CH_STAKE": {
+        "excel_module_name": "Stakeholder Management & Reporting (Certified PMO)",
+        "current_ui_child_label_hint": "Stakeholder Engagement and Communication",
+        "parent_group": "Certified PMO Professional Level 6",
+        "module_role": "mandatory"
+      },
+      "CH_RISK": {
+        "excel_module_name": "Risk, Issue & Quality Management (Certified PMO)",
+        "current_ui_child_label_hint": "Risk, Quality and Issue Management",
+        "parent_group": "Certified PMO Professional Level 6",
+        "module_role": "mandatory"
+      },
+      "CH_PMO": {
+        "excel_module_name": "PMO Fundamentals & Organisational Governance (Certified PMO)",
+        "current_ui_child_label_hint": "Project Management Office",
+        "parent_group": "Certified PMO Professional Level 6",
+        "module_role": "mandatory"
+      },
+      "AI": {
+        "excel_module_name": "AI in Project Controls & Management",
+        "module_role": "mandatory"
+      },
+      "FINANCE": {
+        "excel_module_name": "Chosen one: Earned Value Management (EVM) or Portfolio Management (APMG)",
+        "module_role": "chosen_optional"
+      }
+    }
+  },
+  "summary": {
+    "operational": {
+      "total_ksbs": 71,
+      "owner_group_counts": {
+        "PMP": 16,
+        "AI": 12,
+        "RISK": 9,
+        "PPC": 17,
+        "FINANCE": 11,
+        "SCHEDULE": 6
+      }
+    },
+    "strategic": {
+      "total_ksbs": 71,
+      "owner_group_counts": {
+        "PMP": 16,
+        "AI": 12,
+        "RISK": 9,
+        "PPC": 17,
+        "FINANCE": 11,
+        "SCHEDULE": 6
+      }
+    },
+    "chartered": {
+      "total_ksbs": 71,
+      "owner_group_counts": {
+        "CH_PLAN": 21,
+        "CH_STAKE": 7,
+        "CH_RISK": 11,
+        "CH_PMO": 9,
+        "AI": 12,
+        "FINANCE": 11
+      }
+    }
+  },
+  "ksbs": [
+    {
+      "code": "K1",
+      "type": "Knowledge",
+      "wording": "Organisational and business strategies: and how these impact on the strategy for project control and its execution",
+      "topic": "Organisational strategy",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "K1 Organisational and business strategies: and how these impact on the strategy for project control and its execution",
+      "full_description": "Organisational and business strategies: and how these impact on the strategy for project control and its execution"
+    },
+    {
+      "code": "K2",
+      "type": "Knowledge",
+      "wording": "Principles of project control including the principles of the project life cycle; and the role project control plays in the governance of a project.",
+      "topic": "Project lifecycle and governance",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "K2 Principles of project control including the principles of the project life cycle; and the role project control plays in the governance of a project.",
+      "full_description": "Principles of project control including the principles of the project life cycle; and the role project control plays in the governance of a project."
+    },
+    {
+      "code": "K3",
+      "type": "Knowledge",
+      "wording": "Project control procedures and methods including employer organisation management systems that are critical to project control for example: quality control, configuration management, document and version control",
+      "topic": "Controls procedures and quality systems",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "K3 Project control procedures and methods including employer organisation management systems that are critical to project control for example: quality control, configuration management, document and version control",
+      "full_description": "Project control procedures and methods including employer organisation management systems that are critical to project control for example: quality control, configuration management, document and version control"
+    },
+    {
+      "code": "K4",
+      "type": "Knowledge",
+      "wording": "The benefits, attributes, limitations and use of project controls related software used for key tasks such as planning and scheduling, cost management, cost and risk analysis, estimating, progress and performance monitoring and reporting",
+      "topic": "Project-controls software",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "K4 The benefits, attributes, limitations and use of project controls related software used for key tasks such as planning and scheduling, cost management, cost and risk analysis, estimating, progress and performance monitoring and reporting",
+      "full_description": "The benefits, attributes, limitations and use of project controls related software used for key tasks such as planning and scheduling, cost management, cost and risk analysis, estimating, progress and performance monitoring and reporting"
+    },
+    {
+      "code": "K5",
+      "type": "Knowledge",
+      "wording": "Underlying engineering and manufacturing principles including the principles of reviewing and interpreting technical project documents such as scopes of work and engineering drawings.",
+      "topic": "Engineering principles and technical documents",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K5 Underlying engineering and manufacturing principles including the principles of reviewing and interpreting technical project documents such as scopes of work and engineering drawings.",
+      "full_description": "Underlying engineering and manufacturing principles including the principles of reviewing and interpreting technical project documents such as scopes of work and engineering drawings."
+    },
+    {
+      "code": "K6",
+      "type": "Knowledge",
+      "wording": "Breakdown and coding structures: purpose, creation and use for accurate control. Their relevance in the creation of data models to help feed integrated and intelligent reporting and insights; familiarisation with standard coding structures and how they are used to underpin data flow systems as well as underpin the use and integration of new technology into project controls delivery including BIM .",
+      "topic": "Breakdown, coding and data structures",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K6 Breakdown and coding structures: purpose, creation and use for accurate control. Their relevance in the creation of data models to help feed integrated and intelligent reporting and insights; familiarisation with standard coding structures and how they are used to underpin data flow systems as well as underpin the use and integration of new technology into project controls delivery including BIM .",
+      "full_description": "Breakdown and coding structures: purpose, creation and use for accurate control. Their relevance in the creation of data models to help feed integrated and intelligent reporting and insights; familiarisation with standard coding structures and how they are used to underpin data flow systems as well as underpin the use and integration of new technology into project controls delivery including BIM ."
+    },
+    {
+      "code": "K7",
+      "type": "Knowledge",
+      "wording": "Project Control Plans and reporting frameworks - their purpose and content and how they underpin the generation and reporting of meaningful controls data",
+      "topic": "Controls plans and reporting frameworks",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K7 Project Control Plans and reporting frameworks - their purpose and content and how they underpin the generation and reporting of meaningful controls data",
+      "full_description": "Project Control Plans and reporting frameworks - their purpose and content and how they underpin the generation and reporting of meaningful controls data"
+    },
+    {
+      "code": "K8",
+      "type": "Knowledge",
+      "wording": "Strategic principles of creating and managing the project controls baseline (including scope definition, schedule, risk and cost), throughout the project life cycle.",
+      "topic": "Integrated baseline strategy",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K8 Strategic principles of creating and managing the project controls baseline (including scope definition, schedule, risk and cost), throughout the project life cycle.",
+      "full_description": "Strategic principles of creating and managing the project controls baseline (including scope definition, schedule, risk and cost), throughout the project life cycle."
+    },
+    {
+      "code": "K9",
+      "type": "Knowledge",
+      "wording": "HSE knowledge relative to the industry and project controls, including related national and industrial health, safety and environmental standards and legislation, the obligations of safety in design and CDM (construction, design and management) regulations.",
+      "topic": "HSE, CDM and safety in design",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "K9 HSE knowledge relative to the industry and project controls, including related national and industrial health, safety and environmental standards and legislation, the obligations of safety in design and CDM (construction, design and management) regulations.",
+      "full_description": "HSE knowledge relative to the industry and project controls, including related national and industrial health, safety and environmental standards and legislation, the obligations of safety in design and CDM (construction, design and management) regulations."
+    },
+    {
+      "code": "K10",
+      "type": "Knowledge",
+      "wording": "The environmental impact of a project’s activities, how it could contribute to the drive towards net carbon zero and how to minimise negative impacts on environmental sustainability during all stages of a project, within the context of the role.",
+      "topic": "Environmental sustainability and net zero",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "K10 The environmental impact of a project’s activities, how it could contribute to the drive towards net carbon zero and how to minimise negative impacts on environmental sustainability during all stages of a project, within the context of the role.",
+      "full_description": "The environmental impact of a project’s activities, how it could contribute to the drive towards net carbon zero and how to minimise negative impacts on environmental sustainability during all stages of a project, within the context of the role."
+    },
+    {
+      "code": "K11",
+      "type": "Knowledge",
+      "wording": "Principles of ethical conduct, diversity and inclusion, including codes of conduct and duty of care, corporate social responsibility, equality, diversity and inclusivity in the workplace.",
+      "topic": "Ethics, diversity and inclusion",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "K11 Principles of ethical conduct, diversity and inclusion, including codes of conduct and duty of care, corporate social responsibility, equality, diversity and inclusivity in the workplace.",
+      "full_description": "Principles of ethical conduct, diversity and inclusion, including codes of conduct and duty of care, corporate social responsibility, equality, diversity and inclusivity in the workplace."
+    },
+    {
+      "code": "K12",
+      "type": "Knowledge",
+      "wording": "Data assurance: approaches to gathering data; ensuring the validity and integrity of data (consistent, quality, technical controls information); and how to review the assumptions used to establish the data, as well as the inherent risks associated with these assumptions.",
+      "topic": "Data assurance and assumptions",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "K12 Data assurance: approaches to gathering data; ensuring the validity and integrity of data (consistent, quality, technical controls information); and how to review the assumptions used to establish the data, as well as the inherent risks associated with these assumptions.",
+      "full_description": "Data assurance: approaches to gathering data; ensuring the validity and integrity of data (consistent, quality, technical controls information); and how to review the assumptions used to establish the data, as well as the inherent risks associated with these assumptions."
+    },
+    {
+      "code": "K13",
+      "type": "Knowledge",
+      "wording": "Analysis techniques: different approaches to data analysis, the benefits of each, what the analytics are indicating and why and how this may impact on decisions and recommendations.",
+      "topic": "Data-analysis techniques",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "K13 Analysis techniques: different approaches to data analysis, the benefits of each, what the analytics are indicating and why and how this may impact on decisions and recommendations.",
+      "full_description": "Analysis techniques: different approaches to data analysis, the benefits of each, what the analytics are indicating and why and how this may impact on decisions and recommendations."
+    },
+    {
+      "code": "K14",
+      "type": "Knowledge",
+      "wording": "Approaches to communicating with different stakeholders in order to influence key decision-makers and colleagues.",
+      "topic": "Stakeholder communication and influence",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_STAKE"
+      },
+      "display_text": "K14 Approaches to communicating with different stakeholders in order to influence key decision-makers and colleagues.",
+      "full_description": "Approaches to communicating with different stakeholders in order to influence key decision-makers and colleagues."
+    },
+    {
+      "code": "K15",
+      "type": "Knowledge",
+      "wording": "The principles of risk management and the risk process; different risk analysis techniques; the methodologies and considerations for mitigating risk.",
+      "topic": "Risk management and analysis",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "K15 The principles of risk management and the risk process; different risk analysis techniques; the methodologies and considerations for mitigating risk.",
+      "full_description": "The principles of risk management and the risk process; different risk analysis techniques; the methodologies and considerations for mitigating risk."
+    },
+    {
+      "code": "K16",
+      "type": "Knowledge",
+      "wording": "Approaches to integrating cost and planning with a consistent basis for project risks and opportunities including cost and schedule risk analysis and associated contingency calculations.",
+      "topic": "Integrated cost/schedule risk and contingency",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "K16 Approaches to integrating cost and planning with a consistent basis for project risks and opportunities including cost and schedule risk analysis and associated contingency calculations.",
+      "full_description": "Approaches to integrating cost and planning with a consistent basis for project risks and opportunities including cost and schedule risk analysis and associated contingency calculations."
+    },
+    {
+      "code": "K17",
+      "type": "Knowledge",
+      "wording": "Project control change management and control: the principles of project control change procedures; how these procedures may vary in owner/contractor organisations, and when and how to use and apply them including project closeout procedure(s).",
+      "topic": "Change control and project closeout",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K17 Project control change management and control: the principles of project control change procedures; how these procedures may vary in owner/contractor organisations, and when and how to use and apply them including project closeout procedure(s).",
+      "full_description": "Project control change management and control: the principles of project control change procedures; how these procedures may vary in owner/contractor organisations, and when and how to use and apply them including project closeout procedure(s)."
+    },
+    {
+      "code": "K18",
+      "type": "Knowledge",
+      "wording": "Commercial matters: different types of contracts and their legal principles; contractual requirements and how they impact on project controls and the auditable recording, sharing, and storing of information.",
+      "topic": "Contracts and commercial requirements",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "K18 Commercial matters: different types of contracts and their legal principles; contractual requirements and how they impact on project controls and the auditable recording, sharing, and storing of information.",
+      "full_description": "Commercial matters: different types of contracts and their legal principles; contractual requirements and how they impact on project controls and the auditable recording, sharing, and storing of information."
+    },
+    {
+      "code": "K19",
+      "type": "Knowledge",
+      "wording": "Key principles of invitations to tender received and bid responses.",
+      "topic": "Tenders and bids",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "K19 Key principles of invitations to tender received and bid responses.",
+      "full_description": "Key principles of invitations to tender received and bid responses."
+    },
+    {
+      "code": "K20",
+      "type": "Knowledge",
+      "wording": "Estimating techniques and application (cost, time and resources): different methodologies for estimating including approaches to various estimating outcomes, pros and cons and degree of certainty/uncertainty for each; approaches to creating an estimating framework and basis of estimate.",
+      "topic": "Estimating techniques and basis of estimate",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K20 Estimating techniques and application (cost, time and resources): different methodologies for estimating including approaches to various estimating outcomes, pros and cons and degree of certainty/uncertainty for each; approaches to creating an estimating framework and basis of estimate.",
+      "full_description": "Estimating techniques and application (cost, time and resources): different methodologies for estimating including approaches to various estimating outcomes, pros and cons and degree of certainty/uncertainty for each; approaches to creating an estimating framework and basis of estimate."
+    },
+    {
+      "code": "K21",
+      "type": "Knowledge",
+      "wording": "Assurance techniques including benchmarking, comparisons to historical data, published data and other projects and how to apply them for example to assure estimated schedules, cost estimates and cost forecasting",
+      "topic": "Assurance and benchmarking",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K21 Assurance techniques including benchmarking, comparisons to historical data, published data and other projects and how to apply them for example to assure estimated schedules, cost estimates and cost forecasting",
+      "full_description": "Assurance techniques including benchmarking, comparisons to historical data, published data and other projects and how to apply them for example to assure estimated schedules, cost estimates and cost forecasting"
+    },
+    {
+      "code": "K22",
+      "type": "Knowledge",
+      "wording": "Planning and scheduling practice: different planning and scheduling techniques; how to create schedules to all levels; understanding, maintaining and establishing the impacts of schedule constraints and the principles of resource loading.",
+      "topic": "Planning, scheduling and resource loading",
+      "original_owner_group_by_pathway": {
+        "operational": "SCHEDULE",
+        "strategic": "SCHEDULE",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K22 Planning and scheduling practice: different planning and scheduling techniques; how to create schedules to all levels; understanding, maintaining and establishing the impacts of schedule constraints and the principles of resource loading.",
+      "full_description": "Planning and scheduling practice: different planning and scheduling techniques; how to create schedules to all levels; understanding, maintaining and establishing the impacts of schedule constraints and the principles of resource loading."
+    },
+    {
+      "code": "K23",
+      "type": "Knowledge",
+      "wording": "Modelling techniques (‘what-if’ scenarios and impact analysis) used to optimise the potential for improved efficiency against time, cost and quality and for improved project outcomes.",
+      "topic": "What-if modelling and optimisation",
+      "original_owner_group_by_pathway": {
+        "operational": "SCHEDULE",
+        "strategic": "SCHEDULE",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "K23 Modelling techniques (‘what-if’ scenarios and impact analysis) used to optimise the potential for improved efficiency against time, cost and quality and for improved project outcomes.",
+      "full_description": "Modelling techniques (‘what-if’ scenarios and impact analysis) used to optimise the potential for improved efficiency against time, cost and quality and for improved project outcomes."
+    },
+    {
+      "code": "K24",
+      "type": "Knowledge",
+      "wording": "Cost engineering practice: approaches to the creation of budget baselines and estimate recasting; cost control hierarchy; budget transfers and other budget variances.",
+      "topic": "Cost engineering and budgets",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "K24 Cost engineering practice: approaches to the creation of budget baselines and estimate recasting; cost control hierarchy; budget transfers and other budget variances.",
+      "full_description": "Cost engineering practice: approaches to the creation of budget baselines and estimate recasting; cost control hierarchy; budget transfers and other budget variances."
+    },
+    {
+      "code": "K25",
+      "type": "Knowledge",
+      "wording": "Financial controls as relevant to project control, including taxation, cashflow, accruals, payment terms. The monitoring and reporting of supplier and contractor commitments and expenditures.",
+      "topic": "Financial controls and cashflow",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "K25 Financial controls as relevant to project control, including taxation, cashflow, accruals, payment terms. The monitoring and reporting of supplier and contractor commitments and expenditures.",
+      "full_description": "Financial controls as relevant to project control, including taxation, cashflow, accruals, payment terms. The monitoring and reporting of supplier and contractor commitments and expenditures."
+    },
+    {
+      "code": "K26",
+      "type": "Knowledge",
+      "wording": "Techniques for monitoring and measuring progress including rules of credit and performance including earned value analysis, their pros and cons and what key points to share with different stakeholders.",
+      "topic": "Progress measurement and earned value",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "K26 Techniques for monitoring and measuring progress including rules of credit and performance including earned value analysis, their pros and cons and what key points to share with different stakeholders.",
+      "full_description": "Techniques for monitoring and measuring progress including rules of credit and performance including earned value analysis, their pros and cons and what key points to share with different stakeholders."
+    },
+    {
+      "code": "K27",
+      "type": "Knowledge",
+      "wording": "Progress and performance measurement: how to establish a progress baseline and identify trends or variances using different analysis techniques.",
+      "topic": "Progress baselines, trends and variances",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "K27 Progress and performance measurement: how to establish a progress baseline and identify trends or variances using different analysis techniques.",
+      "full_description": "Progress and performance measurement: how to establish a progress baseline and identify trends or variances using different analysis techniques."
+    },
+    {
+      "code": "K28",
+      "type": "Knowledge",
+      "wording": "Approaches to using statistical analysis, productivity and performance analysis.",
+      "topic": "Statistics, productivity and performance",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "K28 Approaches to using statistical analysis, productivity and performance analysis.",
+      "full_description": "Approaches to using statistical analysis, productivity and performance analysis."
+    },
+    {
+      "code": "K29",
+      "type": "Knowledge",
+      "wording": "Forecasting techniques used to forecast cost and schedule out-turns, and the use of predictive statistical analysis techniques and engineering knowledge to generate accurate forecasts of work to complete in sufficient time for action to be taken.",
+      "topic": "Cost and schedule forecasting",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "K29 Forecasting techniques used to forecast cost and schedule out-turns, and the use of predictive statistical analysis techniques and engineering knowledge to generate accurate forecasts of work to complete in sufficient time for action to be taken.",
+      "full_description": "Forecasting techniques used to forecast cost and schedule out-turns, and the use of predictive statistical analysis techniques and engineering knowledge to generate accurate forecasts of work to complete in sufficient time for action to be taken."
+    },
+    {
+      "code": "K30",
+      "type": "Knowledge",
+      "wording": "Leadership: strategies to, lead, coach, motivate and develop members of the team; different leadership styles.",
+      "topic": "Leadership, coaching and development",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_STAKE"
+      },
+      "display_text": "K30 Leadership: strategies to, lead, coach, motivate and develop members of the team; different leadership styles.",
+      "full_description": "Leadership: strategies to, lead, coach, motivate and develop members of the team; different leadership styles."
+    },
+    {
+      "code": "K31",
+      "type": "Knowledge",
+      "wording": "Continuous improvement including how to: capture good practice and lessons learned from experience; keep up to date with new technology and ways of working and drive forwards continuous improvement.",
+      "topic": "Continuous improvement and lessons learned",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "K31 Continuous improvement including how to: capture good practice and lessons learned from experience; keep up to date with new technology and ways of working and drive forwards continuous improvement.",
+      "full_description": "Continuous improvement including how to: capture good practice and lessons learned from experience; keep up to date with new technology and ways of working and drive forwards continuous improvement."
+    },
+    {
+      "code": "S1",
+      "type": "Skill",
+      "wording": "Determine, implement, adapt and refine the project controls procedures, methods and systems incorporating the relevant employer organisation management systems and procedures including quality, data management and security, document and version control and record keeping.",
+      "topic": "Implement controls systems and procedures",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "S1 Determine, implement, adapt and refine the project controls procedures, methods and systems incorporating the relevant employer organisation management systems and procedures including quality, data management and security, document and version control and record keeping.",
+      "full_description": "Determine, implement, adapt and refine the project controls procedures, methods and systems incorporating the relevant employer organisation management systems and procedures including quality, data management and security, document and version control and record keeping."
+    },
+    {
+      "code": "S2",
+      "type": "Skill",
+      "wording": "Use project controls related software and IT systems for tasks such as: planning and scheduling, cost management, cost and risk analysis, estimating, progress and performance monitoring and reporting; identify and select the right software package for the task",
+      "topic": "Select and use controls software",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "S2 Use project controls related software and IT systems for tasks such as: planning and scheduling, cost management, cost and risk analysis, estimating, progress and performance monitoring and reporting; identify and select the right software package for the task",
+      "full_description": "Use project controls related software and IT systems for tasks such as: planning and scheduling, cost management, cost and risk analysis, estimating, progress and performance monitoring and reporting; identify and select the right software package for the task"
+    },
+    {
+      "code": "S3",
+      "type": "Skill",
+      "wording": "Application of and the integration of, software and IT systems to enhance the level of data processing. For example, the use of technology including BIM.",
+      "topic": "Integrate systems and data",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "S3 Application of and the integration of, software and IT systems to enhance the level of data processing. For example, the use of technology including BIM.",
+      "full_description": "Application of and the integration of, software and IT systems to enhance the level of data processing. For example, the use of technology including BIM."
+    },
+    {
+      "code": "S4",
+      "type": "Skill",
+      "wording": "Technical and engineering principles: interpret technical information from different sources, identify and know the correct data and elements to monitor and control to ensure the basis for any recommendations are credible; review and interpret technical project documents (including scopes of work and engineering drawings etc.).",
+      "topic": "Interpret engineering information",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S4 Technical and engineering principles: interpret technical information from different sources, identify and know the correct data and elements to monitor and control to ensure the basis for any recommendations are credible; review and interpret technical project documents (including scopes of work and engineering drawings etc.).",
+      "full_description": "Technical and engineering principles: interpret technical information from different sources, identify and know the correct data and elements to monitor and control to ensure the basis for any recommendations are credible; review and interpret technical project documents (including scopes of work and engineering drawings etc.)."
+    },
+    {
+      "code": "S5",
+      "type": "Skill",
+      "wording": "Breakdown and coding structures: develop and implement coding structures as well as critiquing and reviewing technical coding and breakdown structures to ensure they provide a basis for project control.",
+      "topic": "Develop and review coding structures",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S5 Breakdown and coding structures: develop and implement coding structures as well as critiquing and reviewing technical coding and breakdown structures to ensure they provide a basis for project control.",
+      "full_description": "Breakdown and coding structures: develop and implement coding structures as well as critiquing and reviewing technical coding and breakdown structures to ensure they provide a basis for project control."
+    },
+    {
+      "code": "S6",
+      "type": "Skill",
+      "wording": "Lead the creation of comprehensive project control plans and reporting frameworks that identify the right contextual elements to track and the working assumptions to use, in order to generate meaningful controls data, ensuring that project controls deliverables are achievable and in line with project objectives",
+      "topic": "Lead controls plans and reporting",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S6 Lead the creation of comprehensive project control plans and reporting frameworks that identify the right contextual elements to track and the working assumptions to use, in order to generate meaningful controls data, ensuring that project controls deliverables are achievable and in line with project objectives",
+      "full_description": "Lead the creation of comprehensive project control plans and reporting frameworks that identify the right contextual elements to track and the working assumptions to use, in order to generate meaningful controls data, ensuring that project controls deliverables are achievable and in line with project objectives"
+    },
+    {
+      "code": "S7",
+      "type": "Skill",
+      "wording": "Lead the preparation of the strategy for the development and maintenance of the baseline for control taking into account scope definition and schedule, risk and cost (ensuring alignment between cost and schedule using the coding structures).",
+      "topic": "Lead the baseline strategy",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S7 Lead the preparation of the strategy for the development and maintenance of the baseline for control taking into account scope definition and schedule, risk and cost (ensuring alignment between cost and schedule using the coding structures).",
+      "full_description": "Lead the preparation of the strategy for the development and maintenance of the baseline for control taking into account scope definition and schedule, risk and cost (ensuring alignment between cost and schedule using the coding structures)."
+    },
+    {
+      "code": "S8",
+      "type": "Skill",
+      "wording": "Implement and enforce project control change procedures, judge against evidence and decide if a change is within or without scope, evaluate its impact to profitability and make recommendations or implement the change in a manner that reflects its scale",
+      "topic": "Implement change-control procedures",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S8 Implement and enforce project control change procedures, judge against evidence and decide if a change is within or without scope, evaluate its impact to profitability and make recommendations or implement the change in a manner that reflects its scale",
+      "full_description": "Implement and enforce project control change procedures, judge against evidence and decide if a change is within or without scope, evaluate its impact to profitability and make recommendations or implement the change in a manner that reflects its scale"
+    },
+    {
+      "code": "S9",
+      "type": "Skill",
+      "wording": "Ensure that project control work is undertaken in accordance with HSE regulations and requirements including applying knowledge of HSE with awareness of how it impacts on project control schedules and costs and ensuring that the schedule and resourcing for a project meets the requirements of regulations (including CDM and safety) and can be delivered in accordance with the requirements i.e. ensure everything is in place and accounted for to ensure the project can run safely.",
+      "topic": "Apply HSE to plans, cost and resources",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "S9 Ensure that project control work is undertaken in accordance with HSE regulations and requirements including applying knowledge of HSE with awareness of how it impacts on project control schedules and costs and ensuring that the schedule and resourcing for a project meets the requirements of regulations (including CDM and safety) and can be delivered in accordance with the requirements i.e. ensure everything is in place and accounted for to ensure the project can run safely.",
+      "full_description": "Ensure that project control work is undertaken in accordance with HSE regulations and requirements including applying knowledge of HSE with awareness of how it impacts on project control schedules and costs and ensuring that the schedule and resourcing for a project meets the requirements of regulations (including CDM and safety) and can be delivered in accordance with the requirements i.e. ensure everything is in place and accounted for to ensure the project can run safely."
+    },
+    {
+      "code": "S10",
+      "type": "Skill",
+      "wording": "Identify opportunities within their remit in projects to contribute to net carbon zero and environmental sustainability, and then take action to minimise the environmental impact of the project",
+      "topic": "Act on environmental improvement",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "S10 Identify opportunities within their remit in projects to contribute to net carbon zero and environmental sustainability, and then take action to minimise the environmental impact of the project",
+      "full_description": "Identify opportunities within their remit in projects to contribute to net carbon zero and environmental sustainability, and then take action to minimise the environmental impact of the project"
+    },
+    {
+      "code": "S11",
+      "type": "Skill",
+      "wording": "Undertake project control work in accordance with ethics, codes of conduct and duty of care.",
+      "topic": "Apply ethics and duty of care",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "S11 Undertake project control work in accordance with ethics, codes of conduct and duty of care.",
+      "full_description": "Undertake project control work in accordance with ethics, codes of conduct and duty of care."
+    },
+    {
+      "code": "S12",
+      "type": "Skill",
+      "wording": "Data assurance: challenge, verify and validate data reports and data to ensure their integrity, timeliness and technical appropriateness",
+      "topic": "Verify and validate controls data",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "S12 Data assurance: challenge, verify and validate data reports and data to ensure their integrity, timeliness and technical appropriateness",
+      "full_description": "Data assurance: challenge, verify and validate data reports and data to ensure their integrity, timeliness and technical appropriateness"
+    },
+    {
+      "code": "S13",
+      "type": "Skill",
+      "wording": "Identify stakeholders across the project for example: those to work with when developing estimates, schedules, and plans and those to deliver controls information and recommendations to. Modify communication style and method to stakeholders, for example to gather information needed.",
+      "topic": "Identify stakeholders and adapt communication",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_STAKE"
+      },
+      "display_text": "S13 Identify stakeholders across the project for example: those to work with when developing estimates, schedules, and plans and those to deliver controls information and recommendations to. Modify communication style and method to stakeholders, for example to gather information needed.",
+      "full_description": "Identify stakeholders across the project for example: those to work with when developing estimates, schedules, and plans and those to deliver controls information and recommendations to. Modify communication style and method to stakeholders, for example to gather information needed."
+    },
+    {
+      "code": "S14",
+      "type": "Skill",
+      "wording": "Risk management and analysis: undertake quantitative and qualitative analysis of risks and lead regular reviews of risks and related assumptions in the project risk register such as questioning their presence and relevance in order to underpin the management of the project risk register.",
+      "topic": "Analyse risks and lead risk reviews",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "S14 Risk management and analysis: undertake quantitative and qualitative analysis of risks and lead regular reviews of risks and related assumptions in the project risk register such as questioning their presence and relevance in order to underpin the management of the project risk register.",
+      "full_description": "Risk management and analysis: undertake quantitative and qualitative analysis of risks and lead regular reviews of risks and related assumptions in the project risk register such as questioning their presence and relevance in order to underpin the management of the project risk register."
+    },
+    {
+      "code": "S15",
+      "type": "Skill",
+      "wording": "Identify opportunities to use data analysis techniques to benefit project controls delivery such as automating repetitive processes or improving data quality or extracting deeper insights and, validate the related data analysis to ensure correct interpretation against which effective decisions can be made.",
+      "topic": "Apply and validate analysis and automation",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "S15 Identify opportunities to use data analysis techniques to benefit project controls delivery such as automating repetitive processes or improving data quality or extracting deeper insights and, validate the related data analysis to ensure correct interpretation against which effective decisions can be made.",
+      "full_description": "Identify opportunities to use data analysis techniques to benefit project controls delivery such as automating repetitive processes or improving data quality or extracting deeper insights and, validate the related data analysis to ensure correct interpretation against which effective decisions can be made."
+    },
+    {
+      "code": "S16",
+      "type": "Skill",
+      "wording": "Commercial matters: identification and application of subcontract/supplier deliverables to project control in order to provide the ability to monitor subcontractor/supplier performance and create, record and store project controls content in support of legal and contractual requirements.;",
+      "topic": "Apply supplier and contract requirements",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "S16 Commercial matters: identification and application of subcontract/supplier deliverables to project control in order to provide the ability to monitor subcontractor/supplier performance and create, record and store project controls content in support of legal and contractual requirements.;",
+      "full_description": "Commercial matters: identification and application of subcontract/supplier deliverables to project control in order to provide the ability to monitor subcontractor/supplier performance and create, record and store project controls content in support of legal and contractual requirements.;"
+    },
+    {
+      "code": "S17",
+      "type": "Skill",
+      "wording": "Create project controls content to inform tenders and evaluate invitations to tender received and bid responses",
+      "topic": "Prepare and evaluate tender content",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "S17 Create project controls content to inform tenders and evaluate invitations to tender received and bid responses",
+      "full_description": "Create project controls content to inform tenders and evaluate invitations to tender received and bid responses"
+    },
+    {
+      "code": "S18",
+      "type": "Skill",
+      "wording": "Prepare an estimating framework and make recommendations on classes of estimate to meet project needs at different project stages",
+      "topic": "Prepare estimating frameworks",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S18 Prepare an estimating framework and make recommendations on classes of estimate to meet project needs at different project stages",
+      "full_description": "Prepare an estimating framework and make recommendations on classes of estimate to meet project needs at different project stages"
+    },
+    {
+      "code": "S19",
+      "type": "Skill",
+      "wording": "Use an evidence based approach to select and apply the most suitable estimating technique for the purpose and undertake estimate assurance, cost risk analysis, prepare related detailed basis of estimate narratives that are evidenced and explanatory - setting out the risks, assumptions, probabilities, uncertainties and contingencies in order to provide a sound basis for decision making",
+      "topic": "Produce and assure evidenced estimates",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S19 Use an evidence based approach to select and apply the most suitable estimating technique for the purpose and undertake estimate assurance, cost risk analysis, prepare related detailed basis of estimate narratives that are evidenced and explanatory - setting out the risks, assumptions, probabilities, uncertainties and contingencies in order to provide a sound basis for decision making",
+      "full_description": "Use an evidence based approach to select and apply the most suitable estimating technique for the purpose and undertake estimate assurance, cost risk analysis, prepare related detailed basis of estimate narratives that are evidenced and explanatory - setting out the risks, assumptions, probabilities, uncertainties and contingencies in order to provide a sound basis for decision making"
+    },
+    {
+      "code": "S20",
+      "type": "Skill",
+      "wording": "Prepare planning and scheduling strategic frameworks and make recommendations on different levels of plans and schedules to meet different project needs for example, milestones or detailed engineer schedules.",
+      "topic": "Prepare scheduling frameworks",
+      "original_owner_group_by_pathway": {
+        "operational": "SCHEDULE",
+        "strategic": "SCHEDULE",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S20 Prepare planning and scheduling strategic frameworks and make recommendations on different levels of plans and schedules to meet different project needs for example, milestones or detailed engineer schedules.",
+      "full_description": "Prepare planning and scheduling strategic frameworks and make recommendations on different levels of plans and schedules to meet different project needs for example, milestones or detailed engineer schedules."
+    },
+    {
+      "code": "S21",
+      "type": "Skill",
+      "wording": "Use an evidence based approach to create credible, achievable control schedules, applying relevant assumptions and contingency and undertaking schedule assurance, schedule risk analysis and compile a related basis of schedule that is explanatory, setting out the risks, assumptions, probabilities, uncertainties, contingencies, dependencies and constraints.",
+      "topic": "Build and assure credible schedules",
+      "original_owner_group_by_pathway": {
+        "operational": "SCHEDULE",
+        "strategic": "SCHEDULE",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S21 Use an evidence based approach to create credible, achievable control schedules, applying relevant assumptions and contingency and undertaking schedule assurance, schedule risk analysis and compile a related basis of schedule that is explanatory, setting out the risks, assumptions, probabilities, uncertainties, contingencies, dependencies and constraints.",
+      "full_description": "Use an evidence based approach to create credible, achievable control schedules, applying relevant assumptions and contingency and undertaking schedule assurance, schedule risk analysis and compile a related basis of schedule that is explanatory, setting out the risks, assumptions, probabilities, uncertainties, contingencies, dependencies and constraints."
+    },
+    {
+      "code": "S22",
+      "type": "Skill",
+      "wording": "Model the potential for efficiency against time, cost and quality, review and make recommendations.",
+      "topic": "Model time/cost/quality improvements",
+      "original_owner_group_by_pathway": {
+        "operational": "SCHEDULE",
+        "strategic": "SCHEDULE",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "S22 Model the potential for efficiency against time, cost and quality, review and make recommendations.",
+      "full_description": "Model the potential for efficiency against time, cost and quality, review and make recommendations."
+    },
+    {
+      "code": "S23",
+      "type": "Skill",
+      "wording": "Apply cost engineering practice to: recast the estimate and set the budget baseline and; select and apply proven cost control techniques to capture actual commitment and expenditure data with appropriate use of accruals; and integrate cost and schedule data to develop project cashflow projections and assessments of value of work done over time.",
+      "topic": "Apply cost engineering and cashflow controls",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "S23 Apply cost engineering practice to: recast the estimate and set the budget baseline and; select and apply proven cost control techniques to capture actual commitment and expenditure data with appropriate use of accruals; and integrate cost and schedule data to develop project cashflow projections and assessments of value of work done over time.",
+      "full_description": "Apply cost engineering practice to: recast the estimate and set the budget baseline and; select and apply proven cost control techniques to capture actual commitment and expenditure data with appropriate use of accruals; and integrate cost and schedule data to develop project cashflow projections and assessments of value of work done over time."
+    },
+    {
+      "code": "S24",
+      "type": "Skill",
+      "wording": "Monitor and control project progress and performance by establishing a progress baseline and selecting and applying the right analysis techniques (for example, earned value analysis) for the size and complexity of the project.",
+      "topic": "Establish progress baseline and analyse performance",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "S24 Monitor and control project progress and performance by establishing a progress baseline and selecting and applying the right analysis techniques (for example, earned value analysis) for the size and complexity of the project.",
+      "full_description": "Monitor and control project progress and performance by establishing a progress baseline and selecting and applying the right analysis techniques (for example, earned value analysis) for the size and complexity of the project."
+    },
+    {
+      "code": "S25",
+      "type": "Skill",
+      "wording": "Control and monitor project progress and performance by selecting and applying the right analysis techniques (for example, earned value analysis) for the size and complexity of the project",
+      "topic": "Monitor and control progress and performance",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "S25 Control and monitor project progress and performance by selecting and applying the right analysis techniques (for example, earned value analysis) for the size and complexity of the project",
+      "full_description": "Control and monitor project progress and performance by selecting and applying the right analysis techniques (for example, earned value analysis) for the size and complexity of the project"
+    },
+    {
+      "code": "S26",
+      "type": "Skill",
+      "wording": "Identify variations from the progress baseline and assess their potential impact, explain the variations to the project, portfolio or programme manager.",
+      "topic": "Explain baseline variances and impact",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "S26 Identify variations from the progress baseline and assess their potential impact, explain the variations to the project, portfolio or programme manager.",
+      "full_description": "Identify variations from the progress baseline and assess their potential impact, explain the variations to the project, portfolio or programme manager."
+    },
+    {
+      "code": "S27",
+      "type": "Skill",
+      "wording": "Communicate and justify own conclusions and recommendations for example for project recovery or to lead to improved project delivery by influencing and, when necessary, challenging key stakeholders to make informed decisions. Key stakeholders include the project manager, portfolio manager or programme manager",
+      "topic": "Defend and communicate recommendations",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_STAKE"
+      },
+      "display_text": "S27 Communicate and justify own conclusions and recommendations for example for project recovery or to lead to improved project delivery by influencing and, when necessary, challenging key stakeholders to make informed decisions. Key stakeholders include the project manager, portfolio manager or programme manager",
+      "full_description": "Communicate and justify own conclusions and recommendations for example for project recovery or to lead to improved project delivery by influencing and, when necessary, challenging key stakeholders to make informed decisions. Key stakeholders include the project manager, portfolio manager or programme manager"
+    },
+    {
+      "code": "S28",
+      "type": "Skill",
+      "wording": "Steer across project controls functions in accordance with organisational core values and specific guidelines; mentor and coach team members such as Project Controls Technicians to meet project control requirements.",
+      "topic": "Lead controls functions and coach teams",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_STAKE"
+      },
+      "display_text": "S28 Steer across project controls functions in accordance with organisational core values and specific guidelines; mentor and coach team members such as Project Controls Technicians to meet project control requirements.",
+      "full_description": "Steer across project controls functions in accordance with organisational core values and specific guidelines; mentor and coach team members such as Project Controls Technicians to meet project control requirements."
+    },
+    {
+      "code": "S29",
+      "type": "Skill",
+      "wording": "Apply continuous improvement approaches for example using emerging technologies and lessons learnt from previous projects.",
+      "topic": "Apply continuous improvement",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "S29 Apply continuous improvement approaches for example using emerging technologies and lessons learnt from previous projects.",
+      "full_description": "Apply continuous improvement approaches for example using emerging technologies and lessons learnt from previous projects."
+    },
+    {
+      "code": "B1",
+      "type": "Behaviour",
+      "wording": "Safety: Promotes and adopts a safety culture within the organisation, demonstrating a commitment to personal safety and the safety and wellbeing of others.",
+      "topic": "Safety",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "B1 Safety: Promotes and adopts a safety culture within the organisation, demonstrating a commitment to personal safety and the safety and wellbeing of others.",
+      "full_description": "Safety: Promotes and adopts a safety culture within the organisation, demonstrating a commitment to personal safety and the safety and wellbeing of others."
+    },
+    {
+      "code": "B2",
+      "type": "Behaviour",
+      "wording": "Leadership: leads by example, demonstrating resilience, acting responsibly, and ethically, taking account of the need to progress environmental, ethical, social and economic outcomes.",
+      "topic": "Responsible and ethical leadership",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_STAKE"
+      },
+      "display_text": "B2 Leadership: leads by example, demonstrating resilience, acting responsibly, and ethically, taking account of the need to progress environmental, ethical, social and economic outcomes.",
+      "full_description": "Leadership: leads by example, demonstrating resilience, acting responsibly, and ethically, taking account of the need to progress environmental, ethical, social and economic outcomes."
+    },
+    {
+      "code": "B3",
+      "type": "Behaviour",
+      "wording": "Commercially astute: Recognising when to leverage the contract commercial terms to maximise profitability for example how the commercial agreements generate cost and revenue streams for the organisation and how this links to generation of profit.",
+      "topic": "Commercial astuteness",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_PMO"
+      },
+      "display_text": "B3 Commercially astute: Recognising when to leverage the contract commercial terms to maximise profitability for example how the commercial agreements generate cost and revenue streams for the organisation and how this links to generation of profit.",
+      "full_description": "Commercially astute: Recognising when to leverage the contract commercial terms to maximise profitability for example how the commercial agreements generate cost and revenue streams for the organisation and how this links to generation of profit."
+    },
+    {
+      "code": "B4",
+      "type": "Behaviour",
+      "wording": "Pre-emptive: Foresees events and issues that might cause instability, uncertainty and phase changes.",
+      "topic": "Pre-emptive action",
+      "original_owner_group_by_pathway": {
+        "operational": "RISK",
+        "strategic": "RISK",
+        "chartered": "CH_RISK"
+      },
+      "display_text": "B4 Pre-emptive: Foresees events and issues that might cause instability, uncertainty and phase changes.",
+      "full_description": "Pre-emptive: Foresees events and issues that might cause instability, uncertainty and phase changes."
+    },
+    {
+      "code": "B5",
+      "type": "Behaviour",
+      "wording": "Integrity: Challenges areas of concern and acts with assertiveness and confidence.",
+      "topic": "Integrity and confident challenge",
+      "original_owner_group_by_pathway": {
+        "operational": "PPC",
+        "strategic": "PPC",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "B5 Integrity: Challenges areas of concern and acts with assertiveness and confidence.",
+      "full_description": "Integrity: Challenges areas of concern and acts with assertiveness and confidence."
+    },
+    {
+      "code": "B6",
+      "type": "Behaviour",
+      "wording": "Impartial: Responds to feedback and challenging questions professionally and objectively by reference to evidence.",
+      "topic": "Evidence-based impartiality",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "B6 Impartial: Responds to feedback and challenging questions professionally and objectively by reference to evidence.",
+      "full_description": "Impartial: Responds to feedback and challenging questions professionally and objectively by reference to evidence."
+    },
+    {
+      "code": "B7",
+      "type": "Behaviour",
+      "wording": "Accountable: Takes responsibility for the accuracy and integrity of project controls reporting and recommendations.",
+      "topic": "Accountability for accuracy",
+      "original_owner_group_by_pathway": {
+        "operational": "FINANCE",
+        "strategic": "FINANCE",
+        "chartered": "FINANCE"
+      },
+      "display_text": "B7 Accountable: Takes responsibility for the accuracy and integrity of project controls reporting and recommendations.",
+      "full_description": "Accountable: Takes responsibility for the accuracy and integrity of project controls reporting and recommendations."
+    },
+    {
+      "code": "B8",
+      "type": "Behaviour",
+      "wording": "Collaborative: Interacts within a wide, multi-disciplinary project team, building co-operative relationships. Encourages team effort and promotes an interdependent culture.",
+      "topic": "Collaboration",
+      "original_owner_group_by_pathway": {
+        "operational": "PMP",
+        "strategic": "PMP",
+        "chartered": "CH_STAKE"
+      },
+      "display_text": "B8 Collaborative: Interacts within a wide, multi-disciplinary project team, building co-operative relationships. Encourages team effort and promotes an interdependent culture.",
+      "full_description": "Collaborative: Interacts within a wide, multi-disciplinary project team, building co-operative relationships. Encourages team effort and promotes an interdependent culture."
+    },
+    {
+      "code": "B9",
+      "type": "Behaviour",
+      "wording": "Innovation: Learns from innovative solutions and seeks out new ideas to deliver improvements.",
+      "topic": "Innovation",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "B9 Innovation: Learns from innovative solutions and seeks out new ideas to deliver improvements.",
+      "full_description": "Innovation: Learns from innovative solutions and seeks out new ideas to deliver improvements."
+    },
+    {
+      "code": "B10",
+      "type": "Behaviour",
+      "wording": "Personal & professional development: Takes responsibility for personal learning and professional development. Demonstrates commitment to learning and improvement, providing and receiving feedback and with a commitment to professional standards.",
+      "topic": "Personal and professional development",
+      "original_owner_group_by_pathway": {
+        "operational": "AI",
+        "strategic": "AI",
+        "chartered": "AI"
+      },
+      "display_text": "B10 Personal & professional development: Takes responsibility for personal learning and professional development. Demonstrates commitment to learning and improvement, providing and receiving feedback and with a commitment to professional standards.",
+      "full_description": "Personal & professional development: Takes responsibility for personal learning and professional development. Demonstrates commitment to learning and improvement, providing and receiving feedback and with a commitment to professional standards."
+    },
+    {
+      "code": "B11",
+      "type": "Behaviour",
+      "wording": "Adaptable: adapts to evolving circumstances.",
+      "topic": "Adaptability",
+      "original_owner_group_by_pathway": {
+        "operational": "SCHEDULE",
+        "strategic": "SCHEDULE",
+        "chartered": "CH_PLAN"
+      },
+      "display_text": "B11 Adaptable: adapts to evolving circumstances.",
+      "full_description": "Adaptable: adapts to evolving circumstances."
+    }
+  ],
+  "learner_ui_display_rule": "For every KSB row, render the full_description verbatim with code and category, as well as the existing Answer action. Never show only code, an abbreviated topic, or placeholder text.",
+  "exact_text_reference": "Pasted text(20261102-112959).txt — 71 original complete KSB descriptions; cross-checked exactly against Excel KSB source and reference mapping."
+}

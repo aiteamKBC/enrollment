@@ -62,9 +62,11 @@ class SeparationTests(SimpleTestCase):
         with patch.dict(os.environ, {"ENROLMENT_API_REQUIRE_AUTH": "0"}), \
                 patch.dict(extended_ilr.KINDS, {"apprenticeship": learner_model}), \
                 patch.object(extended_ilr.transaction, "atomic", lambda **_: nullcontext()), \
+                patch.object(extended_ilr.ExtendedIlr.objects, "filter") as existing, \
                 patch.object(extended_ilr.ExtendedIlr.objects, "update_or_create", return_value=(row, True)) as upsert, \
                 patch.object(extended_ilr, "project_draft") as project, \
                 patch.object(extended_ilr, "_payload", return_value={"ok": True}):
+            existing.return_value.first.return_value = None
             response = extended_ilr.extended_ilr(request, kind="apprenticeship", learner_id=41)
 
         self.assertEqual(response.status_code, 200, response.content)

@@ -55,7 +55,7 @@ CONN = "enrolment"
 LAYOUT_TABLE = "Wizard_Form_Layouts"
 
 #: A layout is a few KB; this only stops a runaway payload.
-MAX_LAYOUT_BYTES = 512 * 1024
+MAX_LAYOUT_BYTES = 4 * 1024 * 1024  # Includes four complete Skills Radar catalogues.
 MAX_STEPS = 40
 MAX_ITEMS_PER_STEP = 200
 MAX_OPTIONS = 200
@@ -182,15 +182,17 @@ def current_layout():
     """The published layout as a dict, or None when nothing is published."""
     with connections[CONN].cursor() as cursor:
         current = read_current(cursor)
-    return with_modules(with_suitability_step(current[1])) if current else None
+    from .skills_radar.catalogue import with_catalogues
+    return with_catalogues(with_modules(with_suitability_step(current[1]))) if current else None
 
 
 def _payload(current):
     if current is None:
         return {"layout": None, "version": None, "updatedAt": "", "updatedBy": ""}
     version, layout, created_at, created_by = current
+    from .skills_radar.catalogue import with_catalogues
     return {
-        "layout": with_modules(with_suitability_step(layout)),
+        "layout": with_catalogues(with_modules(with_suitability_step(layout))),
         "version": version,
         "updatedAt": created_at.isoformat() if created_at else "",
         "updatedBy": created_by or "",
@@ -371,6 +373,11 @@ def normalize_layout(raw, previous):
         from programme_suitability.modules_configuration import integrate_layout as integrate_modules
         integrate_modules(raw, previous, layout)
     except ConfigurationError as exc:
+        raise LayoutError(str(exc)) from exc
+    from .skills_radar.catalogue import CatalogueError, integrate_layout as integrate_radar
+    try:
+        integrate_radar(raw, previous, layout)
+    except CatalogueError as exc:
         raise LayoutError(str(exc)) from exc
     return with_suitability_step(layout), plan
 
@@ -611,6 +618,15 @@ def publish_wizard_layout(request):
     if not isinstance(body, dict):
         return _error("Request body must be a JSON object.", 400)
     from programme_suitability.permissions import is_staff
+    if isinstance(body.get('layout'), dict) and 'skillsRadarCatalogues' in body['layout']:
+        if not is_staff(request):
+            return _error('Admissions staff access required to publish Skills Radar configuration.', 403)
+        # Legacy layout clients predate CSRF. Catalogue imports always use the
+        # secure builder client, so enforce CSRF for this new publishing path.
+        from django.middleware.csrf import CsrfViewMiddleware
+        rejection = CsrfViewMiddleware(lambda r: None).process_view(request, lambda r: None, (), {})
+        if rejection is not None:
+            return rejection
     if isinstance(body.get('layout'), dict) and 'programmeModules' in body['layout'] and not is_staff(request):
         return _error('Admissions staff access required to publish modules configuration.', 403)
     if isinstance(body.get("layout"), dict) and "programmeSuitability" in body["layout"] and not is_staff(request):

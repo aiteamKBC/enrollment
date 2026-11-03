@@ -108,6 +108,8 @@ export interface LayoutStep {
 }
 
 export interface WizardLayout {
+  skillsRadarCatalogues?: import('@/features/programme-suitability/skills-radar/catalogue/types').RadarCatalogues;
+  skillsRadarImportApprovals?: import('@/features/programme-suitability/skills-radar/catalogue/types').CatalogueDraft['skillsRadarImportApprovals'];
   programmeModules?: import('@/features/programme-suitability/modules/configuration').ModulesConfiguration;
   programmeSuitability?: import('@/features/programme-suitability/types').Configuration;
   steps: LayoutStep[];
