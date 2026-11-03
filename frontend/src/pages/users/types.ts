@@ -443,6 +443,11 @@ export interface KsbAssessment {
   note?: string;
 }
 export interface SkillsRadarState {
+  /** Server-owned programme/version pins; a signed token binds a first save. */
+  catalogueVersions?: Record<string, string>;
+  catalogueToken?: string;
+  /** Derived PCP catalogue/allocation validity; never persisted as an answer. */
+  configurationError?: string;
   standardId: string;
   assessments: Record<string, KsbAssessment>;
   /**

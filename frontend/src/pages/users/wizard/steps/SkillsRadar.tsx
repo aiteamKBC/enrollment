@@ -11,6 +11,11 @@ import { StepHeading } from './fields';
 import { useText } from '../layout/textsContext';
 import { useShowStepErrors } from "../stepErrors.helpers";
 import { RowsSkeleton } from '@/components/feature/Skeletons';
+import { isPcpRadar, radarProfileProgramme, resolvePcpRadar } from '@/features/programme-suitability/skills-radar/allocation';
+import { isMmRadar, mmRadarProfileProgramme, resolveMmRadar } from '@/features/programme-suitability/skills-radar/marketingManager';
+import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/programme-suitability/skills-radar/marketingExecutive';
+import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
+import { ModuleMasterDetail } from '@/features/programme-suitability/skills-radar/ModuleMasterDetail';
 
 /**
  * Skills Radar — a sequential self-assessment questionnaire.
@@ -65,7 +70,13 @@ function workingFrom(existing?: KsbAssessment): WorkingAnswer {
 }
 
 export default function SkillsRadar() {
-  const { draft, setSection, readOnly, board } = useWizard();
+  const { draft, setSection, readOnly, board, suitability, modules, radarCatalogue } = useWizard();
+  const managed = Boolean(radarCatalogue?.enabled && !(radarCatalogue.data && !radarCatalogue.data.catalogue));
+  const pcp = isPcpRadar(suitability?.state);
+  const mm = isMmRadar(suitability?.state);
+  const me = isMeRadar(suitability?.state);
+  const apm = isApmRadar(suitability?.state) || isApmStaffReview(readOnly, board.programme.name || '', suitability?.state);
+  const moduleBased = managed || pcp || mm || me || apm;
   const t = useText();
   const showErrors = useShowStepErrors();
   const sr = draft.skillsRadar;
@@ -73,50 +84,68 @@ export default function SkillsRadar() {
   // The KSBs come from the profile authored against THIS learner's programme
   // (curriculum.ksb_profiles), not a fixed standard — a learner must only ever
   // self-assess against their own programme's competencies.
-  const programme = board.programme.name || '';
+  const programmeLookup = apm ? apmRadarProfileProgramme(suitability?.state) : me ? meRadarProfileProgramme(suitability?.state) : mm ? mmRadarProfileProgramme(suitability?.state) : radarProfileProgramme(board.programme.name || '', suitability?.state);
+  const programme = managed ? modules?.data?.configuration.programmes.find((p) => p.id === radarCatalogue?.data?.programmeId)?.title || board.programme.name || '' : moduleBased ? modules?.data?.configuration.programmes.find((p) => p.id === (apm ? 'APM_L4' : me ? 'ME_L4' : mm ? 'MM_L6' : 'PCP_L6'))?.title || (apm ? 'Associate Project Manager Level 4' : me ? 'Marketing Executive Level 4' : mm ? 'Marketing Manager Level 6' : 'Project Controls Professional Level 6') : board.programme.name || '';
   // Seeded from the cache the wizard bootstrap primed, so a step the learner has
   // already visited (or one opened after the bootstrap) renders its competencies
   // on the first frame. Starting empty-and-loading meant a spinner flashed on
   // every mount for a list that was already in memory — effects run after paint,
   // so even an instantly-resolving promise costs one visible frame.
-  const cached = peekKsbProfile(programme);
-  const [ksbs, setKsbs] = useState<Ksb[]>(() => (cached?.results as Ksb[]) ?? []);
-  const [loading, setLoading] = useState(!cached && Boolean(programme));
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const cached = peekKsbProfile(programmeLookup);
+  const [profileKsbs, setKsbs] = useState<Ksb[]>(() => (cached?.results as Ksb[]) ?? []);
+  const [loadedProgramme, setLoadedProgramme] = useState(cached ? programmeLookup : '');
+  const [profileLoading, setLoading] = useState(!cached && Boolean(programmeLookup));
+  const [profileError, setLoadError] = useState<string | null>(null);
+  const loading = managed ? Boolean(radarCatalogue?.loading) : profileLoading;
+  const loadError = managed ? radarCatalogue?.error : profileError;
 
   useEffect(() => {
-    if (!programme) {
+    if (managed) return;
+    if (!programmeLookup) {
       setKsbs([]);
+      setLoadedProgramme('');
       setLoading(false);
       return;
     }
     let cancelled = false;
     // A cache hit is served synchronously above; re-reading it here would only
     // re-set identical state. A miss still shows the spinner it always did.
-    const hit = peekKsbProfile(programme);
+    const hit = peekKsbProfile(programmeLookup);
     if (hit) {
       setKsbs(hit.results as Ksb[]);
+      setLoadedProgramme(programmeLookup);
+      setLoadError(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     setLoadError(null);
-    fetchKsbProfile(programme)
+    fetchKsbProfile(programmeLookup)
       .then((res) => {
         if (cancelled) return;
         setKsbs(res.results as Ksb[]);
+        setLoadedProgramme(programmeLookup);
       })
       .catch((e: Error) => { if (!cancelled) setLoadError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [programme]);
+  }, [programmeLookup, managed]);
+
+  const grouping = useMemo(() => managed ? radarCatalogue?.grouping : pcp ? resolvePcpRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : mm ? resolveMmRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : me ? resolveMeRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : apm ? resolveApmRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : null,
+    [managed, radarCatalogue?.grouping, pcp, mm, me, apm, loading, loadedProgramme, programmeLookup, profileKsbs, modules?.data, modules?.error, loadError]);
+  const ksbs = useMemo(() => grouping ? grouping.questions : managed ? [] : profileKsbs, [grouping, managed, profileKsbs]);
+  const questionIndex = useMemo(() => new Map(ksbs.map((ksb, index) => [ksb.id, index])), [ksbs]);
+  const moduleForQuestion = useMemo(() => new Map(grouping?.modules.flatMap((module) => module.questions.map((ksb) => [ksb.id, module.id] as const)) ?? []), [grouping]);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
 
   // An unrated row per competency is seeded by WizardProvider rather than here:
   // completeness is judged for every step at once, so a learner who never opens
   // this one must still show it as outstanding.
 
-  // Index of the question open in the modal; null when closed.
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // Keep the open question tied to its profile ID if module grouping changes.
+  const [openKsbId, setOpenKsbId] = useState<string | null>(null);
+  const position = openKsbId == null ? -1 : ksbs.findIndex((ksb) => ksb.id === openKsbId);
+  const openIndex = position < 0 ? null : position;
   const [work, setWork] = useState<WorkingAnswer>(workingFrom());
 
   const answeredCount = useMemo(
@@ -130,11 +159,14 @@ export default function SkillsRadar() {
 
   const open = (index: number) => {
     const ksb = ksbs[index];
+    if (!ksb) return;
+    const owner = moduleForQuestion.get(ksb.id);
+    if (owner) setSelectedModuleId(owner);
     setWork(workingFrom(sr.assessments[ksb.id]));
-    setOpenIndex(index);
+    setOpenKsbId(ksb.id);
   };
 
-  /** Persist the open question, then advance. Returns the next index (or null). */
+  /** Apply the confirmed answer using the existing profile ID. */
   const commit = (index: number): void => {
     const ksb = ksbs[index];
     const existing = sr.assessments[ksb.id];
@@ -159,12 +191,50 @@ export default function SkillsRadar() {
     if (nextIndex < ksbs.length) {
       open(nextIndex);
     } else {
-      setOpenIndex(null);
+      setOpenKsbId(null);
     }
   };
 
   const openKsb = openIndex != null ? ksbs[openIndex] : null;
   const highRating = isHighRating(work.level);
+
+  const renderQuestion = (ksb: Ksb, i: number) => {
+    const level = sr.assessments[ksb.id]?.level ?? null;
+    const meta = competenceMeta(level);
+    const score = competenceScore(level);
+    // After a refused Next, every competency still to rate is marked.
+    const unrated = showErrors && !readOnly && !level;
+    return (
+      <div key={ksb.id} className={`flex items-center gap-3 px-3 py-2.5${moduleBased ? ' flex-wrap sm:flex-nowrap' : ''}${unrated ? ' bg-red-50 ring-1 ring-inset ring-red-500' : ''}`}>
+        <span className="text-[12px] font-semibold text-foreground-400 w-7 shrink-0 text-right">{i + 1}.</span>
+        <span className={`flex-1 min-w-0 [overflow-wrap:anywhere] ${moduleBased ? 'basis-[calc(100%-3rem)] sm:basis-auto' : ''}`}>
+          <span className="text-[13px] text-foreground-800">{ksb.codes.join(', ')} {ksb.title}</span>
+          <span className="block text-[11px] text-foreground-400 mt-0.5">{ksb.theme} · {ksb.kind}</span>
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-3">
+        {score != null && meta ? (
+          <span className={`text-[11px] font-bold w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${meta.tintBg} ${meta.tintText}`} title={meta.label}>
+            {score}
+          </span>
+        ) : unrated ? (
+          <span className="text-[11px] text-red-600 shrink-0">Please answer</span>
+        ) : (
+          <span className="text-[11px] text-foreground-300 shrink-0">—</span>
+        )}
+        {/* Fixed-width slot so the scores stay in one column. */}
+        <span className="w-7 shrink-0">{isHighRating(level) && <HighRatingFlag />}</span>
+        <button
+          onClick={() => open(i)}
+          aria-label={moduleBased ? `${readOnly ? 'View' : level ? 'Edit' : 'Answer'} ${ksb.codes[0]}` : undefined}
+          aria-invalid={unrated || undefined}
+          className={`${btnSecondary} !py-1 !px-3 !text-[11px] shrink-0`}
+        >
+          <AppIcon className={readOnly ? 'ri-eye-line' : 'ri-edit-line'} />{readOnly ? 'View' : level ? 'Edit' : 'Answer'}
+        </button>
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -179,7 +249,10 @@ export default function SkillsRadar() {
           <i className="ri-error-warning-line mr-1.5" />{loadError}
         </p>
       )}
-      {!loading && !loadError && ksbs.length === 0 && (
+      {grouping && !loading && !loadError && grouping.status !== 'ready' && (
+        <p role={grouping.status === 'loading' ? 'status' : 'alert'} className="my-4 text-sm text-foreground-700">{grouping.message}</p>
+      )}
+      {!moduleBased && !loading && !loadError && ksbs.length === 0 && (
         <div className="py-6">
           <EmptyState text={
             programme
@@ -223,62 +296,31 @@ export default function SkillsRadar() {
         </button>
       )}
 
-      {/* Question list — numbered, showing each answer's score */}
-      <div className="border border-foreground-200/70 rounded-xl divide-y divide-foreground-100 overflow-hidden">
+      {/* Same answer rows and popup, grouped for confirmed PCP, MM, ME and APM programmes. */}
+      {grouping?.status === 'ready' ? <ModuleMasterDetail modules={grouping.modules} assessments={sr.assessments}
+        selectedModuleId={(openKsbId && moduleForQuestion.get(openKsbId)) || selectedModuleId} onSelect={setSelectedModuleId}
+        renderQuestion={(ksb) => renderQuestion(ksb, questionIndex.get(ksb.id)!)} /> : !moduleBased && <div className="border border-foreground-200/70 rounded-xl divide-y divide-foreground-100 overflow-hidden">
         <div className="flex items-center gap-3 px-3 py-2 bg-background-100/60">
           <span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider flex-1">Skill description</span>
           <span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider">Answer</span>
         </div>
-        {ksbs.map((ksb, i) => {
-          const level = sr.assessments[ksb.id]?.level ?? null;
-          const meta = competenceMeta(level);
-          const score = competenceScore(level);
-          // After a refused Next, every competency still to rate is marked.
-          const unrated = showErrors && !readOnly && !level;
-          return (
-            <div key={ksb.id} className={`flex items-center gap-3 px-3 py-2.5${unrated ? ' bg-red-50 ring-1 ring-inset ring-red-500' : ''}`}>
-              <span className="text-[12px] font-semibold text-foreground-400 w-7 shrink-0 text-right">{i + 1}.</span>
-              <span className="flex-1 min-w-0">
-                <span className="text-[13px] text-foreground-800">{ksb.codes.join(', ')} {ksb.title}</span>
-                <span className="block text-[11px] text-foreground-400 mt-0.5">{ksb.theme} · {ksb.kind}</span>
-              </span>
-              {score != null && meta ? (
-                <span className={`text-[11px] font-bold w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${meta.tintBg} ${meta.tintText}`} title={meta.label}>
-                  {score}
-                </span>
-              ) : unrated ? (
-                <span className="text-[11px] text-red-600 shrink-0">Please answer</span>
-              ) : (
-                <span className="text-[11px] text-foreground-300 shrink-0">—</span>
-              )}
-              {/* Fixed-width slot so the scores stay in one column. */}
-              <span className="w-7 shrink-0">{isHighRating(level) && <HighRatingFlag />}</span>
-              <button
-                onClick={() => open(i)}
-                aria-invalid={unrated || undefined}
-                className={`${btnSecondary} !py-1 !px-3 !text-[11px] shrink-0`}
-              >
-                <AppIcon className={readOnly ? 'ri-eye-line' : 'ri-edit-line'} />{readOnly ? 'View' : level ? 'Edit' : 'Answer'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+        {ksbs.map(renderQuestion)}
+      </div>}
 
       {/* Question modal */}
       {openIndex != null && openKsb && (
         <Modal
           title={`Question ${openIndex + 1} of ${ksbs.length}`}
-          onClose={() => setOpenIndex(null)}
+          onClose={() => setOpenKsbId(null)}
           size="max-w-3xl"
           /* Each question starts at the top rather than inheriting the last scroll. */
           scrollResetKey={openIndex}
           footer={
             readOnly ? (
-              <button className={btnSecondary} onClick={() => setOpenIndex(null)}>Close</button>
+              <button className={btnSecondary} onClick={() => setOpenKsbId(null)}>Close</button>
             ) : (
               <>
-                <button className={btnSecondary} onClick={() => setOpenIndex(null)}>Cancel</button>
+                <button className={btnSecondary} onClick={() => setOpenKsbId(null)}>Cancel</button>
                 <button className={btnPrimary} onClick={confirm} disabled={!work.level || (highRating && !work.note.trim())}>
                   <AppIcon className="ri-check-line" />{openIndex + 1 < ksbs.length ? 'Confirm & next' : 'Confirm'}
                 </button>

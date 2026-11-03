@@ -1,0 +1,139 @@
+﻿PCP Level 6 Module-Based Skills Radar — Implementation Report
+
+HISTORICAL REPORT: this records the earlier accordion implementation. Its UI layout, component filename and test counts are superseded by MASTER_DETAIL_VERIFICATION_REPORT.md in this folder. The final UI uses ModuleMasterDetail.tsx with modules on the left and one question panel on the right. Original evidence below is retained for reference.
+
+Branch and scope
+Worked on the existing skills-radar branch. The working tree was clean at task start.
+No commit, push, merge, rebase, reset or branch switch was performed.
+The existing Programme Suitability/Modules implementation and other developers' steps were preserved.
+No backend production files, database records, module configurations or migrations were changed.
+
+Implemented result
+Confirmed PCP L6 now shows selected-module accordions instead of the flat list. Other programmes retain the existing flat Skills Radar.
+Each selected module displays its full published title, answered/assigned count, expand/collapse arrow and complete KSB rows.
+Rows show code, type, exact full English description, existing rating/status and the existing Answer/Edit/View button. Long text wraps; mobile buttons can sit beneath it.
+The existing Modal, nine rating choices/labels, high-rating note requirement, notes, evidence workflow, Cancel and Confirm & next were reused.
+The open question is tracked by the existing profile ID rather than only a list index, protecting notes/evidence if module grouping changes while the popup is open.
+
+Authoritative data and verification
+Canonical file:
+frontend/src/features/programme-suitability/skills-radar/pcp_l6_ksb_full_descriptions_and_mapping.json
+It is a byte-identical copy of the supplied JSON, including all 71 full_description strings and original ownership metadata. topic is never used as question wording.
+Verified every code, type, full description, display text and original owner against Project_Controls_Level6_KSB_Mapping (1).xlsx, sheets KSB source and Coverage, rows 9-79. Zero mismatches.
+Counts: K1-K31 = 31 Knowledge; S1-S29 = 29 Skill; B1-B11 = 11 Behaviour.
+All 71 existing database descriptions also matched the supplied full text. The existing profile source is standard:st0845-v1-1, with IDs such as st0845-v1-1-K1.
+The separately named Pasted text(20261102-112959).txt was not present in the supplied locations; no wording/mapping was invented. Both available authoritative sources independently matched all records.
+Canonical JSON SHA-256: 66ab531129d68292e9d0cd443a2949cffd982897031f4d398e34d4e873b80b40
+Workbook SHA-256: 4d65903073c1be5d7cb90b3d5095fde94e74f3a596e11aef575a4ef705f45930
+Read-only verifier: tools/verify_pcp_radar_sources.py --reference-json <supplied-json> --workbook <supplied-workbook>
+Uses the already available openpyxl package; it does not load application settings or connect to a database.
+
+Module resolution and allocation
+Uses confirmed PCP programme plus the existing modules controller's savedSelection, selectionComplete and pinned configurationVersion. Unsaved local Step 6 edits are not used.
+Uses stable published module IDs, never matching display names or module indices.
+Mandatory IDs, selection validity and active status come from the existing configuration/validation helpers. Module headers respect published hierarchy/order and editable names.
+Operational owner mapping: pmp=PMP, ai-project-control=AI, risk-apm=RISK, planning-control=PPC, earned-value=FINANCE, pmi-sp=SCHEDULE.
+Strategic: same mandatory owner IDs; pmi-pmo=PPC, portfolio=FINANCE, successful-programmes=SCHEDULE.
+Chartered: pmo-planning-control=CH_PLAN, pmo-stakeholders=CH_STAKE, pmo-risk-quality=CH_RISK, pmo-office=CH_PMO, ai-project-management=AI; either selected portfolio or earned-value owns FINANCE.
+Certified PMO parent is not rendered as a KSB owner. Its four children appear as independent cards.
+
+Deterministic redistribution
+Original ownership in the master JSON never changes.
+KSBs from the excluded Operational/Strategic optional owner are sorted in canonical K1..K31, S1..S29, B1..B11 order and assigned round-robin to the selected optional modules.
+Recipient priority follows the source owner order PPC, FINANCE, SCHEDULE, independent of checkbox-array order and editable module display order.
+Thus excluded EVM's 11 records add 6 to PPC and 5 to Schedule: final counts 16,12,9,23,11.
+Chartered does not redistribute; either optional receives the identical 11 FINANCE records.
+Tested all eight standard combinations:
+Operational PPC+Finance: 16,12,9,20,14
+Operational PPC+Schedule: 16,12,9,23,11
+Operational Finance+Schedule: 16,12,9,20,14
+Strategic PMO+Portfolio: 16,12,9,20,14
+Strategic PMO+MSP: 16,12,9,23,11
+Strategic Portfolio+MSP: 16,12,9,20,14
+Chartered Portfolio: 21,7,11,9,12,11
+Chartered Earned Value: 21,7,11,9,12,11
+Every combination contains exactly 71 unique existing profile IDs, codes and full descriptions.
+
+Answer compatibility, progress and validation
+The existing curriculum profile IDs are retained. Canonical wording replaces only the displayed title; no new answer IDs are generated.
+Ratings, notes, evidenceFiles, existing action plans and historical assessment rows remain in the existing skillsRadar.assessments dictionary.
+Regrouping changes only derived membership, never the saved answer envelope. Confirm & next follows the current assigned 71-question order.
+Overall and per-module counts use the same answer IDs, count each KSB once, and ignore unrelated historical profile rows.
+The existing answer persistence remains through the wizard's save/projection workflow. Merely opening/closing accordions does not call setSection or save APIs.
+Missing/duplicate/ambiguous profile codes, missing or placeholder descriptions, unsupported selected module IDs or owner assignments produce configuration errors instead of bare-code fallback or silently losing KSBs.
+A derived skillsRadar.configurationError blocks navigation/completion while PCP allocation is invalid, even if all returned profile items were rated. It is never saved as an answer. Other programmes' completion rules are unchanged.
+Confirmed programme catalogue lookup is used even when board.programme.name is stale. Cached profile requests remain shared.
+
+Performance and browser verification
+Native details accordions expand immediately without fetching individual descriptions. The catalogue is bundled once; the existing profile cache supplies IDs/answers.
+Chrome verified the actual WizardProvider and SkillsRadar components using a read-only export of the real version-11 module configuration and existing 71-item profile. Learner API writes were intercepted to avoid changing real records.
+Verified all 71 full descriptions, 71 Answer/Edit buttons, one profile network request per load, zero writes while toggling accordions, all nine rating options, unchanged note/evidence flow, sequential modal order, save/reload and answer preservation after Operational-to-Chartered regrouping.
+Desktop 1440px: two-column cards and right-side answer buttons.
+Mobile 390px: full K6 long description readable, button below description where needed, no horizontal overflow. No browser page errors.
+Browser persistence used controlled API fixtures, not a full authenticated production-account end-to-end test.
+Temporary harness files were removed, and the isolated Vite server started for verification was stopped.
+
+Database inspection
+Used the existing Django connection under a read-only PostgreSQL transaction, following the installed Neon/Postgres skill guidance. No project, branch, connection string or database schema was created/changed.
+Published module version 11 already contains the Strategic Risk mandatory module and PMO optional module required by the request. Backend seed defaults differ from this published configuration; they were deliberately not edited in this Skills Radar task. Allocation uses the actual pinned published snapshot, not seed module labels.
+Custom or historical snapshots missing one of the required owner modules need configuration review; the UI reports that condition rather than inventing a mapping or rewriting historical selections.
+
+Tests and checks
+PASS: new allocation tests — 16 tests (all eight combinations plus text/identity/configuration/determinism coverage).
+PASS: new UI tests — 7 tests, including the unchanged popup, notes/evidence, read-only review and historical answer regrouping.
+PASS: new real-provider integration tests — 3 tests, including stale-board programme resolution, answer envelope preservation and missing-K6 completion blocking.
+PASS: existing Skills Radar nine-point/high-rating and stale-KSB tests within the regression run.
+PASS: frontend type-check, lint, production build and git diff --check.
+PASS: source verifier — all 71 exact descriptions and ownership records match the workbook; canonical JSON is byte-identical to the input.
+PASS: programme_suitability Django suite — 133 tests.
+PASS: focused backend scale, ILR details/employer and service tests — 36 tests.
+
+Pre-existing failures, independently distinguished from this change
+Full frontend regression run: 513 tests across 65 files; 509 passed, 4 failed.
+Those four failures expect 12 wizard steps / old Next Steps progress and numbering, while this branch already has 13 steps. No step registration was changed by this task.
+Verified by re-running the two failing test files with the four modified shared files loaded read-only from HEAD using a temporary Vitest load plugin. Baseline result: 6 passed, the exact same 4 failed by full test name. The workspace was never reset or switched. Temporary comparison config was removed.
+Frontend baseline cases:
+- registers twelve default steps with suitability sixth and CV seventh
+- Next Steps in the step rail is locked and not counted as complete before the earlier steps are done
+- Next Steps in the step rail shows its number rather than a tick for staff, who are not gated
+- Next Steps in the step rail does not count as complete just by being opened while earlier steps are unfinished
+Broad backend check: 278 tests; 5 existing failures/errors (3 failures, 2 errors) in BKSB provisioning and wizard field normalization. All backend production/test files are unchanged relative to HEAD, so these failures are outside this frontend implementation.
+Backend baseline cases:
+- tests_bksb.BksbHelpersTests.test_auto_login_provisions_a_new_account_then_verifies_and_enrols_english
+- tests_wizard_layout.NormalizeLayoutTests.test_content_blocks_have_no_answer_storage
+- tests_wizard_layout.NormalizeLayoutTests.test_radio_and_checkbox_fields_use_their_answer_storage
+- tests_wizard_layout.NormalizeLayoutTests.test_new_text_types_share_text_storage
+- tests_wizard_layout.NormalizeLayoutTests.test_legacy_text_field_can_be_upgraded_to_multi_line
+These shared baseline issues remain for coordination with their owners; they were not hidden or fixed by changing unrelated steps.
+
+Exact modified existing files
+frontend/src/pages/users/wizard/steps/SkillsRadar.tsx
+frontend/src/pages/users/wizard/WizardContext.tsx
+frontend/src/pages/users/wizard/layout/registry.ts
+frontend/src/pages/users/types.ts
+
+New files
+frontend/src/features/programme-suitability/skills-radar/allocation.ts
+frontend/src/features/programme-suitability/skills-radar/ModuleAccordions.tsx
+frontend/src/features/programme-suitability/skills-radar/pcp_l6_ksb_full_descriptions_and_mapping.json
+frontend/src/features/programme-suitability/__tests__/pcpRadarFixtures.ts
+frontend/src/features/programme-suitability/__tests__/pcpRadarAllocation.test.ts
+frontend/src/features/programme-suitability/__tests__/pcpRadarUI.test.tsx
+frontend/src/features/programme-suitability/__tests__/pcpRadarIntegration.test.tsx
+frontend/src/features/programme-suitability/skills-radar/IMPLEMENTATION_REPORT.txt (this report)
+tools/verify_pcp_radar_sources.py
+
+Merge/integration notes
+No database migration or backend deployment change is required.
+The four existing frontend files listed above are shared wizard files: coordinate merges in SkillsRadar.tsx, WizardContext.tsx, registry.ts and types.ts. Changes are restricted to PCP selection/profile validation and rendering.
+The feature-specific folder and tests isolate canonical data, ownership resolution and accordion presentation from other steps.
+Keep existing profile IDs and module IDs stable; new/custom module IDs require an explicit reviewed owner mapping rather than name-based guesses.
+Do not persist the derived configurationError/module allocation metadata or remove historical answer rows when integrating.
+The only outstanding issues identified are the pre-existing broader-suite failures above and the normal authenticated deployment smoke test; no new feature test failure remains.
+
+Ignored local evidence
+frontend/.cache/pcp-radar-regression.json
+frontend/.cache/pcp-radar-head-baseline.json
+frontend/.cache/pcp-radar-browser-results.json
+frontend/.cache/pcp-radar-desktop.png
+frontend/.cache/pcp-radar-mobile-k6.png

@@ -36,6 +36,7 @@ class ModuleDraftPersistenceTests(SimpleTestCase):
                 patch.object(extended_ilr.ExtendedIlr.objects, 'filter') as find, \
                 patch.object(extended_ilr, 'project_draft'), \
                 patch.object(extended_ilr, 'project_custom_fields'), \
+                patch('enrolment_api.skills_radar.service.read_legacy_radar', return_value=None), \
                 patch.object(extended_ilr, 'read_ilr_details', return_value=None):
             find.return_value.first.return_value = row
             with patch('programme_suitability.modules_service.validate_choices', side_effect=lambda _kind, _id, value: value):

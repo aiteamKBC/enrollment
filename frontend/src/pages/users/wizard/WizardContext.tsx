@@ -18,9 +18,15 @@ import type { CustomAnswer, LayoutStep, WizardLayout } from './layout/types';
 import { WIZARD_STEPS, type EnrolmentBoard, type IlrForm, type Ksb, type WizardDraft } from '../types';
 import { useSuitability } from '@/features/programme-suitability/useSuitability';
 import { useModulesConfiguration } from '@/features/programme-suitability/modules/useModulesConfiguration';
-import { moduleSelectionComplete, selectionFingerprint, type ProgrammeModuleSelection } from '@/features/programme-suitability/modules/configuration';
+import { moduleSelectionComplete, selectionFingerprint, type ProgrammeModuleSelection, type ModulesState } from '@/features/programme-suitability/modules/configuration';
 import { saveModuleSelection } from '@/features/programme-suitability/modules/api';
 import { ModuleSaveQueue } from '@/features/programme-suitability/modules/moduleSaveQueue';
+import { isPcpRadar, radarProfileProgramme, resolvePcpRadar } from '@/features/programme-suitability/skills-radar/allocation';
+import { isMmRadar, mmRadarProfileProgramme, resolveMmRadar } from '@/features/programme-suitability/skills-radar/marketingManager';
+import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/programme-suitability/skills-radar/marketingExecutive';
+import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
+import { useCatalogue } from '@/features/programme-suitability/skills-radar/catalogue/useCatalogue';
+import { catalogueQuestions } from '@/features/programme-suitability/skills-radar/catalogue/runtime';
 
 function emptyIlr(firstNames: string, surname: string): IlrForm {
   return {
@@ -204,6 +210,7 @@ export function WizardProvider({
   const [hydrated, setHydrated] = useState(Boolean(seed));
   /** Whether the programme's competencies have been seeded (or settled as none). */
   const [ksbsSettled, setKsbsSettled] = useState(false);
+  const [radarProfile, setRadarProfile] = useState<{ programme: string; ksbs: Ksb[] | null; error: string }>({ programme: '', ksbs: null, error: '' });
 
   // The published layout. Read from the cache on the first frame when it is
   // already there (as the saved answers are), otherwise the default layout
@@ -232,6 +239,17 @@ export function WizardProvider({
   const suitability = useSuitability(kindForSeed, userId, Boolean(layout.programmeSuitability), publishedVersion,
     ['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) || layout.programmeSuitability?.enabled === false);
   const modules = useModulesConfiguration(kindForSeed, userId, suitability.selectionConfirmed, publishedVersion);
+  const apmStaffReview = isApmStaffReview(readOnlyLearnerSteps, board.programme.name || '', suitability.state);
+  // Unconfirmed staff reviews cannot use the learner modules endpoint (which
+  // requires confirmation and may pin a snapshot). Read published metadata only.
+  const reviewModules = useMemo<ModulesState | null>(() => apmStaffReview && !suitability.loading && !suitability.error && layout.programmeModules ? {
+    configuration: layout.programmeModules, configurationVersion: publishedVersion,
+    selectedProgramme: 'APM_L4', savedSelection: null,
+  } : null, [apmStaffReview, suitability.loading, suitability.error, layout.programmeModules, publishedVersion]);
+  const radarModulesData = apmStaffReview ? reviewModules : modules.data;
+  const radarModulesError = apmStaffReview
+    ? suitability.error || (layoutSettled && !suitability.loading && !reviewModules ? 'Published APM modules are unavailable. Reload the wizard to retry.' : '')
+    : modules.error;
   useEffect(() => {
     if (!modules.data) return;
     moduleServerLoaded.current = true;
@@ -314,12 +332,49 @@ export function WizardProvider({
    * Runs after hydration (the merge above replaces skillsRadar wholesale) and
    * never for staff, who review this step rather than answer it.
    */
-  const programmeName = board.programme.name || '';
+  const apmRadar = isApmRadar(suitability.state) || apmStaffReview;
+  const meRadar = isMeRadar(suitability.state);
+  const mmRadar = isMmRadar(suitability.state);
+  const programmeName = apmRadar ? apmRadarProfileProgramme(suitability.state) : meRadar ? meRadarProfileProgramme(suitability.state) : mmRadar ? mmRadarProfileProgramme(suitability.state) : radarProfileProgramme(board.programme.name || '', suitability.state);
+  const pcpRadar = isPcpRadar(suitability.state);
+  const moduleRadar = pcpRadar || mmRadar || meRadar || apmRadar;
+  const catalogueModules = useMemo<ModulesState | null>(() => radarModulesData || (layout.programmeModules ? {
+    configuration: layout.programmeModules, configurationVersion: publishedVersion,
+    selectedProgramme: suitability.state?.selectedProgramme || 'APM_L4', savedSelection: null,
+  } : null), [radarModulesData, layout.programmeModules, publishedVersion, suitability.state?.selectedProgramme]);
+  const radarCatalogue = useCatalogue(Boolean(layout.skillsRadarCatalogues) && hydrated, kind, userId, programmeName,
+    catalogueModules, radarModulesError, !layoutSettled || (Boolean(layout.skillsRadarCatalogues) && !hydrated));
+  const managedRadar = radarCatalogue.enabled && !(radarCatalogue.data && !radarCatalogue.data.catalogue);
+  const radarGrouping = useMemo(() => managedRadar ? radarCatalogue.grouping : pcpRadar ? resolvePcpRadar(radarProfile.programme === programmeName ? radarProfile.ksbs : null,
+    modules.data, radarProfile.programme === programmeName ? radarProfile.error || modules.error : modules.error) : mmRadar ? resolveMmRadar(radarProfile.programme === programmeName ? radarProfile.ksbs : null,
+    modules.data, radarProfile.programme === programmeName ? radarProfile.error || modules.error : modules.error) : meRadar ? resolveMeRadar(radarProfile.programme === programmeName ? radarProfile.ksbs : null,
+    modules.data, radarProfile.programme === programmeName ? radarProfile.error || modules.error : modules.error) : apmRadar ? resolveApmRadar(radarProfile.programme === programmeName ? radarProfile.ksbs : null,
+    radarModulesData, radarProfile.programme === programmeName ? radarProfile.error || radarModulesError : radarModulesError) : null,
+    [managedRadar, radarCatalogue.grouping, pcpRadar, mmRadar, meRadar, apmRadar, radarProfile, programmeName, modules.data, modules.error, radarModulesData, radarModulesError]);
   useEffect(() => {
+    if (!managedRadar || radarCatalogue.loading) return;
+    const catalogue = radarCatalogue.data?.catalogue;
+    if (catalogue) {
+      const questions = catalogueQuestions(catalogue);
+      setDraft((prev) => {
+        const assessments = { ...prev.skillsRadar.assessments };
+        if (!readOnlyLearnerSteps) for (const k of questions) {
+          assessments[k.id] ??= { ksbId: k.id, level: null, evidenceFiles: [], actionPlan: null };
+        }
+        const next = { ...prev, skillsRadar: { ...prev.skillsRadar, assessments,
+          programmeKsbIds: questions.map((q) => q.id), catalogueToken: radarCatalogue.data!.token } };
+        if (lastSavedDraft.current === prev) lastSavedDraft.current = next;
+        return next;
+      });
+    }
+    setKsbsSettled(true);
+  }, [managedRadar, radarCatalogue.loading, radarCatalogue.data, readOnlyLearnerSteps]);
+  useEffect(() => {
+    if (managedRadar || !layoutSettled) return;
     // Staff never seed, and a learner with no programme has nothing to seed —
     // both are settled by definition, or `ready` would never come true and the
     // rail would sit on "Loading your answers…" for good.
-    if (readOnlyLearnerSteps || !programmeName) {
+    if ((readOnlyLearnerSteps && !moduleRadar) || !programmeName) {
       setKsbsSettled(true);
       return;
     }
@@ -330,6 +385,8 @@ export function WizardProvider({
       .then((res) => {
         const ksbs = res.results as Ksb[];
         if (cancelled) return;
+        setRadarProfile({ programme: programmeName, ksbs, error: '' });
+        if (readOnlyLearnerSteps) return;
         setDraft((prev) => {
           const assessments = { ...prev.skillsRadar.assessments };
           for (const k of ksbs) {
@@ -352,7 +409,8 @@ export function WizardProvider({
           return next;
         });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (!cancelled) setRadarProfile({ programme: programmeName, ksbs: null, error: error instanceof Error ? error.message : 'Could not load Skills Radar questions.' });
         // The step surfaces its own load error; a learner is not blocked on
         // competencies we could not fetch.
       })
@@ -365,7 +423,7 @@ export function WizardProvider({
     return () => {
       cancelled = true;
     };
-  }, [readOnlyLearnerSteps, hydrated, programmeName]);
+  }, [managedRadar, layoutSettled, readOnlyLearnerSteps, hydrated, programmeName, moduleRadar]);
 
   /**
    * Whether the learner has answered the inclusion assessment, read from the
@@ -418,10 +476,13 @@ export function WizardProvider({
       userId,
       isCommercial,
       board,
-      draft: suitability.enabled ? { ...draft, programmeSuitability: { required: suitability.required, status: suitability.status, selectionConfirmed: suitability.selectionConfirmed, selectedProgramme: suitability.state?.selectedProgramme },
-        programmeModulesCompletion: { required: modulesRequired, complete: modulesComplete } } : draft,
+      draft: { ...draft, ...(suitability.enabled ? { programmeSuitability: { required: suitability.required, status: suitability.status, selectionConfirmed: suitability.selectionConfirmed, selectedProgramme: suitability.state?.selectedProgramme },
+        programmeModulesCompletion: { required: modulesRequired, complete: modulesComplete } } : {}),
+        skillsRadar: radarGrouping ? { ...draft.skillsRadar, configurationError: radarGrouping.status === 'ready' ? undefined : radarGrouping.message } : draft.skillsRadar,
+      },
+      radarCatalogue,
       suitability,
-      modules,
+      modules: apmStaffReview ? { ...modules, data: radarModulesData, error: radarModulesError } : modules,
       moduleSaveQueue,
       readOnly: readOnlyLearnerSteps,
       setSection: (key, val) => {
@@ -468,7 +529,9 @@ export function WizardProvider({
           // Read from the curriculum on every open; never stored.
           if (rest.skillsRadar) {
             const skillsRadar = { ...rest.skillsRadar };
+            if (managedRadar && radarCatalogue.data?.catalogue) skillsRadar.catalogueToken = radarCatalogue.data.token;
             delete skillsRadar.programmeKsbIds;
+            delete skillsRadar.configurationError;
             rest.skillsRadar = skillsRadar;
           }
           const res = await saveExtendedIlr(kind, userId, ilr, rest);
@@ -481,7 +544,7 @@ export function WizardProvider({
       ilrSaving,
       ilrSavedAt,
       hydrated,
-      ready: hydrated && ksbsSettled && layoutSettled && inclusionSettled && (!suitability.enabled || !suitability.loading) && (!modulesRequired || Boolean(modules.data || modules.error)),
+      ready: hydrated && ksbsSettled && !radarCatalogue.loading && layoutSettled && inclusionSettled && (!suitability.enabled || !suitability.loading) && (!modulesRequired || Boolean(modules.data || modules.error)),
       fileIlrDocument: async () => {
         setIlrFiling(true);
         try {
@@ -505,7 +568,7 @@ export function WizardProvider({
       ilrFiling,
       inclusionCheck,
     }),
-    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue]
+    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
   );
   moduleWriter.current = value.saveModules;
 

@@ -1,0 +1,290 @@
+{
+  "programme": "Marketing Executive Level 4",
+  "source_workbook": "Marketing_Executive_Level_4_KSB_Mapping(1).xlsx",
+  "source_sheet": "KSB source",
+  "mapping_version": "source-workbook-2026-11-02",
+  "module_selection": "fixed_all_modules",
+  "total_ksbs": 33,
+  "counts": {
+    "knowledge": 11,
+    "skills": 14,
+    "behaviours": 8
+  },
+  "modules": [
+    {
+      "name": "Marketing Impact and Planning",
+      "sessions": 16,
+      "ksb_count": 14,
+      "ksb_codes": [
+        "K1",
+        "K2",
+        "K4",
+        "K5",
+        "K6",
+        "K7",
+        "K8",
+        "K9",
+        "K10",
+        "S2",
+        "S6",
+        "S9",
+        "B6",
+        "B8"
+      ],
+      "counts_by_category": {
+        "Knowledge": 9,
+        "Skill": 3,
+        "Behaviour": 2
+      }
+    },
+    {
+      "name": "Social Media",
+      "sessions": 14,
+      "ksb_count": 10,
+      "ksb_codes": [
+        "K11",
+        "S1",
+        "S3",
+        "S4",
+        "S5",
+        "S7",
+        "S8",
+        "B1",
+        "B3",
+        "B7"
+      ],
+      "counts_by_category": {
+        "Knowledge": 1,
+        "Skill": 6,
+        "Behaviour": 3
+      }
+    },
+    {
+      "name": "Marketing Technology (MarTech)",
+      "sessions": 14,
+      "ksb_count": 9,
+      "ksb_codes": [
+        "K3",
+        "S10",
+        "S11",
+        "S12",
+        "S13",
+        "S14",
+        "B2",
+        "B4",
+        "B5"
+      ],
+      "counts_by_category": {
+        "Knowledge": 1,
+        "Skill": 5,
+        "Behaviour": 3
+      }
+    }
+  ],
+  "ksbs": [
+    {
+      "code": "K1",
+      "category": "Knowledge",
+      "full_description": "The fundamentals of marketing theory that support the marketing process e.g. the extended marketing mix (7P’S: Product, Price, Place, Promotion, Physical environment, Process, People), product development, and segmentation",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K2",
+      "category": "Knowledge",
+      "full_description": "The concepts of brand positioning and management and implementing process to support corporate reputation",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K3",
+      "category": "Knowledge",
+      "full_description": "The principles of stakeholder management and customer relationship management (CRM), both internal and external, to facilitate effective cross-functional relationships internally, and channel and customer relationships externally.",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "K4",
+      "category": "Knowledge",
+      "full_description": "The characteristics and plans of the business and sector they work within, including their vision and values",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K5",
+      "category": "Knowledge",
+      "full_description": "How marketing contributes to achieving wider business objectives",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K6",
+      "category": "Knowledge",
+      "full_description": "The target audience’s decision making process and how that can influence marketing activities",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K7",
+      "category": "Knowledge",
+      "full_description": "The sector specific legal, regulatory and compliance frameworks within which they must work, including current Data Protection regulations.",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K8",
+      "category": "Knowledge",
+      "full_description": "The principles of effective market research and how this can influence marketing activity e.g. valid data collection sources and methodologies and usage, including digital sources, and when to use quantitative and qualitative methods.",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K9",
+      "category": "Knowledge",
+      "full_description": "Basic principles of product development and product/service portfolios",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K10",
+      "category": "Knowledge",
+      "full_description": "The marketing landscape and how routes to market interplay most efficiently, e.g. franchise model, distribution",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "K11",
+      "category": "Knowledge",
+      "full_description": "The features and benefits of different marketing communications channels and media, both digital and offline, and when and how to apply these.",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "S1",
+      "category": "Skill",
+      "full_description": "Coordinate and maintain key marketing channels (both digital and offline)",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "S2",
+      "category": "Skill",
+      "full_description": "Plan and deliver tactical campaigns against SMART (Specific, Measurable, Achievable, Realistic, Time-bound) objectives",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "S3",
+      "category": "Skill",
+      "full_description": "Manage the production and distribution of marketing materials, e.g. digital, print and video content as appropriate.",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "S4",
+      "category": "Skill",
+      "full_description": "Produce a wide range of creative and effective communications, including ability to write and proofread clear and innovative copy, project briefs, and give confident presentations",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "S5",
+      "category": "Skill",
+      "full_description": "Able to engage and collaborate with a wide range of clients/stakeholders, across departments internally and with clients/suppliers externally to support marketing outcomes as required.",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "S6",
+      "category": "Skill",
+      "full_description": "Use good project and time management to deliver projects/tasks/events as appropriate, effectively. Including the ability to divide time effectively between reporting, planning and delivery",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "S7",
+      "category": "Skill",
+      "full_description": "Coordinate several marketing campaigns/projects/events to agreed deadlines",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "S8",
+      "category": "Skill",
+      "full_description": "Effectively liaise with, and manage, internal and external stakeholders including suppliers to deliver required outcomes.",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "S9",
+      "category": "Skill",
+      "full_description": "Monitor project budgets within their scope of work using appropriate systems and controls.",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "S10",
+      "category": "Skill",
+      "full_description": "Evaluate the effectiveness of marketing campaigns by choosing the appropriate digital and offline data sources.",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "S11",
+      "category": "Skill",
+      "full_description": "Assimilate and analyse data and information from a range of sources to support marketing activities",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "S12",
+      "category": "Skill",
+      "full_description": "Evaluate data and research findings to derive insights to support improvements to future campaigns.",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "S13",
+      "category": "Skill",
+      "full_description": "Effectively use appropriate business systems and software to deliver marketing outcomes efficiently, for example to analyse data, produce reports and deliver copy",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "S14",
+      "category": "Skill",
+      "full_description": "Use appropriate technologies to deliver marketing outcomes e.g. digital/web analytics, social media, CRM.",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "B1",
+      "category": "Behaviour",
+      "full_description": "A tenacious and driven approach to see projects through to completion",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "B2",
+      "category": "Behaviour",
+      "full_description": "Being a proven ‘self-starter’ and have an adaptable approach to meet changing work priorities.",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "B3",
+      "category": "Behaviour",
+      "full_description": "A creative and analytical mind, with a willingness to think of new ways of doing things",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "B4",
+      "category": "Behaviour",
+      "full_description": "They come up with ideas and solutions to support the delivery of their work.",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "B5",
+      "category": "Behaviour",
+      "full_description": "A willingness to learn from mistakes, as not all activities go to plan, and improve their own performance as a result.",
+      "module_name": "Marketing Technology (MarTech)"
+    },
+    {
+      "code": "B6",
+      "category": "Behaviour",
+      "full_description": "A high level of professionalism, reliability and dependability with a passion for the customer",
+      "module_name": "Marketing Impact and Planning"
+    },
+    {
+      "code": "B7",
+      "category": "Behaviour",
+      "full_description": "A collaborative approach is central to how they work, showing empathy and being mindful to the needs/views of others",
+      "module_name": "Social Media"
+    },
+    {
+      "code": "B8",
+      "category": "Behaviour",
+      "full_description": "Ethical behaviour in the way they approach marketing activities and their work, valuing equality & diversity.",
+      "module_name": "Marketing Impact and Planning"
+    }
+  ],
+  "notes": [
+    "KSB text copied verbatim from workbook KSB source worksheet, cross-checked against Coverage.",
+    "Module IDs must be resolved against existing programme configuration when imported; names are a reference, not production identifiers.",
+    "Session counts are from the existing programme modules information provided in the conversation: 16, 14, 14.",
+    "Each KSB appears exactly once across the three fixed modules; no optional modules or redistribution."
+  ]
+}

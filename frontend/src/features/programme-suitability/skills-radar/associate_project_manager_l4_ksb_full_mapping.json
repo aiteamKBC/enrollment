@@ -1,0 +1,547 @@
+{
+  "programme": "Associate Project Manager Level 4",
+  "programme_code_reference": "APM_L4",
+  "ksb_total": 62,
+  "type_counts": {
+    "Knowledge": 31,
+    "Skill": 26,
+    "Behaviour": 5
+  },
+  "sources": {
+    "workbook": "Associate_Project_Manager_Level_4_KSB_Mapping_Revised(1).xlsx",
+    "ownership_sheet": "Coverage",
+    "exact_wording_sheet": "KSB source"
+  },
+  "notes": [
+    "Workbook assigns each of the 62 KSBs to exactly one of two fixed modules.",
+    "Mapping keys are reference labels only; resolve actual existing database module identifiers during integration.",
+    "Initial sessions are based on user-provided programme module requirements, while actual sessions should be read from published Admin configuration.",
+    "Preserve full original wording and existing saved learner responses."
+  ],
+  "modules": [
+    {
+      "mapping_key": "apm_l4_pmp",
+      "name": "Project Management Professional (PMP)",
+      "initial_sessions": 28,
+      "expected_ksbs": 42,
+      "type_counts": {
+        "Knowledge": 24,
+        "Skill": 15,
+        "Behaviour": 3
+      },
+      "ksb_codes": [
+        "K1",
+        "K2",
+        "K3",
+        "K4",
+        "K5",
+        "K6",
+        "K7",
+        "K8",
+        "K9",
+        "K10",
+        "K11",
+        "K12",
+        "K13",
+        "K14",
+        "K16",
+        "K17",
+        "K18",
+        "K21",
+        "K22",
+        "K23",
+        "K24",
+        "K25",
+        "K28",
+        "K29",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "S9",
+        "S10",
+        "S11",
+        "S12",
+        "S14",
+        "S15",
+        "S17",
+        "S18",
+        "S21",
+        "S26",
+        "B1",
+        "B2",
+        "B3"
+      ]
+    },
+    {
+      "mapping_key": "apm_l4_ai",
+      "name": "AI in Project Management",
+      "initial_sessions": 14,
+      "expected_ksbs": 20,
+      "type_counts": {
+        "Knowledge": 7,
+        "Skill": 11,
+        "Behaviour": 2
+      },
+      "ksb_codes": [
+        "K15",
+        "K19",
+        "K20",
+        "K26",
+        "K27",
+        "K30",
+        "K31",
+        "S1",
+        "S7",
+        "S8",
+        "S13",
+        "S16",
+        "S19",
+        "S20",
+        "S22",
+        "S23",
+        "S24",
+        "S25",
+        "B4",
+        "B5"
+      ]
+    }
+  ],
+  "ksbs": [
+    {
+      "code": "K1",
+      "type": "Knowledge",
+      "full_description": "The differences between projects and business as usual.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K2",
+      "type": "Knowledge",
+      "full_description": "The importance of alignment between the project and organisational objectives.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K3",
+      "type": "Knowledge",
+      "full_description": "The interdependencies between project, programme, and portfolio management.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K4",
+      "type": "Knowledge",
+      "full_description": "Techniques used to understand the project context, such as PESTLE (political, economic, social, technological, legal, and environmental), SWOT (strength, weakness, opportunities, threats) or VUCA (velocity, uncertainty, complexity, ambiguity).",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K5",
+      "type": "Knowledge",
+      "full_description": "The need and benefit of the project governance structure, requirements, and process and the impact on their role.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K6",
+      "type": "Knowledge",
+      "full_description": "The differences and comparative benefits between functional, matrix and project structures.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K7",
+      "type": "Knowledge",
+      "full_description": "Different roles and responsibilities within a project environment.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K8",
+      "type": "Knowledge",
+      "full_description": "The differences and comparative benefits between linear, iterative and hybrid life cycle approaches.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K9",
+      "type": "Knowledge",
+      "full_description": "Importance, content, and purpose of a business case.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K10",
+      "type": "Knowledge",
+      "full_description": "Approaches to the maintenance of a business case and the management of the benefits which will be achieved upon the successful delivery of the project.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K11",
+      "type": "Knowledge",
+      "full_description": "The purpose, format, and significance of the project management plan.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K12",
+      "type": "Knowledge",
+      "full_description": "Methods used to define, record, integrate, deliver, and manage scope.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K13",
+      "type": "Knowledge",
+      "full_description": "The identification, analysis, and management of stakeholders.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K14",
+      "type": "Knowledge",
+      "full_description": "Communication techniques and approaches to interact with stakeholders to meet their requirements.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K15",
+      "type": "Knowledge",
+      "full_description": "The use of information management.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "K16",
+      "type": "Knowledge",
+      "full_description": "Techniques for managing conflict and negotiation.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K17",
+      "type": "Knowledge",
+      "full_description": "Techniques for working collaboratively within a team and with stakeholders.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K18",
+      "type": "Knowledge",
+      "full_description": "How and when to apply different estimating methods.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K19",
+      "type": "Knowledge",
+      "full_description": "Configuration management and change control.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "K20",
+      "type": "Knowledge",
+      "full_description": "The principles of earned value management (EVM) and the interpretation of EVM information.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "K21",
+      "type": "Knowledge",
+      "full_description": "Project scheduling and maintenance, including critical path analysis.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K22",
+      "type": "Knowledge",
+      "full_description": "Allocation and management of resources throughout the project life cycle.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K23",
+      "type": "Knowledge",
+      "full_description": "Principles of project risk and issue management.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K24",
+      "type": "Knowledge",
+      "full_description": "Procurement strategies and processes that are both ethical and sustainable.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K25",
+      "type": "Knowledge",
+      "full_description": "The role and purpose of quality requirements, planning and control in a project environment.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K26",
+      "type": "Knowledge",
+      "full_description": "Principles for evaluating project success, including how lessons learned are captured and can impact future project delivery.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "K27",
+      "type": "Knowledge",
+      "full_description": "Relevant regulations and legislation such as data protection, and how they impact on their role.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "K28",
+      "type": "Knowledge",
+      "full_description": "The impact of project objectives and how to respond to challenges around sustainability and the UK Government's policy to achieve net carbon zero.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K29",
+      "type": "Knowledge",
+      "full_description": "Principles of conducting project management activities which are ethical and inclusive.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "K30",
+      "type": "Knowledge",
+      "full_description": "Technology and software used in the performance of project management activities.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "K31",
+      "type": "Knowledge",
+      "full_description": "Presentation tools and techniques.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S1",
+      "type": "Skill",
+      "full_description": "Use project monitoring and reporting techniques to track, interpret and report on performance.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S2",
+      "type": "Skill",
+      "full_description": "Manage and engage with stakeholders.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S3",
+      "type": "Skill",
+      "full_description": "Influence and negotiate with others to create a positive outcome for the project.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S4",
+      "type": "Skill",
+      "full_description": "Resolve conflict as and when required with stakeholders within limits of responsibility.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S5",
+      "type": "Skill",
+      "full_description": "Adapt communications to different stakeholders.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S6",
+      "type": "Skill",
+      "full_description": "Communicate and support the project vision, to ensure buy in to the project objectives.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S7",
+      "type": "Skill",
+      "full_description": "Collate and analyse information and provide input to support negotiations relating to project objectives.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S8",
+      "type": "Skill",
+      "full_description": "Monitor and analyse project budgets.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S9",
+      "type": "Skill",
+      "full_description": "Review and provide feedback on a project business case to ensure the project remains valid.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S10",
+      "type": "Skill",
+      "full_description": "Apply change control processes to support the management of project scope.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S11",
+      "type": "Skill",
+      "full_description": "Evaluate an integrated project management plan to provide recommendations on areas for improvement.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S12",
+      "type": "Skill",
+      "full_description": "Prepare, monitor, and schedule activities that contribute to the delivery of the overall project schedule and objectives.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S13",
+      "type": "Skill",
+      "full_description": "Evaluate and make recommendations on the risk management plan to threats to delivery and recommend solutions.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S14",
+      "type": "Skill",
+      "full_description": "Identify and monitor project risks and issues; and plan and implement responses to them.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S15",
+      "type": "Skill",
+      "full_description": "Deliver a Quality Management Plan which contributes to quality control processes.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S16",
+      "type": "Skill",
+      "full_description": "Use an organisation's continual improvement process including lessons learned to improve performance.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S17",
+      "type": "Skill",
+      "full_description": "Support the preparation or maintenance of a resource management plan for project activities.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S18",
+      "type": "Skill",
+      "full_description": "Work with stakeholders to deliver the project.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S19",
+      "type": "Skill",
+      "full_description": "Use digital tools and software to meet project objectives for example research, collaboration, presentations, and resolution of problems.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S20",
+      "type": "Skill",
+      "full_description": "Provide underpinning data to support the written submission through the governance process.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S21",
+      "type": "Skill",
+      "full_description": "Work within the approved project budget.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "S22",
+      "type": "Skill",
+      "full_description": "Ensure that integrated schedules support critical path analysis, interface management, resource forecasting and risk management.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S23",
+      "type": "Skill",
+      "full_description": "Apply relevant legislation, regulations, codes of practice, and ethical guidance where appropriate to their work.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S24",
+      "type": "Skill",
+      "full_description": "Use data to inform decisions on actions to take to mitigate risks on project.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S25",
+      "type": "Skill",
+      "full_description": "Use configuration management and change control to schedule and maintain projects.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "S26",
+      "type": "Skill",
+      "full_description": "Manages resources through the project lifecycle.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "B1",
+      "type": "Behaviour",
+      "full_description": "Works flexibly and adapts to circumstances.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "B2",
+      "type": "Behaviour",
+      "full_description": "Works collaboratively and builds strong relationships with others across the organisation and external stakeholders.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "B3",
+      "type": "Behaviour",
+      "full_description": "Has accountability and ownership of their tasks and workload.",
+      "module_mapping_key": "apm_l4_pmp",
+      "module_name": "Project Management Professional (PMP)"
+    },
+    {
+      "code": "B4",
+      "type": "Behaviour",
+      "full_description": "Operates professionally with integrity and confidentiality.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    },
+    {
+      "code": "B5",
+      "type": "Behaviour",
+      "full_description": "Seeks learning opportunities and continuous professional development.",
+      "module_mapping_key": "apm_l4_ai",
+      "module_name": "AI in Project Management"
+    }
+  ]
+}
