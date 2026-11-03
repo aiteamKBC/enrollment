@@ -124,6 +124,8 @@ export interface WizardLayout {
 export interface WizardLayoutResponse {
   layout: WizardLayout | null;
   version: number | null;
+  /** Signed learner-bound reference, present only on learner-specific reads. */
+  layoutToken?: string | null;
   updatedAt: string;
   updatedBy: string;
 }

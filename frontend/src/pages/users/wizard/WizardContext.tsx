@@ -216,21 +216,22 @@ export function WizardProvider({
   // already there (as the saved answers are), otherwise the default layout
   // stands in until the request settles. A failed load keeps the default — the
   // wizard as it was before the builder existed — rather than blocking anyone.
-  const [layoutPeek] = useState(() => (layoutOverride ? undefined : peekWizardLayout()));
+  const [layoutPeek] = useState(() => (layoutOverride ? undefined : peekWizardLayout({ kind: kindForSeed, learnerId: userId })));
   const [publishedLayout, setPublishedLayout] = useState<WizardLayout | null>(() => layoutPeek?.layout ?? null);
-  const [publishedVersion, setPublishedVersion] = useState<number | null>(layoutPeek?.version ?? null);
+  const [publishedVersion, setPublishedVersion] = useState<number | null>(() => layoutPeek?.version ?? null);
+  const [publishedLayoutToken, setPublishedLayoutToken] = useState<string | null>(() => layoutPeek?.layoutToken ?? null);
   const [layoutSettled, setLayoutSettled] = useState(Boolean(layoutOverride || layoutPeek));
   useEffect(() => {
     if (layoutOverride) return;
     let cancelled = false;
-    fetchWizardLayout()
-      .then((res) => { if (!cancelled) { setPublishedLayout(res.layout ?? null); setPublishedVersion(res.version); } })
+    fetchWizardLayout({ kind: kindForSeed, learnerId: userId })
+      .then((res) => { if (!cancelled) { setPublishedLayout(res.layout ?? null); setPublishedVersion(res.version); setPublishedLayoutToken(res.layoutToken ?? null); } })
       .catch(() => {
         // Not fatal: the default layout stays in place.
       })
       .finally(() => { if (!cancelled) setLayoutSettled(true); });
     return () => { cancelled = true; };
-  }, [layoutOverride]);
+  }, [layoutOverride, kindForSeed, userId]);
   const layout = useMemo(
     () => layoutForLearner(resolveLayout(layoutOverride ?? publishedLayout), isCommercial),
     [layoutOverride, publishedLayout, isCommercial]
@@ -507,10 +508,11 @@ export function WizardProvider({
         setDraft((previous) => selectionFingerprint(previous.programmeModules) === selectionFingerprint(selection)
           ? { ...previous, programmeModules: committed.selection } : previous);
       },
-      saveIlr: async () => {
+      saveIlr: async (options = {}) => {
         // Nothing has changed since the last write — moving off a step the
         // learner didn't touch costs no request and shows no spinner.
-        if (lastSavedDraft.current && Object.keys(draft).every((key) =>
+        const mustRecordVersion = Boolean(options.skillsRadarCheckpoint || options.submitted);
+        if (!mustRecordVersion && lastSavedDraft.current && Object.keys(draft).every((key) =>
           key === 'programmeModules' || key === 'programmeModulesCompletion' || draft[key as keyof WizardDraft] === lastSavedDraft.current?.[key as keyof WizardDraft])) return;
         // Captured before the await: the learner can keep typing while the
         // request is in flight, and marking *that* newer draft saved would
@@ -534,7 +536,12 @@ export function WizardProvider({
             delete skillsRadar.configurationError;
             rest.skillsRadar = skillsRadar;
           }
-          const res = await saveExtendedIlr(kind, userId, ilr, rest);
+          const res = await saveExtendedIlr(kind, userId, ilr, rest, {
+            layoutVersion: publishedVersion,
+            layoutToken: publishedLayoutToken,
+            skillsRadarCheckpoint: Boolean(options.skillsRadarCheckpoint),
+            submitted: Boolean(options.submitted),
+          });
           lastSavedDraft.current = saving;
           setIlrSavedAt(res.meta.updatedAt);
         } finally {
@@ -568,7 +575,7 @@ export function WizardProvider({
       ilrFiling,
       inclusionCheck,
     }),
-    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
+    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, publishedVersion, publishedLayoutToken, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
   );
   moduleWriter.current = value.saveModules;
 

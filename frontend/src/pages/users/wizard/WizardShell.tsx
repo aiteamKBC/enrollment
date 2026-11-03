@@ -201,7 +201,7 @@ export function WizardShell({
     if (target < 0 || target >= steps.length) return;
     /** Write this step behind the move; a failure is reported, never blocking. */
     const saveInBackground = () =>
-      saveIlr().catch((e: unknown) =>
+      saveIlr({ skillsRadarCheckpoint: mode === 'learner' && steps[target]?.slug === 'skills-radar' }).catch((e: unknown) =>
         error('Could not save your answers', e instanceof Error ? e.message : 'Unexpected error')
       );
 
