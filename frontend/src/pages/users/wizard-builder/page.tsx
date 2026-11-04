@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { SuitabilityAdmin } from '@/features/programme-suitability/SuitabilityAdmin';
 import { ModulesAdmin } from '@/features/programme-suitability/modules/ModulesAdmin';
 import { CatalogueAdmin } from '@/features/programme-suitability/skills-radar/catalogue/CatalogueAdmin';
@@ -74,7 +73,6 @@ const clone = (layout: WizardLayout): WizardLayout => JSON.parse(JSON.stringify(
  * keeps its column and answers.
  */
 export default function WizardBuilderPage() {
-  const navigate = useNavigate();
   const { success, error } = useToast();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -126,11 +124,6 @@ export default function WizardBuilderPage() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  const leave = () => {
-    if (dirty && !window.confirm('You have unpublished changes to the wizard. Leave without publishing them?')) return;
-    navigate('/users');
-  };
-
   const edit = useCallback((fn: (l: WizardLayout) => WizardLayout) => setLayout((l) => (l ? fn(l) : l)), []);
 
   const publish = async () => {
@@ -172,9 +165,6 @@ export default function WizardBuilderPage() {
               </button>
               <button type="button" className={btnSecondary} onClick={() => setVersionAction('assign')}>
                 <AppIcon className="ri-user-settings-line" />Assign a version
-              </button>
-              <button type="button" className={btnSecondary} onClick={leave}>
-                <AppIcon className="ri-arrow-left-line" />Back to users
               </button>
               <button type="button" className={btnSecondary} disabled={!dirty || publishing} onClick={() => published && setLayout(clone(published))}>
                 <AppIcon className="ri-arrow-go-back-line" />Discard changes
