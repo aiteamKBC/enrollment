@@ -14,6 +14,7 @@ import { isContentFieldType, type CustomAnswer, type LayoutItem, type LayoutStep
 import type { WizardDraft } from '../../types';
 import { cleanTexts } from './texts';
 import { SUITABILITY_STEP } from '@/features/programme-suitability/wizardStep';
+import { hasConfirmedSignature } from '../signatureDeclaration';
 
 export function defaultLayout(): WizardLayout {
   return {
@@ -26,8 +27,6 @@ export function defaultLayout(): WizardLayout {
     })),
   };
 }
-
-export const DEFAULT_LAYOUT: WizardLayout = defaultLayout();
 
 const isCustomItem = (item: LayoutItem) => !item.builtin;
 
@@ -52,7 +51,7 @@ function resolveLegacyCustomType(item: LayoutItem): LayoutItem {
 
 /** Steps, and blocks wherever they sit, that only apprenticeship learners take. */
 const APPRENTICESHIP_ONLY_STEPS = new Set(['inclusion']);
-const APPRENTICESHIP_ONLY_ITEMS = new Set(['block.inclusion']);
+const APPRENTICESHIP_ONLY_ITEMS = new Set(['block.inclusion', 'ild.niApplied', 'ild.healthConditions', 'ild.primaryHealth', 'ild.additionalSupport', 'ild.workingHours']);
 
 /**
  * The layout as one learner walks it: a commercial learner skips the
@@ -61,16 +60,52 @@ const APPRENTICESHIP_ONLY_ITEMS = new Set(['block.inclusion']);
  * gating and validation still lines up.
  */
 export function layoutForLearner(layout: WizardLayout, commercial: boolean): WizardLayout {
-  if (!commercial) return layout;
+  if (!commercial) {
+    // Keep the common builder catalog for commercial delivery and historical
+    // answers. Apprenticeships always retire its Personal Details page, even
+    // when an older publication explicitly showed or reordered that page.
+    const steps = layout.steps.map(step => ({ ...step, items: step.items.map(item => ({ ...item })) }));
+    const signature = steps.flatMap(step => step.items).find(item => item.builtin && item.key === 'pd.signature')
+      ?? { key: 'pd.signature', builtin: true, hidden: false };
+    const declaration = steps.flatMap(step => step.items).find(item => item.builtin && item.key === 'ild.signature')
+      ?? { key: 'ild.signature', builtin: true };
+    for (const step of steps) {
+      if (step.slug === 'personal-details') step.hidden = true;
+      step.items = step.items.filter(item => !(item.builtin && ['pd.signature', 'ild.signature', 'ild.postcodePrior'].includes(item.key)));
+    }
+    const ilr = steps.find(step => step.slug === 'ilr-details');
+    if (ilr) {
+      ilr.hidden = false;
+      const title = ilr.items.find(item => item.builtin && item.key === 'ild.title');
+      if (title) Object.assign(title, { hidden: false, required: true, condition: undefined });
+      else ilr.items.splice(Math.max(0, ilr.items.findIndex(item => item.key === 'ild.record') + 1), 0,
+        { key: 'ild.title', builtin: true, hidden: false, required: true });
+      // Keep the editable residential postcode immediately after the learner
+      // record block, even when an older published layout placed it elsewhere.
+      const currentPostcode = ilr.items.find(item => item.builtin && item.key === 'ild.currentPostcode')
+        ?? { key: 'ild.currentPostcode', builtin: true, hidden: false, required: true };
+      ilr.items = ilr.items.filter(item => !(item.builtin && item.key === 'ild.currentPostcode'));
+      const recordIndex = ilr.items.findIndex(item => item.builtin && item.key === 'ild.record');
+      ilr.items.splice(Math.max(0, recordIndex + 1), 0, { ...currentPostcode, hidden: false, required: true, condition: undefined });
+      // The old ILR key now renders the accuracy text only. Neither older
+      // publications nor builder edits can reintroduce a second signing box.
+      ilr.items.push({ ...declaration, hidden: false, required: false, condition: undefined });
+      ilr.items.push({ ...signature, hidden: false, required: true, condition: undefined });
+    }
+    return { ...layout, steps };
+  }
   return {
     ...layout,
     steps: layout.steps.map((s) => ({
       ...s,
       hidden: s.hidden || (s.builtin && APPRENTICESHIP_ONLY_STEPS.has(s.slug)),
-      items: s.items.map((it) => (it.builtin && APPRENTICESHIP_ONLY_ITEMS.has(it.key) ? { ...it, hidden: true } : it)),
+      items: s.items.map((it) => (it.builtin && (APPRENTICESHIP_ONLY_ITEMS.has(it.key) || it.key === 'ild.title' || it.key === 'ild.currentPostcode') ? { ...it, hidden: true } : it)),
     })),
   };
 }
+
+/** Default active apprenticeship journey; defaultLayout remains the shared builder catalog. */
+export const DEFAULT_LAYOUT: WizardLayout = layoutForLearner(defaultLayout(), false);
 
 /** The published layout, made whole against the registry. */
 export function resolveLayout(saved: WizardLayout | null | undefined): WizardLayout {
@@ -251,7 +286,9 @@ export function missingForLayoutStep(step: LayoutStep, draft: WizardDraft, layou
     if (!isShown(item, draft, index)) continue;
     if (item.builtin) {
       const def = BUILTIN_ITEMS[item.key];
-      if (def?.missing) out.push(...def.missing(draft, isRequired(item)));
+      if (step.slug === 'ilr-details' && item.key === 'pd.signature') {
+        if (!hasConfirmedSignature(draft.personalDetails, layout.texts)) out.push('Your signature');
+      } else if (def?.missing) out.push(...def.missing(draft, isRequired(item)));
     } else {
       out.push(...customMissing(item, draft));
     }

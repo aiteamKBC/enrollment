@@ -40,16 +40,31 @@ def started(test, target, attribute, **kwargs):
     return p.start()
 
 
+class ManualReviewInvitationGuardTests(SimpleTestCase):
+    def test_every_manual_decision_blocks_accounts_and_mail_even_with_forged_automatic_approval(self):
+        with patch.object(ei, "has_account") as accounts, patch.object(EnrolmentUser.all_learners, "create") as create, patch.object(services, "invite_eligible_applicant") as mail:
+            for status in ("approved", "rejected", "more_evidence_required"):
+                outcome = ei.invite_applicant({**ROW, "review_status": status, "eligible": True, "assessment_status": "provisional_eligible"})
+                self.assertEqual(outcome, "notEligible" if status == "rejected" else "pendingAssessment")
+            accounts.assert_not_called()
+            create.assert_not_called()
+            mail.assert_not_called()
+
+
 class SubmitInvitesTests(SimpleTestCase):
     """Which submissions the form sends on to be invited."""
 
     def setUp(self):
         from django.test import RequestFactory
+        started(self, ef.transaction, 'atomic', side_effect=lambda **_: nullcontext())
 
         self.factory = RequestFactory()
         self.lookup = stub_lookup(self)
         started(self, ef, "_published_layout", return_value=(None, None))
         self.invite = started(self, ei, "invite_applicant", return_value=ei.INVITED)
+        p = patch('enrolment_api.eligibility_link.refresh_response', side_effect=lambda _id, response: response)
+        p.start()
+        self.addCleanup(p.stop)
 
     def post(self, body):
         request = self.factory.post(
@@ -64,10 +79,18 @@ class SubmitInvitesTests(SimpleTestCase):
         response, data, cursor = self.post(application())
         self.assertEqual(response.status_code, 201)
         self.assertEqual(data, {"submitted": True, "eligible": True, "reasons": [], "outcome": "invited"})
-        self.assertEqual(len(cursor.executed), 1)
+        self.assertEqual(len(cursor.executed), 2)  # application plus durable response receipt
         self.invite.assert_called_once()
         row = self.invite.call_args.args[0]
         self.assertEqual((row["work_email"], row["eligible"]), ("sam@employer.example", True))
+
+    def test_an_eligible_applicant_with_structured_address_and_no_postcode_is_still_invited(self):
+        response, data, _cursor = self.post(application(fullAddress="", postcode=""))
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(data["outcome"], "invited")
+        row = self.invite.call_args.args[0]
+        self.assertEqual(row["full_address"], "1 Example Street, Exampletown")
+        self.assertIsNone(row["postcode"])
 
     def test_the_outcome_of_the_invitation_is_reported(self):
         for outcome in (ei.INVITE_PENDING, ei.EXISTING_ACCOUNT, ei.RETRY_LATER):
@@ -78,21 +101,57 @@ class SubmitInvitesTests(SimpleTestCase):
         _response, data, cursor = self.post(application(postcode="EH1 1YZ"))
         self.assertEqual(data["outcome"], "notEligible")
         self.assertEqual(data["reasons"], ["Your postcode (EH1 1YZ) is outside England (Scotland)."])
-        self.assertEqual(len(cursor.executed), 1)
+        self.assertEqual(len(cursor.executed), 2)
         self.invite.assert_not_called()
 
     def test_postcodes_that_could_not_be_checked_invite_nobody(self):
         from enrolment_api import postcode_lookup
 
         def down(_postcode):
+            if _postcode == "EX3 4MP":
+                return {"postcode": "EX3 4MP", "country": "England", "region": "", "district": ""}
             raise postcode_lookup.PostcodeLookupUnavailable("timed out")
 
         self.lookup.side_effect = down
         with self.assertLogs("enrolment_api.eligibility_form", level="WARNING"):
-            _response, data, cursor = self.post(application())
-        self.assertEqual((data["eligible"], data["outcome"]), (None, "retryLater"))
-        # Still saved, as unchecked.
-        self.assertEqual(len(cursor.executed), 1)
+            response, data, cursor = self.post(application())
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("outcome", data)
+        self.assertEqual(cursor.executed, [])
+        self.invite.assert_not_called()
+
+    def test_employment_validation_failures_never_save_or_invite(self):
+        from enrolment_api import postcode_lookup
+
+        for changes in (
+            {"majorityHoursInEngland": None},
+            {"majorityHoursInEngland": "true"},
+            {"employerPostcode": "ss", "eligible": True},
+            {"employerPostcode": "ZZ9 9ZZ"},
+            {"employerPostcode": ""},
+        ):
+            with self.subTest(changes=changes):
+                response, data, cursor = self.post(application(**changes))
+                self.assertEqual(response.status_code, 400)
+                self.assertNotIn("outcome", data)
+                self.assertNotIn("eligible", data)
+                self.assertEqual(cursor.executed, [])
+                self.invite.assert_not_called()
+
+        self.lookup.side_effect = postcode_lookup.PostcodeLookupUnavailable("timeout")
+        with self.assertLogs("enrolment_api.eligibility_form", level="WARNING"):
+            response, data, cursor = self.post(application())
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(cursor.executed, [])
+        self.invite.assert_not_called()
+
+    def test_no_hours_declaration_is_not_eligible_and_never_invited(self):
+        response, data, cursor = self.post(application(majorityHoursInEngland=False, eligible=True, outcome="invited"))
+        self.assertEqual(response.status_code, 201)
+        self.assertIs(data["eligible"], False)
+        self.assertEqual(data["outcome"], "notEligible")
+        self.assertIn("50%", data["reasons"][0])
+        self.assertEqual(len(cursor.executed), 2)
         self.invite.assert_not_called()
 
     def test_invalid_answers_invite_nobody(self):
@@ -114,14 +173,18 @@ class LearnerFieldsTests(SimpleTestCase):
         self.assertIs(fields["invite_to_platform"], True)
         self.assertTrue(fields["enrolled_time_and_user"].endswith(" by Eligibility form"))
 
-    def test_the_chosen_standard_is_a_target_not_a_placement(self):
+    def test_eligibility_programme_is_never_an_enrolment_target_or_placement(self):
         fields = ei.learner_fields(ROW)
-        self.assertEqual(fields["target_programme"], "Associate Project Manager Level 4")
-        for placement in ("programme", "cohort", "group", "start_date", "end_date"):
+        for placement in ("target_programme", "programme", "cohort", "group", "start_date", "end_date"):
             self.assertNotIn(placement, fields)
 
     def test_a_date_of_birth_the_form_did_not_ask_is_left_empty(self):
         self.assertIsNone(ei.learner_fields({**ROW, "date_of_birth": None})["date_of_birth"])
+
+    def test_missing_personal_address_and_postcode_are_left_empty(self):
+        fields = ei.learner_fields({**ROW, "full_address": None, "postcode": None})
+        self.assertIsNone(fields["address"])
+        self.assertIsNone(fields["current_postcode"])
 
 
 class InviteApplicantTests(SimpleTestCase):

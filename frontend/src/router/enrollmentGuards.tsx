@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth.helpers';
 import { mayAccessRoute } from '@/lib/routeAccess';
-import { fetchFirstLoginDetails } from '@/api/firstLoginDetails';
 import { fetchLearnerFirstSession } from '@/api/learnerCalendar';
 import { useMyLearner, rememberLearner } from '@/hooks/useMyLearner';
 import { fetchEnrolmentBoard } from '@/api/enrolmentUsers';
@@ -39,8 +38,6 @@ export function LearnerStart() {
     setError('');
     async function resolve() {
       if (kind === 'apprenticeship') {
-        const details = await fetchFirstLoginDetails(id);
-        if (details.required) return '/learner/welcome';
         const board = await fetchEnrolmentBoard(id);
         const status = (board.programme.status || '').toLowerCase();
         if (status === 'fresh user' || status === 'onboarding') return '/learner/onboarding';
@@ -55,6 +52,12 @@ export function LearnerStart() {
   }, [kind, id, attempt]);
   if (error) return <div role="alert" className="p-6"><p>{error}</p><button onClick={() => setAttempt(value => value + 1)}>Try again</button></div>;
   return destination ? <Navigate to={destination} replace /> : <p role="status" className="p-6">Loading your enrolment…</p>;
+}
+
+/** Old Welcome bookmarks follow the same authenticated start/resume resolver. */
+export function WelcomeEntry({ children }: { children: ReactNode }) {
+  const { kind } = useMyLearner();
+  return kind === 'apprenticeship' ? <LearnerStart /> : children;
 }
 
 export function Home() {

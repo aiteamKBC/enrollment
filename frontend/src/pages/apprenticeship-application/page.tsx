@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, ClipboardList, Loader2, MapPin, RotateCcw, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, ClipboardList, Info, Loader2, MapPin, RotateCcw, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   ApplicationSubmitError,
@@ -14,10 +14,19 @@ import {
 import {
   answerFor,
   businessToday,
+  dateNotice,
   formPage,
   formSections,
+  EMPLOYMENT_RESTRICTION_ERROR,
+  EMPLOYER_POSTCODE_UNAVAILABLE,
+  WORKPLACE_POSTCODE_UNAVAILABLE,
+  INVALID_POSTCODE,
+  UNKNOWN_POSTCODE,
+  isEmploymentRestricted,
+  isNoteShown,
   isPostcodeQuestion,
   isQuestion,
+  isRequired,
   isShown,
   toPayload,
   validateSection,
@@ -44,8 +53,10 @@ interface LoadedForm {
   version: number | null;
 }
 
-const RETRY_LATER = 'We could not check your postcodes just now, so we could not confirm your eligibility. '
+const RETRY_LATER = 'We could not complete your submission just now. '
   + 'Your answers have been kept: please try again in a few minutes.';
+const EMPLOYMENT_REQUIREMENTS_NOTICE_KEY = 'note.employmentRequirements';
+const EMPLOYMENT_CONTACT_EMAIL = 'office@kentbusinesscollege.org';
 
 /** The questions whose answer is looked up as a UK postcode. */
 const POSTCODE_KEYS = Object.values(BUILTIN_ITEMS).filter((item) => isBuiltinQuestion(item) && item.postcode).map((item) => item.key);
@@ -60,11 +71,9 @@ const POSTCODE_KEYS = Object.values(BUILTIN_ITEMS).filter((item) => isBuiltinQue
  * enrolment.eligibility_form. The form collects answers only -- staff assess
  * eligibility, so no funding rule is applied here.
  *
- * Postcodes are looked up as they are typed, to show where one in England is.
- * Nothing under the question says a postcode is wrong and nothing stops the
- * applicant: the server saves the application either way, and when a postcode
- * is not a UK postcode, cannot be found or is outside England the applicant is
- * told they are not eligible, with the reasons. An eligible applicant is
+ * Postcodes are looked up as they are typed. Employer Postcode must also be
+ * verified before continuing; final submission independently verifies it.
+ * Country-based eligibility is decided on submission. An eligible applicant is
  * emailed a link to create their password (or told to sign in when the address
  * already has an account); when the postcodes could not be checked the form
  * stays open so they can submit again.
@@ -77,8 +86,11 @@ export default function ApprenticeshipApplicationPage() {
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [verifyingEmployer, setVerifyingEmployer] = useState(false);
+  const pendingContinue = useRef<object | null>(null);
   const [submitError, setSubmitError] = useState('');
   const [outcome, setOutcome] = useState<ApplicationOutcome | null>(null);
+  const [historicalMessage, setHistoricalMessage] = useState('');
   const submitted = outcome !== null;
   const [dirty, setDirty] = useState(false);
   const [focusErrors, setFocusErrors] = useState(0);
@@ -99,7 +111,7 @@ export default function ApprenticeshipApplicationPage() {
     setLoadError('');
     fetchEligibilityForm()
       .then((res) => {
-        if (!cancelled) setForm({ layout: resolveLayout(res.layout), version: res.version });
+        if (!cancelled) setForm({ layout: resolveLayout(res.layout, res.workplaceEnabled === true), version: res.version });
       })
       .catch((reason: Error) => {
         if (!cancelled) setLoadError(reason.message);
@@ -111,6 +123,7 @@ export default function ApprenticeshipApplicationPage() {
 
   const sections = useMemo(() => (form ? formSections(form.layout) : []), [form]);
   const page = useMemo(() => (form ? formPage(form.layout) : null), [form]);
+  const employmentStep = sections.findIndex(candidate => candidate.items.some(item => isQuestion(item) && item.key === 'employmentStatus'));
 
   // Nothing is saved before Submit, so leaving part-way would lose the answers.
   useEffect(() => {
@@ -153,10 +166,12 @@ export default function ApprenticeshipApplicationPage() {
     if (known && known.status !== 'checking' && known.status !== 'unavailable') return Promise.resolve(known);
     let pending = inFlight.current.get(code);
     if (!pending) {
-      setChecks((current) => ({ ...current, [code]: { status: 'checking' } }));
+      checksRef.current = { ...checksRef.current, [code]: { status: 'checking' } };
+      setChecks(checksRef.current);
       pending = lookupPostcode(value).then((result) => {
         inFlight.current.delete(code);
-        setChecks((current) => ({ ...current, [code]: result }));
+        checksRef.current = { ...checksRef.current, [code]: result };
+        setChecks(checksRef.current);
         return result;
       });
       inFlight.current.set(code, pending);
@@ -165,7 +180,8 @@ export default function ApprenticeshipApplicationPage() {
   }, []);
 
   // Check a postcode once the applicant pauses typing it.
-  const postcodeValues = POSTCODE_KEYS.map((key) => String(answers[key] ?? '')).join('\n');
+  const residentialUk = ['', 'United Kingdom'].includes(String(answers.countryOfResidence ?? ''));
+  const postcodeValues = POSTCODE_KEYS.filter(key => key !== 'postcode' || residentialUk).map((key) => String(answers[key] ?? '')).join('\n');
   useEffect(() => {
     const timer = window.setTimeout(() => {
       for (const value of postcodeValues.split('\n')) void checkPostcode(value);
@@ -174,18 +190,27 @@ export default function ApprenticeshipApplicationPage() {
   }, [postcodeValues, checkPostcode]);
 
   const goTo = (index: number) => {
+    if (index > step && index > employmentStep && isEmploymentRestricted(answersRef.current.employmentStatus)) return;
+    pendingContinue.current = null;
+    setVerifyingEmployer(false);
     moved.current = true;
     setSubmitError('');
     setStep(index);
   };
 
   const setAnswer = (key: string, value: AnswerValue) => {
-    setAnswers((current) => ({ ...current, [key]: value }));
+    // An outstanding check must never advance using answers that have changed.
+    pendingContinue.current = null;
+    setVerifyingEmployer(false);
+    if (['employerPostcode', 'mainWorkplacePostcode', 'workplaceArrangement', 'majorityHoursInEngland'].includes(key)) setSubmitError('');
+    setAnswers((current) => ({ ...current, [key]: value,
+      ...(key === 'workplaceArrangement' || (key === 'employmentStatus' && value !== 'In paid employment') ? { mainWorkplacePostcode: '' } : {}) }));
     setDirty(true);
     setErrors((current) => {
-      if (!current[key]) return current;
       const next = { ...current };
       delete next[key];
+      if (key === 'countryOfResidence') delete next.postcode;
+      if (key === 'workplaceArrangement' || key === 'employmentStatus') delete next.mainWorkplacePostcode;
       return next;
     });
   };
@@ -212,18 +237,29 @@ export default function ApprenticeshipApplicationPage() {
   const index = Math.min(step, sections.length - 1);
   const section = sections[index];
   const last = index === sections.length - 1;
+  const employmentRestricted = index >= employmentStep && isEmploymentRestricted(answers.employmentStatus);
   const percent = Math.round(((index + 1) / sections.length) * 100);
   const SectionIcon = section.icon;
 
   const submit = async () => {
+    if (isEmploymentRestricted(answersRef.current.employmentStatus)) {
+      setErrors(current => ({ ...current, employmentStatus: EMPLOYMENT_RESTRICTION_ERROR }));
+      setSubmitError(EMPLOYMENT_RESTRICTION_ERROR);
+      return;
+    }
     setSubmitting(true);
     setSubmitError('');
+    setHistoricalMessage('');
     try {
       const result = await submitApprenticeshipApplication(toPayload(answersRef.current, sections, form.version));
       // The postcodes could not be checked, so eligibility was not decided:
       // keep the form and its answers so the applicant can submit again.
-      if (result.outcome === 'retryLater') setSubmitError(RETRY_LATER);
-      else setOutcome(result);
+      if (result.review || result.outcome === 'pendingAssessment') {
+        // Historical receipts stay intact, but are not a third new screening result.
+        setHistoricalMessage(result.review?.message || 'Your previously submitted application is awaiting assessment. No new eligibility decision or invitation has been issued.');
+      } else if (result.outcome === 'retryLater' || typeof result.eligible !== 'boolean') {
+        setSubmitError(RETRY_LATER);
+      } else setOutcome(result);
     } catch (reason) {
       const failure = reason instanceof ApplicationSubmitError
         ? reason
@@ -235,7 +271,7 @@ export default function ApprenticeshipApplicationPage() {
         let message = failure.message;
         try {
           const fresh = await fetchEligibilityForm();
-          setForm({ layout: resolveLayout(fresh.layout), version: fresh.version });
+          setForm({ layout: resolveLayout(fresh.layout, fresh.workplaceEnabled === true), version: fresh.version });
         } catch {
           message = `${failure.message} We could not load the updated form just now: check your connection, then submit again.`;
         }
@@ -257,93 +293,86 @@ export default function ApprenticeshipApplicationPage() {
     }
   };
 
-  const handleContinue = (event: FormEvent) => {
-    event.preventDefault();
-    if (submitting) return;
-    const found = validateSection(section, answers, today);
+  const handleContinue = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (submitting || pendingContinue.current) return;
+    const found = validateSection(section, answers, today, sections);
     setErrors(found);
+    if (employmentRestricted) {
+      setErrors({ ...found, employmentStatus: EMPLOYMENT_RESTRICTION_ERROR });
+      setFocusErrors(count => count + 1);
+      return;
+    }
     if (Object.keys(found).length) {
       setFocusErrors(count => count + 1);
       return;
+    }
+    const postcodes = section.items.filter(item => isQuestion(item) && ['employerPostcode', 'mainWorkplacePostcode'].includes(item.key) && isShown(item, answers));
+    for (const postcode of postcodes) {
+      const value = String(answers[postcode.key] ?? '');
+      if (!value.trim()) continue;
+      if (!isUkPostcode(value)) {
+        setErrors({ [postcode.key]: INVALID_POSTCODE });
+        setFocusErrors(count => count + 1);
+        return;
+      }
+      const request = {};
+      pendingContinue.current = request;
+      setVerifyingEmployer(true);
+      try {
+        const result = await checkPostcode(value);
+        if (pendingContinue.current !== request) return;
+        if (result?.status !== 'found') {
+          const unavailable = postcode.key === 'mainWorkplacePostcode' ? WORKPLACE_POSTCODE_UNAVAILABLE : EMPLOYER_POSTCODE_UNAVAILABLE;
+          setErrors({ [postcode.key]: result?.status === 'notFound' ? UNKNOWN_POSTCODE : unavailable });
+          setFocusErrors(count => count + 1);
+          return;
+        }
+      } finally {
+        if (pendingContinue.current === request) {
+          pendingContinue.current = null;
+          setVerifyingEmployer(false);
+        }
+      }
     }
     if (last) void submit();
     else goTo(index + 1);
   };
 
   let number = 0;
-  const programme = typeof answers.programme === 'string' ? answers.programme : '';
   const email = String(answers.workEmail ?? '').trim();
 
   return (
     <Frame hero={page}>
-      {outcome?.eligible === false ? (
+      {submitted ? (
         <section className={styles.card} aria-labelledby="application-submitted">
           <div className={styles.success}>
-            <span className={`${styles.successIcon} ${styles.notEligibleIcon}`} aria-hidden="true"><XCircle /></span>
-            <h2 id="application-submitted" ref={successRef} tabIndex={-1}>You are not eligible</h2>
-            <p>
-              Thank you, {String(answers.firstName ?? '').trim()}. We have received your application
-              {programme ? <> for <strong>{programme}</strong></> : null}, but you are not eligible for an
-              apprenticeship with us: apprenticeship funding is only available in England.
-            </p>
-            {outcome.reasons.length > 0 && (
-              <ul className={styles.reasons}>
-                {outcome.reasons.map(reason => <li key={reason}>{reason}</li>)}
-              </ul>
-            )}
-            <p>If you think this is a mistake, please get in touch with our team. You can now close this page.</p>
-          </div>
-        </section>
-      ) : outcome?.outcome === 'existingAccount' ? (
-        <section className={styles.card} aria-labelledby="application-submitted">
-          <div className={styles.success}>
-            <span className={styles.successIcon} aria-hidden="true"><CheckCircle2 /></span>
-            <h2 id="application-submitted" ref={successRef} tabIndex={-1}>You already have an account</h2>
-            <p>
-              Thank you, {String(answers.firstName ?? '').trim()}. We have received your application
-              {programme ? <> for <strong>{programme}</strong></> : null}. An account already exists
-              for <strong>{email}</strong>.
-            </p>
-            <p>
-              Please <Link to="/login">sign in</Link>. If you have not set a password yet, or have forgotten it,
-              use <Link to="/forgot-password">Forgot password</Link> and we will email you a link.
-            </p>
-          </div>
-        </section>
-      ) : outcome?.outcome === 'invited' || outcome?.outcome === 'invitePending' ? (
-        <section className={styles.card} aria-labelledby="application-submitted">
-          <div className={styles.success}>
-            <span className={styles.successIcon} aria-hidden="true"><CheckCircle2 /></span>
-            <h2 id="application-submitted" ref={successRef} tabIndex={-1}>You are eligible</h2>
-            <p>
-              Thank you, {String(answers.firstName ?? '').trim()}. We have received your application
-              {programme ? <> for <strong>{programme}</strong></> : null}, and you are eligible for an
-              apprenticeship with us.
-            </p>
-            {outcome.outcome === 'invited' ? (
-              <p>
-                We have sent an email to <strong>{email}</strong> with a link to create your password. The link
-                expires in 7 days. If you cannot find the email, check your junk or spam folder.
-              </p>
-            ) : (
-              <p>
-                We could not send your invitation email just now. Our team will send you a link to create your
-                password at <strong>{email}</strong>.
-              </p>
-            )}
-            <p>You can now close this page.</p>
-          </div>
-        </section>
-      ) : submitted ? (
-        <section className={styles.card} aria-labelledby="application-submitted">
-          <div className={styles.success}>
-            <span className={styles.successIcon} aria-hidden="true"><CheckCircle2 /></span>
-            <h2 id="application-submitted" ref={successRef} tabIndex={-1}>Application submitted</h2>
-            <p>
-              Thank you, {String(answers.firstName ?? '').trim()}. We have received your application
-              {programme ? <> for <strong>{programme}</strong></> : null}.
-            </p>
-            <p>You can now close this page.</p>
+            <span className={`${styles.successIcon} ${outcome.eligible ? '' : styles.notEligibleIcon}`} aria-hidden="true">
+              {outcome.eligible ? <CheckCircle2 /> : <XCircle />}
+            </span>
+            <h2 id="application-submitted" ref={successRef} tabIndex={-1}>
+              {outcome.eligible ? 'You Are Eligible to Proceed!' : 'You Are Not Currently Eligible'}
+            </h2>
+            {outcome.eligible ? <>
+              <p>Thank you for completing your application.</p>
+              <p>Based on the information you have provided, you have successfully passed our initial eligibility screening and can proceed to the next stage of your apprenticeship application.</p>
+              <p>You will receive an email shortly with instructions to activate your account and begin the enrolment process.</p>
+              <p>If you have any questions, please contact our Admissions Team at <a href={`mailto:${EMPLOYMENT_CONTACT_EMAIL}`}>{EMPLOYMENT_CONTACT_EMAIL}</a>.</p>
+              {outcome.outcome === 'existingAccount' ? <p>
+                An account already exists for <strong>{email}</strong>. Please <Link to="/login">sign in</Link>.
+                If you have not set a password yet, or have forgotten it, use <Link to="/forgot-password">Forgot password</Link>.
+              </p> : outcome.outcome === 'invited' ? <p>
+                We have sent an email to <strong>{email}</strong> with a link to create your password. The link expires in 7 days. If you cannot find the email, check your junk or spam folder.
+              </p> : outcome.outcome === 'invitePending' ? <p>
+                We could not send your invitation email just now. Our team will send you a link to create your password at <strong>{email}</strong>.
+              </p> : null}
+            </> : <>
+              <p>Thank you for your interest in Kent Business College.</p>
+              <p>Based on the information you have provided, your application does not currently meet our initial eligibility requirements.</p>
+              {outcome.reasons.map(reason => <p key={reason}>Reason: {reason}</p>)}
+              <p>Government-funded apprenticeships in England generally require qualifying paid employment and at least 50% of working hours to be spent in England.</p>
+              <p>If your employer is based outside England but you work at an English branch, or you believe your circumstances may qualify for an exception, please contact our Admissions Team at <a href={`mailto:${EMPLOYMENT_CONTACT_EMAIL}`}>{EMPLOYMENT_CONTACT_EMAIL}</a>.</p>
+            </>}
           </div>
         </section>
       ) : (
@@ -373,15 +402,54 @@ export default function ApprenticeshipApplicationPage() {
 
           <div className={styles.questions}>
             {section.items.map(item => {
-              if (!isQuestion(item)) return <p key={item.key} className={styles.note}>{item.text}</p>;
+              if (!isQuestion(item)) {
+                if (!isNoteShown(item, answers)) return null;
+                const [title, ...paragraphs] = item.text.split('\n\n');
+                if (item.key === EMPLOYMENT_REQUIREMENTS_NOTICE_KEY) {
+                  return (
+                    <div
+                      key={item.key}
+                      id={EMPLOYMENT_REQUIREMENTS_NOTICE_KEY}
+                      className={`${styles.note} ${styles.employmentNotice}`}
+                      role="note"
+                      aria-live="polite"
+                    >
+                      <div className={styles.noticeTitle}>
+                        <Info aria-hidden="true" />
+                        <strong>{title}</strong>
+                      </div>
+                      {paragraphs.map(paragraph => (
+                        <p key={paragraph}>
+                          {paragraph.split(EMPLOYMENT_CONTACT_EMAIL).map((part, partIndex, parts) => (
+                            <span key={`${part}-${partIndex}`}>
+                              {part}
+                              {partIndex < parts.length - 1 && (
+                                <a href={`mailto:${EMPLOYMENT_CONTACT_EMAIL}`}>{EMPLOYMENT_CONTACT_EMAIL}</a>
+                              )}
+                            </span>
+                          ))}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={item.key} className={styles.note}>
+                    {paragraphs.length ? <strong>{title}</strong> : null}
+                    {paragraphs.length ? paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>) : title}
+                  </div>
+                );
+              }
               if (!isShown(item, answers)) return null;
               number += 1;
               const value = answerFor(answers, item);
-              const postcode = isPostcodeQuestion(item);
+              const postcode = isPostcodeQuestion(item) && (item.key !== 'postcode' || residentialUk);
               return (
                 <QuestionRow
                   key={item.key}
-                  question={item}
+                  question={{ ...item, required: isRequired(item, answers), hint: item.key === 'dateOfBirth'
+                    ? dateNotice(item.key, answers, today) ?? item.hint
+                    : [item.hint, dateNotice(item.key, answers, today)].filter(Boolean).join(' ') || undefined }}
                   number={number}
                   value={value}
                   error={errors[item.key]}
@@ -389,11 +457,16 @@ export default function ApprenticeshipApplicationPage() {
                   onChange={next => setAnswer(item.key, next)}
                   onBlur={postcode ? () => void checkPostcode(String(value ?? '')) : undefined}
                   check={postcode && isUkPostcode(String(value ?? '')) ? checks[compactPostcode(String(value))] : undefined}
+                  onRetry={['employerPostcode', 'mainWorkplacePostcode'].includes(item.key) && [EMPLOYER_POSTCODE_UNAVAILABLE, WORKPLACE_POSTCODE_UNAVAILABLE].includes(errors[item.key]) ? () => void handleContinue() : undefined}
                 />
               );
             })}
           </div>
 
+          {historicalMessage && <div className={styles.note} role="status">
+            <p>{historicalMessage}</p>
+            <p>Please contact our Admissions Team at <a href={`mailto:${EMPLOYMENT_CONTACT_EMAIL}`}>{EMPLOYMENT_CONTACT_EMAIL}</a>.</p>
+          </div>}
           {submitError && <p className={styles.alert} role="alert">{submitError}</p>}
 
           <div className={styles.actions}>
@@ -402,8 +475,14 @@ export default function ApprenticeshipApplicationPage() {
                 <ArrowLeft aria-hidden="true" /> Previous
               </button>
             )}
-            <button type="submit" className={styles.primary} disabled={submitting}>
-              {last ? (submitting ? 'Submitting…' : 'Submit application') : 'Continue'}
+            <button
+              type="submit"
+              className={styles.primary}
+              disabled={submitting || verifyingEmployer || employmentRestricted}
+              aria-busy={submitting || verifyingEmployer}
+              aria-describedby={employmentRestricted ? EMPLOYMENT_REQUIREMENTS_NOTICE_KEY : undefined}
+            >
+              {verifyingEmployer ? 'Verifying postcode…' : last ? (submitting ? 'Submitting…' : 'Submit application') : 'Continue'}
               <ArrowRight aria-hidden="true" />
             </button>
           </div>
@@ -428,7 +507,6 @@ function Frame({ hero, children }: { hero?: { eyebrow: string; title: string; in
               <p className={frame.eyebrow}>{hero.eyebrow}</p>
               <h1>{hero.title}</h1>
               <p>{hero.intro}</p>
-              <span className={frame.accessNote}><CheckCircle2 size={16} aria-hidden="true" />No LMS account needed to apply</span>
             </div>
             <div className={frame.heroIcon} aria-hidden="true"><ClipboardCheck strokeWidth={1.3} /></div>
           </header>
@@ -453,9 +531,10 @@ interface QuestionRowProps {
   onBlur?: () => void;
   /** Postcode questions: the lookup of the current answer. */
   check?: Check;
+  onRetry?: () => void;
 }
 
-function QuestionRow({ question, number, value, error, today, onChange, onBlur, check }: QuestionRowProps) {
+function QuestionRow({ question, number, value, error, today, onChange, onBlur, check, onRetry }: QuestionRowProps) {
   const id = `application-${question.key}`;
   const labelId = `${id}-label`;
   const hintId = question.hint ? `${id}-hint` : undefined;
@@ -477,7 +556,7 @@ function QuestionRow({ question, number, value, error, today, onChange, onBlur, 
   if (question.kind === 'choice' || question.kind === 'yesno') {
     const options = question.kind === 'yesno'
       ? [{ label: 'Yes', value: true }, { label: 'No', value: false }]
-      : question.options.map(option => ({ label: option, value: option }));
+      : question.options.map(option => ({ label: question.optionLabels?.[option] ?? option, value: option }));
     return (
       <div className={styles.row}>
         <div className={styles.prompt}>
@@ -531,7 +610,7 @@ function QuestionRow({ question, number, value, error, today, onChange, onBlur, 
             onChange={event => onChange(event.target.value)}
           >
             <option value="">Please select</option>
-            {question.options.map(option => <option key={option} value={option}>{option}</option>)}
+            {question.options.map(option => <option key={option} value={option}>{question.optionLabels?.[option] ?? option}</option>)}
           </select>
         ) : (
           <input
@@ -541,6 +620,7 @@ function QuestionRow({ question, number, value, error, today, onChange, onBlur, 
             value={String(value ?? '')}
             onChange={event => onChange(event.target.value)}
             onBlur={onBlur}
+            placeholder={question.placeholder}
             maxLength={'maxLength' in question ? question.maxLength : undefined}
             max={question.kind === 'date' && !question.allowFuture ? today : undefined}
             min={question.kind === 'date' ? '1900-01-01' : undefined}
@@ -550,9 +630,13 @@ function QuestionRow({ question, number, value, error, today, onChange, onBlur, 
           />
         )}
         {message}
+        {onRetry && <button type="button" className={styles.secondary} onClick={onRetry}>Retry postcode verification</button>}
         {locationId && (
           <div id={locationId} aria-live="polite">
             <PostcodeLocation check={check} />
+            {question.key === 'employerPostcode' && check?.status === 'found' && check.country && (
+              <p className={styles.location}>Country (verified from postcode): {check.country}</p>
+            )}
           </div>
         )}
       </div>

@@ -68,7 +68,9 @@ export interface WizardContextValue {
    */
   readOnly: boolean;
   /** Persist the Extended ILR answers to enrolment."Extended_ILR". */
-  saveIlr: (options?: { skillsRadarCheckpoint?: boolean; submitted?: boolean }) => Promise<void>;
+  saveIlr: (options?: { finalizeIlr?: boolean; skillsRadarCheckpoint?: boolean; submitted?: boolean }) => Promise<void>;
+  ilrFinalisedAt?: string;
+  ilrLegacyReadOnly?: boolean;
   /** Persist only module choices through their revision-checked endpoint. */
   saveModules: (selection: import('@/features/programme-suitability/modules/configuration').ProgrammeModuleSelection) => Promise<void>;
   ilrSaving: boolean;

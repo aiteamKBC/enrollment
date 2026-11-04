@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth.helpers";
 import { syncLearnerStatus } from '@/hooks/useLearnerNavGate';
 import { isOnboardingStatus, ONBOARDING_ROUTE } from '@/hooks/useOnboardingRedirect';
 import { COUNTRY_OPTIONS, DEFAULT_COUNTRY } from '@/lib/countries';
+import { LEARNER_TITLE_OPTIONS as TITLE_OPTIONS } from '@/lib/learnerTitles';
 import { createTypedSignature } from '@/lib/typedSignature';
 import {
   fetchFirstLoginDetails,
@@ -31,7 +32,6 @@ import { btnPrimary, btnSecondary } from '@/pages/users/components/ui';
 // ============================================================================
 
 const learnerNav = roleNavMap.learner;
-const TITLE_OPTIONS = ['Mr', 'Mrs', 'Miss', 'Ms', 'Mx', 'Dr', 'Prof'];
 // Same loose check the server makes (first_login_details.UK_POSTCODE).
 const UK_POSTCODE = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s*[0-9][A-Z]{2}$/i;
 const PHONE_ALLOWED = /^\+?[0-9 ()-]+$/;

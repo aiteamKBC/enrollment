@@ -29,9 +29,18 @@ export interface ExtendedIlrMeta {
   providerSignedDate: string;
   completed: boolean;
   updatedAt: string;
+  ilrFinalisedAt?: string;
+  ilrLegacyReadOnly?: boolean;
 }
 
 export interface ExtendedIlrResponse {
+  /** Verified linked application defaults, separate from persisted wizard answers. */
+  prefill?: {
+    applicationId: string;
+    draft: Partial<WizardDraftRest>;
+    answers: Partial<IlrForm>;
+    employerRepresentative: { name: string; email: string };
+  };
   /** null when the learner has no saved ILR yet — the form opens blank. */
   answers: IlrForm | null;
   /** The wizard's other steps; null/{} when nothing has been saved yet. */
@@ -50,7 +59,11 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     throw new Error('Could not reach the server. Is the backend running on port 8000?');
   }
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: { error?: string } | null = null;
+  if (text && res.headers.get('Content-Type')?.toLowerCase().includes('application/json')) {
+    try { data = JSON.parse(text) as { error?: string }; } catch { /* A malformed response is never shown to a learner. */ }
+  }
+  if (text && !data) throw new Error('The server returned an unexpected response. Please refresh and try again.');
   if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
   return data as T;
 }
@@ -155,8 +168,8 @@ export async function saveExtendedIlr(
   kind: LearnerKind,
   learnerId: string,
   answers: IlrForm,
-  draft?: WizardDraftRest,
-  versioning: { layoutVersion?: number | null; layoutToken?: string | null; skillsRadarCheckpoint?: boolean; submitted?: boolean } = {},
+  draft?: Partial<WizardDraftRest>,
+  versioning: { layoutVersion?: number | null; layoutToken?: string | null; skillsRadarCheckpoint?: boolean; submitted?: boolean; finalizeIlr?: boolean } = {},
 ): Promise<ExtendedIlrResponse> {
   const key = `${kind}/${learnerId}`;
   const body = {

@@ -7,6 +7,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { signatureDeclaration } from '../signatureDeclaration';
 
 const fetchExtendedIlr = vi.fn();
 const saveExtendedIlr = vi.fn();
@@ -33,7 +34,7 @@ vi.mock('@/api/wizardLayout', () => ({
 import { ToastProvider } from '@/hooks/useToast';
 import { WizardProvider } from '../WizardContext';
 import { WizardShell } from '../WizardShell';
-import { DEFAULT_LAYOUT, defaultLayout, missingForLayoutStep, resolveLayout, visibleSteps } from '../layout/resolve';
+import { DEFAULT_LAYOUT, defaultLayout, layoutForLearner, missingForLayoutStep, resolveLayout, visibleSteps } from '../layout/resolve';
 import { missingForStep } from '../validation';
 import { WIZARD_STEPS, type EnrolmentBoard, type WizardDraft } from '../../types';
 import type { LayoutItem, WizardLayout } from '../layout/types';
@@ -47,6 +48,7 @@ const BOARD = {
 const COMPLETE_PD = {
   firstName: 'Test', lastName: 'Learner', email: 'test@example.com', phone: '07123456789',
   address: '1 High Street', dob: '2000-01-01', age: 26, sex: 'Female', signature: 'data:image/png;base64,AAAA',
+  signatureDeclaration: { text: signatureDeclaration(), confirmedAt: '2026-11-03T10:00:00Z' },
 };
 
 const draftWith = (patch: Partial<WizardDraft>): WizardDraft => ({
@@ -88,7 +90,7 @@ beforeEach(() => {
 
 describe('resolving a layout', () => {
   it('is the standard wizard when nothing is published', () => {
-    expect(visibleSteps(resolveLayout(null)).map((s) => s.slug)).toEqual(WIZARD_STEPS.map((s) => s.slug));
+    expect(visibleSteps(layoutForLearner(resolveLayout(null), false)).map((s) => s.slug)).toEqual(WIZARD_STEPS.map((s) => s.slug));
   });
 
   it('puts back built-in steps and items a published layout does not mention, in their default place', () => {
@@ -124,7 +126,8 @@ describe('validation against a layout', () => {
 
   it('matches the standard rules with the default layout', () => {
     const draft = draftWith({ personalDetails: { ...COMPLETE_PD, address: '' } as WizardDraft['personalDetails'] });
-    expect(missingForStep(2, draft)).toEqual(['Address']);
+    const layout = defaultLayout();
+    expect(missingForLayoutStep(step(layout), draft, layout)).toEqual(['Address']);
   });
 
   it('does not require a removed or optional built-in question, but still checks what is typed', () => {
@@ -164,7 +167,7 @@ describe('the wizard with a published layout', () => {
     fetchWizardLayout.mockResolvedValue({ layout, version: 3, updatedAt: '', updatedBy: '' });
     render(
       <ToastProvider>
-        <WizardProvider userId="20" board={BOARD}>
+        <WizardProvider userId="20" board={BOARD} isCommercial>
           <WizardShell currentIndex={currentIndex} mode={mode} onNavigateStep={onNavigateStep} onFinish={vi.fn()} />
         </WizardProvider>
       </ToastProvider>
@@ -228,6 +231,6 @@ describe('the wizard with a published layout', () => {
     );
     await waitFor(() => expect(fetchWizardLayout).toHaveBeenCalled());
     expect(screen.getAllByRole('tab')).toHaveLength(WIZARD_STEPS.length);
-    expect(screen.getByText('Address')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ILR' })).toBeInTheDocument();
   });
 });

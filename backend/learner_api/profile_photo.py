@@ -93,6 +93,9 @@ def learner_profile_photo(request, kind, pk):
         if not model.all_learners.filter(pk=pk).exists():
             return JsonResponse({'error': 'Learner not found.'}, status=404)
         if request.method == 'POST':
+            account = getattr(request, 'login_account', None)
+            if account is not None and account.role == 'learner':
+                return JsonResponse({'error': 'About You is read-only.'}, status=403)
             upload = request.FILES.get('photo')
             if upload is None:
                 return JsonResponse({'error': 'Choose a photo to upload.'}, status=400)

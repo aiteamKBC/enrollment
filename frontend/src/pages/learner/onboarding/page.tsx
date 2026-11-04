@@ -15,7 +15,7 @@ import { useWizard } from "@/pages/users/wizard/WizardContext.helpers";
 import { WizardShell } from '@/pages/users/wizard/WizardShell';
 import { maxReachableStep, missingAcrossWizard } from '@/pages/users/wizard/validation';
 import { ONBOARDING_REVIEWS_ROUTE } from '@/hooks/useOnboardingRedirect';
-import { markEnrolmentSubmitted } from '@/hooks/useLearnerNavGate';
+import { markEnrolmentSubmitted, syncLearnerStatus } from '@/hooks/useLearnerNavGate';
 import { RowsSkeleton } from '@/components/feature/Skeletons';
 import { shouldRedirectLearnerWizardStep } from './navigation';
 
@@ -48,11 +48,12 @@ function LearnerWizard({ stepSlug, onDone }: { stepSlug: string | undefined; onD
   // answers that hadn't loaded yet.
   const reachable = maxReachableStep(draft, steps.length, layout);
   const reachableSlug = steps[reachable]?.slug;
+  const currentSlug = steps[currentIndex]?.slug;
   useEffect(() => {
-    if (shouldRedirectLearnerWizardStep({ ready, currentIndex, reachable }) && reachableSlug) {
+    if (shouldRedirectLearnerWizardStep({ ready, currentIndex, reachable, stepSlug: currentSlug }) && reachableSlug) {
       navigate(`/learner/onboarding/${reachableSlug}`, { replace: true });
     }
-  }, [ready, currentIndex, reachable, reachableSlug, navigate]);
+  }, [ready, currentIndex, reachable, reachableSlug, currentSlug, navigate]);
 
   const finish = async () => {
     // Backstop to the step gating: completeness is judged live, so the whole
@@ -85,10 +86,6 @@ function LearnerWizard({ stepSlug, onDone }: { stepSlug: string | undefined; onD
         // 'Submitted' — not 'Completed'. Completion is the provider's call once
         // identity/eligibility evidence has been verified and countersigned.
         await updateEnrolmentUser(userId, {
-          username: name || board.user.name,
-          email: pd.email,
-          phone: pd.phone,
-          dob: pd.dob,
           onboardingStatus: 'Submitted',
         });
         // Record the submitted layout only after the learner record confirms
@@ -154,7 +151,8 @@ export default function LearnerOnboardingPage() {
   // also clears an old bookmarked/sidebar URL once the account type is known.
   useEffect(() => {
     if (isCommercial) navigate('/workspace/learner', { replace: true });
-  }, [isCommercial, navigate]);
+    else if (stepSlug === 'personal-details') navigate('/learner/onboarding/ilr-details', { replace: true });
+  }, [isCommercial, navigate, stepSlug]);
 
   useEffect(() => {
     if (isCommercial) {
@@ -170,7 +168,10 @@ export default function LearnerOnboardingPage() {
     fetchWizardBootstrap(isCommercial ? 'commercial' : 'apprenticeship', learnerId, {
       force: reloadToken > 0,
     })
-      .then((data) => { if (!cancelled) setBoard(data.board); })
+      .then((data) => { if (!cancelled) {
+        syncLearnerStatus('apprenticeship', learnerId, data.board.programme.status);
+        setBoard(data.board);
+      } })
       .catch((e: Error) => { if (!cancelled) setLoadError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

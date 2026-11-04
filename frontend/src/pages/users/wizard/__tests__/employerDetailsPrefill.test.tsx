@@ -8,12 +8,13 @@ import type { IlrForm } from '../../types';
 
 const api = vi.hoisted(() => ({ fetchIlrEmployerDetails: vi.fn() }));
 vi.mock('@/api/extendedIlr', () => api);
-const wizard = vi.hoisted(() => ({ employer: {} as IlrForm['employer'], hydrated: true, setSection: vi.fn() }));
+const wizard = vi.hoisted(() => ({ employer: {} as IlrForm['employer'], hydrated: true, linked: false, setSection: vi.fn() }));
 vi.mock("../WizardContext.helpers", () => ({
   useWizard: () => ({
     userId: '41',
     isCommercial: false,
     hydrated: wizard.hydrated,
+    board: { contact: { eligibilityLinked: wizard.linked } },
     draft: { ilr: { employer: wizard.employer } },
     setSection: wizard.setSection,
   }),
@@ -32,10 +33,31 @@ const RECORD: IlrForm['employer'] = {
 beforeEach(() => {
   vi.clearAllMocks();
   wizard.hydrated = true;
+  wizard.linked = false;
   api.fetchIlrEmployerDetails.mockResolvedValue(RECORD);
 });
 
 describe('Employer Details prefill', () => {
+  it('uses central linked defaults without refilling saved blanks from another employer source', () => {
+    wizard.linked = true;
+    wizard.employer = EMPTY;
+    renderHook(() => useEmployerDetailsPrefill());
+    expect(api.fetchIlrEmployerDetails).not.toHaveBeenCalled();
+    expect(wizard.setSection).not.toHaveBeenCalled();
+  });
+
+  it('does not apply an old employer response after a linked source becomes available', async () => {
+    wizard.employer = EMPTY;
+    wizard.hydrated = false;
+    const { rerender } = renderHook(() => useEmployerDetailsPrefill());
+    await waitFor(() => expect(api.fetchIlrEmployerDetails).toHaveBeenCalled());
+    await Promise.resolve();
+    wizard.linked = true;
+    wizard.hydrated = true;
+    rerender();
+    expect(wizard.setSection).not.toHaveBeenCalled();
+  });
+
   it('fills empty fields from the learner record', async () => {
     wizard.employer = EMPTY;
     renderHook(() => useEmployerDetailsPrefill());

@@ -21,9 +21,12 @@ export function CvSuitabilityPanel() {
   return <section aria-label="Programme suitability assessment" className="mt-6 space-y-4 rounded-xl border border-primary-200 p-4">
     <h3 className="font-semibold">Programme Suitability Assessment</h3>
     <p className="text-sm">Complete a short assessment to help identify which apprenticeship programme best matches your current job responsibilities.</p>
+    {loading && !state && <p role="status" className="text-sm">Loading your assessment…</p>}
     {error && <div role="alert" className="text-sm text-red-700"><p>{error}</p>
       <button type="button" className={btnSecondary} disabled={loading} onClick={() => { void suitability.refresh(); }}>Retry</button>
     </div>}
+    {!loading && !error && state && (!state.available || !state.configuration?.enabled) &&
+      <p role="status" className="text-sm">The assessment is not currently available. Please contact the enrolment team if you expected to complete it.</p>}
     {!readOnly && suitability.status === 'SUBMITTED' && state?.result && <RecommendationResult state={state} />}
     {readOnly && state?.result && state.pathway && <>
       <p className="text-sm">{state.reviewStatus.replaceAll('_', ' ')}</p>
@@ -48,7 +51,7 @@ export function CvSuitabilityPanel() {
         {state.review.recommendedProgramme ? ` Suggested programme: ${programmeName(state.review.recommendedProgramme)}. Your preference has been preserved.` : ''}</p>}
       {state.review?.learnerRequest && <p className="rounded-lg bg-background-100 p-3 text-sm">Learner review request: {state.review.learnerRequest.reason}</p>}
     </>}
-    {!readOnly && <>
+    {!readOnly && (!state || (state.available && state.configuration?.enabled)) && <>
       <button type="button" className={btnPrimary} onClick={suitability.start}>
         {suitability.status === 'SUBMITTED' ? 'Preview Assessment' : state?.revision ? 'Resume Assessment' : 'Start Assessment'}
       </button>

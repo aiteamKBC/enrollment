@@ -75,6 +75,7 @@ export function LabeledSelect({
   required,
   placeholder = 'Select…',
   missingKey,
+  ariaLabel,
 }: {
   label: string;
   value: string;
@@ -83,11 +84,13 @@ export function LabeledSelect({
   required?: boolean;
   placeholder?: string;
   missingKey?: string;
+  ariaLabel?: string;
 }) {
   const missing = useMissing(missingKey);
   return (
     <FieldRow label={label} required={required}>
       <select
+        aria-label={ariaLabel}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={missing ? true : undefined}
@@ -153,6 +156,7 @@ export function SignatureField({
   savedValue,
   missingBeforeSign,
   missingKey,
+  readOnly = false,
 }: {
   label?: string;
   value?: string;
@@ -172,6 +176,7 @@ export function SignatureField({
   missingBeforeSign?: string[];
   /** This signature's label in the step's validation list: red once Next is pressed unsigned. */
   missingKey?: string;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const unsigned = Boolean(useMissing(missingKey)) && !value;
@@ -196,7 +201,10 @@ export function SignatureField({
     <div className="py-2.5">
       <p className="text-[12px] text-foreground-500 font-medium mb-2">{label}</p>
 
-      {editing ? (
+      {readOnly ? (value ? <div className="flex items-center gap-3 flex-wrap">{isImage
+        ? <img src={value} alt={label} className="h-16 max-w-[280px] object-contain px-3 py-2 border border-foreground-200 rounded-lg bg-white" />
+        : <span className="px-4 py-6 border border-foreground-200 rounded-lg text-[13px] italic text-foreground-700 bg-background-50">{value}</span>}</div>
+        : <p className="text-[12px] text-foreground-500">Not signed</p>) : editing ? (
         <SignaturePad
           signatoryName={signatoryName}
           onCommit={(url) => { onChange(url); setEditing(false); }}

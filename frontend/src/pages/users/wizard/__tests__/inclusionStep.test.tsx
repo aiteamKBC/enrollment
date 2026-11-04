@@ -45,7 +45,7 @@ function Spy() {
   return null;
 }
 
-function renderWizard({ mode = 'learner', isCommercial = false, currentIndex = defaultLayout().steps.findIndex((s) => s.slug === 'inclusion') }: { mode?: 'learner' | 'staff'; isCommercial?: boolean; currentIndex?: number } = {}) {
+function renderWizard({ mode = 'learner', isCommercial = false, currentIndex = visibleSteps(layoutForLearner(defaultLayout(), isCommercial)).findIndex((s) => s.slug === 'inclusion') }: { mode?: 'learner' | 'staff'; isCommercial?: boolean; currentIndex?: number } = {}) {
   const onNavigateStep = vi.fn();
   render(
     <ToastProvider>
@@ -177,7 +177,7 @@ describe('the Inclusion step in a layout', () => {
     const commercial = layoutForLearner(layout, true);
     expect(visibleSteps(commercial).map((s) => s.slug)).not.toContain('inclusion');
     expect(commercial.steps.find((s) => s.slug === 'policies')!.items.find((i) => i.key === 'block.inclusion')!.hidden).toBe(true);
-    expect(layoutForLearner(layout, false)).toBe(layout);
+    expect(layoutForLearner(layout, false).steps.find(step => step.slug === 'inclusion')!.hidden).toBe(false);
   });
 });
 

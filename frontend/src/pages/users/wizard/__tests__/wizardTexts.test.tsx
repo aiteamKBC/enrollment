@@ -11,6 +11,8 @@ vi.mock('@/api/extendedIlr', () => ({
   fetchExtendedIlr: vi.fn().mockResolvedValue({ answers: null, draft: null, meta: { updatedAt: '' } }),
   saveExtendedIlr: vi.fn(),
   peekExtendedIlr: () => undefined,
+  fetchIlrEmployerDetails: vi.fn().mockResolvedValue({}),
+  fetchIlrEvidence: vi.fn().mockResolvedValue({ results: [], locked: false }),
 }));
 vi.mock('@/api/enrolmentDocuments', () => ({ uploadEnrolmentDocument: vi.fn() }));
 vi.mock('@/api/curriculum', () => ({ fetchKsbProfile: vi.fn().mockResolvedValue({ results: [] }), peekKsbProfile: () => undefined }));
@@ -66,6 +68,22 @@ describe('the formatting language', () => {
 });
 
 describe('published wording', () => {
+  it('describes the apprenticeship employer section as a company address', async () => {
+    render(<ToastProvider><WizardProvider userId="20" board={BOARD} layout={defaultLayout()}>
+      <WizardShell currentIndex={3} mode="staff" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
+    </WizardProvider></ToastProvider>);
+    expect(await screen.findByText("Please provide your employer's company address:")).toBeInTheDocument();
+  });
+
+  it('preserves a published custom employer section intro', async () => {
+    const layout={...defaultLayout(),texts:{'xilr.h.employer.intro':'Published company instructions'}};
+    render(<ToastProvider><WizardProvider userId="20" board={BOARD} layout={layout}>
+      <WizardShell currentIndex={3} mode="staff" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
+    </WizardProvider></ToastProvider>);
+    expect(await screen.findByText('Published company instructions')).toBeInTheDocument();
+    expect(screen.queryByText("Please provide your employer's company address:")).not.toBeInTheDocument();
+  });
+
   it('keeps the standard wording for anything not edited, and ignores unknown or blank edits', () => {
     const layout = resolveLayout({ ...defaultLayout(), texts: { 'pd.address.label': 'Home address', 'nope.key': 'x', 'pd.email.label': '  ' } });
     expect(layout.texts).toEqual({ 'pd.address.label': 'Home address' });
@@ -86,7 +104,7 @@ describe('published wording', () => {
     });
     const { unmount } = render(
       <ToastProvider>
-        <WizardProvider userId="20" board={BOARD}>
+        <WizardProvider userId="20" board={BOARD} isCommercial>
           <WizardShell currentIndex={0} mode="staff" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
         </WizardProvider>
       </ToastProvider>
@@ -98,7 +116,7 @@ describe('published wording', () => {
 
     render(
       <ToastProvider>
-        <WizardProvider userId="20" board={BOARD}>
+        <WizardProvider userId="20" board={BOARD} isCommercial>
           <WizardShell currentIndex={2} mode="staff" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
         </WizardProvider>
       </ToastProvider>

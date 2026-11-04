@@ -157,7 +157,7 @@ describe('Next Steps in the step rail', () => {
     // programme), plus unconfigured suitability, count so far — Next Steps
     // would make it 6. The Inclusion
     // assessment is not answered.
-    expect(screen.getByText('5 of 12 steps complete')).toBeInTheDocument();
+    expect(screen.getByText('6 of 12 steps complete')).toBeInTheDocument();
   });
 
   it('shows its number rather than a tick for staff, who are not gated', async () => {

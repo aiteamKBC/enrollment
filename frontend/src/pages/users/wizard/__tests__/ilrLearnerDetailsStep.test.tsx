@@ -3,12 +3,14 @@
  * record cannot answer, and what the step requires before the learner moves on.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppIcon } from '@/components/feature/AppIcon';
 import type { IlrLearnerDetails as Details, WizardDraft } from '../../types';
 import { WIZARD_STEPS } from '../../types';
 import { missingForStep } from '../validation';
+import { signatureDeclaration } from '../signatureDeclaration';
+import { HEALTH_CONDITIONS } from '../ilrHealthOptions';
 
 const RECORD = {
   familyName: 'Learner', givenNames: 'Test', dateOfBirth: '1991-06-12', currentPostcode: 'BR8 7EU',
@@ -27,11 +29,13 @@ const BLANK: Details = {
 const ANSWERED: Details = {
   ...BLANK, postcodePriorToEnrolment: 'BR8 7EU', niNumber: 'AB 12 34 56 C', legalSex: 'Female', ethnicity: 'Irish',
   longTermDisability: false, highestQualification: 'Full level 3', employmentStatus: 'In paid employment',
-  employmentStartDate: '2024-01-15', fullTimeEducation: false,
+  employmentStartDate: '2024-01-15', fullTimeEducation: false, workingHoursPerWeek: '37.5',
 };
 const wizard = vi.hoisted(() => ({
   details: {} as Record<string, unknown>,
   personalSignature: undefined as string | undefined,
+  title: undefined as string | undefined,
+  finalisedAt: undefined as string | undefined,
   setSection: vi.fn(),
 }));
 vi.mock("../WizardContext.helpers", async (importOriginal) => ({
@@ -39,9 +43,11 @@ vi.mock("../WizardContext.helpers", async (importOriginal) => ({
   useWizard: () => ({
     userId: '41',
     isCommercial: false,
-    draft: { ilrDetails: wizard.details, personalDetails: { signature: wizard.personalSignature } },
+    draft: { ilrDetails: wizard.details, personalDetails: { signature: wizard.personalSignature, title: wizard.title } },
     setSection: wizard.setSection,
     board: { contact: { savedSignature: undefined } },
+    ilrFinalisedAt: wizard.finalisedAt,
+    readOnly: false,
   }),
 }));
 
@@ -53,18 +59,45 @@ beforeEach(() => {
   vi.stubGlobal('AppIcon', AppIcon);
   wizard.details = { ...BLANK };
   wizard.personalSignature = undefined;
+  wizard.title = undefined;
+  wizard.finalisedAt = undefined;
   fetchIlrLearnerRecord.mockResolvedValue(RECORD);
 });
 
 describe('ILR Learner Details step', () => {
-  it('shows the record’s own details read-only rather than asking for them again', async () => {
+  it('renders a finalised apprenticeship ILR without active editing or signature replacement', async () => {
+    wizard.title = 'Ms';
+    wizard.personalSignature = 'data:image/png;base64,AAAA';
+    wizard.details = { ...ANSWERED };
+    wizard.finalisedAt = '2026-11-04T12:00:00Z';
+    render(<IlrLearnerDetails />);
+    expect(await screen.findByText(/signed and submitted/i)).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /^Title/ })).toBeDisabled();
+    expect(screen.getAllByDisplayValue('BR8 7EU')[0]).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /re-sign|clear/i })).not.toBeInTheDocument();
+    expect(wizard.setSection).not.toHaveBeenCalled();
+  });
+  it('offers the existing Title choices and saves through the existing personal-details contract', async () => {
+    wizard.title = '';
+    render(<IlrLearnerDetails />);
+    const select = await screen.findByRole('combobox', { name: /^Title/ });
+    await userEvent.selectOptions(select, 'Ms');
+    expect(wizard.setSection).toHaveBeenLastCalledWith('personalDetails', expect.objectContaining({ title: 'Ms' }));
+    expect(Array.from(select.querySelectorAll('option')).map(option => option.value)).toEqual(['', 'Mr', 'Mrs', 'Miss', 'Ms', 'Mx', 'Dr', 'Prof']);
+  });
+  it('retains a historical Title outside the current list', async () => {
+    wizard.title = 'Reverend';
+    render(<IlrLearnerDetails />);
+    expect(await screen.findByRole('combobox', { name: /^Title/ })).toHaveValue('Reverend');
+  });
+  it('protects verified identity while allowing residential corrections before signing', async () => {
     render(<IlrLearnerDetails />);
 
     expect(fetchIlrLearnerRecord).toHaveBeenCalledWith('apprenticeship', '41');
-    expect(await screen.findByDisplayValue('1 Waterton')).toHaveAttribute('readonly');
+    expect(await screen.findByDisplayValue('1 Waterton')).not.toHaveAttribute('readonly');
     expect(screen.getByDisplayValue('12/06/1991')).toHaveAttribute('readonly');
     expect(screen.getByDisplayValue('learner@example.test')).toHaveAttribute('readonly');
-    expect(screen.getByDisplayValue('Swanley')).toHaveAttribute('readonly');
+    expect(screen.getByDisplayValue('Swanley')).not.toHaveAttribute('readonly');
   });
 
   it('starts the prior postcode as the current one, in a single update', async () => {
@@ -82,12 +115,18 @@ describe('ILR Learner Details step', () => {
     expect(wizard.setSection).not.toHaveBeenCalled();
   });
 
-  it('asks a learner with no NI number to confirm they have applied for one', async () => {
+  it('shows NI guidance and the stored application confirmation only when the number is absent', async () => {
     render(<IlrLearnerDetails />);
-
-    expect(await screen.findByText(/apply for one by phoning/i)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('checkbox', { name: /applied for a National Insurance number/i }));
+    await screen.findByDisplayValue('1 Waterton');
+    expect(screen.getByText(/apply for one by phoning/i)).toBeInTheDocument();
+    const confirmation = screen.getByRole('checkbox', { name: /confirm that you have done so/i });
+    await userEvent.click(confirmation);
     expect(wizard.setSection).toHaveBeenLastCalledWith('ilrDetails', expect.objectContaining({ niApplied: true }));
+    cleanup();
+    wizard.details = { ...ANSWERED };
+    render(<IlrLearnerDetails />);
+    await screen.findByDisplayValue('1 Waterton');
+    expect(screen.queryByText(/apply for one by phoning/i)).not.toBeInTheDocument();
   });
 
   it('fills the years with the learner’s age when they have lived there since birth', async () => {
@@ -115,48 +154,41 @@ describe('ILR Learner Details step', () => {
     expect(wizard.setSection).not.toHaveBeenCalled();
   });
 
-  it('never signs the certification for the learner, even with a Personal details signature on file', async () => {
+  it('shows only the retained mark and does not silently repurpose a historical signature', async () => {
     wizard.personalSignature = 'data:image/png;base64,PERSONAL';
     wizard.details = { ...ANSWERED };
     render(<IlrLearnerDetails />);
     await screen.findByDisplayValue('1 Waterton');
 
     expect(wizard.setSection).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /click to sign with your saved signature/i })).toBeInTheDocument();
-    expect(screen.queryByText(/draw a new signature/i)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('img', { name: 'Your signature' })).toHaveLength(1);
+    expect(screen.queryByText('Learner signature')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /confirm signature for this declaration/i })).toBeInTheDocument();
   });
 
-  it('signs with the saved signature when the learner clicks to sign', async () => {
+  it('records combined consent only when the learner explicitly confirms, without copying to the retired field', async () => {
     wizard.personalSignature = 'data:image/png;base64,PERSONAL';
     wizard.details = { ...ANSWERED };
     render(<IlrLearnerDetails />);
     await screen.findByDisplayValue('1 Waterton');
 
-    await userEvent.click(screen.getByRole('button', { name: /click to sign with your saved signature/i }));
+    await userEvent.click(screen.getByRole('button', { name: /confirm signature for this declaration/i }));
 
-    expect(wizard.setSection).toHaveBeenCalledWith('ilrDetails', expect.objectContaining({
+    expect(wizard.setSection).toHaveBeenCalledWith('personalDetails', expect.objectContaining({
       signature: 'data:image/png;base64,PERSONAL',
-      signatureDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      signatureDeclaration: { text: signatureDeclaration(), confirmedAt: expect.any(String) },
     }));
   });
 
-  it('lists what is still unanswered when the learner clicks to sign too early, and does not sign', async () => {
+  it('keeps question completion validation independent of the single signature', async () => {
     wizard.personalSignature = 'data:image/png;base64,PERSONAL';
     wizard.details = { ...ANSWERED, ethnicity: '', fullTimeEducation: null };
     render(<IlrLearnerDetails />);
     await screen.findByDisplayValue('1 Waterton');
 
-    const sign = screen.getByRole('button', { name: /click to sign with your saved signature/i });
-    expect(sign).toBeEnabled();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-
-    await userEvent.click(sign);
-
-    const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Please answer these before signing');
-    expect(alert).toHaveTextContent('Ethnicity');
-    expect(alert).toHaveTextContent('Full-time education or training');
-    expect(alert).not.toHaveTextContent('Declaration signature');
+    const draft = { ilrDetails: wizard.details, personalDetails: { currentPostcode: 'BR8 7EU', signature: wizard.personalSignature } } as unknown as WizardDraft;
+    const missing = missingForStep(WIZARD_STEPS.findIndex(step => step.slug === 'ilr-details'), draft);
+    expect(missing).toEqual(['Ethnicity', 'Full-time education or training', 'Your signature']);
     expect(wizard.setSection).not.toHaveBeenCalled();
   });
 
@@ -166,7 +198,7 @@ describe('ILR Learner Details step', () => {
     render(<IlrLearnerDetails />);
     await screen.findByDisplayValue('1 Waterton');
 
-    expect(screen.getByRole('button', { name: /click to sign with your saved signature/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /confirm signature for this declaration/i })).toBeInTheDocument();
   });
 
   it('still offers the drawing pad when no signature is saved', async () => {
@@ -174,7 +206,7 @@ describe('ILR Learner Details step', () => {
     render(<IlrLearnerDetails />);
     await screen.findByDisplayValue('1 Waterton');
 
-    expect(screen.getByRole('button', { name: /^click to sign$/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^click to sign$/i })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /saved signature/i })).not.toBeInTheDocument();
   });
 
@@ -185,7 +217,8 @@ describe('ILR Learner Details step', () => {
     // Each Yes/No renders its question twice (visible text + fieldset legend).
     expect(screen.getAllByText(/long-term disability, health problem or any learning difficulties\? \*/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/full-time education or training\? \*/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/I certify that the information contained on this form is correct/)).toHaveTextContent('*');
+    expect(screen.getByText(/I certify that the information contained on this form is correct/)).toBeInTheDocument();
+    expect(screen.getByText(/confirm the ILR accuracy declaration and authorise this signature/)).toBeInTheDocument();
   });
 });
 
@@ -263,21 +296,96 @@ describe('ILR follow-up questions', () => {
   });
 });
 
+describe('Apprenticeship ILR health and hours', () => {
+  const show = async (details: Partial<Details>) => {
+    wizard.details = { ...ANSWERED, ...details };
+    render(<IlrLearnerDetails />);
+    await screen.findByDisplayValue('1 Waterton');
+  };
+
+  it('shows all 22 coded conditions for Yes and filters them by search', async () => {
+    await show({ longTermDisability: true });
+    const list = document.querySelector('[aria-label="Health condition options"]') as HTMLElement;
+    expect(HEALTH_CONDITIONS).toHaveLength(22);
+    expect(within(list).getAllByRole('checkbox')).toHaveLength(22);
+    expect(within(list).getByRole('checkbox', { name: /Asperger’s syndrome/ })).toBeInTheDocument();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search health conditions' }), 'dys');
+    expect(within(list).getAllByRole('checkbox')).toHaveLength(3);
+    expect(within(list).getByRole('checkbox', { name: 'Dyslexia' })).toBeInTheDocument();
+  });
+
+  it('adds multiple codes without duplication and removes a selected chip', async () => {
+    await show({ longTermDisability: true, healthConditionCodes: ['12', '13'], primaryHealthConditionCode: '12' });
+    expect(screen.getByRole('button', { name: 'Remove Dyslexia' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Dyslexia' }));
+    expect(wizard.setSection).toHaveBeenLastCalledWith('ilrDetails', expect.objectContaining({
+      healthConditionCodes: ['13'], primaryHealthConditionCode: '',
+    }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Dyscalculia' }));
+    expect(wizard.setSection).toHaveBeenLastCalledWith('ilrDetails', expect.objectContaining({ healthConditionCodes: ['12'] }));
+  });
+
+  it('restricts primary choices to selected conditions and shows support details for Other', async () => {
+    await show({ longTermDisability: true, healthConditionCodes: ['12', '93'], primaryHealthConditionCode: '12' });
+    const primary = screen.getByRole('combobox', { name: /Which of these do you consider/ });
+    expect(Array.from(primary.querySelectorAll('option')).map(option => option.value)).toEqual(['', '12', '93']);
+    expect(screen.getByRole('textbox', { name: /additional support/i })).toBeInTheDocument();
+  });
+
+  it('treats nondisclosure as exclusive and hides primary and support questions', async () => {
+    await show({ longTermDisability: true, healthConditionCodes: ['98'] });
+    expect(screen.queryByRole('combobox', { name: /Which of these do you consider/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /additional support/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Dyslexia' }));
+    expect(wizard.setSection).toHaveBeenLastCalledWith('ilrDetails', expect.objectContaining({ healthConditionCodes: ['12'] }));
+  });
+
+  it('clears dependent answers when Health changes to No', async () => {
+    await show({ longTermDisability: true, healthConditionCodes: ['93'], primaryHealthConditionCode: '93', additionalSupportDetails: 'Quiet room' });
+    await userEvent.click(within(screen.getByRole('group', { name: /long-term disability/i })).getByRole('radio', { name: 'No' }));
+    expect(wizard.setSection).toHaveBeenLastCalledWith('ilrDetails', expect.objectContaining({
+      longTermDisability: false, healthConditionCodes: [], primaryHealthConditionCode: '', additionalSupportDetails: '',
+    }));
+    cleanup();
+    await show({ longTermDisability: false });
+    expect(screen.queryByRole('searchbox', { name: 'Search health conditions' })).not.toBeInTheDocument();
+  });
+
+  it('requires decimal hours for paid work only and clears them when employment changes', async () => {
+    await show({ employmentStatus: 'In paid employment', workingHoursPerWeek: '37.5' });
+    const hours = screen.getByRole('spinbutton', { name: 'Working hours per week' });
+    expect(hours).toHaveValue(37.5);
+    fireEvent.change(hours, { target: { value: '24.25' } });
+    expect(wizard.setSection).toHaveBeenLastCalledWith('ilrDetails', expect.objectContaining({ workingHoursPerWeek: '24.25' }));
+    await userEvent.selectOptions(screen.getByDisplayValue('In paid employment'), 'Not known / not provided');
+    expect(wizard.setSection).toHaveBeenLastCalledWith('ilrDetails', expect.objectContaining({ workingHoursPerWeek: '' }));
+  });
+});
+
 describe('ILR Learner Details completeness', () => {
   const index = WIZARD_STEPS.findIndex((s) => s.slug === 'ilr-details');
   const draftWith = (details: Partial<Details> | undefined) =>
-    ({ ilrDetails: details === undefined ? undefined : { ...BLANK, ...details } }) as unknown as WizardDraft;
+    ({ personalDetails: { currentPostcode: 'CT1 1AA', signature: 'data:image/png;base64,SAVED', signatureDeclaration: { text: signatureDeclaration(), confirmedAt: '2026-11-03T10:00:00Z' } }, ilrDetails: details === undefined ? undefined : { ...BLANK, ...details } }) as unknown as WizardDraft;
   const complete: Partial<Details> = {
     postcodePriorToEnrolment: 'CT1 1AA', niNumber: 'AB 12 34 56 C', legalSex: 'Female', ethnicity: 'Irish',
     longTermDisability: false, highestQualification: 'Full level 3', employmentStatus: 'In paid employment',
-    employmentStartDate: '2024-01-15', fullTimeEducation: false, signature: 'data:image/png;base64,AAAA',
+    employmentStartDate: '2024-01-15', fullTimeEducation: false, workingHoursPerWeek: '37.5',
   };
+  it('requires Title for a new learner only at ILR and retains historical completion compatibility', () => {
+    const draft = draftWith(complete);
+    expect(missingForStep(index, draft)).toEqual([]);
+    draft.personalDetails.title = '';
+    expect(missingForStep(index, draft)).toEqual(['Title']);
+    draft.personalDetails.title = 'Ms';
+    expect(missingForStep(index, draft)).toEqual([]);
+    expect(missingForStep(0, { ...draft, personalDetails: { ...draft.personalDetails, title: '' } })).toEqual([]);
+  });
 
-  it('is named ILR and sits after Personal Details, ahead of the Extended ILR and CV/Job Description', () => {
+  it('is named ILR and follows Before You Begin, ahead of Extended ILR and CV/Job Description', () => {
     const slugs = WIZARD_STEPS.map((s) => s.slug);
     expect(WIZARD_STEPS[index].label).toBe('ILR');
-    expect(slugs.slice(slugs.indexOf('personal-details'), slugs.indexOf('cv-job') + 1))
-      .toEqual(['personal-details', 'ilr-details', 'ilr', 'programme-suitability', 'cv-job']);
+    expect(slugs.slice(slugs.indexOf('before-you-begin'), slugs.indexOf('cv-job') + 1))
+      .toEqual(['before-you-begin', 'ilr-details', 'ilr', 'programme-suitability', 'cv-job']);
   });
 
   it('is complete once every required answer is given', () => {
@@ -285,16 +393,17 @@ describe('ILR Learner Details completeness', () => {
   });
 
   it('names every unanswered required question', () => {
-    expect(missingForStep(index, draftWith({}))).toEqual([
-      'Postcode prior to enrolment',
-      'National Insurance number, or confirm you have applied for one',
+    const draft = draftWith({});
+    draft.personalDetails.currentPostcode = '';
+    expect(missingForStep(index, draft)).toEqual([
+      'Current postcode',
+      'NI number application confirmation',
       'Legal Sex',
       'Ethnicity',
       'Long-term disability, health problem or learning difficulty',
       'Highest qualification achieved',
       'Employment status',
       'Full-time education or training',
-      'Declaration signature',
     ]);
   });
 

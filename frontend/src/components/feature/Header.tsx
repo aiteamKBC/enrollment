@@ -373,14 +373,14 @@ export function Header({ accountButtonRef, pageTitle, pageIcon, pageSubtitle, he
                 {hasLearnerProfile && (
                   <Link
                     role="menuitem"
-                    to="/learner/profile"
+                    to="/learner/account-settings"
                     onClick={() => setProfileOpen(false)}
                     className="account-theme-row group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-smooth hover:bg-background-100 focus:outline-none focus-visible:bg-background-100"
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-background-100 text-foreground-500 transition-smooth group-hover:bg-background-200 group-hover:text-foreground-700" aria-hidden="true">
                       <AppIcon className="ri-user-line text-base" />
                     </span>
-                    <span className="flex-1 text-[0.8125rem] font-semibold text-foreground-700 transition-smooth group-hover:text-foreground-900">My Profile</span>
+                    <span className="flex-1 text-[0.8125rem] font-semibold text-foreground-700 transition-smooth group-hover:text-foreground-900">Account Settings</span>
                     <AppIcon className="ri-arrow-right-s-line text-sm text-foreground-200" />
                   </Link>
                 )}

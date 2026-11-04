@@ -10,6 +10,7 @@ import { AppIcon } from '@/components/feature/AppIcon';
 import type { IlrForm, WizardDraft } from '../../types';
 import { WIZARD_STEPS } from '../../types';
 import { missingForStep } from '../validation';
+import { defaultLayout, resolveLayout } from '../layout/resolve';
 
 const COMPLETE = {
   contact: { byPost: false, byPhone: true, byEmail: true },
@@ -75,6 +76,21 @@ beforeEach(() => {
 });
 
 describe('Extended ILR additional information', () => {
+  it('omits the document action panel, including from older published layouts', () => {
+    const ilrStep = defaultLayout().steps.find((step) => step.slug === 'ilr')!;
+    expect(ilrStep.items.some((item) => item.key === 'xilr.documentActions')).toBe(false);
+
+    const published = defaultLayout();
+    published.steps.find((step) => step.slug === 'ilr')!.items.push({ key: 'xilr.documentActions', builtin: true, hidden: false });
+    const resolved = resolveLayout(published);
+    expect(resolved.steps.find((step) => step.slug === 'ilr')!.items.some((item) => item.key === 'xilr.documentActions')).toBe(false);
+
+    render(<Ilr />);
+    expect(screen.queryByRole('button', { name: 'Download ILR document' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save & file document' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/The document contains every answer above/)).not.toBeInTheDocument();
+  });
+
   it('replaces the old sections, including both signature blocks', () => {
     render(<Ilr />);
 

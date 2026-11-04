@@ -15,12 +15,13 @@ import { ilrDocumentBlob, ilrDocumentFilename } from './steps/ilrDocument';
 import { layoutForLearner, resolveLayout, visibleSteps } from './layout/resolve';
 import { WizardTextsContext } from './layout/textsContext';
 import type { CustomAnswer, LayoutStep, WizardLayout } from './layout/types';
-import { WIZARD_STEPS, type EnrolmentBoard, type IlrForm, type Ksb, type WizardDraft } from '../types';
+import { type EnrolmentBoard, type IlrForm, type Ksb, type WizardDraft } from '../types';
 import { useSuitability } from '@/features/programme-suitability/useSuitability';
 import { useModulesConfiguration } from '@/features/programme-suitability/modules/useModulesConfiguration';
 import { moduleSelectionComplete, selectionFingerprint, type ProgrammeModuleSelection, type ModulesState } from '@/features/programme-suitability/modules/configuration';
 import { saveModuleSelection } from '@/features/programme-suitability/modules/api';
 import { ModuleSaveQueue } from '@/features/programme-suitability/modules/moduleSaveQueue';
+import { mergeFields, preserveEdits } from './prefill';
 import { isPcpRadar, radarProfileProgramme, resolvePcpRadar } from '@/features/programme-suitability/skills-radar/allocation';
 import { isMmRadar, mmRadarProfileProgramme, resolveMmRadar } from '@/features/programme-suitability/skills-radar/marketingManager';
 import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/programme-suitability/skills-radar/marketingExecutive';
@@ -54,7 +55,7 @@ function emptyIlr(firstNames: string, surname: string): IlrForm {
   };
 }
 
-function makeInitialDraft(b: EnrolmentBoard): WizardDraft {
+function makeInitialDraft(b: EnrolmentBoard, isCommercial = false): WizardDraft {
   const parts = b.user.name.split(' ');
   const first = parts[0] ?? '';
   const last = parts.slice(1).join(' ');
@@ -63,14 +64,27 @@ function makeInitialDraft(b: EnrolmentBoard): WizardDraft {
     // Age is derived from the DOB, so a learner whose record already carries one
     // arrives with the field filled — it is read-only and could not be answered
     // by hand otherwise.
-    personalDetails: { firstName: first, lastName: last, email: b.contact.email, phone: b.contact.phone, address: '', dob: iso, age: ageFromDob(iso), sex: '' },
+    personalDetails: {
+      firstName: first, lastName: last, email: b.contact.email, phone: b.contact.phone,
+      address: isCommercial ? '' : b.contact.address ?? '',
+      ...(!isCommercial ? {
+        country: b.contact.country ?? '', currentPostcode: b.contact.currentPostcode ?? '',
+        addressLine1: b.contact.addressLine1 ?? '', addressLine2: b.contact.addressLine2 ?? '',
+        addressLine3: b.contact.addressLine3 ?? '', addressLine4: b.contact.addressLine4 ?? '',
+      } : {}),
+      dob: iso, age: ageFromDob(iso), sex: '',
+      ...(!isCommercial && (b.contact.title || b.contact.titleRequired !== false) ? { title: b.contact.title || '' } : {}),
+    },
     // ILR Learner Details. State benefits start at 'None', the answer most
     // learners give, as on the paper form.
     ilrDetails: {
       yearsAtAddress: null, sinceBirth: null, postcodePriorToEnrolment: '', niNumber: '', niApplied: null,
-      legalSex: '', pronouns: '', ethnicity: '', longTermDisability: null, highestQualification: '',
+      legalSex: '', pronouns: '', ethnicity: '', longTermDisability: null,
+      ...(!isCommercial ? { healthConditionCodes: [], primaryHealthConditionCode: '', additionalSupportDetails: '' } : {}),
+      highestQualification: '',
       employmentStatus: '', employmentStartDate: '', jobTitle: '', selfEmployed: null,
-      fullTimeEducation: null, expectedLeavingDate: '', lengthOfUnemployment: '', volunteers: null,
+      fullTimeEducation: null, ...(!isCommercial ? { workingHoursPerWeek: '' } : {}),
+      expectedLeavingDate: '', lengthOfUnemployment: '', volunteers: null,
       stateBenefits: 'None', benefitClaimBasis: '', signature: null, signatureDate: '',
     },
     // The standard is resolved from the learner's own programme by the Skills
@@ -99,6 +113,9 @@ function makeInitialDraft(b: EnrolmentBoard): WizardDraft {
  * as saved.
  */
 function withRecordDefaults(d: WizardDraft, b: EnrolmentBoard): WizardDraft {
+  // Linked defaults are merged beneath saved answers centrally. Filling blanks
+  // here would undo deliberate clearing of an already saved answer.
+  if (b.contact.eligibilityLinked) return d;
   const pd = d.personalDetails;
   const c = b.contact;
   const blank = (v?: string) => !v || v.trim() === '';
@@ -112,9 +129,10 @@ function withRecordDefaults(d: WizardDraft, b: EnrolmentBoard): WizardDraft {
       fill.age = ageFromDob(iso);
     }
   }
-  if (blank(pd.signature) && !blank(c.savedSignature)) {
+  if (pd.signature == null && !blank(c.savedSignature)) {
     fill.signature = c.savedSignature;
-    fill.signatureDate = c.savedSignatureDate || new Date().toISOString().slice(0, 10);
+    // Keep an unknown historical signing date unknown; opening a page is not signing.
+    fill.signatureDate = c.savedSignatureDate || undefined;
   }
   if (Object.keys(fill).length === 0) return d;
   return { ...d, personalDetails: { ...pd, ...fill } };
@@ -128,14 +146,15 @@ function withRecordDefaults(d: WizardDraft, b: EnrolmentBoard): WizardDraft {
  * answers came from memory or from the wire.
  */
 function mergeSaved(prev: WizardDraft, res: ExtendedIlrResponse): WizardDraft {
-  const next: WizardDraft = { ...prev, ...(res.draft ?? {}) };
+  const source = res.prefill ? mergeFields<WizardDraft>(prev, { ...res.prefill.draft, ilr: mergeFields(prev.ilr, res.prefill.answers) }) : prev;
+  const next: WizardDraft = mergeFields<WizardDraft>(source, res.draft ?? {});
   // Merged per-section over the seeded blanks so a step added after this row was
   // saved still gets its defaults instead of coming back undefined.
-  if (res.answers) next.ilr = { ...prev.ilr, ...res.answers };
+  if (res.answers) next.ilr = mergeFields(source.ilr, res.answers);
   // Recomputed rather than trusted: a row saved last year carries an age that is
   // now a year out of date, and rows written before age was derived may hold a
   // hand-typed value that never matched the DOB.
-  if (next.personalDetails?.dob) {
+  if (!res.meta.ilrFinalisedAt && !res.meta.ilrLegacyReadOnly && next.personalDetails?.dob) {
     next.personalDetails = { ...next.personalDetails, age: ageFromDob(next.personalDetails.dob) };
   }
   // The Inclusion status comes from the Safeguarding database on every open,
@@ -181,10 +200,10 @@ export function WizardProvider({
   // blanks. Kept apart so the filled-in values count as unsaved (see
   // lastSavedDraft below) and are written on the next move, not only shown.
   const [initial] = useState(() => {
-    const blank = makeInitialDraft(board);
-    const saved = seed && (seed.answers || seed.draft) ? mergeSaved(blank, seed) : blank;
+    const blank = makeInitialDraft(board, isCommercial);
+    const saved = seed && (seed.answers || seed.draft || seed.prefill) ? mergeSaved(blank, seed) : blank;
     // Apprentices only: the first-sign-in screens that capture these are theirs.
-    return { saved, filled: isCommercial ? saved : withRecordDefaults(saved, board) };
+    return { saved, filled: isCommercial || seed?.meta.ilrFinalisedAt || seed?.meta.ilrLegacyReadOnly ? saved : withRecordDefaults(saved, board) };
   });
   const [draft, setDraft] = useState<WizardDraft>(initial.filled);
   const [savedModuleChoice, setSavedModuleChoice] = useState<ProgrammeModuleSelection | undefined>(initial.saved.programmeModules);
@@ -201,9 +220,13 @@ export function WizardProvider({
   // every new board object.
   const boardRef = useRef(board);
   boardRef.current = board;
-  const [completed, setCompleted] = useState<boolean[]>(() => Array(WIZARD_STEPS.length).fill(false));
+  const [completedBySlug, setCompletedBySlug] = useState<Record<string, boolean>>({});
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const loadFailed = useRef(false);
   const [ilrSaving, setIlrSaving] = useState(false);
   const [ilrSavedAt, setIlrSavedAt] = useState(() => seed?.meta.updatedAt ?? '');
+  const [ilrFinalisedAt, setIlrFinalisedAt] = useState(() => seed?.meta.ilrFinalisedAt ?? '');
+  const [ilrLegacyReadOnly, setIlrLegacyReadOnly] = useState(() => seed?.meta.ilrLegacyReadOnly ?? false);
   const [ilrFiling, setIlrFiling] = useState(false);
   // A cache hit means the answers are already in `draft`, so there is nothing to
   // wait for; the effect below still runs and is a no-op on the same payload.
@@ -237,7 +260,13 @@ export function WizardProvider({
     [layoutOverride, publishedLayout, isCommercial]
   );
   const steps = useMemo(() => visibleSteps(layout), [layout]);
-  const suitability = useSuitability(kindForSeed, userId, Boolean(layout.programmeSuitability), publishedVersion,
+  const completed = useMemo(() => steps.map(step => Boolean(completedBySlug[step.slug])), [steps, completedBySlug]);
+  // Older version-pinned layouts predate suitability. The assessment endpoint
+  // owns its saved configuration snapshot, so read it for those apprentices
+  // without replacing their assigned wizard steps or Skills Radar catalogue.
+  const loadSuitability = Boolean(layout.programmeSuitability) || (!isCommercial && !readOnlyLearnerSteps && publishedLayout !== null && layoutSettled &&
+    steps.some(step => step.slug === 'programme-suitability'));
+  const suitability = useSuitability(kindForSeed, userId, loadSuitability, publishedVersion,
     ['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) || layout.programmeSuitability?.enabled === false);
   const modules = useModulesConfiguration(kindForSeed, userId, suitability.selectionConfirmed, publishedVersion);
   const apmStaffReview = isApmStaffReview(readOnlyLearnerSteps, board.programme.name || '', suitability.state);
@@ -285,6 +314,24 @@ export function WizardProvider({
   if (lastSavedDraft.current === null && seed && (seed.answers || seed.draft)) {
     lastSavedDraft.current = initial.saved;
   }
+  const currentDraft = useRef(draft);
+  currentDraft.current = draft;
+  const originalSignature = useRef(initial.filled.personalDetails.signature);
+  const originalSignatureDeclaration = useRef(initial.filled.personalDetails.signatureDeclaration);
+  useEffect(() => {
+    if (isCommercial) return;
+    const preventSignatureLoss = (event: BeforeUnloadEvent) => {
+      const saved = lastSavedDraft.current ? lastSavedDraft.current.personalDetails?.signature : originalSignature.current;
+      const savedDeclaration = lastSavedDraft.current ? lastSavedDraft.current.personalDetails?.signatureDeclaration : originalSignatureDeclaration.current;
+      if (currentDraft.current.personalDetails.signature !== saved
+        || JSON.stringify(currentDraft.current.personalDetails.signatureDeclaration) !== JSON.stringify(savedDeclaration)) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', preventSignatureLoss);
+    return () => window.removeEventListener('beforeunload', preventSignatureLoss);
+  }, [isCommercial]);
 
   const kind: LearnerKind = kindForSeed;
 
@@ -294,21 +341,28 @@ export function WizardProvider({
     let cancelled = false;
     fetchExtendedIlr(kind, userId)
       .then((res) => {
-        if (cancelled || (!res.answers && !res.draft)) return;
+        loadFailed.current = false;
+        if (cancelled || (!res.answers && !res.draft && !res.prefill)) return;
         setDraft((prev) => {
-          const merged = mergeSaved(prev, res);
+          const server = mergeSaved(initial.filled, res);
+          const merged = preserveEdits(initial.filled, prev, server);
           if (moduleServerLoaded.current) merged.programmeModules = prev.programmeModules;
           // What just came back from the server is, by definition, saved — so
           // opening the wizard and paging through it writes nothing. Values
           // filled in from the learner's record are the exception: they are not
           // saved yet, so they leave the draft dirty and go out on the next move.
-          lastSavedDraft.current = merged;
-          return kind === 'commercial' ? merged : withRecordDefaults(merged, boardRef.current);
+          // Early edits have not been saved. Source-only defaults are written
+          // on the next normal save, never as a side effect of this read.
+          lastSavedDraft.current = res.answers || res.draft ? server : null;
+          return kind === 'commercial' || res.meta.ilrFinalisedAt || res.meta.ilrLegacyReadOnly ? merged : withRecordDefaults(merged, boardRef.current);
         });
         setIlrSavedAt(res.meta.updatedAt);
+        setIlrFinalisedAt(res.meta.ilrFinalisedAt ?? '');
+        setIlrLegacyReadOnly(res.meta.ilrLegacyReadOnly ?? false);
       })
       .catch(() => {
-        // A failed load is not fatal — the wizard still opens on a blank form.
+        // Never overwrite a signed historical draft with blanks after a failed read.
+        loadFailed.current = true;
       })
       // Flagged in .finally, not .then: a failed load must still release the
       // gating, otherwise the learner is stuck on step one with no way forward.
@@ -318,7 +372,7 @@ export function WizardProvider({
     return () => {
       cancelled = true;
     };
-  }, [kind, userId]);
+  }, [kind, userId, initial.filled]);
 
   /**
    * Seed an unrated row for every competency on the learner's programme.
@@ -487,6 +541,7 @@ export function WizardProvider({
       moduleSaveQueue,
       readOnly: readOnlyLearnerSteps,
       setSection: (key, val) => {
+        if ((ilrFinalisedAt || ilrLegacyReadOnly) && !isCommercial && !readOnlyLearnerSteps && (key === 'personalDetails' || key === 'ilrDetails')) return;
         if (key === 'programmeModules') { moduleEditRef.current += 1; setModuleEditVersion(moduleEditRef.current); }
         setDraft((prev) => ({ ...prev, [key]: val }));
       },
@@ -494,7 +549,10 @@ export function WizardProvider({
       layout,
       steps,
       completed,
-      markComplete: (index, done) => setCompleted((prev) => prev.map((c, i) => (i === index ? done : c))),
+      markComplete: (index, done) => {
+        const step = steps[index];
+        if (step) setCompletedBySlug(previous => ({ ...previous, [step.slug]: done }));
+      },
       saveModules: async (selection) => {
         if (readOnlyLearnerSteps || !hydrated || !modules.data) throw new Error('Module settings are still loading. Please retry.');
         const editing = moduleEditRef.current;
@@ -509,47 +567,62 @@ export function WizardProvider({
           ? { ...previous, programmeModules: committed.selection } : previous);
       },
       saveIlr: async (options = {}) => {
-        // Nothing has changed since the last write — moving off a step the
-        // learner didn't touch costs no request and shows no spinner.
-        const mustRecordVersion = Boolean(options.skillsRadarCheckpoint || options.submitted);
-        if (!mustRecordVersion && lastSavedDraft.current && Object.keys(draft).every((key) =>
-          key === 'programmeModules' || key === 'programmeModulesCompletion' || draft[key as keyof WizardDraft] === lastSavedDraft.current?.[key as keyof WizardDraft])) return;
-        // Captured before the await: the learner can keep typing while the
-        // request is in flight, and marking *that* newer draft saved would
-        // silently drop the edits made during the round-trip.
+        if (!hydrated || loadFailed.current) throw new Error('Your saved answers could not be loaded. Refresh and try again before saving.');
         const saving = draft;
-        setIlrSaving(true);
-        try {
-          // Modules use their own endpoint; the remaining answers keep the
-          // existing wizard persistence and projection workflow.
-          const { ilr, ...rest } = saving;
-          // Read from the Safeguarding database on every open; never stored.
-          delete rest.inclusion;
-          delete rest.programmeSuitability;
-          delete rest.programmeModulesCompletion;
-          delete rest.programmeModules;
-          // Read from the curriculum on every open; never stored.
-          if (rest.skillsRadar) {
-            const skillsRadar = { ...rest.skillsRadar };
-            if (managedRadar && radarCatalogue.data?.catalogue) skillsRadar.catalogueToken = radarCatalogue.data.token;
-            delete skillsRadar.programmeKsbIds;
-            delete skillsRadar.configurationError;
-            rest.skillsRadar = skillsRadar;
+        const operation = saveQueue.current.catch(() => {}).then(async () => {
+          // Nothing has changed since the last write — moving off a step the
+          // learner didn't touch costs no request and shows no spinner.
+          const mustRecordVersion = Boolean(options.skillsRadarCheckpoint || options.submitted);
+          if (!options.finalizeIlr && !mustRecordVersion && lastSavedDraft.current && Object.keys(saving).every((key) =>
+            key === 'programmeModules' || key === 'programmeModulesCompletion' || saving[key as keyof WizardDraft] === lastSavedDraft.current?.[key as keyof WizardDraft])) return;
+          // Captured before the await: the learner can keep typing while the
+          // request is in flight, and marking *that* newer draft saved would
+          // silently drop the edits made during the round-trip.
+          setIlrSaving(true);
+          try {
+            // Modules use their own endpoint; the remaining answers keep the
+            // existing wizard persistence and projection workflow.
+            const { ilr, ...savedRest } = saving;
+            const rest: Partial<typeof savedRest> = { ...savedRest };
+            // Read from the Safeguarding database on every open; never stored.
+            delete rest.inclusion;
+            delete rest.programmeSuitability;
+            delete rest.programmeModulesCompletion;
+            delete rest.programmeModules;
+            if (ilrLegacyReadOnly && !isCommercial) {
+              delete rest.personalDetails;
+              delete rest.ilrDetails;
+            }
+            // Read from the curriculum on every open; never stored.
+            if (rest.skillsRadar) {
+              const skillsRadar = { ...rest.skillsRadar };
+              if (managedRadar && radarCatalogue.data?.catalogue) skillsRadar.catalogueToken = radarCatalogue.data.token;
+              delete skillsRadar.programmeKsbIds;
+              delete skillsRadar.configurationError;
+              rest.skillsRadar = skillsRadar;
+            }
+            const res = await saveExtendedIlr(kind, userId, ilr, rest, {
+              layoutVersion: publishedVersion,
+              layoutToken: publishedLayoutToken,
+              skillsRadarCheckpoint: Boolean(options.skillsRadarCheckpoint),
+              submitted: Boolean(options.submitted),
+              finalizeIlr: Boolean(options.finalizeIlr),
+            });
+            lastSavedDraft.current = saving;
+            setIlrSavedAt(res.meta.updatedAt);
+            setIlrFinalisedAt(res.meta.ilrFinalisedAt ?? '');
+            setIlrLegacyReadOnly(res.meta.ilrLegacyReadOnly ?? false);
+          } finally {
+            setIlrSaving(false);
           }
-          const res = await saveExtendedIlr(kind, userId, ilr, rest, {
-            layoutVersion: publishedVersion,
-            layoutToken: publishedLayoutToken,
-            skillsRadarCheckpoint: Boolean(options.skillsRadarCheckpoint),
-            submitted: Boolean(options.submitted),
-          });
-          lastSavedDraft.current = saving;
-          setIlrSavedAt(res.meta.updatedAt);
-        } finally {
-          setIlrSaving(false);
-        }
+        });
+        saveQueue.current = operation;
+        return operation;
       },
       ilrSaving,
       ilrSavedAt,
+      ilrFinalisedAt,
+      ilrLegacyReadOnly,
       hydrated,
       ready: hydrated && ksbsSettled && !radarCatalogue.loading && layoutSettled && inclusionSettled && (!suitability.enabled || !suitability.loading) && (!modulesRequired || Boolean(modules.data || modules.error)),
       fileIlrDocument: async () => {
@@ -575,7 +648,7 @@ export function WizardProvider({
       ilrFiling,
       inclusionCheck,
     }),
-    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, publishedVersion, publishedLayoutToken, steps, completed, kind, ilrSaving, ilrSavedAt, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
+    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, publishedVersion, publishedLayoutToken, steps, completed, kind, ilrSaving, ilrSavedAt, ilrFinalisedAt, ilrLegacyReadOnly, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
   );
   moduleWriter.current = value.saveModules;
 
