@@ -18,19 +18,19 @@ beforeAll(() => {
 describe('Before You Begin step', () => {
   it('comes straight after the Introduction, with a body for every step', () => {
     expect(WIZARD_STEPS.slice(0, 3).map((step) => step.slug)).toEqual([
-      'introduction', 'before-you-begin', 'personal-details',
+      'introduction', 'before-you-begin', 'ilr-details',
     ]);
     expect(STEP_BODIES).toHaveLength(WIZARD_STEPS.length);
     expect(STEP_BODIES[index('before-you-begin')]).toBe(BeforeYouBegin);
   });
 
-  it('has nothing to answer, while Personal Details keeps its own rules', () => {
+  it('has nothing to answer, while ILR requires the relocated signature', () => {
     const draft = {
       personalDetails: { firstName: '', lastName: '', email: '', phone: '', address: '', dob: '', sex: '' },
     } as unknown as WizardDraft;
 
     expect(missingForStep(index('before-you-begin'), draft)).toEqual([]);
-    expect(missingForStep(index('personal-details'), draft)).toContain('Address');
+    expect(missingForStep(index('ilr-details'), draft)).toContain('Your signature');
   });
 
   it('shows the guidance and the contact address', () => {

@@ -331,6 +331,12 @@ function StepEditor({
           Show this step to learners
         </label>
       </div>
+      {step.slug === 'personal-details' && <p className="mx-5 mt-4 rounded-lg border border-foreground-200 p-3 text-[12px] text-foreground-600">
+        This step applies to commercial onboarding only. Apprenticeship learners skip Personal Details. Your signature is required at the end of ILR and covers the ILR accuracy declaration and enrolment paperwork; its existing storage identifier is retained.
+      </p>}
+      {step.slug === 'ilr-details' && <p className="mx-5 mt-4 rounded-lg border border-foreground-200 p-3 text-[12px] text-foreground-600">
+        Apprenticeships have one required Your signature field at the end of ILR. The legacy Declaration signature item displays the accuracy declaration only; publishing or restoring it cannot add another signing box. Historical signatures are preserved and require explicit confirmation for the combined wording.
+      </p>}
       {(TEXT_SLOTS_BY_ITEM[`step:${step.slug}`] ?? []).length > 0 && (
         <div className="space-y-3 border-b border-foreground-100 px-5 py-4">
           {TEXT_SLOTS_BY_ITEM[`step:${step.slug}`].map((slot) => (

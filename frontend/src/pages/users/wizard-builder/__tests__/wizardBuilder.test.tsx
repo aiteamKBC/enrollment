@@ -162,6 +162,9 @@ describe('the builder page', () => {
     expect(screen.getByText(/nothing has been published from the builder yet/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
     expect(screen.getByText('First Name')).toBeInTheDocument();
+    expect(screen.getByText(/This step applies to commercial onboarding only/)).toBeInTheDocument();
+    await openStep('ILR');
+    expect(screen.getByText(/Apprenticeships have one required Your signature field/)).toBeInTheDocument();
   });
 
   it('offers separate single-line and multi-line text fields', async () => {

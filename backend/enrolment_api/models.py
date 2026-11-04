@@ -125,6 +125,9 @@ class WizardIlrLearnerDetails(_LearnerScoped):
     pronouns = models.TextField(db_column="Pronouns", null=True, blank=True)
     ethnicity = models.TextField(db_column="Ethnicity", null=True, blank=True)
     long_term_disability = models.BooleanField(db_column="Long_term_disability", null=True, blank=True)
+    health_condition_codes = SafeJSONField(db_column="Health_condition_codes", null=True, blank=True)
+    primary_health_condition_code = models.TextField(db_column="Primary_health_condition_code", null=True, blank=True)
+    additional_support_details = models.TextField(db_column="Additional_support_details", null=True, blank=True)
     highest_qualification = models.TextField(db_column="Highest_qualification", null=True, blank=True)
     employment_status = models.TextField(db_column="Employment_status", null=True, blank=True)
     # Asked only of learners in paid employment.
@@ -132,6 +135,7 @@ class WizardIlrLearnerDetails(_LearnerScoped):
     job_title = models.TextField(db_column="Job_title", null=True, blank=True)
     self_employed = models.BooleanField(db_column="Self_employed", null=True, blank=True)
     full_time_education = models.BooleanField(db_column="Full_time_education", null=True, blank=True)
+    working_hours_per_week = models.DecimalField(db_column="Working_hours_per_week", max_digits=5, decimal_places=2, null=True, blank=True)
     # Asked only when in full-time education or training.
     expected_leaving_date = models.DateField(db_column="Expected_leaving_date", null=True, blank=True)
     # Asked only of learners not in paid employment.
@@ -143,6 +147,10 @@ class WizardIlrLearnerDetails(_LearnerScoped):
     # PNG data URL — see SignaturePad.tsx.
     declaration_signature = models.TextField(db_column="Declaration_signature", null=True, blank=True)
     declaration_signed_date = models.DateField(db_column="Declaration_signed_date", null=True, blank=True)
+    # Explicit Sign + Next event; a saved/reusable signature is not finalisation.
+    ilr_finalised_at = models.DateTimeField(db_column="Ilr_finalised_at", null=True, blank=True)
+    ilr_finalised_by = models.BigIntegerField(db_column="Ilr_finalised_by", null=True, blank=True)
+    ilr_signed_snapshot = SafeJSONField(db_column="Ilr_signed_snapshot", null=True, blank=True)
 
     class Meta:
         managed = False

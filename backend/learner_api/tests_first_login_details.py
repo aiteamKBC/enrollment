@@ -127,16 +127,17 @@ class ViewTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         return json.loads(response.content)
 
-    def test_a_new_apprentice_is_asked_with_their_record_prefilled(self, *_):
+    def test_a_new_apprentice_skips_welcome_without_losing_record_details(self, *_):
         data = self.required_for(learner(phone_number="07700 900999", country=""))
 
-        self.assertTrue(data["required"])
+        self.assertFalse(data["required"])
+        self.assertIsNone(data['completedAt'])
         self.assertEqual(data["details"]["phone"], "07700 900999")
         self.assertEqual(data["details"]["country"], "United Kingdom")
         self.assertEqual(data["signatoryName"], "Test Learner")
 
-    def test_an_unset_status_counts_as_a_new_account(self, *_):
-        self.assertTrue(self.required_for(learner(programme_status=""))["required"])
+    def test_an_unset_status_does_not_require_welcome(self, *_):
+        self.assertFalse(self.required_for(learner(programme_status=""))["required"])
 
     def test_nobody_else_is_asked(self, *_):
         for row in (
@@ -172,27 +173,16 @@ class ViewTests(SimpleTestCase):
             response = self.post(body)
         return response, cursor
 
-    def test_saves_the_details_and_signature_then_moves_to_onboarding(self, *_):
+    def test_retired_welcome_cannot_write_identity_or_signatures(self, *_):
         row = learner()
         response, cursor = self.submit(row)
 
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(row.programme_status, "Onboarding")
-        self.assertEqual(row.current_postcode, "CT1 1AA")
-        self.assertEqual(row.title, "Ms")
-        fields = row.save.call_args.kwargs["update_fields"]
-        # Only the columns these screens own, plus the status move — nothing else
-        # on the learner row is rewritten.
-        self.assertEqual(
-            set(fields),
-            {"title", "country", "current_postcode", "address_line_1", "address_line_2", "address_line_3",
-             "address_line_4", "phone_number", "date_of_birth", "programme_status"},
-        )
-        sql, params = cursor.execute.call_args.args
-        self.assertIn('"Learner_signature" = %s', sql)
-        self.assertIn('"First_login_details_completed_at" = now()', sql)
-        self.assertEqual(params, [SIGNATURE, "Test Learner", 41])
-        self.assertEqual(json.loads(response.content)["programmeStatus"], "Onboarding")
+        self.assertEqual(response.status_code, 409, response.content)
+        self.assertEqual(json.loads(response.content)['code'], 'not_required')
+        self.assertEqual(row.programme_status, 'Fresh user')
+        self.assertEqual(row.title, '')
+        row.save.assert_not_called()
+        cursor.execute.assert_not_called()
 
     def test_a_retried_submit_rewrites_nothing(self, *_):
         from datetime import datetime, timezone
@@ -200,8 +190,7 @@ class ViewTests(SimpleTestCase):
         row = learner(programme_status="Onboarding")
         response, cursor = self.submit(row, completion=(True, datetime(2026, 9, 27, tzinfo=timezone.utc)))
 
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(json.loads(response.content)["alreadyCompleted"])
+        self.assertEqual(response.status_code, 409)
         row.save.assert_not_called()
         cursor.execute.assert_not_called()
 
@@ -217,7 +206,7 @@ class ViewTests(SimpleTestCase):
         row = learner()
         response, cursor = self.submit(row, body={**VALID, "signature": ""})
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("signature", json.loads(response.content)["fields"])
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(json.loads(response.content)['code'], 'not_required')
         row.save.assert_not_called()
         cursor.execute.assert_not_called()

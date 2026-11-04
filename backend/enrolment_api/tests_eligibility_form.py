@@ -6,6 +6,9 @@ SimpleTestCase with a recording fake cursor and a stubbed postcode lookup: no
 query reaches a database and no request leaves the machine.
 """
 import json
+from contextlib import nullcontext
+from pathlib import Path
+import re
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
@@ -86,20 +89,31 @@ def application(**overrides):
     body = {
         "firstName": "Sam",
         "surname": "Example",
+        "title": "Mr",
         "workEmail": "sam@employer.example",
         "phoneNumber": "",
         "fullAddress": "1 Example Street, Exampletown",
         "postcode": "EX1 2MP",
         "dateOfBirth": "1995-04-03",
         "employmentStatus": "In paid employment",
+        "startDateWithEmployer": "2020-09-01",
+        "jobTitle": "Marketing Executive",
         "majorityHoursInEngland": True,
         "employerName": "Example Ltd",
         "employerAddress": "2 Business Park, Exampletown",
+        "employerAddressLine1": "2 Business Park", "employerAddressLine2": "", "employerAddressLine3": "",
+        "employerTownCity": "Exampletown", "employerCounty": "",
+        "residentialAddressLine1": "1 Example Street", "residentialAddressLine2": "", "residentialAddressLine3": "",
+        "residentialTownCity": "Exampletown", "residentialCounty": "",
         "employerPostcode": "EX3 4MP",
         "representativeName": "Alex Manager",
         "representativeEmail": "alex@employer.example",
         "livesInUk": True,
+        "countryOfResidence": "United Kingdom",
+        "nationality": "United Kingdom",
+        "residentPrev3Years": True,
         "residenceNotForEducation": True,
+        "fullTimeEducationPrior": False,
         "residencyStatus": "Pre-settled Status",
         "programme": "Associate Project Manager Level 4",
         "attendedFundedTraining": False,
@@ -117,14 +131,28 @@ class CleanApplicationTests(SimpleTestCase):
         self.assertEqual(set(row), set(ef.COLUMNS))
         self.assertEqual(row["first_name"], "Sam")
         self.assertEqual(row["date_of_birth"], date(1995, 4, 3))
+        self.assertEqual(row["start_date_with_employer"], date(2020, 9, 1))
+        self.assertEqual(row["job_title"], "Marketing Executive")
         self.assertIs(row["majority_hours_in_england"], True)
         self.assertEqual(row["residency_status"], "Pre-settled Status")
         # The optional phone number, left blank, is stored as NULL, not "".
         self.assertIsNone(row["phone_number"])
 
+    def test_retired_programme_confirmation_is_not_required_or_accepted(self):
+        for value in (None, True, False, "forged"):
+            with self.subTest(value=value):
+                row, errors = ef.clean_application(application(notPreviouslyCompletedProgramme=value), today=TODAY)
+                self.assertEqual(errors, {})
+                self.assertIsNone(row["not_previously_completed_programme"])
+                self.assertEqual(row["programme"], "Associate Project Manager Level 4")
+
     def test_every_required_answer_is_reported_when_missing(self):
         row, errors = ef.clean_application({}, today=TODAY)
-        required = {key for key, _col, _kind, req, _lim in ef.FIELDS if req}
+        required = {
+            key for key, _col, _kind, req, _lim in ef.FIELDS
+            if req and key not in ef.RETIRED_PUBLIC_FIELDS and key not in ef.EMPLOYMENT_CONDITIONAL_FIELDS
+            and key not in {"yearsInUk", "residenceNotForEducation"}
+        }
         self.assertEqual(set(errors), required)
         self.assertNotIn("phoneNumber", errors)
         self.assertNotIn("fundedTrainingCompletedOn", errors)
@@ -138,6 +166,25 @@ class CleanApplicationTests(SimpleTestCase):
         )
         self.assertEqual(errors, {})
         self.assertEqual(row["funded_training_completed_on"], date(2026, 3, 1))
+
+    def test_expected_leaving_date_accepts_future_dates_only_when_education_yes(self):
+        row, errors = ef.clean_application(application(fullTimeEducationPrior=True, expectedLeavingDate="2027-06-30"), today=TODAY)
+        self.assertEqual(errors, {})
+        self.assertEqual(row["expected_leaving_date"], date(2027, 6, 30))
+        _row, errors = ef.clean_application(application(fullTimeEducationPrior=True, expectedLeavingDate="not a date"), today=TODAY)
+        self.assertEqual(errors, {"expectedLeavingDate": "Enter a valid date."})
+        row, errors = ef.clean_application(application(fullTimeEducationPrior=False, expectedLeavingDate="stale"), today=TODAY)
+        self.assertEqual(errors, {})
+        self.assertIsNone(row["expected_leaving_date"])
+
+    def test_blank_leaving_date_preserves_existing_submission_fingerprints(self):
+        row, _errors = ef.clean_application(application(), today=TODAY)
+        current = ef.submission_fingerprint(row, 1)
+        with patch.object(ef, "COLUMNS", tuple(column for column in ef.COLUMNS if column != "expected_leaving_date")):
+            previous = ef.submission_fingerprint(row, 1)
+        self.assertEqual(current, previous)
+        row["expected_leaving_date"] = date(2027, 6, 30)
+        self.assertNotEqual(ef.submission_fingerprint(row, 1), current)
 
     def test_a_completion_date_left_over_from_a_changed_answer_is_not_stored(self):
         row, errors = ef.clean_application(
@@ -160,18 +207,57 @@ class CleanApplicationTests(SimpleTestCase):
         })
         self.assertEqual(errors["dateOfBirth"], "The date cannot be in the future.")
 
-    def test_no_eligibility_rule_is_applied(self):
-        # Collect only: staff assess eligibility, so a "No" or a young applicant is stored as given.
+    def test_other_declarations_remain_collect_only(self):
         _row, errors = ef.clean_application(application(
-            livesInUk=False, majorityHoursInEngland=False, notPreviouslyCompletedProgramme=False,
+            livesInUk=False, notPreviouslyCompletedProgramme=False,
             dateOfBirth="2015-01-01",
         ), today=TODAY)
         self.assertEqual(errors, {})
+
+    def test_working_hours_no_is_valid_and_missing_remains_required(self):
+        for value, message in ((False, None), (None, ef.REQUIRED), ("true", "Choose Yes or No.")):
+            with self.subTest(value=value):
+                _row, errors = ef.clean_application(application(majorityHoursInEngland=value), today=TODAY)
+                self.assertEqual(errors, {"majorityHoursInEngland": message} if message else {})
 
     def test_single_line_answers_are_trimmed(self):
         row, _errors = ef.clean_application(application(firstName="  Sam \n ", postcode=" EX1   2MP "), today=TODAY)
         self.assertEqual(row["first_name"], "Sam")
         self.assertEqual(row["postcode"], "EX1 2MP")
+
+    def test_personal_address_and_postcode_are_optional_and_keep_their_columns(self):
+        row, errors = ef.clean_application(application(fullAddress="", postcode=""), today=TODAY)
+        self.assertEqual(errors, {})
+        self.assertEqual(row["full_address"], "1 Example Street, Exampletown")
+        self.assertIsNone(row["postcode"])
+
+    def test_paid_employment_fields_are_required_only_for_paid_employment(self):
+        _row, errors = ef.clean_application(application(startDateWithEmployer="", jobTitle=""), today=TODAY)
+        self.assertEqual(set(errors), {"startDateWithEmployer", "jobTitle"})
+
+        row, errors = ef.clean_application(application(
+            employmentStatus="Self employment", startDateWithEmployer="not-a-date", jobTitle="stale",
+            employerName="stale employer", employerAddress="stale address", employerPostcode="stale",
+            representativeName="stale", representativeEmail="stale@example.com", majorityHoursInEngland=True,
+        ), today=TODAY)
+        self.assertEqual(errors, {"employmentStatus": ef.EMPLOYMENT_RESTRICTION_ERROR})
+        for column in (
+            "start_date_with_employer", "job_title", "majority_hours_in_england", "employer_name",
+            "employer_address", "employer_postcode", "representative_name", "representative_email",
+        ):
+            self.assertIsNone(row[column])
+
+    def test_each_non_paid_status_is_restricted_even_without_paid_employment_answers(self):
+        for status in ef.EMPLOYMENT_STATUSES[1:]:
+            _row, errors = ef.clean_application(application(
+                employmentStatus=status,
+                startDateWithEmployer="", jobTitle="", majorityHoursInEngland=None,
+                employerName="", employerAddress="", employerPostcode="",
+                representativeName="", representativeEmail="",
+            ), today=TODAY)
+            self.assertEqual(errors, {"employmentStatus": ef.EMPLOYMENT_RESTRICTION_ERROR}, status)
+        self.assertIn("full_address", ef.COLUMNS)
+        self.assertIn("postcode", ef.COLUMNS)
 
     def test_a_malformed_postcode_is_not_a_form_error(self):
         # It makes the applicant not eligible on submit instead (see SubmitApplicationTests).
@@ -183,10 +269,10 @@ class CleanApplicationTests(SimpleTestCase):
 class PublishedLayoutTests(SimpleTestCase):
     """What a layout published from the builder changes about what is accepted."""
 
-    def test_a_removed_question_is_neither_required_nor_stored(self):
+    def test_removed_optional_questions_stay_hidden_but_dob_remains_required(self):
         layout = layout_with(("dateOfBirth", {"hidden": True}), ("phoneNumber", {"hidden": True}))
         row, errors = ef.clean_application(application(dateOfBirth="", phoneNumber="07000 000000"), today=TODAY, layout=layout)
-        self.assertEqual(errors, {})
+        self.assertEqual(errors, {"dateOfBirth": ef.REQUIRED})
         self.assertIsNone(row["date_of_birth"])
         self.assertIsNone(row["phone_number"])
 
@@ -201,6 +287,13 @@ class PublishedLayoutTests(SimpleTestCase):
         layout = layout_with(("fullAddress", {"required": False}), ("phoneNumber", {"required": True}))
         _row, errors = ef.clean_application(application(fullAddress="", phoneNumber=""), today=TODAY, layout=layout)
         self.assertEqual(errors, {"phoneNumber": ef.REQUIRED})
+
+    def test_address_fields_can_be_required_in_the_residency_layout(self):
+        layout = layout_with(("residentialAddressLine1", {"required": True}), ("postcode", {"required": True}))
+        row, errors = ef.clean_application(application(residentialAddressLine1="", postcode=""), today=TODAY, layout=layout)
+        self.assertEqual(errors, {"residentialAddressLine1": ef.REQUIRED, "postcode": ef.REQUIRED})
+        self.assertEqual(row["full_address"], "Exampletown")
+        self.assertIsNone(row["postcode"])
 
     def test_the_completion_date_can_be_made_optional(self):
         layout = layout_with(("fundedTrainingCompletedOn", {"required": False}))
@@ -280,6 +373,9 @@ class PublishedLayoutTests(SimpleTestCase):
 
 class SubmitApplicationTests(SimpleTestCase):
     def setUp(self):
+        atomic = patch.object(ef.transaction, 'atomic', side_effect=lambda **_: nullcontext())
+        atomic.start()
+        self.addCleanup(atomic.stop)
         self.factory = RequestFactory()
         self.lookup = stub_lookup(self)
         p = patch.object(ef, "_published_layout", return_value=(None, None))
@@ -304,14 +400,17 @@ class SubmitApplicationTests(SimpleTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(json.loads(response.content),
                          {"submitted": True, "eligible": True, "reasons": [], "outcome": "invited"})
-        self.assertEqual(len(cursor.executed), 1)
+        self.assertEqual(len(cursor.executed), 2)  # application and durable receipt
         sql, params = cursor.executed[0]
         self.assertTrue(sql.startswith("INSERT INTO enrolment.eligibility_form ("))
         # Only the form's own columns: the client cannot set id, timestamps or anything else.
-        self.assertIn(f"({', '.join(ef.INSERT_COLUMNS)})", sql)
-        self.assertEqual(len(params), len(ef.INSERT_COLUMNS))
+        self.assertIn(f"({', '.join(ef.INSERT_COLUMNS + ef.SCREENING_COLUMNS)})", sql.replace('"', ''))
+        self.assertEqual(len(params), len(ef.INSERT_COLUMNS + ef.SCREENING_COLUMNS))
         stored = dict(zip(ef.INSERT_COLUMNS, params))
         self.assertEqual(stored["programme"], "Associate Project Manager Level 4")
+        self.assertIsNone(stored["not_previously_completed_programme"])
+        self.assertEqual(stored["start_date_with_employer"], date(2020, 9, 1))
+        self.assertEqual(stored["job_title"], "Marketing Executive")
         # Each postcode is saved as written, with where it is.
         self.assertEqual(stored["postcode"], "EX1 2MP")
         self.assertEqual((stored["postcode_country"], stored["postcode_region"], stored["postcode_district"]),
@@ -325,22 +424,45 @@ class SubmitApplicationTests(SimpleTestCase):
         self.assertEqual(response.status_code, 201)
         return json.loads(response.content), dict(zip(ef.INSERT_COLUMNS, cursor.executed[0][1]))
 
-    def test_a_malformed_postcode_is_saved_and_makes_the_applicant_not_eligible(self):
-        data, stored = self.submitted(application(postcode="ss"))
-        self.assertIs(data["eligible"], False)
-        self.assertEqual(data["reasons"], ["Your postcode (ss) is not a valid UK postcode."])
-        self.assertEqual(stored["postcode"], "ss")
-        self.assertIsNone(stored["postcode_country"])
-        self.assertIs(stored["eligible"], False)
-        self.assertEqual(stored["ineligible_reason"], "Your postcode (ss) is not a valid UK postcode.")
+    def test_expected_leaving_date_is_inserted_when_provided_and_omitted_otherwise(self):
+        response, cursor = self.post(application(fullTimeEducationPrior=True, expectedLeavingDate="2027-06-30"))
+        self.assertEqual(response.status_code, 201)
+        sql, params = cursor.executed[0]
+        self.assertIn("expected_leaving_date", sql)
+        self.assertEqual(params[-1], date(2027, 6, 30))
+        response, cursor = self.post(application(fullTimeEducationPrior=False, expectedLeavingDate="2027-06-30"))
+        self.assertEqual(response.status_code, 201)
+        self.assertNotIn("expected_leaving_date", cursor.executed[0][0])
 
-    def test_an_unknown_postcode_is_saved_and_makes_the_applicant_not_eligible(self):
-        data, stored = self.submitted(application(employerPostcode="zz99zz"))
-        self.assertIs(data["eligible"], False)
-        self.assertEqual(data["reasons"], ["Your employer's postcode (ZZ9 9ZZ) could not be found."])
-        self.assertEqual(stored["ineligible_reason"], data["reasons"][0])
-        # The other postcode is still located.
-        self.assertEqual(stored["postcode_district"], "Exeter")
+    def test_invalid_residential_postcodes_are_field_errors_without_saving(self):
+        for value, message in (("ss", postcode_lookup.INVALID_POSTCODE), ("ZZ9 9ZZ", postcode_lookup.UNKNOWN_POSTCODE)):
+            with self.subTest(value=value):
+                response, cursor = self.post(application(postcode=value, eligible=True, postcode_country="England"))
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(json.loads(response.content)["fields"], {"postcode": message})
+                self.assertEqual(cursor.executed, [])
+
+    def test_invalid_employer_postcodes_cannot_bypass_validation_with_client_metadata(self):
+        for code, message in (("zz99zz", postcode_lookup.UNKNOWN_POSTCODE), ("ss", postcode_lookup.INVALID_POSTCODE), ("", ef.REQUIRED)):
+            with self.subTest(code=code):
+                with patch.object(ef.eligibility_invitation, "invite_applicant") as invite:
+                    response, cursor = self.post(application(
+                        employerPostcode=code, eligible=True, country="England", employer_postcode_country="England",
+                    ))
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(json.loads(response.content)["fields"], {"employerPostcode": message})
+                self.assertEqual(cursor.executed, [])
+                invite.assert_not_called()
+
+    def test_each_uk_country_preserves_the_existing_employer_country_decision(self):
+        for code, country in (("CT1 1AA", "England"), ("CF10 1EP", "Wales"), ("EH1 1YZ", "Scotland"), ("BT1 5GS", "Northern Ireland")):
+            with self.subTest(country=country):
+                self.lookup.reset_mock()
+                self.lookup.side_effect = lambda value: {"postcode": code, "country": country, "region": "", "district": ""}
+                data, stored = self.submitted(application(postcode="", employerPostcode=code))
+                self.assertIs(data["eligible"], country == "England")
+                self.assertEqual(stored["employer_postcode_country"], country)
+                self.lookup.assert_called_once_with(code)
 
     def test_a_postcode_outside_england_is_saved_with_its_country_and_not_eligible(self):
         data, stored = self.submitted(application(postcode="EH1 1YZ"))
@@ -350,27 +472,22 @@ class SubmitApplicationTests(SimpleTestCase):
         self.assertIs(stored["eligible"], False)
 
     def test_an_employer_outside_england_also_rules_the_applicant_out(self):
-        data, _stored = self.submitted(application(postcode="ss", employerPostcode="EH1 1YZ"))
+        data, _stored = self.submitted(application(employerPostcode="EH1 1YZ"))
         self.assertIs(data["eligible"], False)
         self.assertEqual(data["reasons"], [
-            "Your postcode (ss) is not a valid UK postcode.",
             "Your employer's postcode (EH1 1YZ) is outside England (Scotland).",
         ])
 
-    def test_without_the_lookup_service_the_application_is_saved_unlocated(self):
+    def test_without_the_employer_lookup_service_submission_can_be_retried_without_saving(self):
         def down(_postcode):
             raise postcode_lookup.PostcodeLookupUnavailable("timed out")
 
         self.lookup.side_effect = down
         with self.assertLogs("enrolment_api.eligibility_form", level="WARNING"):
             response, cursor = self.post(application())
-        self.assertEqual(response.status_code, 201)
-        stored = dict(zip(ef.INSERT_COLUMNS, cursor.executed[0][1]))
-        self.assertEqual(stored["postcode"], "EX1 2MP")
-        self.assertTrue(all(stored[column] is None for column in ef.LOCATION_COLUMNS))
-        # Not checked is not "eligible": staff see it was never decided.
-        self.assertIsNone(stored["eligible"])
-        self.assertIsNone(json.loads(response.content)["eligible"])
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(json.loads(response.content)["fields"], {"employerPostcode": ef.EMPLOYER_POSTCODE_UNAVAILABLE})
+        self.assertEqual(cursor.executed, [])
 
     def test_custom_answers_are_inserted_into_their_columns(self):
         layout = layout_with(extra=[question("cf_years", "number", required=True)])
@@ -378,7 +495,7 @@ class SubmitApplicationTests(SimpleTestCase):
         response, cursor = self.post(application(layoutVersion=4, custom={"cf_years": 2}))
         self.assertEqual(response.status_code, 201, response.content)
         sql, params = cursor.executed[0]
-        self.assertIn(f'{", ".join(ef.INSERT_COLUMNS)}, "custom_years")', sql)
+        self.assertIn('"custom_years"', sql)
         self.assertEqual(params[-1], Decimal("2"))
         self.assertEqual(params[ef.INSERT_COLUMNS.index("layout_version")], 4)
 
@@ -394,8 +511,9 @@ class SubmitApplicationTests(SimpleTestCase):
     def test_a_page_from_before_the_builder_is_checked_against_the_form_in_force(self):
         self.published.return_value = (5, layout_with(("dateOfBirth", {"hidden": True})))
         response, cursor = self.post(application(dateOfBirth="not asked"))
-        self.assertEqual(response.status_code, 201, response.content)
-        self.assertIsNone(dict(zip(ef.INSERT_COLUMNS, cursor.executed[0][1]))["date_of_birth"])
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("dateOfBirth", json.loads(response.content)["fields"])
+        self.assertEqual(cursor.executed, [])
 
     def test_the_layout_version_must_be_a_number(self):
         for version in ("4", True, 1.5):
@@ -415,6 +533,21 @@ class SubmitApplicationTests(SimpleTestCase):
         payload = json.loads(response.content)
         self.assertEqual(set(payload["fields"]), {"surname", "programme"})
         self.assertEqual(cursor.executed, [])
+
+    def test_non_paid_employment_is_rejected_before_any_row_is_saved(self):
+        for layout in (None, layout_with()):
+            self.published.return_value = (None, layout)
+            for status in ef.EMPLOYMENT_STATUSES[1:]:
+                with self.subTest(status=status, published=layout is not None):
+                    with patch.object(ef.eligibility_invitation, "invite_applicant") as invite:
+                        response, cursor = self.post(application(employmentStatus=status))
+                    self.assertEqual(response.status_code, 400)
+                    self.assertEqual(json.loads(response.content)["fields"], {
+                        "employmentStatus": ef.EMPLOYMENT_RESTRICTION_ERROR,
+                    })
+                    self.assertEqual(cursor.executed, [])
+                    self.lookup.assert_not_called()
+                    invite.assert_not_called()
 
     def test_requires_the_csrf_header(self):
         request = self.factory.post(URL, data=json.dumps(application()), content_type="application/json")
@@ -437,6 +570,24 @@ class SubmitApplicationTests(SimpleTestCase):
 
 
 class TableTests(SimpleTestCase):
+    def test_exported_schema_and_repair_match_submission_field_types(self):
+        root = Path(__file__).resolve().parents[2]
+        schema = (root / "database/schema.sql").read_text(encoding="utf-8")
+        ddl = re.search(r"CREATE TABLE enrolment\.eligibility_form \((.*?)\n\);", schema, re.S)[1]
+        columns = dict(re.findall(r"^    (\w+) (\w+)", ddl, re.M))
+        self.assertTrue(set(ef.INSERT_COLUMNS) | set(ef.leaving_date_columns({"expected_leaving_date": True})) <= columns.keys())
+        for column, kind in ef.ADDED_COLUMNS:
+            self.assertEqual(columns[column], kind)
+        repair = (root / "database/eligibility_submission_fields.sql").read_text(encoding="utf-8")
+        repaired = dict(re.findall(r"ADD COLUMN IF NOT EXISTS (\w+) (\w+)", repair))
+        self.assertEqual(repaired, {column: kind for column, kind in ef.ADDED_COLUMNS if column in {
+            "start_date_with_employer", "job_title", "country_of_residence", "nationality",
+            "resident_prev_3_years", "years_in_uk", "full_time_education_prior", "expected_leaving_date",
+        }})
+        self.assertEqual(schema.count("CREATE TABLE IF NOT EXISTS enrolment.eligibility_application_reviews"), 1)
+        self.assertGreater(schema.index("CREATE TABLE IF NOT EXISTS enrolment.eligibility_application_reviews"),
+                           schema.index("ADD CONSTRAINT eligibility_form_pkey PRIMARY KEY"))
+
     def test_ddl_creates_every_column_the_insert_writes(self):
         cursor = FakeCursor()
         ef.ensure_table(cursor)
@@ -485,7 +636,8 @@ class GateTests(SimpleTestCase):
         cursor = FakeCursor()
         connections = {ef.CONN: SimpleNamespace(cursor=lambda: cursor)}
         with patch.dict("os.environ", {"API_REQUIRE_AUTH": "1"}), patch.object(ef, "connections", connections), \
-                patch.object(ef, "_published_layout", return_value=(None, None)):
+                patch.object(ef, "_published_layout", return_value=(None, None)), \
+                patch.object(ef.transaction, 'atomic', side_effect=lambda **_: nullcontext()):
             response = self.client.post(
                 URL, data=json.dumps(application()), content_type="application/json",
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
@@ -495,7 +647,7 @@ class GateTests(SimpleTestCase):
             neighbour = self.client.get("/enrolment_api/wizard-layout/")
             builder = self.client.get("/enrolment_api/eligibility-form-layout/")
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(len(cursor.executed), 1)
+        self.assertEqual(len(cursor.executed), 2)
         self.assertEqual(lookup.status_code, 200)
         self.assertEqual(json.loads(lookup.content)["district"], "Exeter")
         # The rest of the app is still closed to the same anonymous caller.

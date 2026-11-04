@@ -11,6 +11,13 @@ export const EMPLOYMENT_STATUSES = [
   'Not in paid employment, not looking for work and/or not available to start work',
 ] as const;
 
+export const WORKPLACE_ARRANGEMENTS = ['same', 'different', 'remote_hybrid_multiple'] as const;
+export const WORKPLACE_LABELS: Readonly<Record<string, string>> = {
+  same: 'Yes — I usually work at this address.',
+  different: 'No — I usually work at a different location.',
+  remote_hybrid_multiple: 'I work remotely, hybrid, or across multiple locations.',
+};
+
 export const RESIDENCY_STATUSES = [
   'UK Citizen',
   'Settled Status',
@@ -28,6 +35,7 @@ export const PROGRAMMES = [
 ] as const;
 
 export interface ApprenticeshipApplication {
+  title?: string;
   firstName: string;
   surname: string;
   workEmail: string;
@@ -37,14 +45,41 @@ export interface ApprenticeshipApplication {
   /** YYYY-MM-DD */
   dateOfBirth: string;
   employmentStatus: string;
+  /** YYYY-MM-DD */
+  startDateWithEmployer: string;
+  jobTitle: string;
   majorityHoursInEngland: boolean | null;
   employerName: string;
   employerAddress: string;
+  employerAddressLine1?: string;
+  employerAddressLine2?: string;
+  employerAddressLine3?: string;
+  /** Visible Address Line 3; stable town/city API key retained. */
+  employerTownCity?: string;
+  /** Visible Address Line 4 (County and Country); existing column retained. */
+  employerCounty?: string;
+  residentialAddressLine1?: string;
+  residentialAddressLine2?: string;
+  residentialAddressLine3?: string;
+  /** Visible Address Line 3; stable town/city API key retained. */
+  residentialTownCity?: string;
+  /** Visible Address Line 4 (County and Country); Country of Residence stays separate. */
+  residentialCounty?: string;
   employerPostcode: string;
+  workplaceArrangement?: string;
+  mainWorkplacePostcode?: string;
   representativeName: string;
   representativeEmail: string;
+  /** Residency and funding answers. */
   livesInUk: boolean | null;
+  countryOfResidence: string;
+  nationality: string;
+  residentPrev3Years: boolean | null;
+  yearsInUk: string;
   residenceNotForEducation: boolean | null;
+  fullTimeEducationPrior: boolean | null;
+  /** YYYY-MM-DD; relevant only when fullTimeEducationPrior is Yes. */
+  expectedLeavingDate?: string | null;
   residencyStatus: string;
   programme: string;
   attendedFundedTraining: boolean | null;
@@ -83,22 +118,19 @@ const HEADERS = { 'X-Requested-With': 'XMLHttpRequest' };
 const url = '/enrolment_api/public/apprenticeship-application/';
 
 /**
- * What the server decided from the postcodes. The application is saved either
- * way; `eligible` is false when a postcode is not a UK postcode, cannot be
- * found or is outside England (`reasons` says which), and null when the
- * postcodes could not be checked.
- *
- * `outcome` says what followed: an eligible applicant is created as a learner
- * and emailed a set-password invitation ('invited'), or was created but the
- * email could not be sent ('invitePending'), or already has an account
- * ('existingAccount'). 'retryLater' means the postcodes could not be checked;
- * null comes from a server that does not report an outcome.
+ * Completed initial screening has a boolean eligibility result. Invitation
+ * outcomes describe the next step; technical retries are not eligibility results.
+ * pendingAssessment/review remain readable for historical submission receipts,
+ * which are never reclassified or re-invited by the new screening flow.
  */
-export type ApplicationResult = 'invited' | 'invitePending' | 'existingAccount' | 'notEligible' | 'retryLater';
+export type ApplicationResult = 'invited' | 'invitePending' | 'existingAccount' | 'notEligible' | 'retryLater' | 'pendingAssessment';
 
-const RESULTS: readonly ApplicationResult[] = ['invited', 'invitePending', 'existingAccount', 'notEligible', 'retryLater'];
+const RESULTS: readonly ApplicationResult[] = ['invited', 'invitePending', 'existingAccount', 'notEligible', 'retryLater', 'pendingAssessment'];
 
 export interface ApplicationOutcome {
+  review?: { status: 'approved' | 'rejected' | 'more_evidence_required'; version: number; message: string };
+  assessmentStatus?: 'provisional_eligible' | 'pending_assessment' | 'not_eligible';
+  assessmentReason?: string | null;
   eligible: boolean | null;
   reasons: string[];
   outcome: ApplicationResult | null;
@@ -126,6 +158,11 @@ export async function submitApprenticeshipApplication(body: ApplicationSubmissio
     );
   }
   return {
+    ...(data.review && ['approved', 'rejected', 'more_evidence_required'].includes(data.review.status)
+      && Number.isInteger(data.review.version) && data.review.version > 0 && typeof data.review.message === 'string'
+      ? { review: { status: data.review.status, version: data.review.version, message: data.review.message } } : {}),
+    ...(data.assessmentStatus === 'provisional_eligible' || data.assessmentStatus === 'pending_assessment' || data.assessmentStatus === 'not_eligible'
+      ? { assessmentStatus: data.assessmentStatus, assessmentReason: typeof data.assessmentReason === 'string' ? data.assessmentReason : null } : {}),
     eligible: typeof data.eligible === 'boolean' ? data.eligible : null,
     reasons: Array.isArray(data.reasons) ? data.reasons.filter((reason: unknown): reason is string => typeof reason === 'string') : [],
     outcome: RESULTS.includes(data.outcome) ? data.outcome : null,
@@ -144,7 +181,8 @@ export async function fetchEligibilityForm(): Promise<EligibilityLayoutResponse>
   if (!response.ok || !data || typeof data !== 'object' || !('layout' in data)) {
     throw new Error(data?.error || 'The application form is not available just now. Please try again in a few minutes.');
   }
-  return { layout: data.layout ?? null, version: typeof data.version === 'number' ? data.version : null };
+  return { layout: data.layout ?? null, version: typeof data.version === 'number' ? data.version : null,
+    workplaceEnabled: data.workplaceEnabled === true };
 }
 
 // ── postcode check ──────────────────────────────────────────────────────────
@@ -159,7 +197,7 @@ export const isUkPostcode = (value: string) => UK_POSTCODE.test(compactPostcode(
 export type PostcodeCheck =
   | { status: 'found'; postcode: string; country: string; region: string; district: string; inEngland: boolean }
   | { status: 'notFound' }
-  /** The check could not be made (service down, too many checks, offline): the applicant may carry on. */
+  /** The check could not be made (service down, too many checks, offline); retry verification. */
   | { status: 'unavailable' };
 
 /** Where a UK postcode is. Never throws: a failed check is 'unavailable'. */

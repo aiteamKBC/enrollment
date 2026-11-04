@@ -72,11 +72,96 @@ def item(layout, key):
     return next(i for s in layout["sections"] for i in s["items"] if i["key"] == key)
 
 
+class ResidencyConfirmationTests(SimpleTestCase):
+    def test_legacy_layout_exposes_expected_leaving_date_after_education_without_changing_storage(self):
+        from copy import deepcopy
+        from enrolment_api.tests_eligibility_form import application
+
+        raw = standard_layout()
+        residency = items_of(raw, "residency")
+        residency[:] = [entry for entry in residency if entry["key"] != "expectedLeavingDate"]
+        before = deepcopy(raw)
+        visible = el.public_layout(raw)
+        keys = [entry["key"] for entry in items_of(visible, "residency")]
+        self.assertEqual(keys[keys.index("fullTimeEducationPrior") + 1], "expectedLeavingDate")
+        row, errors = ef.clean_application(application(fullTimeEducationPrior=True, expectedLeavingDate="2027-06-30"), layout=visible)
+        self.assertEqual(errors, {})
+        self.assertEqual(row["expected_leaving_date"].isoformat(), "2027-06-30")
+        self.assertEqual(raw, before)
+
+    def test_public_layout_restores_confirmation_after_parent_without_rewriting_published_layout(self):
+        from copy import deepcopy
+        from enrolment_api.tests_eligibility_form import application
+
+        for mode in ("missing", "hidden-moved"):
+            with self.subTest(mode=mode):
+                raw = standard_layout()
+                residency = items_of(raw, "residency")
+                residency[:] = [entry for entry in residency if entry["key"] != "residenceNotForEducation"]
+                if mode == "hidden-moved":
+                    residency.append({"key": "residenceNotForEducation", "builtin": True, "hidden": True})
+                before = deepcopy(raw)
+                visible = el.public_layout(raw)
+                keys = [entry["key"] for entry in items_of(visible, "residency")]
+                self.assertEqual(keys[keys.index("residentPrev3Years") + 1], "residenceNotForEducation")
+                self.assertFalse(item(visible, "residenceNotForEducation")["hidden"])
+                self.assertEqual(raw, before)
+                _row, errors = ef.clean_application(application(residenceNotForEducation=None), layout=visible)
+                self.assertEqual(errors, {"residenceNotForEducation": ef.REQUIRED})
+                row, errors = ef.clean_application(application(residentPrev3Years=False, yearsInUk="2", residenceNotForEducation="stale"), layout=visible)
+                self.assertEqual(errors, {})
+                self.assertIsNone(row["residence_not_for_education"])
+
+
+class ThreeSectionLayoutTests(SimpleTestCase):
+    def test_legacy_publication_and_republish_retire_programme_section_without_data_changes(self):
+        from copy import deepcopy
+        from enrolment_api.tests_eligibility_form import application, TODAY
+
+        raw = standard_layout()
+        programme = item(raw, "programme")
+        programme.update(options=["Data Analyst Level 4"], required=True)
+        items_of(raw, "personal-details").remove(programme)
+        raw["sections"].append({"slug": "programme", "title": "Programme Suitability", "builtin": True,
+                                "hidden": False, "items": [programme, {
+                                    "key": "notPreviouslyCompletedProgramme", "builtin": True, "required": True,
+                                }]})
+        before = deepcopy(raw)
+        for result in (el.public_layout(raw), el.normalize_layout(raw, raw)[0]):
+            self.assertEqual([section["slug"] for section in result["sections"]],
+                             ["personal-details", "employment", "residency"])
+            self.assertIn(item(result, "programme"), items_of(result, "personal-details"))
+            self.assertEqual(item(result, "programme")["options"], ["Data Analyst Level 4"])
+            self.assertFalse(any(entry["key"] == "notPreviouslyCompletedProgramme"
+                                 for section in result["sections"] for entry in section["items"]))
+            row, errors = ef.clean_application(application(programme="Data Analyst Level 4",
+                                                           notPreviouslyCompletedProgramme="stale"),
+                                                today=TODAY, layout=result)
+            self.assertEqual(errors, {})
+            self.assertEqual(row["programme"], "Data Analyst Level 4")
+            self.assertIsNone(row["not_previously_completed_programme"])
+            _row, errors = ef.clean_application(application(programme=""), today=TODAY, layout=result)
+            self.assertEqual(errors, {"programme": ef.REQUIRED})
+            _row, errors = ef.clean_application(application(programme="forged"), today=TODAY, layout=result)
+            self.assertEqual(errors, {"programme": "Choose one of the listed options."})
+        self.assertEqual(raw, before)
+
+    def test_retiring_container_preserves_custom_question_columns(self):
+        raw = standard_layout()
+        raw["sections"].append({"slug": "programme", "title": "Programme Suitability", "builtin": True,
+                                "items": [custom("Career goals", key="cf_goals", column="custom_goals")]})
+        normalized, columns = el.normalize_layout(raw, raw)
+        self.assertEqual(item(normalized, "cf_goals")["column"], "custom_goals")
+        self.assertIn(item(normalized, "cf_goals"), items_of(normalized, "personal-details"))
+        self.assertEqual(columns, {"custom_goals": "text"})
+        self.assertEqual(len(normalized["sections"]), 3)
+
+
 class RegistryTests(SimpleTestCase):
     def test_every_builtin_question_sits_in_exactly_one_section(self):
         keys = [key for _title, keys in el.BUILTIN_SECTIONS.values() for key in keys]
         self.assertEqual(len(keys), len(set(keys)))
-        self.assertEqual(set(keys), set(ef.FIELD_BY_KEY) | el.NOTES)
+        self.assertEqual(set(keys), (set(ef.FIELD_BY_KEY) - ef.RETIRED_PUBLIC_FIELDS - ef.LEGACY_ADDRESS_FIELDS) | el.NOTES)
 
 
 class NormalizeLayoutTests(SimpleTestCase):
@@ -85,6 +170,8 @@ class NormalizeLayoutTests(SimpleTestCase):
         self.assertEqual(columns, {})
         self.assertEqual([s["slug"] for s in layout["sections"]], list(el.BUILTIN_SECTIONS))
         self.assertEqual(layout["sections"][0]["title"], "Personal Details")
+        self.assertFalse(item(layout, "residentialAddressLine1")["hidden"])
+        self.assertFalse(item(layout, "postcode")["hidden"])
 
     def test_a_new_question_gets_a_key_and_column_from_the_server(self):
         raw = with_items(standard_layout(), "employment", custom("Years in role?", "number", key="new_x", column="first_name"))
@@ -134,11 +221,11 @@ class NormalizeLayoutTests(SimpleTestCase):
     def test_builtin_questions_and_sections_left_out_come_back_hidden(self):
         raw = standard_layout()
         raw["sections"] = [s for s in raw["sections"] if s["slug"] != "residency"]
-        items_of(raw, "employment").pop()  # representativeEmail
+        items_of(raw, "employment").remove(item(raw, "representativeEmail"))
         layout, _ = el.normalize_layout(raw, None)
         residency = next(s for s in layout["sections"] if s["slug"] == "residency")
         self.assertTrue(residency["hidden"])
-        self.assertTrue(item(layout, "livesInUk")["hidden"])
+        self.assertFalse(item(layout, "livesInUk")["hidden"])
         self.assertTrue(item(layout, "representativeEmail")["hidden"])
 
     def test_the_questions_that_identify_the_applicant_must_stay(self):
@@ -164,6 +251,15 @@ class NormalizeLayoutTests(SimpleTestCase):
         # Trimmed, blanks and repeats dropped.
         self.assertEqual(item(layout, "programme")["options"], ["Data Analyst Level 4", "Marketing Manager Level 6"])
 
+    def test_moved_address_fields_are_kept_visible_in_residency(self):
+        raw = standard_layout()
+        item(raw, "residentialAddressLine1")["hidden"] = False
+        item(raw, "postcode")["hidden"] = False
+        layout, _ = el.normalize_layout(raw, None)
+        self.assertFalse(item(layout, "residentialAddressLine1")["hidden"])
+        self.assertFalse(item(layout, "postcode")["hidden"])
+        self.assertEqual([s["slug"] for s in layout["sections"] for i in s["items"] if i["key"] == "residentialAddressLine1"], ["residency"])
+
     def test_a_choice_list_cannot_be_emptied(self):
         raw = standard_layout()
         item(raw, "programme")["options"] = ["", " "]
@@ -179,22 +275,22 @@ class NormalizeLayoutTests(SimpleTestCase):
             el.normalize_layout(raw, None)
 
     def test_a_condition_names_a_question_with_set_answers_and_one_of_its_answers(self):
-        ok = with_items(standard_layout(), "programme",
+        ok = with_items(standard_layout(), "personal-details",
                         custom("Which programme?", key="new_a", condition={"field": "attendedFundedTraining", "values": ["Yes"]}),
                         custom("Why marketing?", key="new_b", condition={"field": "programme", "values": ["Marketing Manager Level 6"]}))
         layout, _ = el.normalize_layout(ok, None)
         self.assertEqual(item(layout, "cf_why_marketing")["condition"], {"field": "programme", "values": ["Marketing Manager Level 6"]})
 
-        free_text = with_items(standard_layout(), "programme", custom("X", key="new_a", condition={"field": "employerName", "values": ["Acme"]}))
+        free_text = with_items(standard_layout(), "personal-details", custom("X", key="new_a", condition={"field": "employerName", "values": ["Acme"]}))
         with self.assertRaisesMessage(LayoutError, "can only depend on a question with set answers"):
             el.normalize_layout(free_text, None)
 
-        unknown = with_items(standard_layout(), "programme", custom("X", key="new_a", condition={"field": "livesInUk", "values": ["Maybe"]}))
+        unknown = with_items(standard_layout(), "personal-details", custom("X", key="new_a", condition={"field": "livesInUk", "values": ["Maybe"]}))
         with self.assertRaisesMessage(LayoutError, "no longer offers: Maybe"):
             el.normalize_layout(unknown, None)
 
     def test_removing_an_answer_a_condition_relies_on_is_refused(self):
-        raw = with_items(standard_layout(), "programme",
+        raw = with_items(standard_layout(), "personal-details",
                          custom("Why marketing?", key="new_b", condition={"field": "programme", "values": ["Marketing Manager Level 6"]}))
         item(raw, "programme")["options"] = ["Associate Project Manager Level 4"]
         with self.assertRaisesMessage(LayoutError, "no longer offers: Marketing Manager Level 6"):
@@ -331,6 +427,20 @@ class LayoutAccessTests(SimpleTestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(set(json.loads(res.content)), {"layout", "version"})
         self.assertNotIn("Staff Member", res.content.decode())
+
+    def test_the_public_layout_keeps_moved_fields_in_residency(self):
+        raw = standard_layout()
+        item(raw, "residentialAddressLine1")["hidden"] = False
+        item(raw, "postcode")["hidden"] = False
+        cursor = FakeCursor([("x",), (6, raw, datetime(2026, 10, 15, tzinfo=timezone.utc), "Staff Member")])
+        request = self.factory.get("/enrolment_api/public/eligibility-form-layout/")
+        request.user = SimpleNamespace(is_authenticated=False)
+        with patch.object(el, "connections", FakeConnections(cursor)):
+            res = el.public_eligibility_form_layout(request)
+        body = json.loads(res.content)
+        self.assertFalse(item(body["layout"], "residentialAddressLine1")["hidden"])
+        self.assertFalse(item(body["layout"], "postcode")["hidden"])
+        self.assertEqual([s["slug"] for s in body["layout"]["sections"] for i in s["items"] if i["key"] == "residentialAddressLine1"], ["residency"])
 
     def test_the_public_layout_is_null_until_something_is_published(self):
         cursor = FakeCursor([(None,)])  # no layout table yet

@@ -17,13 +17,17 @@ caller that only has ILR data cannot silently wipe the other steps.
 import json
 
 from django.db import DatabaseError, transaction
+from django.utils import timezone
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from learner_api.models import CommercialUser, EnrolmentUser
 
 from .auth import enrolment_login_required
-from .models import ExtendedIlr
+from .models import ExtendedIlr, WizardIlrLearnerDetails
+from .ilr_finalisation import legacy_review_required, published_ilr_custom_keys, signed_snapshot, validate_finalisation
+from .ilr_health import validate_ilr_additions
+from .ilr_learner_record import learner_record
 from .wizard_steps import (
     ILR_DETAILS_KEY,
     project_draft,
@@ -32,6 +36,7 @@ from .wizard_steps import (
     without_ilr_details,
 )
 from .wizard_layout import project_custom_fields
+from .learner_profile_fields import clean_profile, transport_profile, without_profile_fields
 
 KINDS = {"apprenticeship": EnrolmentUser, "commercial": CommercialUser}
 
@@ -120,7 +125,7 @@ def _empty_payload(kind, learner_id, learner_name):
     }
 
 
-def read_extended_ilr(kind, learner_id, learner_name):
+def read_extended_ilr(kind, learner_id, learner_name, show_signed_snapshot=False, learner=None):
     """The GET payload, as a plain dict.
 
     Split out from the view so the wizard-bootstrap endpoint can compose this
@@ -134,6 +139,19 @@ def read_extended_ilr(kind, learner_id, learner_name):
     details = read_ilr_details(kind, int(learner_id))
     if details is not None:
         payload["draft"] = {**(payload.get("draft") or {}), ILR_DETAILS_KEY: details}
+    if kind == 'apprenticeship' and show_signed_snapshot:
+        snapshot = signed_snapshot(int(learner_id))
+        payload['meta']['ilrFinalisedAt'] = snapshot.get('finalisedAt', '') if snapshot else ''
+        payload['meta']['ilrLegacyReadOnly'] = bool(not snapshot and learner and legacy_review_required(learner, int(learner_id)))
+        if snapshot:
+            payload['draft'] = {**(payload.get('draft') or {}),
+                                'personalDetails': snapshot['personalDetails'],
+                                ILR_DETAILS_KEY: snapshot[ILR_DETAILS_KEY]}
+            custom = dict((payload['draft'].get('custom') or {}))
+            custom.update(snapshot.get('ilrCustom') or {})
+            payload['draft']['custom'] = custom
+    from .eligibility_prefill import add_defaults
+    add_defaults(payload, kind, int(learner_id))
     return payload
 
 
@@ -153,6 +171,13 @@ def _read_extended_ilr_row(kind, learner_id, learner_name):
     # from the per-step tables so nothing looks lost in the wizard.
     if not payload["draft"]:
         payload["draft"] = read_projection(kind, int(learner_id))
+    elif kind == 'apprenticeship' and 'personalDetails' not in payload['draft']:
+        # A historical submitted wizard can have its signature only in the
+        # per-step table. Later Extended ILR saves must not make that view
+        # disappear merely because Wizard_draft is now non-empty.
+        personal = (read_projection(kind, int(learner_id)) or {}).get('personalDetails')
+        if personal:
+            payload['draft'] = {**payload['draft'], 'personalDetails': personal}
     return payload
 
 
@@ -165,17 +190,18 @@ def extended_ilr(request, kind, learner_id):
 
     try:
         learner = model.objects.filter(pk=learner_id).first()
-    except DatabaseError as exc:
-        return _error(f"Database error: {exc}", 502)
+    except DatabaseError:
+        return _error('The learner could not be loaded. Please try again.', 503)
     if learner is None:
         return _error("Learner not found.", 404)
     learner_name = _s(learner.username)
 
     if request.method == "GET":
         try:
-            return JsonResponse(read_extended_ilr(kind, learner_id, learner_name))
-        except DatabaseError as exc:
-            return _error(f"Database error: {exc}", 502)
+            own = getattr(getattr(request, 'login_account', None), 'role', None) == 'learner'
+            return JsonResponse(read_extended_ilr(kind, learner_id, learner_name, own, learner))
+        except DatabaseError:
+            return _error('Your answers could not be loaded. Please try again.', 503)
 
     if request.method in ("PUT", "PATCH", "POST"):
         if not request.body:
@@ -212,6 +238,21 @@ def extended_ilr(request, kind, learner_id):
         if answers is None and draft is None:
             return _error("Provide 'answers' and/or 'draft' to save.", 400)
 
+        if draft is not None and ILR_DETAILS_KEY in draft:
+            try:
+                validate_ilr_additions(draft[ILR_DETAILS_KEY])
+            except ValueError as exc:
+                return _error(str(exc), 400)
+
+        account = getattr(request, 'login_account', None)
+        learner_write = bool(account and account.role == 'learner' and kind == 'apprenticeship')
+        finalise = body.get('finalizeIlr') is True
+        if finalise and not learner_write:
+            return _error('Only the apprenticeship learner can finalise their ILR.', 403)
+        if finalise and (not draft or not isinstance(draft.get('personalDetails'), dict)
+                         or not isinstance(draft.get(ILR_DETAILS_KEY), dict)):
+            return _error('Complete the ILR before signing and continuing.', 400)
+
         if draft is not None and 'programmeModules' in draft:
             from programme_suitability.configuration import ConfigurationError
             from programme_suitability.modules_service import validate_choices
@@ -222,19 +263,69 @@ def extended_ilr(request, kind, learner_id):
             except DatabaseError:
                 return _error('Could not verify module choices. Please retry.', 503)
 
-        defaults = {"learner_name": learner_name}
-        if answers is not None:
-            # Signature/`completed` flags are derived from the answers, so they
-            # are only recomputed when answers are actually being replaced.
-            defaults["answers"] = answers
-            defaults.update(_signature_state(answers))
-            defaults.update(_next_of_kin_state(answers))
-        if draft is not None:
-            # Everything but the ILR Learner Details step, which is a separate
-            # record kept in its own table (project_draft below writes it there).
-            defaults["wizard_draft"] = without_ilr_details(draft)
         try:
             with transaction.atomic(using="enrolment"):
+                # Serialize *every* learner save with Sign + Next. An old tab
+                # cannot win a race after the signed snapshot is committed.
+                if learner_write:
+                    learner = model.objects.select_for_update().get(pk=learner_id)
+                signed = signed_snapshot(int(learner_id)) if learner_write else None
+                legacy = bool(learner_write and not signed and legacy_review_required(learner, int(learner_id)))
+                if signed:
+                    for key in ('personalDetails', ILR_DETAILS_KEY):
+                        if draft is not None and key in draft and draft[key] != signed[key]:
+                            return _error('Your ILR has been signed and can no longer be changed.', 409)
+                    frozen_custom = signed.get('ilrCustom') or {}
+                    protected_custom_keys = set(frozen_custom) | published_ilr_custom_keys()
+                    incoming_custom = (draft or {}).get('custom') or {}
+                    if any(key in incoming_custom and (key not in frozen_custom or incoming_custom[key] != frozen_custom[key])
+                           for key in protected_custom_keys):
+                        return _error('Your ILR has been signed and can no longer be changed.', 409)
+                    if finalise:
+                        return JsonResponse(read_extended_ilr(kind, learner_id, learner_name, True))
+                    # Later wizard steps stay editable. Do not rewrite signed
+                    # sections (or staff's later corrections) from this learner
+                    # request, even when it carries an unchanged stale copy.
+                    draft = {key: value for key, value in draft.items()
+                             if key not in ('personalDetails', ILR_DETAILS_KEY)} if draft is not None else None
+                    if draft is not None and 'custom' in draft:
+                        draft['custom'] = {key: value for key, value in (draft['custom'] or {}).items()
+                                           if key not in protected_custom_keys}
+                elif legacy:
+                    if finalise or (draft is not None and any(key in draft for key in ('personalDetails', ILR_DETAILS_KEY))):
+                        return _error('This historical ILR is read-only pending review.', 409)
+                    protected_custom_keys = published_ilr_custom_keys()
+                    if any(key in protected_custom_keys for key in ((draft or {}).get('custom') or {})):
+                        return _error('This historical ILR is read-only pending review.', 409)
+                elif finalise:
+                    try:
+                        validate_finalisation(draft, learner)
+                    except ValueError as exc:
+                        return _error(str(exc), 400)
+
+                profile = {}
+                if kind == 'apprenticeship' and isinstance((draft or {}).get('personalDetails'), dict) and not signed and not legacy:
+                    personal = draft['personalDetails']
+                    try:
+                        profile = clean_profile(personal, learner)
+                    except ValueError as exc:
+                        return _error(str(exc), 400)
+                    draft = {**draft, 'personalDetails': without_profile_fields(personal)}
+                defaults = {"learner_name": learner_name}
+                if answers is not None:
+                    defaults["answers"] = answers
+                    defaults.update(_signature_state(answers))
+                    defaults.update(_next_of_kin_state(answers))
+                if draft is not None:
+                    if signed or legacy:
+                        stored_row = ExtendedIlr.objects.filter(learner_kind=kind, learner_id=learner_id).first()
+                        previous = (stored_row.wizard_draft or {}) if stored_row else {}
+                        merged = {**previous, **without_ilr_details(draft)}
+                        if 'custom' in draft:
+                            merged['custom'] = {**(previous.get('custom') or {}), **(draft['custom'] or {})}
+                        defaults["wizard_draft"] = merged
+                    else:
+                        defaults["wizard_draft"] = without_ilr_details(draft)
                 row, _ = ExtendedIlr.objects.update_or_create(
                     learner_kind=kind,
                     learner_id=learner_id,
@@ -247,9 +338,44 @@ def extended_ilr(request, kind, learner_id):
                     # The wizard builder's custom fields, into their own columns.
                     # Conditions on Extended ILR questions read the stored answers.
                     project_custom_fields(kind, int(learner_id), draft, answers=row.answers)
+                if profile:
+                    for attribute, value in profile.items():
+                        setattr(learner, attribute, value)
+                    learner.save(update_fields=list(profile))
+                if finalise:
+                    finalised_at = timezone.now()
+                    custom_keys = published_ilr_custom_keys()
+                    snapshot = {
+                        'personalDetails': draft['personalDetails'],
+                        ILR_DETAILS_KEY: draft[ILR_DETAILS_KEY],
+                        'ilrCustom': {key: value for key, value in (draft.get('custom') or {}).items()
+                                      if key in custom_keys},
+                        'learnerRecord': learner_record(learner),
+                        'finalisedAt': finalised_at.isoformat(),
+                    }
+                    updated = WizardIlrLearnerDetails.objects.filter(
+                        learner_kind=kind, learner_id=learner_id,
+                    ).update(ilr_finalised_at=finalised_at,
+                             ilr_finalised_by=account.id,
+                             ilr_signed_snapshot=snapshot)
+                    if updated != 1:
+                        raise DatabaseError('ILR details row missing during finalisation.')
         except DatabaseError as exc:
-            return _error(f"Database error: {exc}", 502)
+            return _error('Your answers could not be saved. Please try again.', 503)
 
-        return JsonResponse(_payload(row))
+        response = _payload(row)
+        if 'meta' in response and learner_write:
+            response['meta']['ilrFinalisedAt'] = (snapshot['finalisedAt'] if finalise
+                                                   else signed.get('finalisedAt', '') if signed else '')
+            response['meta']['ilrLegacyReadOnly'] = legacy
+        if 'draft' in response and draft is not None:
+            stored = response['draft'] or {}
+            if ILR_DETAILS_KEY in draft:
+                stored = {**stored, ILR_DETAILS_KEY: draft[ILR_DETAILS_KEY]}
+            if profile:
+                stored = {**stored, 'personalDetails': {**(stored.get('personalDetails') or {}),
+                                                       **transport_profile(profile)}}
+            response['draft'] = stored
+        return JsonResponse(response)
 
     return _error("Method not allowed.", 405)

@@ -55,6 +55,8 @@ export interface EligibilitySection {
 }
 
 export interface EligibilityLayout {
+  /** Runtime capability supplied by Django, never enabled by a saved layout. */
+  workplaceEnabled?: boolean;
   sections: EligibilitySection[];
   /** Edited wording, by text slot (see registry.ts). A slot not listed here shows its standard wording. */
   texts?: Record<string, string>;
@@ -62,6 +64,7 @@ export interface EligibilityLayout {
 
 /** What the layout endpoints return. `layout` is null until one is published; the public one carries no names. */
 export interface EligibilityLayoutResponse {
+  workplaceEnabled?: boolean;
   layout: EligibilityLayout | null;
   version: number | null;
   updatedAt?: string;

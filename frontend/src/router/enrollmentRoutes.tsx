@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 import { type RouteObject } from 'react-router-dom';
-import { AccessGate, Home, LearnerStart } from './enrollmentGuards';
+import { AccessGate, Home, LearnerStart, WelcomeEntry } from './enrollmentGuards';
 
 const Login = lazy(() => import('@/pages/login/page'));
 const ForgotPassword = lazy(() => import('@/pages/forgot-password/page'));
@@ -11,6 +11,7 @@ const Board = lazy(() => import('@/pages/users/BoardPage'));
 const Wizard = lazy(() => import('@/pages/users/wizard/WizardPage'));
 const WizardBuilder = lazy(() => import('@/pages/users/wizard-builder/page'));
 const EligibilityBuilder = lazy(() => import('@/pages/users/eligibility-builder/page'));
+const EligibilityApplications = lazy(() => import('@/pages/users/eligibility-applications/page'));
 const FirstSessions = lazy(() => import('@/pages/users/first-sessions/page'));
 const CoachDirectory = lazy(() => import('@/pages/admin/coach-directory/page'));
 const CoachBooking = lazy(() => import('@/pages/coach-booking/page'));
@@ -23,6 +24,7 @@ const Documents = lazy(() => import('@/pages/learner/compliance/page'));
 const FirstSession = lazy(() => import('@/pages/learner/first-session/page'));
 const EmployerDocuments = lazy(() => import('@/pages/employer/EmployerDocumentsPage'));
 const ContinueInLms = lazy(() => import('@/pages/continue-lms/page'));
+const Profile = lazy(() => import('@/pages/profile/page'));
 
 export const enrollmentRoutes: RouteObject[] = [
   { path: '/login', element: <Login /> },
@@ -37,12 +39,14 @@ export const enrollmentRoutes: RouteObject[] = [
     { path: '/users', element: <Users /> },
     { path: '/users/wizard-builder', element: <WizardBuilder /> },
     { path: '/users/eligibility-builder', element: <EligibilityBuilder /> },
+    { path: '/users/eligibility-applications', element: <EligibilityApplications /> },
+    { path: '/users/eligibility-applications/:applicationId', element: <EligibilityApplications /> },
     { path: '/users/first-sessions', element: <FirstSessions /> },
     { path: '/users/coach-directory', element: <CoachDirectory workspaceRole="compliance" /> },
     { path: '/users/:userId', element: <Board /> },
     { path: '/users/:userId/wizard', element: <Wizard /> },
     { path: '/users/:userId/wizard/:stepSlug', element: <Wizard /> },
-    { path: '/learner/welcome', element: <Welcome /> },
+    { path: '/learner/welcome', element: <WelcomeEntry><Welcome /></WelcomeEntry> },
     { path: '/learner/onboarding', element: <Onboarding /> },
     { path: '/learner/onboarding/reviews', element: <Reviews /> },
     { path: '/learner/onboarding/reviews/:eventKey', element: <ReviewForm /> },
@@ -52,6 +56,12 @@ export const enrollmentRoutes: RouteObject[] = [
     ...['/learner', '/learner/home', '/workspace/learner', '/workspace/learner/dashboard'].map(path => ({ path, element: <LearnerStart /> })),
     { path: '/employers/:employerId/documents', element: <EmployerDocuments /> },
     { path: '/lms', element: <ContinueInLms /> },
+    { path: '/profile', element: <Profile /> },
+    { path: '/learner/profile', element: <Profile /> },
+    { path: '/learner/account-settings', element: <Profile view="home" /> },
+    { path: '/learner/account-settings/about-you', element: <Profile view="about" /> },
+    { path: '/learner/account-settings/signature', element: <Profile view="signature" /> },
+    { path: '/learner/account-settings/security', element: <Profile view="security" /> },
     { path: '*', element: <ContinueInLms /> },
   ] },
 ];

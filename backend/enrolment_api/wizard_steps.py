@@ -13,6 +13,7 @@ removing a PLR record in the UI removes it here too.
 """
 import logging
 
+from .ilr_health import working_hours_value
 from .models import (
     WizardCvJob,
     WizardIlrLearnerDetails,
@@ -139,12 +140,16 @@ def project_draft(kind, learner_id, draft):
                 "pronouns": _s(d.get("pronouns")),
                 "ethnicity": _s(d.get("ethnicity")),
                 "long_term_disability": _bool(d.get("longTermDisability")),
+                **({"health_condition_codes": d["healthConditionCodes"]} if "healthConditionCodes" in d else {}),
+                **({"primary_health_condition_code": d["primaryHealthConditionCode"]} if "primaryHealthConditionCode" in d else {}),
+                **({"additional_support_details": d["additionalSupportDetails"]} if "additionalSupportDetails" in d else {}),
                 "highest_qualification": _s(d.get("highestQualification")),
                 "employment_status": _s(d.get("employmentStatus")),
                 "employment_start_date": _date(d.get("employmentStartDate")),
                 "job_title": _s(d.get("jobTitle")),
                 "self_employed": _bool(d.get("selfEmployed")),
                 "full_time_education": _bool(d.get("fullTimeEducation")),
+                **({"working_hours_per_week": working_hours_value(d["workingHoursPerWeek"])} if "workingHoursPerWeek" in d else {}),
                 "expected_leaving_date": _date(d.get("expectedLeavingDate")),
                 "length_of_unemployment": _s(d.get("lengthOfUnemployment")),
                 "volunteers": _bool(d.get("volunteers")),
@@ -296,12 +301,16 @@ def ilr_details_draft(row):
         "pronouns": row.pronouns or "",
         "ethnicity": row.ethnicity or "",
         "longTermDisability": row.long_term_disability,
+        "healthConditionCodes": row.health_condition_codes or [],
+        "primaryHealthConditionCode": row.primary_health_condition_code or "",
+        "additionalSupportDetails": row.additional_support_details or "",
         "highestQualification": row.highest_qualification or "",
         "employmentStatus": row.employment_status or "",
         "employmentStartDate": str(row.employment_start_date) if row.employment_start_date else "",
         "jobTitle": row.job_title or "",
         "selfEmployed": row.self_employed,
         "fullTimeEducation": row.full_time_education,
+        "workingHoursPerWeek": str(row.working_hours_per_week) if row.working_hours_per_week is not None else "",
         "expectedLeavingDate": str(row.expected_leaving_date) if row.expected_leaving_date else "",
         "lengthOfUnemployment": row.length_of_unemployment or "",
         "volunteers": row.volunteers,

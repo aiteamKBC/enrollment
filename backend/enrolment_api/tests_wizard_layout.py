@@ -60,7 +60,7 @@ class NormalizeLayoutTests(SimpleTestCase):
             custom("Please provide your qualification details.\nUse one line per qualification.", "description"),
             custom("", "divider"),
         ])]}, None)
-        items = layout["steps"][0]["items"]
+        items = cv_step(layout)["items"]
         self.assertEqual([item["type"] for item in items], ["heading", "description", "divider"])
         self.assertEqual([item["required"] for item in items], [False, False, False])
         self.assertTrue(all("table" not in item and "column" not in item for item in items))
@@ -71,7 +71,7 @@ class NormalizeLayoutTests(SimpleTestCase):
             custom("Preferred route", "radio", options=["Online", "In person"]),
             custom("Subjects completed", "checkbox", options=["English", "Maths"]),
         ])]}, None)
-        items = layout["steps"][0]["items"]
+        items = cv_step(layout)["items"]
         self.assertEqual([item["type"] for item in items], ["radio", "checkbox"])
         self.assertEqual(plan["Wizard_Cv_Job"]["columns"], {
             "Custom_preferred_route": "text",
@@ -83,7 +83,7 @@ class NormalizeLayoutTests(SimpleTestCase):
             {"steps": [step("cv-job", [custom("Short answer", "single_line"), custom("Long answer", "multi_line")])]},
             None,
         )
-        items = layout["steps"][0]["items"]
+        items = cv_step(layout)["items"]
         self.assertEqual([item["type"] for item in items], ["single_line", "multi_line"])
         self.assertEqual(plan["Wizard_Cv_Job"]["columns"], {
             "Custom_short_answer": "text",
@@ -146,9 +146,9 @@ class NormalizeLayoutTests(SimpleTestCase):
     def test_legacy_text_field_can_be_upgraded_to_multi_line(self):
         first, _ = wl.normalize_layout({"steps": [step("cv-job", [custom("Long answer")])]}, None)
         upgraded = json.loads(json.dumps(first))
-        upgraded["steps"][0]["items"][0]["type"] = "multi_line"
+        cv_step(upgraded)["items"][0]["type"] = "multi_line"
         second, plan = wl.normalize_layout(upgraded, first)
-        item = second["steps"][0]["items"][0]
+        item = cv_step(second)["items"][0]
         self.assertEqual(item["type"], "multi_line")
         self.assertEqual(item["column"], "Custom_long_answer")
         self.assertEqual(plan["Wizard_Cv_Job"]["columns"], {"Custom_long_answer": "text"})

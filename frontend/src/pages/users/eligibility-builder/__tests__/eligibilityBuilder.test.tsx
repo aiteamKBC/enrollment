@@ -53,7 +53,7 @@ describe('layout edits', () => {
   it('moves a question past the next shown one, skipping removed questions', () => {
     let layout = removeItem(defaultLayout(), 'surname');
     layout = moveItem(layout, 'personal-details', 'firstName', 1);
-    expect(sectionItems(layout, 'personal-details').map((i) => i.key).slice(0, 3)).toEqual(['workEmail', 'surname', 'firstName']);
+    expect(sectionItems(layout, 'personal-details').map((i) => i.key).slice(0, 3)).toEqual(['title', 'surname', 'firstName']);
   });
 
   it('hides a built-in or published question but drops one never published', () => {
@@ -131,11 +131,26 @@ async function publish() {
 }
 
 describe('builder page', () => {
+  it('exposes preview workplace questions with fixed verification choices and conditional requiredness', async () => {
+    fetchEligibilityLayout.mockResolvedValue({ layout: null, version: null, workplaceEnabled: true });
+    renderBuilder();
+    await screen.findByRole('textbox', { name: 'Section name' });
+    fireEvent.click(screen.getByRole('button', { name: 'Employment' }));
+    const label = "Is your employer's address also your usual place of work?";
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    expect(screen.getByText('Main Workplace Postcode')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: `Remove ${label}` })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: `Move ${label} to another section` })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: `Edit answers of ${label}` }));
+    expect(screen.getByText(/These verification choices are fixed/)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: `${label}: answer 1` })).not.toBeInTheDocument();
+  });
+
   it('opens on the standard form with nothing to publish', async () => {
     renderBuilder();
     expect(await screen.findByText(/Showing the standard form/)).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Form sections' });
-    for (const name of ['Form heading', 'Personal Details', 'Employment', 'Residency', 'Programme Suitability']) {
+    for (const name of ['Form heading', 'Personal Details', 'Employment', 'Residency']) {
       expect(within(nav).getByRole('button', { name: new RegExp(`^${name}`) })).toBeInTheDocument();
     }
     expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
@@ -154,10 +169,31 @@ describe('builder page', () => {
     expect(within(firstName).getByRole('checkbox', { name: 'Mandatory' })).toBeChecked();
   });
 
+  it('opens an old published layout without restoring Programme Suitability', async () => {
+    const layout = defaultLayout();
+    const personal = layout.sections[0];
+    const programme = personal.items.find(item => item.key === 'programme')!;
+    personal.items = personal.items.filter(item => item !== programme);
+    layout.sections.push({ slug: 'programme', title: 'Programme Suitability', builtin: true, hidden: false,
+      items: [{ ...programme, options: ['Data Analyst Level 4'] },
+        { key: 'notPreviouslyCompletedProgramme', builtin: true, hidden: false }] });
+    const before = JSON.stringify(layout);
+    fetchEligibilityLayout.mockResolvedValue({ layout, version: 8 });
+    renderBuilder();
+    await screen.findByRole('textbox', { name: 'Section name' });
+    const nav = screen.getByRole('navigation', { name: 'Form sections' });
+    expect(within(nav).queryByRole('button', { name: /Programme Suitability/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Choose Your Applying Programme')).toBeInTheDocument();
+    expect(screen.queryByText(/not previously completed this programme/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit answers of Choose Your Applying Programme' }));
+    expect(screen.getByRole('textbox', { name: 'Choose Your Applying Programme: answer 1' })).toHaveValue('Data Analyst Level 4');
+    expect(JSON.stringify(layout)).toBe(before);
+  });
+
   it('edits a built-in answer list and publishes it', async () => {
     renderBuilder();
     await screen.findByRole('textbox', { name: 'Section name' });
-    fireEvent.click(screen.getByRole('button', { name: 'Programme Suitability' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Personal Details' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit answers of Choose Your Applying Programme' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Choose Your Applying Programme: answer 2' }), { target: { value: 'Data Analyst Level 4' } });
     fireEvent.click(screen.getByRole('button', { name: /Remove “Project Controls Professional Level 6”/ }));
@@ -169,6 +205,31 @@ describe('builder page', () => {
       'Marketing Executive Level 4', 'Data Analyst Level 4', 'Associate Project Manager Level 4',
     ]);
     expect(await screen.findByText(/Published version 1/)).toBeInTheDocument();
+  });
+
+  it('expands a legacy address slot with its edited label and mandatory core parts', async () => {
+    const layout = defaultLayout();
+    const employment = layout.sections.find(section => section.slug === 'employment')!;
+    const addressKeys = ['employerAddressLine1', 'employerAddressLine2', 'employerTownCity', 'employerCounty'];
+    const position = employment.items.findIndex(item => item.key === addressKeys[0]);
+    employment.items = employment.items.filter(item => !addressKeys.includes(item.key));
+    employment.items.splice(position, 0, { key: 'employerAddress', builtin: true, hidden: false, required: false });
+    layout.texts = { 'employerAddress.label': 'Company location' };
+    fetchEligibilityLayout.mockResolvedValue({ layout, version: 9 });
+    renderBuilder();
+    await screen.findByRole('textbox', { name: 'Section name' });
+    fireEvent.click(screen.getByRole('button', { name: 'Employment' }));
+    const firstLine = (await screen.findByText('Company location')).closest('div.rounded-xl') as HTMLElement;
+    expect(within(firstLine).getByRole('checkbox', { name: 'Mandatory' })).toBeChecked();
+    expect(within(firstLine).getByRole('checkbox', { name: 'Mandatory' })).toBeDisabled();
+    expect(screen.getByText('Employer Address Line 3')).toBeInTheDocument();
+    expect(screen.getByText('Employer Address Line 2')).toBeInTheDocument();
+    expect(screen.queryByText('Employer Full Address')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit wording of Company location' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Question' }), { target: { value: 'Company address line' } });
+    await publish();
+    expect(publishedLayout().texts?.['employerAddressLine1.label']).toBe('Company address line');
+    expect(item(publishedLayout(), 'employerTownCity').hidden).toBe(false);
   });
 
   it('edits the wording of a built-in question', async () => {
@@ -225,10 +286,10 @@ describe('builder page', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderBuilder();
     await screen.findByRole('textbox', { name: 'Section name' });
-    fireEvent.click(screen.getByRole('button', { name: 'Programme Suitability' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Remove Have you attended any other government funded/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Residency' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Remove Have you attended any other government-funded/ }));
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('1 question only asked for an answer to this question will stop being asked'));
-    expect(screen.getByRole('button', { name: /Remove Have you attended any other government funded/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Remove Have you attended any other government-funded/ })).toBeInTheDocument();
   });
 
   it('will not publish a form with a problem', async () => {

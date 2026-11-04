@@ -6,12 +6,16 @@ import { LabeledInput, LabeledSelect, SignatureField, StepHeading } from './fiel
 import { ILR_SIGNATURE_LABEL, ilrDetailsMissing } from '../validation';
 import { FieldError, invalidClass } from '../stepErrors';
 import { requiredMessage, useMissing, useMissingCheck } from "../stepErrors.helpers";
-import { NI_OR_APPLIED_KEY, NI_RE } from '../layout/registry';
+import { NI_RE } from '../layout/registry';
+import { COUNTRY_OPTIONS } from '@/lib/countries';
 import { StepItems, type ItemRenderer } from '../layout/StepItems';
 import { useStepTitle } from '../layout/useLayout';
 import { useText } from '../layout/textsContext';
 import { RichText } from '../layout/RichText';
 import type { IlrLearnerDetails as IlrLearnerDetailsState } from '../../types';
+import EnrolmentSignature from './EnrolmentSignature';
+import { LEARNER_TITLE_OPTIONS } from '@/lib/learnerTitles';
+import { HEALTH_CONDITIONS, NONDISCLOSURE_CODES, OTHER_HEALTH_CODES, healthLabel } from '../ilrHealthOptions';
 import {
   BENEFIT_CLAIM_BASIS_OPTIONS,
   EMPLOYMENT_STATUS_OPTIONS,
@@ -60,7 +64,8 @@ function displayDate(value: string): string {
 }
 
 export default function IlrLearnerDetails() {
-  const { userId, isCommercial, draft, setSection, board, layout } = useWizard();
+  const { userId, isCommercial, draft, setSection, board, layout, ilrFinalisedAt, ilrLegacyReadOnly, readOnly } = useWizard();
+  const locked = Boolean((ilrFinalisedAt || ilrLegacyReadOnly) && !isCommercial && !readOnly);
   const title = useStepTitle('ilr-details', 'ILR');
   const t = useText();
   const missing = useMissingCheck();
@@ -69,6 +74,7 @@ export default function IlrLearnerDetails() {
 
   const [record, setRecord] = useState<IlrLearnerRecord | null>(null);
   const [recordError, setRecordError] = useState<string | null>(null);
+  const [healthSearch, setHealthSearch] = useState('');
   useEffect(() => {
     let cancelled = false;
     fetchIlrLearnerRecord(isCommercial ? 'commercial' : 'apprenticeship', userId)
@@ -94,21 +100,25 @@ export default function IlrLearnerDetails() {
     if (record?.currentPostcode && !d.postcodePriorToEnrolment) fill.postcodePriorToEnrolment = record.currentPostcode;
     if (record?.nationalInsuranceNumber && !d.niNumber) fill.niNumber = record.nationalInsuranceNumber;
     if (d.sinceBirth === true && ageYears !== null && d.yearsAtAddress !== ageYears) fill.yearsAtAddress = ageYears;
-    if (Object.keys(fill).length) set(fill);
+    if (!locked && Object.keys(fill).length) set(fill);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record, ageYears, d.sinceBirth]);
 
   const niError = d.niNumber.trim() && !NI_RE.test(d.niNumber.trim())
     ? 'Enter a valid National Insurance number, for example AB 12 34 56 C'
-    : missing(NI_OR_APPLIED_KEY) ? 'Please enter your National Insurance number, or tick below to confirm you have applied for one.' : '';
+    : '';
   const legalSexMissing = Boolean(missing('Legal Sex'));
   const yearsMissing = Boolean(missing('How long have you been at this address (years)?'));
   const benefitsMissing = Boolean(missing('State benefits'));
+  const healthMissing = Boolean(missing('Health conditions'));
+  const primaryHealthMissing = Boolean(missing('Primary health condition'));
+  const hoursMissing = Boolean(missing('Working hours per week'));
+  const niAppliedMissing = Boolean(missing('NI number application confirmation'));
   const signatoryName = record ? [record.givenNames, record.familyName].filter(Boolean).join(' ') : '';
   // The certification comes last: clicking to sign while a required question
   // is unanswered lists what is missing instead. Same rule as the step's
   // completeness check, so the two cannot disagree.
-  const missingBeforeSign = ilrDetailsMissing(draft, layout).filter((label) => label !== ILR_SIGNATURE_LABEL);
+  const missingBeforeSign = ilrDetailsMissing(draft, layout).filter((label) => ![ILR_SIGNATURE_LABEL, 'Your signature'].includes(label));
   const noop = () => {};
 
   // Follow-up questions depend on earlier answers. Changing an answer clears the
@@ -116,9 +126,23 @@ export default function IlrLearnerDetails() {
   const inPaidEmployment = d.employmentStatus === IN_PAID_EMPLOYMENT;
   const notInPaidEmployment = NOT_IN_PAID_EMPLOYMENT.includes(d.employmentStatus);
   const claimsBenefit = Boolean(d.stateBenefits) && d.stateBenefits !== NO_BENEFITS;
+  const selectedHealthCodes = d.healthConditionCodes ?? [];
+  const nondisclosure = selectedHealthCodes.some(code => NONDISCLOSURE_CODES.has(code));
+  const needsSupportDetail = selectedHealthCodes.some(code => OTHER_HEALTH_CODES.has(code));
+  const toggleHealthCode = (code: string) => {
+    const selected = selectedHealthCodes.includes(code);
+    const next = selected ? selectedHealthCodes.filter(value => value !== code)
+      : NONDISCLOSURE_CODES.has(code) ? [code]
+      : [...selectedHealthCodes.filter(value => !NONDISCLOSURE_CODES.has(value)), code];
+    set({
+      healthConditionCodes: next,
+      primaryHealthConditionCode: next.includes(d.primaryHealthConditionCode ?? '') ? d.primaryHealthConditionCode : '',
+      additionalSupportDetails: next.some(value => OTHER_HEALTH_CODES.has(value)) ? d.additionalSupportDetails ?? '' : '',
+    });
+  };
   const changeEmploymentStatus = (status: string) => set({
     employmentStatus: status,
-    ...(status === IN_PAID_EMPLOYMENT ? {} : { employmentStartDate: '', jobTitle: '', selfEmployed: null }),
+    ...(status === IN_PAID_EMPLOYMENT ? {} : { employmentStartDate: '', jobTitle: '', selfEmployed: null, workingHoursPerWeek: '' }),
     ...(NOT_IN_PAID_EMPLOYMENT.includes(status)
       // Preselected, as on the paper form: most learners out of work have been
       // for under six months.
@@ -129,6 +153,10 @@ export default function IlrLearnerDetails() {
   // One renderer per item in layout/registry.ts; the layout decides order,
   // which are shown and which are required.
   const renderers: Record<string, ItemRenderer> = {
+    // Kept as a layout/validation key for published layouts. The visible
+    // control is rendered inside ild.record so it sits after learner names.
+    'ild.title': () => null,
+    'pd.signature': () => <EnrolmentSignature />,
     'ild.h.learner': ({ children }) => (
       <Section title={t('ild.h.learner.title')}>
         {recordError && (
@@ -142,13 +170,38 @@ export default function IlrLearnerDetails() {
       <>
         <LabeledInput label={t('ild.record.familyName')} value={record?.familyName ?? ''} onChange={noop} readOnly />
         <LabeledInput label={t('ild.record.givenNames')} value={record?.givenNames ?? ''} onChange={noop} readOnly />
+        {!isCommercial && <LabeledSelect
+          label={t('ild.title.label')}
+          ariaLabel={t('ild.title.label')}
+          value={draft.personalDetails.title ?? ''}
+          options={draft.personalDetails.title && !LEARNER_TITLE_OPTIONS.includes(draft.personalDetails.title)
+            ? [draft.personalDetails.title, ...LEARNER_TITLE_OPTIONS] : LEARNER_TITLE_OPTIONS}
+          required={Boolean(draft.personalDetails.title !== undefined)}
+          missingKey="Title"
+          onChange={value => setSection('personalDetails', { ...draft.personalDetails, title: value })}
+        />}
         <LabeledInput label={t('ild.record.dateOfBirth')} value={displayDate(record?.dateOfBirth ?? '')} onChange={noop} readOnly />
-        <LabeledInput label={t('ild.record.currentPostcode')} value={record?.currentPostcode ?? ''} onChange={noop} readOnly />
-        <LabeledInput label={t('ild.record.address1')} value={record?.addressLine1 ?? ''} onChange={noop} readOnly />
-        <LabeledInput label={t('ild.record.address2')} value={record?.addressLine2 ?? ''} onChange={noop} readOnly />
-        <LabeledInput label={t('ild.record.address3')} value={record?.addressLine3 ?? ''} onChange={noop} readOnly />
-        <LabeledInput label={t('ild.record.address4')} value={record?.addressLine4 ?? ''} onChange={noop} readOnly />
+        {!isCommercial && <>
+          <LabeledSelect label="Country of residence" value={draft.personalDetails.country ?? record?.country ?? ''}
+            options={draft.personalDetails.country && !COUNTRY_OPTIONS.includes(draft.personalDetails.country)
+              ? [draft.personalDetails.country, ...COUNTRY_OPTIONS] : COUNTRY_OPTIONS}
+            onChange={(value) => setSection('personalDetails', { ...draft.personalDetails, country: value })} />
+          <LabeledInput label={t('ild.record.address1')} value={draft.personalDetails.addressLine1 ?? record?.addressLine1 ?? ''}
+            onChange={(value) => setSection('personalDetails', { ...draft.personalDetails, addressLine1: value })} />
+          <LabeledInput label={t('ild.record.address2')} value={draft.personalDetails.addressLine2 ?? record?.addressLine2 ?? ''}
+            onChange={(value) => setSection('personalDetails', { ...draft.personalDetails, addressLine2: value })} />
+          <LabeledInput label={t('ild.record.address3')} value={draft.personalDetails.addressLine3 ?? record?.addressLine3 ?? ''}
+            onChange={(value) => setSection('personalDetails', { ...draft.personalDetails, addressLine3: value })} />
+          <LabeledInput label={t('ild.record.address4')} value={draft.personalDetails.addressLine4 ?? record?.addressLine4 ?? ''}
+            onChange={(value) => setSection('personalDetails', { ...draft.personalDetails, addressLine4: value })} />
+        </>}
       </>
+    ),
+    'ild.currentPostcode': () => (
+      <LabeledInput label={t('ild.record.currentPostcode')} missingKey="Current postcode" required
+        value={draft.personalDetails.currentPostcode ?? record?.currentPostcode ?? ''}
+        onChange={(value) => setSection('personalDetails', { ...draft.personalDetails, currentPostcode: value.toUpperCase() })}
+      />
     ),
     'ild.yearsAtAddress': ({ required }) => (
       <FieldRow label={t('ild.yearsAtAddress.label')} required={required}>
@@ -184,7 +237,10 @@ export default function IlrLearnerDetails() {
         </div>
       </FieldRow>
     ),
-    'ild.telephone': () => <LabeledInput label={t('ild.telephone.label')} value={record?.telephone ?? ''} onChange={noop} readOnly />,
+    'ild.telephone': () => <LabeledInput label={t('ild.telephone.label')}
+      value={isCommercial ? record?.telephone ?? '' : draft.personalDetails.phone ?? record?.telephone ?? ''}
+      onChange={isCommercial ? noop : (value) => setSection('personalDetails', { ...draft.personalDetails, phone: value })}
+      readOnly={isCommercial} />,
     'ild.postcodePrior': ({ required }) => (
       <LabeledInput
         label={t('ild.postcodePrior.label')}
@@ -195,7 +251,7 @@ export default function IlrLearnerDetails() {
         placeholder="CT1 1AA"
       />
     ),
-    'ild.ni': ({ required }) => (
+    'ild.ni': () => (
       <>
         <FieldRow label={t('ild.ni.label')}>
           <input
@@ -207,23 +263,18 @@ export default function IlrLearnerDetails() {
           />
           {niError && <FieldError message={niError} />}
         </FieldRow>
-        {!d.niNumber.trim() && (
-          <>
-            <p className="py-2 text-[12px] leading-relaxed text-foreground-600">{t('ild.ni.help')}</p>
-            <FieldRow label={t('ild.ni.confirm')} required={required}>
-              <input
-                type="checkbox"
-                aria-label="I have applied for a National Insurance number"
-                aria-invalid={missing(NI_OR_APPLIED_KEY) ? true : undefined}
-                checked={d.niApplied === true}
-                onChange={(e) => set({ niApplied: e.target.checked })}
-                className="accent-primary-500"
-              />
-            </FieldRow>
-          </>
-        )}
+        {!isCommercial && !d.niNumber.trim() && <div className="mb-4 rounded-lg border border-foreground-100 bg-background-50 px-4 py-3 text-[12px] leading-relaxed text-foreground-700">
+          <p>{t('ild.ni.help')}</p>
+          <label className="mt-2 flex cursor-pointer items-start justify-between gap-3">
+            <span>{t('ild.ni.confirm')}</span>
+            <input type="checkbox" checked={d.niApplied === true} onChange={event => set({ niApplied: event.target.checked })}
+              aria-invalid={niAppliedMissing || undefined} className="mt-0.5 shrink-0 accent-primary-500" />
+          </label>
+          {niAppliedMissing && <FieldError message="Confirm that you have applied for a National Insurance number." />}
+        </div>}
       </>
     ),
+    'ild.niApplied': () => null,
     'ild.email': () => <LabeledInput label={t('ild.email.label')} value={record?.email ?? ''} onChange={noop} readOnly />,
     'ild.legalSex': ({ required }) => (
       <FieldRow label={t('ild.legalSex.label')} required={required}>
@@ -259,8 +310,60 @@ export default function IlrLearnerDetails() {
         missingKey="Long-term disability, health problem or learning difficulty"
         required={required}
         value={d.longTermDisability}
-        onChange={(v) => set({ longTermDisability: v })}
+        onChange={(v) => set({ longTermDisability: v, ...(v ? {} : {
+          healthConditionCodes: [], primaryHealthConditionCode: '', additionalSupportDetails: '',
+        }) })}
       />
+    ),
+    'ild.healthConditions': () => d.longTermDisability === true && !isCommercial && (
+      <FieldRow label={t('ild.healthConditions.label')} required>
+        <div className={`rounded-lg border bg-background-50 p-3 ${healthMissing ? 'border-red-500' : 'border-foreground-200'}`}>
+          {selectedHealthCodes.length > 0 && <div className="mb-3 flex flex-wrap gap-2" aria-label="Selected health conditions">
+            {selectedHealthCodes.map(code => <span key={code} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary-100 px-2.5 py-1 text-[12px] text-foreground-900">
+              <span className="truncate">{healthLabel(code)}</span>
+              <button type="button" onClick={() => toggleHealthCode(code)} aria-label={`Remove ${healthLabel(code)}`}
+                className="rounded-full px-1 font-semibold hover:bg-primary-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500">×</button>
+            </span>)}
+          </div>}
+          {selectedHealthCodes.includes('15') && <p className="mb-2 text-[12px] text-foreground-700">
+            Asperger’s syndrome has a historical ILR code that expired on 31 July 2025. The enrolment team will review how it is reported.
+          </p>}
+          <label className="block text-[12px] font-medium text-foreground-700" htmlFor="ilr-health-search">Search health conditions</label>
+          <input id="ilr-health-search" type="search" value={healthSearch} onChange={event => setHealthSearch(event.target.value)}
+            placeholder="Type to filter the list" className={`${inputClass} mt-1 w-full`} />
+          <div role="group" className="mt-2 max-h-48 space-y-0.5 overflow-y-auto" aria-label="Health condition options">
+            {HEALTH_CONDITIONS.filter(option => option.label.toLowerCase().includes(healthSearch.trim().toLowerCase())).map(option => (
+              <label key={option.code} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[12px] text-foreground-800 hover:bg-primary-50">
+                <input type="checkbox" checked={selectedHealthCodes.includes(option.code)} onChange={() => toggleHealthCode(option.code)}
+                  className="mt-0.5 accent-primary-500" />
+                <span>{option.label}{'expired' in option && <span className="ml-1 text-foreground-500">(historical ILR code)</span>}</span>
+              </label>
+            ))}
+            {!HEALTH_CONDITIONS.some(option => option.label.toLowerCase().includes(healthSearch.trim().toLowerCase())) &&
+              <p className="px-2 py-2 text-[12px] text-foreground-600">No matching conditions.</p>}
+          </div>
+        </div>
+        {healthMissing && <FieldError message="Select at least one health condition or a nondisclosure option." />}
+      </FieldRow>
+    ),
+    'ild.primaryHealth': () => d.longTermDisability === true && !isCommercial && !nondisclosure && selectedHealthCodes.length > 0 && (
+      <FieldRow label={t('ild.primaryHealth.label')} required>
+        <select value={d.primaryHealthConditionCode ?? ''} onChange={event => set({ primaryHealthConditionCode: event.target.value })}
+          aria-label={t('ild.primaryHealth.label')}
+          aria-invalid={primaryHealthMissing || undefined} className={`${inputClass} cursor-pointer${primaryHealthMissing ? invalidClass : ''}`}>
+          <option value="">Select primary condition</option>
+          {selectedHealthCodes.map(code => <option key={code} value={code}>{healthLabel(code)}</option>)}
+        </select>
+        {primaryHealthMissing && <FieldError message="Choose one of your selected health conditions." />}
+      </FieldRow>
+    ),
+    'ild.additionalSupport': () => d.longTermDisability === true && !isCommercial && needsSupportDetail && (
+      <FieldRow label={t('ild.additionalSupport.label')}>
+        <textarea value={d.additionalSupportDetails ?? ''} onChange={event => set({ additionalSupportDetails: event.target.value })}
+          aria-label={t('ild.additionalSupport.label')}
+          maxLength={4000} rows={4} className={`${inputClass} min-h-24 w-full`} />
+        <p className="mt-1 text-[12px] text-foreground-600">Only share what would help us support your learning.</p>
+      </FieldRow>
     ),
     'ild.h.education': ({ children }) => <Section title={t('ild.h.education.title')}>{children}</Section>,
     'ild.highestQualification': ({ required }) => (
@@ -326,6 +429,15 @@ export default function IlrLearnerDetails() {
         )}
       </>
     ),
+    'ild.workingHours': () => !isCommercial && inPaidEmployment && (
+      <FieldRow label={t('ild.workingHours.label')} required>
+        <input type="number" min="0.01" max="168" step="0.01" inputMode="decimal"
+          value={d.workingHoursPerWeek ?? ''} onChange={event => set({ workingHoursPerWeek: event.target.value })}
+          aria-label={t('ild.workingHours.label')} aria-invalid={hoursMissing || undefined}
+          className={`${inputClass} !w-32${hoursMissing ? invalidClass : ''}`} />
+        {hoursMissing && <FieldError message="Enter weekly working hours greater than 0 and no more than 168 (up to two decimal places)." />}
+      </FieldRow>
+    ),
     'ild.stateBenefits': ({ required }) => (
       <>
         <FieldRow label={t('ild.stateBenefits.label')} required={required}>
@@ -374,7 +486,7 @@ export default function IlrLearnerDetails() {
         <p className="mt-4 text-[13px] font-medium text-foreground-800">
           {t('ild.signature.certify')} {required && <span className="text-red-500">*</span>}
         </p>
-        <SignatureField
+        {isCommercial && <SignatureField
           label={t('ild.signature.label')}
           signatoryName={signatoryName}
           // The learner's saved signature — from Personal details, or the one
@@ -387,7 +499,7 @@ export default function IlrLearnerDetails() {
             signature: v || null,
             signatureDate: v && !d.signatureDate ? new Date().toISOString().slice(0, 10) : v ? d.signatureDate : '',
           })}
-        />
+        />}
       </>
     ),
   };
@@ -395,7 +507,11 @@ export default function IlrLearnerDetails() {
   return (
     <div>
       <StepHeading title={title} subtitle={t('step.ilr-details.subtitle')} />
-      <StepItems slug="ilr-details" renderers={renderers} />
+      <p className="mb-4 text-[13px] text-foreground-700" role="status">{locked
+        ? ilrFinalisedAt ? 'Your ILR has been signed and submitted. You can view your information, but you can no longer make changes.'
+          : 'This historical ILR is read-only pending review. Its original signing state has not been changed.'
+        : 'Please review your information carefully. Once you sign and continue, you will not be able to edit your ILR.'}</p>
+      <fieldset disabled={locked} className="min-w-0 border-0 p-0"><StepItems slug="ilr-details" renderers={renderers} /></fieldset>
     </div>
   );
 }

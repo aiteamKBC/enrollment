@@ -26,6 +26,8 @@ from learner_api.curriculum import ksb_profile_for_programme
 from learner_api.learner_progression import advance_learner
 from learner_api.mappers import to_board
 from learner_api.models import CommercialUser, EnrolmentUser
+from learner_api.aptem_status import programme_status
+from learner_api.constants import DEFAULT_PROGRAMME_STATUS
 
 from .auth import enrolment_login_required
 from .extended_ilr import read_extended_ilr
@@ -49,8 +51,8 @@ def wizard_bootstrap(request, kind, learner_id):
         # and ids are unique across the single table, so a commercial learner
         # would 404 here otherwise. Mirrors enrolment_user_detail.
         learner = EnrolmentUser.all_learners.filter(pk=learner_id).first()
-    except DatabaseError as exc:
-        return _error(f"Database error: {exc}", 502)
+    except DatabaseError:
+        return _error('The learner could not be loaded. Please try again.', 503)
     if learner is None:
         return _error("Learner not found.", 404)
 
@@ -66,8 +68,29 @@ def wizard_bootstrap(request, kind, learner_id):
             learner.refresh_from_db()
         advance_learner(learner)
 
+        account = getattr(request, 'login_account', None)
+        own_learner = (getattr(account, 'role', None) == 'learner'
+                       and str(getattr(account, 'subject_id', '')) == str(learner.pk))
+        if own_learner and kind == 'apprenticeship' and learner_type == 'apprenticeship' and (
+            programme_status(learner) or DEFAULT_PROGRAMME_STATUS
+        ).strip().casefold() == DEFAULT_PROGRAMME_STATUS.casefold():
+            # Opening the wizard starts onboarding; it does not sign anything
+            # or complete the retired first-login screens.
+            learner.programme_status = 'Onboarding'
+            learner.save(update_fields=['programme_status'])
+
         board = to_board(learner)
-        ilr = read_extended_ilr(kind, int(learner_id), str(learner.username or "").strip())
+        ilr = read_extended_ilr(kind, int(learner_id), str(learner.username or "").strip(), own_learner, learner)
+        if kind == 'apprenticeship':
+            saved = ilr.get('draft') or {}
+            previously_signed = bool((saved.get('personalDetails') or {}).get('signature')
+                                     or (saved.get('ilrDetails') or {}).get('signature'))
+            submitted = str(getattr(learner, 'onboarding_status', '') or '').casefold() in ('submitted', 'completed')
+            # Older signed/submitted records without a Title remain reachable.
+            board['contact']['titleRequired'] = not (previously_signed or submitted)
+        if ilr.get('prefill'):
+            board['contact']['eligibilityLinked'] = True
+            board['contact']['eligibilityRepresentative'] = ilr['prefill']['employerRepresentative']
 
         # Keyed on the programme the board just resolved. A learner with no
         # programme has no profile to fetch, and the helper already answers
@@ -79,7 +102,7 @@ def wizard_bootstrap(request, kind, learner_id):
             ksb_profile_payload = {"standard": standard, "results": ksb_results}
         else:
             ksb_profile_payload = None
-    except DatabaseError as exc:
-        return _error(f"Database error: {exc}", 502)
+    except DatabaseError:
+        return _error('Your enrolment could not be loaded. Please try again.', 503)
 
     return JsonResponse({"board": board, "ilr": ilr, "ksbProfile": ksb_profile_payload})

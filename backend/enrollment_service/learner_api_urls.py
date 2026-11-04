@@ -5,6 +5,8 @@ from learner_api import learner_import
 from learner_api.attendance_mode import attendance_modes, review_attendance_mode
 from learner_api.first_session_bookings import first_session_bookings
 from learner_api.first_login_details import first_login_details
+from learner_api.account_settings import learner_account_settings
+from learner_api.profile_photo import learner_profile_photo
 from learner_api import apprenticeship_agreement, calendar, curriculum, employer_portal, employers, ilr_document, training_plan_document, written_agreement, learner_detail, learning_plan, review_form, views
 from enrollment_service import study_boundary as module_shift
 
@@ -15,6 +17,8 @@ urlpatterns = [
     path('attendance-mode/', attendance_modes, name='attendance-modes'),
     path('first-session-bookings/', first_session_bookings, name='first-session-bookings'),
     path('first-login-details/<int:pk>/', first_login_details, name='first-login-details'),
+    path('account-settings/<int:pk>/', learner_account_settings, name='learner-account-settings'),
+    path('profile-photo/<str:kind>/<int:pk>/', learner_profile_photo, name='learner-profile-photo'),
     path('enrolment-users/', views.enrolment_users, name='enrolment-users'),
     path('enrolment-users/import-template/', learner_import.import_template, name='enrolment-users-import-template'),
     path('enrolment-users/import/', learner_import.import_students, name='enrolment-users-import'),

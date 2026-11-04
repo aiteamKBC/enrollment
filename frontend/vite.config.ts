@@ -1,4 +1,5 @@
-import { defineConfig, loadEnv } from "vite";
+import { createLogger, defineConfig, loadEnv } from "vite";
+import { redactLocalLogTokens } from './src/lib/localLogRedaction';
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import AutoImport from "unplugin-auto-import/vite";
@@ -8,12 +9,20 @@ const base = process.env.BASE_PATH || "/";
 const isPreview = process.env.IS_PREVIEW ? true : false;
 //const proxyPlugins = isPreview ? [readdyJsxRuntimeProxyPlugin()] : [];
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   // Read the local backend address before configuring the dev proxy. All API
   // prefixes belong to the same Django application and must follow this target.
   const env = loadEnv(mode, __dirname, "VITE_API_");
   const apiTarget = env.VITE_API_TARGET || env.VITE_API_PROXY || "http://127.0.0.1:8000";
+  const localLogger = command === 'serve' && mode === 'eligibility-local' ? createLogger() : undefined;
+  if (localLogger) {
+    for (const method of ['info', 'warn', 'warnOnce', 'error'] as const) {
+      const output = localLogger[method].bind(localLogger);
+      localLogger[method] = (message, options) => output(redactLocalLogTokens(message), options);
+    }
+  }
   return {
+  ...(localLogger ? { customLogger: localLogger } : {}),
   // Keep optimized dependencies local even when node_modules is a shared junction.
   cacheDir: resolve(__dirname, ".cache/vite"),
   define: {

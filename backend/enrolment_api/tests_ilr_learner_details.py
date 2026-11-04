@@ -8,7 +8,7 @@ from these tests, so they are safe to run against any configured database.
 """
 import json
 import os
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -44,6 +44,38 @@ PERSONAL = {"firstName": "Test", "lastName": "Learner"}
 
 
 class SeparationTests(SimpleTestCase):
+    def setUp(self):
+        boundary = patch('enrolment_api.eligibility_prefill.verified_application', return_value=None)
+        boundary.start()
+        self.addCleanup(boundary.stop)
+
+    def test_combined_signature_confirmation_round_trips_in_existing_json_without_reinterpreting_old_certification(self):
+        personal = {**PERSONAL, "signature": "data:image/png;base64,PAPERWORK", "signatureDate": "2020-04-03",
+                    "signatureDeclaration": {"text": "I certify the ILR.\nEnrolment paperwork.",
+                                             "confirmedAt": "2026-11-03T10:00:00Z"}}
+        draft = {"personalDetails": personal, "ilrDetails": ILR_DETAILS}
+        request = RequestFactory().post("/enrolment_api/extended-ilr/apprenticeship/41/",
+                                        data=json.dumps({"draft": draft}), content_type="application/json")
+        learner_model = MagicMock()
+        learner_model.objects.filter.return_value.first.return_value = SimpleNamespace(username="Test Learner")
+        row = SimpleNamespace(wizard_draft=None, answers=None)
+        def save_row(**kwargs):
+            row.wizard_draft = kwargs["defaults"]["wizard_draft"]
+            return row, True
+        with patch.dict(os.environ, {"ENROLMENT_API_REQUIRE_AUTH": "0"}), \
+                patch.dict(extended_ilr.KINDS, {"apprenticeship": learner_model}), \
+                patch.object(extended_ilr.transaction, "atomic", lambda **_: nullcontext()), \
+                patch.object(extended_ilr.ExtendedIlr.objects, "update_or_create", side_effect=save_row), \
+                patch.object(extended_ilr, "project_draft") as project, \
+                patch.object(extended_ilr, "project_custom_fields"), \
+                patch.object(extended_ilr, "_payload", side_effect=lambda saved: {"draft": saved.wizard_draft}):
+            response = extended_ilr.extended_ilr(request, kind="apprenticeship", learner_id=41)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["draft"]["personalDetails"], personal)
+        project.assert_called_once_with("apprenticeship", 41, draft)
+        self.assertEqual(draft["ilrDetails"]["signature"], ILR_DETAILS["signature"])
+        self.assertEqual(draft["ilrDetails"]["signatureDate"], ILR_DETAILS["signatureDate"])
+
     def test_the_extended_ilr_copy_never_carries_the_ilr_step(self):
         stored = wizard_steps.without_ilr_details({"personalDetails": PERSONAL, "ilrDetails": ILR_DETAILS})
 
@@ -88,6 +120,55 @@ class SeparationTests(SimpleTestCase):
 
 
 class ProjectionTests(SimpleTestCase):
+    def test_old_personal_details_projection_still_returns_signature_and_original_date(self):
+        from datetime import date
+        original = SimpleNamespace(first_name="Test", last_name="Learner", email="test@example.invalid", phone="123",
+                                   address="Historical address", date_of_birth=date(1991, 6, 12), age=35, sex="Female",
+                                   signature="data:image/png;base64,PAPERWORK", signature_date=date(2020, 4, 3))
+        with ExitStack() as stack:
+            for model in (wizard_steps.WizardPersonalDetails, wizard_steps.WizardIlrLearnerDetails, wizard_steps.WizardSkillsRadar,
+                          wizard_steps.WizardKsbAssessment, wizard_steps.WizardPlr, wizard_steps.WizardPlrRecord,
+                          wizard_steps.WizardCvJob, wizard_steps.WizardPolicyAck):
+                query = stack.enter_context(patch.object(model.objects, "filter"))
+                query.return_value.first.return_value = original if model is wizard_steps.WizardPersonalDetails else None
+            draft = wizard_steps.read_projection("apprenticeship", 41)
+        self.assertEqual(draft["personalDetails"]["signature"], original.signature)
+        self.assertEqual(draft["personalDetails"]["signatureDate"], "2020-04-03")
+        self.assertEqual(draft["personalDetails"]["address"], original.address)
+
+    def test_relocated_paperwork_signature_keeps_its_original_storage_separate_from_certification(self):
+        from copy import deepcopy
+        personal = {**PERSONAL, "email": "historic@example.invalid", "address": "Historical address",
+                    "signature": "data:image/png;base64,PAPERWORK", "signatureDate": "2020-04-03"}
+        draft = {"personalDetails": personal, "ilrDetails": ILR_DETAILS}
+        before = deepcopy(draft)
+        with patch.object(wizard_steps.WizardPersonalDetails.objects, "update_or_create") as pd, \
+                patch.object(wizard_steps.WizardIlrLearnerDetails.objects, "update_or_create") as ilr:
+            wizard_steps.project_draft("apprenticeship", 41, draft)
+        self.assertEqual(draft, before)
+        self.assertEqual(pd.call_args.kwargs["defaults"]["signature"], personal["signature"])
+        self.assertEqual(str(pd.call_args.kwargs["defaults"]["signature_date"]), "2020-04-03")
+        self.assertEqual(pd.call_args.kwargs["defaults"]["address"], "Historical address")
+        self.assertEqual(ilr.call_args.kwargs["defaults"]["declaration_signature"], ILR_DETAILS["signature"])
+        self.assertEqual(wizard_steps.without_ilr_details(draft), {"personalDetails": personal})
+
+    def test_ilr_only_save_cannot_remove_old_personal_details_or_signatures(self):
+        with patch.object(wizard_steps.WizardPersonalDetails.objects, "update_or_create") as personal, \
+                patch.object(wizard_steps.WizardIlrLearnerDetails.objects, "update_or_create"):
+            wizard_steps.project_draft("apprenticeship", 41, {"ilrDetails": ILR_DETAILS})
+        personal.assert_not_called()
+
+    def test_explicit_signature_clear_uses_the_existing_columns_without_wiping_identity(self):
+        with patch.object(wizard_steps.WizardPersonalDetails.objects, "update_or_create") as personal:
+            wizard_steps.project_draft("apprenticeship", 41, {"personalDetails": {
+                **PERSONAL, "email": "historic@example.invalid", "signature": "", "signatureDate": "",
+            }})
+        defaults = personal.call_args.kwargs["defaults"]
+        self.assertIsNone(defaults["signature"])
+        self.assertIsNone(defaults["signature_date"])
+        self.assertEqual(defaults["first_name"], PERSONAL["firstName"])
+        self.assertEqual(defaults["email"], "historic@example.invalid")
+
     def test_writes_every_answer_to_its_own_table(self):
         with patch.object(wizard_steps.WizardIlrLearnerDetails.objects, "update_or_create") as upsert:
             wizard_steps.project_draft("apprenticeship", 41, {"ilrDetails": ILR_DETAILS})
@@ -133,13 +214,18 @@ class ProjectionTests(SimpleTestCase):
             years_at_address=3, at_address_since_birth=False, postcode_prior_to_enrolment="CT1 1AA",
             national_insurance_number="AB 12 34 56 C", ni_number_applied=None, legal_sex="Female",
             pronouns="she/her", ethnicity="Irish", long_term_disability=False,
+            health_condition_codes=None, primary_health_condition_code=None, additional_support_details=None,
             highest_qualification="Full level 3", employment_status="In paid employment",
             employment_start_date=date(2024, 1, 15), job_title="Marketing Assistant", self_employed=False,
             full_time_education=False, expected_leaving_date=None, length_of_unemployment=None, volunteers=None,
+            working_hours_per_week=None,
             state_benefits="None", benefit_claim_basis=None,
             declaration_signature="data:image/png;base64,AAAA", declaration_signed_date=date(2026, 9, 27),
         )
-        self.assertEqual(wizard_steps.ilr_details_draft(row), ILR_DETAILS)
+        self.assertEqual(wizard_steps.ilr_details_draft(row), {
+            **ILR_DETAILS, "healthConditionCodes": [], "primaryHealthConditionCode": "",
+            "additionalSupportDetails": "", "workingHoursPerWeek": "",
+        })
 
 
 class LearnerRecordTests(SimpleTestCase):
@@ -151,6 +237,8 @@ class LearnerRecordTests(SimpleTestCase):
             national_insurance_number="", legal_sex="",
         )
         self.assertEqual(ilr_learner_record.learner_record(learner), {
+            "title": "",
+        "country": "",
             "familyName": "Learner",
             "givenNames": "Test Middle",
             "dateOfBirth": "1991-06-12",

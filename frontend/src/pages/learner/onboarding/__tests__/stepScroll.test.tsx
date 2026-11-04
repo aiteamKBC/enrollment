@@ -41,6 +41,7 @@ describe('learner enrolment step scroll', () => {
     await act(async () => { await router.navigate('/learner/onboarding/personal-details'); });
 
     expect(scroller.scrollTop).toBe(0);
+    expect(router.state.location.pathname).toBe('/learner/onboarding/ilr-details');
   });
 
   it('leaves the scroll alone when the step has not changed', async () => {

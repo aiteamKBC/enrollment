@@ -10,6 +10,9 @@ import {
   BUILTIN_ITEMS,
   ITEM_TEXT_SLOTS,
   PAGE_TEXT_SLOTS,
+  RETIRED_PUBLIC_ITEMS,
+  REQUIRED_ADDRESS_FIELDS,
+  WORKPLACE_FIELDS,
   builtinSection,
   isBuiltinQuestion,
   textFor,
@@ -78,7 +81,7 @@ export default function EligibilityBuilderPage() {
     fetchEligibilityLayout()
       .then((res) => {
         if (cancelled) return;
-        const resolved = resolveLayout(res.layout);
+        const resolved = resolveLayout(res.layout, res.workplaceEnabled === true);
         setPublished(resolved);
         setLayout(clone(resolved));
         setVersion(res.version);
@@ -113,7 +116,7 @@ export default function EligibilityBuilderPage() {
     setPublishing(true);
     try {
       const saved = await publishEligibilityLayout(layout, version);
-      const resolved = resolveLayout(saved.layout);
+      const resolved = resolveLayout(saved.layout, saved.workplaceEnabled === true);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(saved.version);
@@ -316,8 +319,8 @@ function SectionEditor({
   setEditing: (v: string | 'new' | null) => void;
   edit: (fn: (l: EligibilityLayout) => EligibilityLayout) => void;
 }) {
-  const shown = section.items.filter((it) => !it.hidden);
-  const removed = section.items.filter((it) => it.hidden);
+  const shown = section.items.filter((it) => !it.hidden && !RETIRED_PUBLIC_ITEMS.has(it.key));
+  const removed = section.items.filter((it) => it.hidden && !RETIRED_PUBLIC_ITEMS.has(it.key));
   const [showRemoved, setShowRemoved] = useState(false);
   const addRef = useRef<HTMLButtonElement>(null);
   // Hiding this section would hide a question that identifies the applicant.
@@ -448,7 +451,9 @@ function ItemRow({
   const note = def?.kind === 'note';
   const label = itemLabel(layout, item);
   const locked = isLocked(item);
-  const required = locked || (item.builtin ? item.required ?? question?.required ?? false : Boolean(item.required));
+  const workplace = item.builtin && WORKPLACE_FIELDS.has(item.key);
+  const addressRequired = item.builtin && REQUIRED_ADDRESS_FIELDS.has(item.key);
+  const required = addressRequired || (workplace ? item.key === 'workplaceArrangement' : locked || (item.builtin ? item.required ?? question?.required ?? false : Boolean(item.required)));
   const deps = dependents(layout, item.key);
   const slots = item.builtin ? ITEM_TEXT_SLOTS[item.key] ?? [] : [];
   const list = builtinOptions(item);
@@ -496,7 +501,7 @@ function ItemRow({
               type="checkbox"
               className="accent-primary-500"
               checked={required}
-              disabled={locked}
+              disabled={locked || workplace || addressRequired}
               onChange={(e) => edit((l) => updateItem(l, item.key, { required: e.target.checked }))}
             />
             Mandatory
@@ -507,6 +512,7 @@ function ItemRow({
             aria-label={`Move ${label} to another section`}
             className={`${inputClass} !w-auto shrink-0 cursor-pointer !py-1.5 text-[12px]`}
             value=""
+            disabled={workplace}
             onChange={(e) => e.target.value && edit((l) => moveItemToSection(l, item.key, e.target.value))}
           >
             <option value="">Move to section…</option>
@@ -514,10 +520,10 @@ function ItemRow({
           </select>
         )}
         <div className="flex shrink-0 items-center">
-          <button type="button" className={iconBtn} disabled={first} aria-label={`Move ${label} up`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, -1))}>
+          <button type="button" className={iconBtn} disabled={first || workplace} aria-label={`Move ${label} up`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, -1))}>
             <AppIcon className="ri-arrow-up-line" />
           </button>
-          <button type="button" className={iconBtn} disabled={last} aria-label={`Move ${label} down`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, 1))}>
+          <button type="button" className={iconBtn} disabled={last || workplace} aria-label={`Move ${label} down`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, 1))}>
             <AppIcon className="ri-arrow-down-line" />
           </button>
           {slots.length > 0 && (
@@ -549,7 +555,7 @@ function ItemRow({
               <AppIcon className="ri-pencil-line" />
             </button>
           )}
-          {!locked && (
+          {!locked && !workplace && (
             <button type="button" className={`${iconBtn} hover:!text-red-600`} aria-label={`Remove ${label}`} onClick={remove}>
               <AppIcon className="ri-delete-bin-line" />
             </button>
@@ -563,7 +569,10 @@ function ItemRow({
           ))}
         </div>
       )}
-      {panel === 'answers' && list && question?.options && (
+      {panel === 'answers' && list && question?.optionLabels && (
+        <p className="text-[12px] text-foreground-600">These verification choices are fixed: {Object.values(question.optionLabels).join(' ')}</p>
+      )}
+      {panel === 'answers' && list && question?.options && !question.optionLabels && (
         <div className="mt-3 space-y-2 border-t border-foreground-100 pt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[12px] font-medium text-foreground-600">Answers applicants choose from</p>

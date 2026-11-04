@@ -15,12 +15,14 @@ const blank = (v?: string | null) => !v || v.trim() === '';
  * stay editable like any other answer.
  */
 export function useEmployerDetailsPrefill() {
-  const { userId, isCommercial, draft, setSection, hydrated } = useWizard();
+  const { userId, isCommercial, draft, setSection, hydrated, board } = useWizard();
+  const linked = !isCommercial && board?.contact?.eligibilityLinked;
   const kind: LearnerKind = isCommercial ? 'commercial' : 'apprenticeship';
   const [details, setDetails] = useState<IlrEmployerDetails | null>(null);
   const applied = useRef(false);
 
   useEffect(() => {
+    if (linked) return;
     let cancelled = false;
     applied.current = false;
     setDetails(null);
@@ -29,10 +31,10 @@ export function useEmployerDetailsPrefill() {
       // A prefill is a convenience: without it the learner simply types the details.
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [kind, userId]);
+  }, [kind, userId, linked]);
 
   useEffect(() => {
-    if (!details || !hydrated || applied.current) return;
+    if (linked || !details || !hydrated || applied.current) return;
     applied.current = true;
     const current = draft.ilr.employer;
     const fill: Partial<IlrEmployerDetails> = {};
@@ -41,5 +43,5 @@ export function useEmployerDetailsPrefill() {
     });
     if (Object.keys(fill).length === 0) return;
     setSection('ilr', { ...draft.ilr, employer: { ...current, ...fill } });
-  }, [details, hydrated, draft.ilr, setSection]);
+  }, [details, hydrated, draft.ilr, setSection, linked]);
 }

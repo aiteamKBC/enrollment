@@ -67,7 +67,9 @@ export interface WizardContextValue {
    */
   readOnly: boolean;
   /** Persist the Extended ILR answers to enrolment."Extended_ILR". */
-  saveIlr: () => Promise<void>;
+  saveIlr: (finalizeIlr?: boolean) => Promise<void>;
+  ilrFinalisedAt?: string;
+  ilrLegacyReadOnly?: boolean;
   /** Persist only module choices through their revision-checked endpoint. */
   saveModules: (selection: import('@/features/programme-suitability/modules/configuration').ProgrammeModuleSelection) => Promise<void>;
   ilrSaving: boolean;
