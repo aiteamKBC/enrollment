@@ -70,7 +70,7 @@ export async function publishWizardLayout(layout: WizardLayout, baseVersion: num
     headers: { 'Content-Type': 'application/json', ...security },
     body: JSON.stringify({ layout, baseVersion, ...options }),
   });
-  if ((options.scope ?? 'default') === 'default') layoutResource.prime('current', saved);
+  if ((options.scope ?? 'default') === 'default') layoutResource.invalidate('current');
   return saved;
 }
 
@@ -100,6 +100,17 @@ export async function assignWizardVersion(input: {
     headers: { 'Content-Type': 'application/json', ...security },
     body: JSON.stringify({ ...input, clear: input.version === null }),
   });
+}
+
+/** Changes global field visibility without publishing a layout version. */
+export async function setWizardFieldVisibility(version: number, fieldKey: string, hidden: boolean): Promise<void> {
+  const security = { 'X-CSRFToken': (await prefetchAssessmentSecurity()).csrfToken };
+  await send(`${BASE}/visibility/`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...security },
+    body: JSON.stringify({ version, fieldKey, hidden }),
+  });
+  layoutResource.invalidate();
 }
 
 // ── custom upload fields ────────────────────────────────────────────────────

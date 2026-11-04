@@ -33,7 +33,11 @@ from .wizard_steps import (
     read_projection,
     without_ilr_details,
 )
-from .wizard_layout import LayoutError, project_custom_fields, read_version, record_layout_progress
+from .wizard_layout import (
+    LayoutError, apply_field_visibility, capture_field_visibility, project_custom_fields,
+    read_field_visibility, read_pinned_visibility, read_version,
+    record_layout_progress, uses_global_layout,
+)
 
 KINDS = {"apprenticeship": EnrolmentUser, "commercial": CommercialUser}
 
@@ -266,9 +270,16 @@ def extended_ilr(request, kind, learner_id):
                 if layout_version is not None:
                     with connections["enrolment"].cursor() as cursor:
                         version_row = read_version(cursor, layout_version)
+                        if version_row is not None and uses_global_layout(cursor, kind, int(learner_id)):
+                            layout_snapshot = apply_field_visibility(version_row[1], read_field_visibility(cursor))
+                        elif version_row is not None:
+                            snapshot = read_pinned_visibility(cursor, kind, int(learner_id), layout_version)
+                            if snapshot:
+                                layout_snapshot = apply_field_visibility(version_row[1], snapshot)
                     if version_row is None:
                         return _error("The wizard version used for these answers is unavailable. Reload the wizard before saving.", 409)
-                    layout_snapshot = version_row[1]
+                    if layout_snapshot is None:
+                        layout_snapshot = version_row[1]
                 if draft is not None:
                     # Serialise first answers even when no Extended ILR row
                     # exists yet; an existing saved catalogue pin always wins.
@@ -296,6 +307,7 @@ def extended_ilr(request, kind, learner_id):
                     project_custom_fields(kind, int(learner_id), draft, answers=row.answers, layout=layout_snapshot)
                 if checkpoint or submitted:
                     with connections["enrolment"].cursor() as cursor:
+                        snapshot = capture_field_visibility(cursor, kind, int(learner_id)) if layout_version is not None else None
                         record_layout_progress(
                             cursor,
                             kind,
@@ -303,6 +315,7 @@ def extended_ilr(request, kind, learner_id):
                             layout_version,
                             checkpoint=checkpoint,
                             submitted=submitted,
+                            visibility_snapshot=snapshot,
                         )
         except DatabaseError as exc:
             return _error(f"Database error: {exc}", 502)

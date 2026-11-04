@@ -437,3 +437,78 @@ class LayoutAccessTests(SimpleTestCase):
         request = self.factory.get("/enrolment_api/wizard-layout/")
         request.user = SimpleNamespace(is_authenticated=False)
         self.assertEqual(wl.wizard_layout(request).status_code, 401)
+
+
+class FieldVisibilityTests(SimpleTestCase):
+    def test_overlay_does_not_mutate_published_layout(self):
+        published = {"steps": [step("cv-job", [{"key": "block.cv", "builtin": True, "hidden": False}])]}
+        visible = wl.apply_field_visibility(published, {"block.cv": True})
+        self.assertTrue(visible["steps"][0]["items"][0]["hidden"])
+        self.assertFalse(published["steps"][0]["items"][0]["hidden"])
+
+    def test_pinned_learner_uses_frozen_visibility_instead_of_live_toggle(self):
+        row = (11, {"steps": [step("cv-job", [{"key": "block.cv", "builtin": True, "hidden": False}])]}, None, None)
+        with patch.object(wl, "effective_layout", return_value=row), \
+             patch.object(wl, "read_layout_assignment", return_value=(None, None, 11, {"block.cv": True})), \
+             patch.object(wl, "read_field_visibility", return_value={"block.cv": False}):
+            result = wl.learner_layout_with_visibility(None, "apprenticeship", 9)
+        self.assertTrue(result[1]["steps"][0]["items"][0]["hidden"])
+
+    def test_toggling_visibility_does_not_insert_a_layout_version(self):
+        cursor = FakeCursor([(11, True), ("visibility_table",), (True,)])
+        request = RequestFactory().put(
+            "/enrolment_api/wizard-layout/visibility/",
+            data=json.dumps({"version": 11, "fieldKey": "block.cv", "hidden": True}),
+            content_type="application/json",
+        )
+        request.csrf_processing_done = True
+        with patch.dict(os.environ, {"ENROLMENT_API_REQUIRE_AUTH": "0"}), \
+             patch.object(wl, "connections", FakeConnections(cursor)), \
+             patch.object(wl.transaction, "atomic", return_value=nullcontext()):
+            response = wl.set_wizard_field_visibility(request)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(any('INSERT INTO enrolment."Wizard_Field_Visibility"' in sql for sql, _ in cursor.executed))
+        self.assertFalse(any('INSERT INTO enrolment."Wizard_Form_Layouts"' in sql for sql, _ in cursor.executed))
+        self.assertTrue(any('"Layout" @> %s::jsonb' in sql for sql, _ in cursor.executed))
+
+    def test_unknown_field_cannot_be_toggled(self):
+        cursor = FakeCursor([(11, False)])
+        request = RequestFactory().put(
+            "/enrolment_api/wizard-layout/visibility/",
+            data=json.dumps({"version": 11, "fieldKey": "block.unknown", "hidden": True}),
+            content_type="application/json",
+        )
+        request.csrf_processing_done = True
+        with patch.dict(os.environ, {"ENROLMENT_API_REQUIRE_AUTH": "0"}), \
+             patch.object(wl, "connections", FakeConnections(cursor)), \
+             patch.object(wl.transaction, "atomic", return_value=nullcontext()):
+            response = wl.set_wizard_field_visibility(request)
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(any(sql.startswith("INSERT") for sql, _ in cursor.executed))
+
+    def test_checkpoint_freezes_nonempty_visibility_without_publishing(self):
+        cursor = FakeCursor()
+        with patch.object(wl, "uses_global_layout", return_value=True), \
+             patch.object(wl, "read_field_visibility", return_value={"block.cv": True}), \
+             patch.object(wl, "read_version", return_value=(11, {}, None, None)), \
+             patch.object(wl, "has_visibility_snapshot_column", return_value=True):
+            snapshot = wl.capture_field_visibility(cursor, "apprenticeship", 9)
+            wl.record_layout_progress(cursor, "apprenticeship", 9, 11, checkpoint=True, visibility_snapshot=snapshot)
+        inserts = [(sql, args) for sql, args in cursor.executed if sql.startswith("INSERT")]
+        self.assertEqual(len(inserts), 1)
+        self.assertIn('Wizard_Layout_Assignments', inserts[0][0])
+        self.assertIn('"Visibility_snapshot"', inserts[0][0])
+        self.assertIn('{"block.cv": true}', inserts[0][1])
+
+    def test_pinned_visibility_is_ignored_for_a_different_assigned_version(self):
+        cursor = FakeCursor([(None, None, 11, {"block.cv": True})])
+        self.assertIsNone(wl.read_pinned_visibility(cursor, "apprenticeship", 9, 12))
+
+    def test_checkpoint_still_saves_before_snapshot_column_is_installed(self):
+        cursor = FakeCursor()
+        with patch.object(wl, "read_version", return_value=(11, {}, None, None)), \
+             patch.object(wl, "has_visibility_snapshot_column", return_value=False):
+            wl.record_layout_progress(cursor, "apprenticeship", 9, 11, checkpoint=True)
+        inserts = [sql for sql, _ in cursor.executed if sql.startswith("INSERT")]
+        self.assertEqual(len(inserts), 1)
+        self.assertNotIn('"Visibility_snapshot"', inserts[0])

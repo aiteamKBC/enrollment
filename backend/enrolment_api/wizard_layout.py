@@ -39,6 +39,7 @@ import json
 import logging
 import re
 import secrets
+from copy import deepcopy
 from decimal import Decimal, InvalidOperation
 
 from django.db import DatabaseError, connections, transaction
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 
 CONN = "enrolment"
 LAYOUT_TABLE = "Wizard_Form_Layouts"
+VISIBILITY_TABLE = "Wizard_Field_Visibility"
 
 #: A layout is a few KB; this only stops a runaway payload.
 MAX_LAYOUT_BYTES = 4 * 1024 * 1024  # Includes four complete Skills Radar catalogues.
@@ -184,8 +186,9 @@ def current_layout():
     """The published layout as a dict, or None when nothing is published."""
     with connections[CONN].cursor() as cursor:
         current = read_current(cursor)
+        layout = apply_field_visibility(current[1], read_field_visibility(cursor)) if current else None
     from .skills_radar.catalogue import with_catalogues
-    return with_catalogues(with_modules(with_suitability_step(current[1]))) if current else None
+    return with_catalogues(with_modules(with_suitability_step(layout))) if layout else None
 
 
 def _payload(current):
@@ -204,6 +207,70 @@ def _payload(current):
 ASSIGNMENT_TABLE = "Wizard_Layout_Assignments"
 
 
+def read_field_visibility(cursor):
+    """Live global field overrides. Missing table is safe before the schema command runs."""
+    cursor.execute("SELECT to_regclass(%s)", [f'enrolment."{VISIBILITY_TABLE}"'])
+    if cursor.fetchone()[0] is None:
+        return {}
+    cursor.execute(f'SELECT "Field_key", "Hidden" FROM enrolment."{VISIBILITY_TABLE}"')
+    return dict(cursor.fetchall())
+
+
+def apply_field_visibility(layout, overrides):
+    """Overlay visibility without changing the stored version JSON."""
+    if not layout or not overrides:
+        return layout
+    result = deepcopy(layout)
+    for step in result.get("steps", []):
+        for item in step.get("items", []):
+            if item.get("key") in overrides:
+                item["hidden"] = overrides[item["key"]]
+    return result
+
+
+def read_layout_assignment(cursor, kind, learner_id):
+    cursor.execute(
+        f'SELECT "Override_version", "Submitted_version", "Pinned_version", '
+        f'to_jsonb(saved)->\'Visibility_snapshot\' FROM enrolment."{ASSIGNMENT_TABLE}" saved '
+        'WHERE "Learner_kind" = %s AND "Learner_id" = %s',
+        [kind, learner_id],
+    )
+    row = cursor.fetchone()
+    if row and isinstance(row[3], str):
+        return (*row[:3], json.loads(row[3]))
+    return row
+
+
+def uses_global_layout(cursor, kind, learner_id):
+    assignment = read_layout_assignment(cursor, kind, learner_id)
+    return not assignment or all(value is None for value in assignment[:3])
+
+
+def has_visibility_snapshot_column(cursor):
+    cursor.execute(
+        "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass(%s) "
+        "AND attname = 'Visibility_snapshot' AND NOT attisdropped)",
+        [f'enrolment."{ASSIGNMENT_TABLE}"'],
+    )
+    return bool(cursor.fetchone()[0])
+
+
+def read_pinned_visibility(cursor, kind, learner_id, version):
+    """Read the assignment's frozen visibility, including before the column is installed."""
+    assignment = read_layout_assignment(cursor, kind, learner_id)
+    if not assignment or version not in assignment[1:3]:
+        return None
+    return assignment[3]
+
+
+def capture_field_visibility(cursor, kind, learner_id):
+    """Capture live overrides for the first pin or submission in the same save."""
+    if not uses_global_layout(cursor, kind, learner_id):
+        return None
+    snapshot = read_field_visibility(cursor)
+    return snapshot or None
+
+
 def read_version(cursor, version):
     cursor.execute(
         f'SELECT id, "Layout", "Created_at", "Created_by", "Scope", "Variant_name", "Parent_version" '
@@ -217,38 +284,56 @@ def read_version(cursor, version):
     return row[0], layout, row[2], row[3], row[4], row[5], row[6]
 
 
-def effective_layout(cursor, kind, learner_id):
+def effective_layout(cursor, kind, learner_id, assignment=None):
     """Resolve explicit admin assignment, submission snapshot, checkpoint pin, then default."""
-    cursor.execute(
-        f'SELECT "Override_version", "Submitted_version", "Pinned_version" '
-        f'FROM enrolment."{ASSIGNMENT_TABLE}" WHERE "Learner_kind" = %s AND "Learner_id" = %s',
-        [kind, learner_id],
-    )
-    assignment = cursor.fetchone()
-    version = next((value for value in assignment if value is not None), None) if assignment else None
+    if assignment is None:
+        assignment = read_layout_assignment(cursor, kind, learner_id)
+    version = next((value for value in assignment[:3] if value is not None), None) if assignment else None
     return read_version(cursor, version) if version is not None else read_current(cursor)
 
 
-def record_layout_progress(cursor, kind, learner_id, version, *, checkpoint=False, submitted=False, actor=None):
+def learner_layout_with_visibility(cursor, kind, learner_id):
+    assignment = read_layout_assignment(cursor, kind, learner_id)
+    current = effective_layout(cursor, kind, learner_id, assignment=assignment) if assignment else read_current(cursor)
+    if current is None:
+        return None
+    if not assignment or all(value is None for value in assignment[:3]):
+        overrides = read_field_visibility(cursor)
+    else:
+        overrides = assignment[3] if current[0] in assignment[1:3] else {}
+    return (current[0], apply_field_visibility(current[1], overrides), *current[2:])
+
+
+def record_layout_progress(cursor, kind, learner_id, version, *, checkpoint=False, submitted=False, actor=None, visibility_snapshot=None):
     """Pin only after the Skills Radar checkpoint; preserve the first submission reference."""
     if not version:
         return
     if read_version(cursor, version) is None:
         raise LayoutError("The wizard layout version being saved is no longer available.")
+    # A deployment can serve the old wizard while its schema command is pending.
+    has_snapshot_column = has_visibility_snapshot_column(cursor)
+    snapshot_column = ', "Visibility_snapshot"' if has_snapshot_column else ''
+    snapshot_value = ', %s::jsonb' if has_snapshot_column else ''
+    snapshot_update = (
+        ', "Visibility_snapshot" = CASE WHEN saved."Pinned_version" IS NULL '
+        'AND saved."Submitted_version" IS NULL THEN EXCLUDED."Visibility_snapshot" '
+        'ELSE saved."Visibility_snapshot" END'
+    ) if has_snapshot_column else ''
     cursor.execute(
         f'''INSERT INTO enrolment."{ASSIGNMENT_TABLE}" AS saved
-            ("Learner_kind", "Learner_id", "Pinned_version", "Submitted_version", "Pinned_at", "Submitted_at", "Updated_at")
+            ("Learner_kind", "Learner_id", "Pinned_version", "Submitted_version", "Pinned_at", "Submitted_at", "Updated_at"{snapshot_column})
             VALUES (%s, %s, CASE WHEN %s THEN %s ELSE NULL END,
                     CASE WHEN %s THEN %s ELSE NULL END,
                     CASE WHEN %s THEN now() ELSE NULL END,
-                    CASE WHEN %s THEN now() ELSE NULL END, now())
+                    CASE WHEN %s THEN now() ELSE NULL END, now(){snapshot_value})
             ON CONFLICT ("Learner_kind", "Learner_id") DO UPDATE SET
               "Pinned_version" = CASE WHEN %s THEN COALESCE(saved."Pinned_version", EXCLUDED."Pinned_version") ELSE saved."Pinned_version" END,
               "Pinned_at" = CASE WHEN %s THEN COALESCE(saved."Pinned_at", EXCLUDED."Pinned_at") ELSE saved."Pinned_at" END,
               "Submitted_version" = CASE WHEN %s THEN COALESCE(saved."Submitted_version", EXCLUDED."Submitted_version") ELSE saved."Submitted_version" END,
               "Submitted_at" = CASE WHEN %s THEN COALESCE(saved."Submitted_at", EXCLUDED."Submitted_at") ELSE saved."Submitted_at" END,
-              "Updated_at" = now()''',
+              "Updated_at" = now(){snapshot_update}''',
         [kind, learner_id, checkpoint, version, submitted, version, checkpoint, submitted,
+         *([json.dumps(visibility_snapshot) if visibility_snapshot else None] if has_snapshot_column else []),
          checkpoint, checkpoint, submitted, submitted],
     )
 
@@ -682,8 +767,10 @@ def wizard_layout(request, kind=None, learner_id=None):
         return _error("Unknown learner kind.", 400)
     try:
         with connections[CONN].cursor() as cursor:
-            current = effective_layout(cursor, kind, learner_id) if kind is not None and learner_id is not None else read_current(cursor)
+            current = learner_layout_with_visibility(cursor, kind, learner_id) if kind is not None and learner_id is not None else read_current(cursor)
             payload = _payload(current)
+            if kind is None:
+                payload["fieldVisibility"] = read_field_visibility(cursor) if current else {}
             if kind is not None and learner_id is not None and current is not None:
                 payload["layoutToken"] = signing.dumps(
                     {"kind": kind, "learnerId": int(learner_id), "version": current[0]},
@@ -695,6 +782,61 @@ def wizard_layout(request, kind=None, learner_id=None):
     except DatabaseError as exc:
         logger.warning("Could not read the wizard layout: %s", exc)
         return _error("Could not load the wizard layout.", 502)
+
+
+@enrolment_login_required
+@csrf_exempt
+def set_wizard_field_visibility(request):
+    """Hide or restore a field for learners using the live global layout."""
+    if request.method != "PUT":
+        return _error("Method not allowed.", 405)
+    from django.middleware.csrf import CsrfViewMiddleware
+    rejection = CsrfViewMiddleware(lambda r: None).process_view(request, lambda r: None, (), {})
+    if rejection is not None:
+        return rejection
+    try:
+        body = json.loads(request.body or b"{}")
+    except ValueError:
+        return _error("Request body must be valid JSON.", 400)
+    if not isinstance(body, dict):
+        return _error("Request body must be a JSON object.", 400)
+    version, key, hidden = body.get("version"), body.get("fieldKey"), body.get("hidden")
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        return _error("A current published version is required.", 400)
+    if not isinstance(key, str) or len(key) > 80 or not (BUILTIN_KEY_RE.fullmatch(key) or CUSTOM_KEY_RE.fullmatch(key)):
+        return _error("Invalid field key.", 400)
+    if not isinstance(hidden, bool):
+        return _error("'hidden' must be a boolean.", 400)
+    try:
+        with transaction.atomic(using=CONN):
+            with connections[CONN].cursor() as cursor:
+                cursor.execute(
+                    f'SELECT id, "Layout" @> %s::jsonb FROM enrolment."{LAYOUT_TABLE}" '
+                    "WHERE COALESCE(\"Scope\", 'default') = 'default' AND NOT COALESCE(\"Archived\", false) "
+                    'ORDER BY id DESC LIMIT 1',
+                    [json.dumps({"steps": [{"items": [{"key": key}]}]})],
+                )
+                current = cursor.fetchone()
+                if not current or current[0] != version:
+                    return _error("The global wizard changed. Reload the builder before hiding fields.", 409)
+                if not current[1]:
+                    return _error("This field is not in the published wizard.", 404)
+                cursor.execute("SELECT to_regclass(%s)", [f'enrolment."{VISIBILITY_TABLE}"'])
+                if cursor.fetchone()[0] is None:
+                    return _error("Field visibility storage is not installed yet.", 503)
+                if not has_visibility_snapshot_column(cursor):
+                    return _error("Field visibility snapshot storage is not installed yet.", 503)
+                cursor.execute(
+                    f'''INSERT INTO enrolment."{VISIBILITY_TABLE}" ("Field_key", "Hidden", "Updated_by")
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT ("Field_key") DO UPDATE SET
+                            "Hidden" = EXCLUDED."Hidden", "Updated_by" = EXCLUDED."Updated_by", "Updated_at" = now()''',
+                    [key, hidden, _actor(request)],
+                )
+        return JsonResponse({"version": version, "fieldKey": key, "hidden": hidden})
+    except DatabaseError as exc:
+        logger.warning("Could not update wizard field visibility: %s", exc)
+        return _error("Could not update field visibility.", 502)
 
 
 @enrolment_login_required

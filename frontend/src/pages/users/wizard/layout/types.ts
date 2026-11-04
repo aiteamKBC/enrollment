@@ -124,6 +124,8 @@ export interface WizardLayout {
 export interface WizardLayoutResponse {
   layout: WizardLayout | null;
   version: number | null;
+  /** Live global field visibility, independent of published layout versions. */
+  fieldVisibility?: Record<string, boolean>;
   /** Signed learner-bound reference, present only on learner-specific reads. */
   layoutToken?: string | null;
   updatedAt: string;
