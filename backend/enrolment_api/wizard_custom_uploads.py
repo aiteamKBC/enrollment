@@ -25,23 +25,21 @@ from learner_api.evidence_storage import azure_configured, get_download_sas
 from . import learner_uploads as uploads
 from .auth import enrolment_login_required
 from .extended_ilr import KINDS
-from .wizard_layout import COLUMN_RE, CONN, TABLE_RE, _q, custom_fields, learner_layout_with_visibility
+from .wizard_layout import COLUMN_RE, CONN, TABLE_RE, _q, current_layout, custom_fields
 
 logger = logging.getLogger(__name__)
 
 _error = uploads.error
 
 
-def _field(kind, learner_id, field_key, for_upload):
+def _field(field_key, for_upload):
     """(table, column) of an upload field, or an error response.
 
     New files are only accepted while the field is in the wizard; existing ones
     stay listable and removable after it is removed, so nothing is stranded.
     """
     try:
-        with connections[CONN].cursor() as cursor:
-            version = learner_layout_with_visibility(cursor, kind, learner_id)
-        found = custom_fields(version[1] if version else None).get(field_key)
+        found = custom_fields(current_layout()).get(field_key)
     except DatabaseError as exc:
         logger.warning("Could not read the wizard layout for an upload: %s", exc)
         return None, _error("Could not load the wizard layout.", 502)
@@ -105,7 +103,7 @@ def custom_uploads(request, kind, learner_id, field_key):
         return refused
     if request.method not in ("GET", "POST"):
         return _error("Method not allowed.", 405)
-    storage, refused = _field(kind, learner_id, field_key, for_upload=request.method == "POST")
+    storage, refused = _field(field_key, for_upload=request.method == "POST")
     if refused:
         return refused
     table, column = storage
@@ -159,7 +157,7 @@ def download_custom_upload(request, kind, learner_id, field_key, file_id):
         return _error(f"Unknown learner kind '{kind}'.", 400)
     if not azure_configured():
         return _error("Document storage is not configured.", 503)
-    storage, refused = _field(kind, learner_id, field_key, for_upload=False)
+    storage, refused = _field(field_key, for_upload=False)
     if refused:
         return refused
     table, column = storage
@@ -183,7 +181,7 @@ def delete_custom_upload(request, kind, learner_id, field_key, file_id):
         return _error("Method not allowed.", 405)
     if kind not in KINDS:
         return _error(f"Unknown learner kind '{kind}'.", 400)
-    storage, refused = _field(kind, learner_id, field_key, for_upload=False)
+    storage, refused = _field(field_key, for_upload=False)
     if refused:
         return refused
     table, column = storage

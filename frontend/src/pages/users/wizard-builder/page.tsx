@@ -10,7 +10,7 @@ import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
 import * as WizardLayoutApi from '@/api/wizardLayout';
-import { fetchWizardLayout, publishWizardLayout, setWizardFieldVisibility } from '@/api/wizardLayout';
+import { fetchWizardLayout, publishWizardLayout } from '@/api/wizardLayout';
 import type { WizardLayoutVersion } from '@/api/wizardLayout';
 import { fetchEnrolmentUsers } from '@/api/enrolmentUsers';
 import type { LearnerKind } from '@/api/extendedIlr';
@@ -83,8 +83,6 @@ export default function WizardBuilderPage() {
   const [updatedBy, setUpdatedBy] = useState('');
   const [published, setPublished] = useState<WizardLayout | null>(null);
   const [layout, setLayout] = useState<WizardLayout | null>(null);
-  const [fieldVisibility, setFieldVisibility] = useState<Record<string, boolean>>({});
-  const [togglingField, setTogglingField] = useState<string | null>(null);
   const [selected, setSelected] = useState<string>('');
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -108,7 +106,6 @@ export default function WizardBuilderPage() {
         const resolved = resolveLayout(res.layout);
         setPublished(resolved);
         setLayout(clone(resolved));
-        setFieldVisibility(res.fieldVisibility ?? {});
         setVersion(res.version);
         setUpdatedAt(res.updatedAt);
         setUpdatedBy(res.updatedBy);
@@ -135,29 +132,6 @@ export default function WizardBuilderPage() {
   };
 
   const edit = useCallback((fn: (l: WizardLayout) => WizardLayout) => setLayout((l) => (l ? fn(l) : l)), []);
-
-  const toggleFieldVisibility = async (item: LayoutItem) => {
-    if (version === null || togglingField) return;
-    const previous = fieldVisibility[item.key];
-    const hadOverride = Object.hasOwn(fieldVisibility, item.key);
-    const hidden = !(previous ?? item.hidden);
-    setTogglingField(item.key);
-    setFieldVisibility((current) => ({ ...current, [item.key]: hidden }));
-    try {
-      await setWizardFieldVisibility(version, item.key, hidden);
-      success(hidden ? 'Field hidden' : 'Field shown', 'Visibility updated without publishing a new layout version.');
-    } catch (e) {
-      setFieldVisibility((current) => {
-        const restored = { ...current };
-        if (hadOverride && previous !== undefined) restored[item.key] = previous;
-        else delete restored[item.key];
-        return restored;
-      });
-      error('Could not update field visibility', e instanceof Error ? e.message : 'Unexpected error');
-    } finally {
-      setTogglingField(null);
-    }
-  };
 
   const publish = async () => {
     if (!layout) return;
@@ -254,9 +228,6 @@ export default function WizardBuilderPage() {
                   editing={editing}
                   setEditing={setEditing}
                   edit={edit}
-                  fieldVisibility={fieldVisibility}
-                  togglingField={togglingField}
-                  onToggleVisibility={toggleFieldVisibility}
                 />
               )}
             </div>
@@ -347,9 +318,6 @@ function StepEditor({
   editing,
   setEditing,
   edit,
-  fieldVisibility,
-  togglingField,
-  onToggleVisibility,
 }: {
   version: number | null;
   layout: WizardLayout;
@@ -357,12 +325,9 @@ function StepEditor({
   editing: string | 'new' | null;
   setEditing: (v: string | 'new' | null) => void;
   edit: (fn: (l: WizardLayout) => WizardLayout) => void;
-  fieldVisibility: Record<string, boolean>;
-  togglingField: string | null;
-  onToggleVisibility: (item: LayoutItem) => void;
 }) {
-  const shown = step.items.filter((it) => !it.hidden || Object.hasOwn(fieldVisibility, it.key));
-  const removed = step.items.filter((it) => it.hidden && !Object.hasOwn(fieldVisibility, it.key));
+  const shown = step.items.filter((it) => !it.hidden);
+  const removed = step.items.filter((it) => it.hidden);
   const [showRemoved, setShowRemoved] = useState(false);
   const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const addRef = useRef<HTMLButtonElement>(null);
@@ -475,10 +440,6 @@ function StepEditor({
                   edit(() => result.layout);
                   setEditing(result.key);
                 }}
-                visibilityHidden={fieldVisibility[item.key] ?? item.hidden}
-                onToggleVisibility={() => onToggleVisibility(item)}
-                visibilityDisabled={version === null || togglingField !== null}
-                visibilitySaving={togglingField === item.key}
               />
             )}
           </li>
@@ -526,10 +487,6 @@ function ItemRow({
   edit,
   onEdit,
   onDuplicate,
-  visibilityHidden,
-  onToggleVisibility,
-  visibilityDisabled,
-  visibilitySaving,
 }: {
   layout: WizardLayout;
   step: LayoutStep;
@@ -537,10 +494,6 @@ function ItemRow({
   edit: (fn: (l: WizardLayout) => WizardLayout) => void;
   onEdit: () => void;
   onDuplicate: () => void;
-  visibilityHidden: boolean;
-  onToggleVisibility: () => void;
-  visibilityDisabled: boolean;
-  visibilitySaving: boolean;
 }) {
   const def = builtinDef(item);
   const label = itemLabel(item);
@@ -568,7 +521,7 @@ function ItemRow({
   };
 
   return (
-    <div className={`flex overflow-hidden rounded-xl border border-foreground-100 bg-background-50 ${visibilityHidden ? 'opacity-65' : ''}`}>
+    <div className="flex overflow-hidden rounded-xl border border-foreground-100 bg-background-50">
       <span className="flex w-14 shrink-0 cursor-grab items-center justify-center border-r border-foreground-100 bg-background-100/40 text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
         <AppIcon className="ri-drag-move-2-line text-[20px]" />
       </span>
@@ -583,7 +536,6 @@ function ItemRow({
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {item.builtin ? KIND_LABEL[def?.kind ?? 'field'] : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
-            {visibilityHidden && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Hidden from learners</span>}
             {!item.builtin && !item.column && !isContentFieldType(item.type) && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
             {onIlr && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800"><AppIcon className="ri-file-text-line mr-0.5" />On ILR document</span>}
             {condition && trigger && (
@@ -632,25 +584,14 @@ function ItemRow({
             </button>
           )}
           {!item.builtin && (
-            <button type="button" className={iconBtn} aria-label={`Edit ${label}`} onClick={onEdit}>
-              <AppIcon className="ri-pencil-line" />
-            </button>
-          )}
-          <button
-            type="button"
-            className={`${iconBtn}${visibilityHidden ? ' !bg-amber-50 !text-amber-700' : ''}`}
-            aria-label={`${visibilityHidden ? 'Show' : 'Hide'} ${label} for learners`}
-            title={visibilityDisabled ? 'Publish this field before changing its live visibility' : visibilityHidden ? 'Show field without publishing' : 'Hide field without publishing'}
-            disabled={visibilityDisabled}
-            onClick={onToggleVisibility}
-            aria-busy={visibilitySaving}
-          >
-            <AppIcon className={visibilitySaving ? 'ri-loader-4-line animate-spin' : visibilityHidden ? 'ri-eye-off-line' : 'ri-eye-line'} />
-          </button>
-          {!item.builtin && (
-            <button type="button" className={iconBtn} aria-label={`Duplicate ${label}`} title="Duplicate field" onClick={onDuplicate}>
-              <AppIcon className="ri-file-copy-line" />
-            </button>
+            <>
+              <button type="button" className={iconBtn} aria-label={`Edit ${label}`} onClick={onEdit}>
+                <AppIcon className="ri-pencil-line" />
+              </button>
+              <button type="button" className={iconBtn} aria-label={`Duplicate ${label}`} title="Duplicate field" onClick={onDuplicate}>
+                <AppIcon className="ri-file-copy-line" />
+              </button>
+            </>
           )}
           <button type="button" className={`${iconBtn} hover:!text-red-600`} aria-label={`Remove ${label}`} onClick={remove}>
             <AppIcon className="ri-delete-bin-line" />

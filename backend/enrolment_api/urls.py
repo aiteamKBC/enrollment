@@ -42,7 +42,6 @@ urlpatterns = [
     path('wizard-layout/', wizard_layout.wizard_layout, name='wizard-layout'),
     path('wizard-layout/<str:kind>/<int:learner_id>/', wizard_layout.wizard_layout, name='wizard-layout-learner'),
     path('wizard-layout/publish/', wizard_layout.publish_wizard_layout, name='wizard-layout-publish'),
-    path('wizard-layout/visibility/', wizard_layout.set_wizard_field_visibility, name='wizard-layout-visibility'),
     path('wizard-layout/versions/', wizard_layout.wizard_layout_versions, name='wizard-layout-versions'),
     path('wizard-layout/assignments/', wizard_layout.assign_wizard_layout, name='wizard-layout-assignments'),
     # Files on the builder's custom upload fields (Azure-backed, path in the field's own column)
