@@ -91,6 +91,9 @@ function LearnerWizard({ stepSlug, onDone }: { stepSlug: string | undefined; onD
           dob: pd.dob,
           onboardingStatus: 'Submitted',
         });
+        // Record the submitted layout only after the learner record confirms
+        // submission, so a failed status update cannot leave a false snapshot.
+        await saveIlr({ submitted: true });
         // Opens the Reviews tab now, rather than on the learner's next session.
         markEnrolmentSubmitted('apprenticeship', userId);
       }

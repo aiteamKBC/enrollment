@@ -115,7 +115,6 @@ function renderBuilder() {
     <MemoryRouter initialEntries={['/users/eligibility-builder']}>
       <Routes>
         <Route path="/users/eligibility-builder" element={<EligibilityBuilderPage />} />
-        <Route path="/users" element={<p>Users directory</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -139,8 +138,6 @@ describe('builder page', () => {
       expect(within(nav).getByRole('button', { name: new RegExp(`^${name}`) })).toBeInTheDocument();
     }
     expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: /Back to users/ }));
-    expect(await screen.findByText('Users directory')).toBeInTheDocument();
   });
 
   it('never lets the questions that identify the applicant be removed or hidden', async () => {

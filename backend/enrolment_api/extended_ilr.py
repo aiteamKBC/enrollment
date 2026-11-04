@@ -16,7 +16,8 @@ caller that only has ILR data cannot silently wipe the other steps.
 """
 import json
 
-from django.db import DatabaseError, transaction
+from django.core import signing
+from django.db import DatabaseError, connections, transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -32,7 +33,7 @@ from .wizard_steps import (
     read_projection,
     without_ilr_details,
 )
-from .wizard_layout import project_custom_fields
+from .wizard_layout import LayoutError, project_custom_fields, read_version, record_layout_progress
 
 KINDS = {"apprenticeship": EnrolmentUser, "commercial": CommercialUser}
 
@@ -217,7 +218,25 @@ def extended_ilr(request, kind, learner_id):
         if draft is not None and not isinstance(draft, dict):
             return _error("'draft' must be a JSON object.", 400)
 
-        if answers is None and draft is None:
+        layout_version = body.get("layoutVersion")
+        if layout_version is not None and (not isinstance(layout_version, int) or isinstance(layout_version, bool) or layout_version < 1):
+            return _error("'layoutVersion' must be a positive integer or null.", 400)
+        layout_token = body.get("layoutToken")
+        if layout_version is not None:
+            try:
+                token_data = signing.loads(layout_token, salt="enrolment.wizard-layout.learner-version")
+            except (signing.BadSignature, TypeError):
+                return _error("The wizard version reference is invalid. Reload the wizard before saving.", 409)
+            if token_data != {"kind": kind, "learnerId": int(learner_id), "version": layout_version}:
+                return _error("The wizard version reference does not match this learner. Reload before saving.", 409)
+        checkpoint = body.get("skillsRadarCheckpoint", False)
+        submitted = body.get("submitted", False)
+        if not isinstance(checkpoint, bool) or not isinstance(submitted, bool):
+            return _error("'skillsRadarCheckpoint' and 'submitted' must be boolean values.", 400)
+        if submitted and _s(getattr(learner, "onboarding_status", "")).lower() not in {"submitted", "completed"}:
+            return _error("The learner must be marked submitted before recording the submitted wizard version.", 409)
+
+        if answers is None and draft is None and not (checkpoint or submitted):
             return _error("Provide 'answers' and/or 'draft' to save.", 400)
 
         if draft is not None and 'programmeModules' in draft:
@@ -243,6 +262,13 @@ def extended_ilr(request, kind, learner_id):
             defaults["wizard_draft"] = without_ilr_details(draft)
         try:
             with transaction.atomic(using="enrolment"):
+                layout_snapshot = None
+                if layout_version is not None:
+                    with connections["enrolment"].cursor() as cursor:
+                        version_row = read_version(cursor, layout_version)
+                    if version_row is None:
+                        return _error("The wizard version used for these answers is unavailable. Reload the wizard before saving.", 409)
+                    layout_snapshot = version_row[1]
                 if draft is not None:
                     # Serialise first answers even when no Extended ILR row
                     # exists yet; an existing saved catalogue pin always wins.
@@ -267,9 +293,21 @@ def extended_ilr(request, kind, learner_id):
                     project_draft(kind, int(learner_id), draft)
                     # The wizard builder's custom fields, into their own columns.
                     # Conditions on Extended ILR questions read the stored answers.
-                    project_custom_fields(kind, int(learner_id), draft, answers=row.answers)
+                    project_custom_fields(kind, int(learner_id), draft, answers=row.answers, layout=layout_snapshot)
+                if checkpoint or submitted:
+                    with connections["enrolment"].cursor() as cursor:
+                        record_layout_progress(
+                            cursor,
+                            kind,
+                            int(learner_id),
+                            layout_version,
+                            checkpoint=checkpoint,
+                            submitted=submitted,
+                        )
         except DatabaseError as exc:
             return _error(f"Database error: {exc}", 502)
+        except LayoutError as exc:
+            return _error(str(exc), 409)
         except CatalogueError as exc:
             return _error(str(exc), 409)
 

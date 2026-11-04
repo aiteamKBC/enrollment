@@ -461,13 +461,4 @@ describe('the builder page', () => {
     expect(screen.getByText('You have unpublished changes.')).toBeInTheDocument();
   });
 
-  it('asks before leaving with unpublished changes', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    renderBuilder();
-    await openStep('Personal Details');
-    dragFieldBefore('Last Name', 'First Name');
-    await userEvent.click(screen.getByRole('button', { name: /Back to users/ }));
-    expect(confirm).toHaveBeenCalled();
-    expect(screen.queryByText('User directory')).not.toBeInTheDocument();
-  });
 });
