@@ -274,7 +274,10 @@ describe('learner step gating', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(3));
-    expect(saveExtendedIlr).toHaveBeenCalledWith('apprenticeship', '20', expect.anything(), expect.anything(), true);
+    expect(saveExtendedIlr).toHaveBeenCalledWith(
+      'apprenticeship', '20', expect.anything(), expect.anything(),
+      expect.objectContaining({ finalizeIlr: true }),
+    );
   });
 
   it('still saves an untouched draft that has never been stored', async () => {

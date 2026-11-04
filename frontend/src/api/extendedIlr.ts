@@ -169,12 +169,16 @@ export async function saveExtendedIlr(
   learnerId: string,
   answers: IlrForm,
   draft?: Partial<WizardDraftRest>,
-  finalizeIlr = false,
+  versioning: { layoutVersion?: number | null; layoutToken?: string | null; skillsRadarCheckpoint?: boolean; submitted?: boolean; finalizeIlr?: boolean } = {},
 ): Promise<ExtendedIlrResponse> {
   const key = `${kind}/${learnerId}`;
+  const body = {
+    ...(draft ? { answers, draft } : { answers }),
+    ...versioning,
+  };
   const saved = await request<ExtendedIlrResponse>(`${BASE}/${key}/`, {
     method: 'PUT',
-    body: JSON.stringify(draft ? { answers, draft, ...(finalizeIlr ? { finalizeIlr: true } : {}) } : { answers }),
+    body: JSON.stringify(body),
   });
   // The server echoes the stored row, so the cache is updated from the response
   // rather than dropped — a save leaves the next read served from memory instead

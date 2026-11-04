@@ -2338,7 +2338,28 @@ CREATE TABLE enrolment."Wizard_Form_Layouts" (
     id bigint NOT NULL,
     "Layout" jsonb NOT NULL,
     "Created_by" text,
-    "Created_at" timestamp with time zone DEFAULT now() NOT NULL
+    "Created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "Scope" text DEFAULT 'default'::text NOT NULL,
+    "Variant_name" text,
+    "Parent_version" bigint,
+    "Archived" boolean DEFAULT false NOT NULL
+);
+
+-- Sparse wizard-version pins and assignments. Prepared by
+-- apply_wizard_form_layout_table on existing installations.
+CREATE TABLE enrolment."Wizard_Layout_Assignments" (
+    "Learner_kind" text NOT NULL,
+    "Learner_id" bigint NOT NULL,
+    "Pinned_version" bigint,
+    "Override_version" bigint,
+    "Submitted_version" bigint,
+    "Reason" text,
+    "Assigned_by" text,
+    "Assigned_at" timestamp with time zone,
+    "Pinned_at" timestamp with time zone,
+    "Submitted_at" timestamp with time zone,
+    "Updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+    PRIMARY KEY ("Learner_kind", "Learner_id")
 );
 
 

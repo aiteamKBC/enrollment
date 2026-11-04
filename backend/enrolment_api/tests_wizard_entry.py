@@ -14,12 +14,14 @@ class TitleTests(SimpleTestCase):
         learner = MagicMock(username='Test Learner', title='Dr')
         model = MagicMock()
         model.objects.filter.return_value.first.return_value = learner
+        model.objects.select_for_update.return_value.get.return_value = learner
         draft = {'personalDetails': personal} if personal is not None else {'plr': {'uln': '123'}}
         request = RequestFactory().put('/enrolment_api/extended-ilr/apprenticeship/41/',
                                       data=json.dumps({'draft': draft}), content_type='application/json')
         with patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '0'}), \
              patch.dict(ilr.KINDS, {kind: model}), \
              patch.object(ilr.transaction, 'atomic', lambda **_: nullcontext()), \
+             patch.object(ilr.ExtendedIlr.objects, 'filter', return_value=SimpleNamespace(first=lambda: None)), \
              patch.object(ilr.ExtendedIlr.objects, 'update_or_create', return_value=(MagicMock(), True)) as upsert, \
              patch.object(ilr, 'project_draft'), patch.object(ilr, 'project_custom_fields'), \
              patch.object(ilr, '_payload', return_value={'draft': {}}):

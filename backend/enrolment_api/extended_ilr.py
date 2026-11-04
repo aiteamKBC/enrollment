@@ -16,7 +16,8 @@ caller that only has ILR data cannot silently wipe the other steps.
 """
 import json
 
-from django.db import DatabaseError, transaction
+from django.core import signing
+from django.db import DatabaseError, connections, transaction
 from django.utils import timezone
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -28,6 +29,7 @@ from .models import ExtendedIlr, WizardIlrLearnerDetails
 from .ilr_finalisation import legacy_review_required, published_ilr_custom_keys, signed_snapshot, validate_finalisation
 from .ilr_health import validate_ilr_additions
 from .ilr_learner_record import learner_record
+from .skills_radar.catalogue import CatalogueError
 from .wizard_steps import (
     ILR_DETAILS_KEY,
     project_draft,
@@ -35,8 +37,8 @@ from .wizard_steps import (
     read_projection,
     without_ilr_details,
 )
-from .wizard_layout import project_custom_fields
 from .learner_profile_fields import clean_profile, transport_profile, without_profile_fields
+from .wizard_layout import LayoutError, project_custom_fields, read_version, record_layout_progress
 
 KINDS = {"apprenticeship": EnrolmentUser, "commercial": CommercialUser}
 
@@ -171,13 +173,21 @@ def _read_extended_ilr_row(kind, learner_id, learner_name):
     # from the per-step tables so nothing looks lost in the wizard.
     if not payload["draft"]:
         payload["draft"] = read_projection(kind, int(learner_id))
-    elif kind == 'apprenticeship' and 'personalDetails' not in payload['draft']:
+    elif payload['draft']:
         # A historical submitted wizard can have its signature only in the
         # per-step table. Later Extended ILR saves must not make that view
         # disappear merely because Wizard_draft is now non-empty.
-        personal = (read_projection(kind, int(learner_id)) or {}).get('personalDetails')
-        if personal:
-            payload['draft'] = {**payload['draft'], 'personalDetails': personal}
+        if kind == 'apprenticeship' and 'personalDetails' not in payload['draft']:
+            personal = (read_projection(kind, int(learner_id)) or {}).get('personalDetails')
+            if personal:
+                payload['draft'] = {**payload['draft'], 'personalDetails': personal}
+    if payload['draft'] and 'skillsRadar' not in payload['draft']:
+        # Older partial draft writers may have left radar answers only in the
+        # per-step tables. Recover them without replacing other saved sections.
+        from .skills_radar.service import read_legacy_radar
+        radar = read_legacy_radar(kind, int(learner_id))
+        if radar is not None:
+            payload['draft'] = {**payload['draft'], 'skillsRadar': radar}
     return payload
 
 
@@ -235,7 +245,25 @@ def extended_ilr(request, kind, learner_id):
         if draft is not None and not isinstance(draft, dict):
             return _error("'draft' must be a JSON object.", 400)
 
-        if answers is None and draft is None:
+        layout_version = body.get("layoutVersion")
+        if layout_version is not None and (not isinstance(layout_version, int) or isinstance(layout_version, bool) or layout_version < 1):
+            return _error("'layoutVersion' must be a positive integer or null.", 400)
+        layout_token = body.get("layoutToken")
+        if layout_version is not None:
+            try:
+                token_data = signing.loads(layout_token, salt="enrolment.wizard-layout.learner-version")
+            except (signing.BadSignature, TypeError):
+                return _error("The wizard version reference is invalid. Reload the wizard before saving.", 409)
+            if token_data != {"kind": kind, "learnerId": int(learner_id), "version": layout_version}:
+                return _error("The wizard version reference does not match this learner. Reload before saving.", 409)
+        checkpoint = body.get("skillsRadarCheckpoint", False)
+        submitted = body.get("submitted", False)
+        if not isinstance(checkpoint, bool) or not isinstance(submitted, bool):
+            return _error("'skillsRadarCheckpoint' and 'submitted' must be boolean values.", 400)
+        if submitted and _s(getattr(learner, "onboarding_status", "")).lower() not in {"submitted", "completed"}:
+            return _error("The learner must be marked submitted before recording the submitted wizard version.", 409)
+
+        if answers is None and draft is None and not (checkpoint or submitted):
             return _error("Provide 'answers' and/or 'draft' to save.", 400)
 
         if draft is not None and ILR_DETAILS_KEY in draft:
@@ -265,9 +293,17 @@ def extended_ilr(request, kind, learner_id):
 
         try:
             with transaction.atomic(using="enrolment"):
+                layout_snapshot = None
+                if layout_version is not None:
+                    with connections["enrolment"].cursor() as cursor:
+                        version_row = read_version(cursor, layout_version)
+                    if version_row is None:
+                        return _error("The wizard version used for these answers is unavailable. Reload the wizard before saving.", 409)
+                    layout_snapshot = version_row[1]
                 # Serialize *every* learner save with Sign + Next. An old tab
                 # cannot win a race after the signed snapshot is committed.
-                if learner_write:
+                # Main's catalogue pinning also requires this lock for drafts.
+                if learner_write or draft is not None:
                     learner = model.objects.select_for_update().get(pk=learner_id)
                 signed = signed_snapshot(int(learner_id)) if learner_write else None
                 legacy = bool(learner_write and not signed and legacy_review_required(learner, int(learner_id)))
@@ -317,9 +353,17 @@ def extended_ilr(request, kind, learner_id):
                     defaults.update(_signature_state(answers))
                     defaults.update(_next_of_kin_state(answers))
                 if draft is not None:
+                    stored_row = ExtendedIlr.objects.filter(learner_kind=kind, learner_id=learner_id).first()
+                    previous = (stored_row.wizard_draft or {}) if stored_row else {}
+                    stored = previous
+                    if 'skillsRadar' in draft and 'skillsRadar' not in stored:
+                        from .skills_radar.service import read_legacy_radar
+                        radar = read_legacy_radar(kind, int(learner_id))
+                        if radar is not None:
+                            stored = {**stored, 'skillsRadar': radar}
+                    from .skills_radar.service import prepare_answers
+                    prepare_answers(kind, learner, draft, stored)
                     if signed or legacy:
-                        stored_row = ExtendedIlr.objects.filter(learner_kind=kind, learner_id=learner_id).first()
-                        previous = (stored_row.wizard_draft or {}) if stored_row else {}
                         merged = {**previous, **without_ilr_details(draft)}
                         if 'custom' in draft:
                             merged['custom'] = {**(previous.get('custom') or {}), **(draft['custom'] or {})}
@@ -337,7 +381,7 @@ def extended_ilr(request, kind, learner_id):
                     project_draft(kind, int(learner_id), draft)
                     # The wizard builder's custom fields, into their own columns.
                     # Conditions on Extended ILR questions read the stored answers.
-                    project_custom_fields(kind, int(learner_id), draft, answers=row.answers)
+                    project_custom_fields(kind, int(learner_id), draft, answers=row.answers, layout=layout_snapshot)
                 if profile:
                     for attribute, value in profile.items():
                         setattr(learner, attribute, value)
@@ -360,8 +404,22 @@ def extended_ilr(request, kind, learner_id):
                              ilr_signed_snapshot=snapshot)
                     if updated != 1:
                         raise DatabaseError('ILR details row missing during finalisation.')
-        except DatabaseError as exc:
+                if checkpoint or submitted:
+                    with connections["enrolment"].cursor() as cursor:
+                        record_layout_progress(
+                            cursor,
+                            kind,
+                            int(learner_id),
+                            layout_version,
+                            checkpoint=checkpoint,
+                            submitted=submitted,
+                        )
+        except DatabaseError:
             return _error('Your answers could not be saved. Please try again.', 503)
+        except LayoutError as exc:
+            return _error(str(exc), 409)
+        except CatalogueError as exc:
+            return _error(str(exc), 409)
 
         response = _payload(row)
         if 'meta' in response and learner_write:

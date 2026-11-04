@@ -212,7 +212,7 @@ export function WizardShell({
       if (mode === 'learner' && steps[currentIndex]?.slug === 'ilr-details') {
         if ((ilrFinalisedAt || ilrLegacyReadOnly) && !isCommercial) { onNavigateStep(target); return; }
         navigatingSignature.current = true;
-        try { await saveIlr(leavingUnsignedIlr); onNavigateStep(target); }
+        try { await saveIlr({ finalizeIlr: leavingUnsignedIlr }); onNavigateStep(target); }
         catch (reason) { error('Could not save your answers', reason instanceof Error ? reason.message : 'Unexpected error'); }
         finally { navigatingSignature.current = false; }
       } else {
@@ -222,7 +222,7 @@ export function WizardShell({
     };
     /** Write this step behind the move; a failure is reported, never blocking. */
     const saveInBackground = () =>
-      saveIlr().catch((e: unknown) =>
+      saveIlr({ skillsRadarCheckpoint: mode === 'learner' && steps[target]?.slug === 'skills-radar' }).catch((e: unknown) =>
         error('Could not save your answers', e instanceof Error ? e.message : 'Unexpected error')
       );
 

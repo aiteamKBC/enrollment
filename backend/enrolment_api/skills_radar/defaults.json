@@ -1,0 +1,1762 @@
+{
+  "PCP_L6": {
+    "programmeId": "PCP_L6",
+    "records": [
+      {
+        "id": "st0845-v1-1-K1",
+        "code": "K1",
+        "kind": "Knowledge",
+        "description": "Organisational and business strategies: and how these impact on the strategy for project control and its execution",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K2",
+        "code": "K2",
+        "kind": "Knowledge",
+        "description": "Principles of project control including the principles of the project life cycle; and the role project control plays in the governance of a project.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K3",
+        "code": "K3",
+        "kind": "Knowledge",
+        "description": "Project control procedures and methods including employer organisation management systems that are critical to project control for example: quality control, configuration management, document and version control",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K4",
+        "code": "K4",
+        "kind": "Knowledge",
+        "description": "The benefits, attributes, limitations and use of project controls related software used for key tasks such as planning and scheduling, cost management, cost and risk analysis, estimating, progress and performance monitoring and reporting",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K5",
+        "code": "K5",
+        "kind": "Knowledge",
+        "description": "Underlying engineering and manufacturing principles including the principles of reviewing and interpreting technical project documents such as scopes of work and engineering drawings.",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K6",
+        "code": "K6",
+        "kind": "Knowledge",
+        "description": "Breakdown and coding structures: purpose, creation and use for accurate control. Their relevance in the creation of data models to help feed integrated and intelligent reporting and insights; familiarisation with standard coding structures and how they are used to underpin data flow systems as well as underpin the use and integration of new technology into project controls delivery including BIM .",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K7",
+        "code": "K7",
+        "kind": "Knowledge",
+        "description": "Project Control Plans and reporting frameworks - their purpose and content and how they underpin the generation and reporting of meaningful controls data",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K8",
+        "code": "K8",
+        "kind": "Knowledge",
+        "description": "Strategic principles of creating and managing the project controls baseline (including scope definition, schedule, risk and cost), throughout the project life cycle.",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K9",
+        "code": "K9",
+        "kind": "Knowledge",
+        "description": "HSE knowledge relative to the industry and project controls, including related national and industrial health, safety and environmental standards and legislation, the obligations of safety in design and CDM (construction, design and management) regulations.",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K10",
+        "code": "K10",
+        "kind": "Knowledge",
+        "description": "The environmental impact of a project’s activities, how it could contribute to the drive towards net carbon zero and how to minimise negative impacts on environmental sustainability during all stages of a project, within the context of the role.",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K11",
+        "code": "K11",
+        "kind": "Knowledge",
+        "description": "Principles of ethical conduct, diversity and inclusion, including codes of conduct and duty of care, corporate social responsibility, equality, diversity and inclusivity in the workplace.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K12",
+        "code": "K12",
+        "kind": "Knowledge",
+        "description": "Data assurance: approaches to gathering data; ensuring the validity and integrity of data (consistent, quality, technical controls information); and how to review the assumptions used to establish the data, as well as the inherent risks associated with these assumptions.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K13",
+        "code": "K13",
+        "kind": "Knowledge",
+        "description": "Analysis techniques: different approaches to data analysis, the benefits of each, what the analytics are indicating and why and how this may impact on decisions and recommendations.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K14",
+        "code": "K14",
+        "kind": "Knowledge",
+        "description": "Approaches to communicating with different stakeholders in order to influence key decision-makers and colleagues.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_STAKE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K15",
+        "code": "K15",
+        "kind": "Knowledge",
+        "description": "The principles of risk management and the risk process; different risk analysis techniques; the methodologies and considerations for mitigating risk.",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K16",
+        "code": "K16",
+        "kind": "Knowledge",
+        "description": "Approaches to integrating cost and planning with a consistent basis for project risks and opportunities including cost and schedule risk analysis and associated contingency calculations.",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K17",
+        "code": "K17",
+        "kind": "Knowledge",
+        "description": "Project control change management and control: the principles of project control change procedures; how these procedures may vary in owner/contractor organisations, and when and how to use and apply them including project closeout procedure(s).",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K18",
+        "code": "K18",
+        "kind": "Knowledge",
+        "description": "Commercial matters: different types of contracts and their legal principles; contractual requirements and how they impact on project controls and the auditable recording, sharing, and storing of information.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K19",
+        "code": "K19",
+        "kind": "Knowledge",
+        "description": "Key principles of invitations to tender received and bid responses.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K20",
+        "code": "K20",
+        "kind": "Knowledge",
+        "description": "Estimating techniques and application (cost, time and resources): different methodologies for estimating including approaches to various estimating outcomes, pros and cons and degree of certainty/uncertainty for each; approaches to creating an estimating framework and basis of estimate.",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K21",
+        "code": "K21",
+        "kind": "Knowledge",
+        "description": "Assurance techniques including benchmarking, comparisons to historical data, published data and other projects and how to apply them for example to assure estimated schedules, cost estimates and cost forecasting",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K22",
+        "code": "K22",
+        "kind": "Knowledge",
+        "description": "Planning and scheduling practice: different planning and scheduling techniques; how to create schedules to all levels; understanding, maintaining and establishing the impacts of schedule constraints and the principles of resource loading.",
+        "owners": {
+          "operational": "SCHEDULE",
+          "strategic": "SCHEDULE",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K23",
+        "code": "K23",
+        "kind": "Knowledge",
+        "description": "Modelling techniques (‘what-if’ scenarios and impact analysis) used to optimise the potential for improved efficiency against time, cost and quality and for improved project outcomes.",
+        "owners": {
+          "operational": "SCHEDULE",
+          "strategic": "SCHEDULE",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K24",
+        "code": "K24",
+        "kind": "Knowledge",
+        "description": "Cost engineering practice: approaches to the creation of budget baselines and estimate recasting; cost control hierarchy; budget transfers and other budget variances.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K25",
+        "code": "K25",
+        "kind": "Knowledge",
+        "description": "Financial controls as relevant to project control, including taxation, cashflow, accruals, payment terms. The monitoring and reporting of supplier and contractor commitments and expenditures.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K26",
+        "code": "K26",
+        "kind": "Knowledge",
+        "description": "Techniques for monitoring and measuring progress including rules of credit and performance including earned value analysis, their pros and cons and what key points to share with different stakeholders.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K27",
+        "code": "K27",
+        "kind": "Knowledge",
+        "description": "Progress and performance measurement: how to establish a progress baseline and identify trends or variances using different analysis techniques.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K28",
+        "code": "K28",
+        "kind": "Knowledge",
+        "description": "Approaches to using statistical analysis, productivity and performance analysis.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K29",
+        "code": "K29",
+        "kind": "Knowledge",
+        "description": "Forecasting techniques used to forecast cost and schedule out-turns, and the use of predictive statistical analysis techniques and engineering knowledge to generate accurate forecasts of work to complete in sufficient time for action to be taken.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K30",
+        "code": "K30",
+        "kind": "Knowledge",
+        "description": "Leadership: strategies to, lead, coach, motivate and develop members of the team; different leadership styles.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_STAKE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-K31",
+        "code": "K31",
+        "kind": "Knowledge",
+        "description": "Continuous improvement including how to: capture good practice and lessons learned from experience; keep up to date with new technology and ways of working and drive forwards continuous improvement.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S1",
+        "code": "S1",
+        "kind": "Skill",
+        "description": "Determine, implement, adapt and refine the project controls procedures, methods and systems incorporating the relevant employer organisation management systems and procedures including quality, data management and security, document and version control and record keeping.",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S2",
+        "code": "S2",
+        "kind": "Skill",
+        "description": "Use project controls related software and IT systems for tasks such as: planning and scheduling, cost management, cost and risk analysis, estimating, progress and performance monitoring and reporting; identify and select the right software package for the task",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S3",
+        "code": "S3",
+        "kind": "Skill",
+        "description": "Application of and the integration of, software and IT systems to enhance the level of data processing. For example, the use of technology including BIM.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S4",
+        "code": "S4",
+        "kind": "Skill",
+        "description": "Technical and engineering principles: interpret technical information from different sources, identify and know the correct data and elements to monitor and control to ensure the basis for any recommendations are credible; review and interpret technical project documents (including scopes of work and engineering drawings etc.).",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S5",
+        "code": "S5",
+        "kind": "Skill",
+        "description": "Breakdown and coding structures: develop and implement coding structures as well as critiquing and reviewing technical coding and breakdown structures to ensure they provide a basis for project control.",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S6",
+        "code": "S6",
+        "kind": "Skill",
+        "description": "Lead the creation of comprehensive project control plans and reporting frameworks that identify the right contextual elements to track and the working assumptions to use, in order to generate meaningful controls data, ensuring that project controls deliverables are achievable and in line with project objectives",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S7",
+        "code": "S7",
+        "kind": "Skill",
+        "description": "Lead the preparation of the strategy for the development and maintenance of the baseline for control taking into account scope definition and schedule, risk and cost (ensuring alignment between cost and schedule using the coding structures).",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S8",
+        "code": "S8",
+        "kind": "Skill",
+        "description": "Implement and enforce project control change procedures, judge against evidence and decide if a change is within or without scope, evaluate its impact to profitability and make recommendations or implement the change in a manner that reflects its scale",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S9",
+        "code": "S9",
+        "kind": "Skill",
+        "description": "Ensure that project control work is undertaken in accordance with HSE regulations and requirements including applying knowledge of HSE with awareness of how it impacts on project control schedules and costs and ensuring that the schedule and resourcing for a project meets the requirements of regulations (including CDM and safety) and can be delivered in accordance with the requirements i.e. ensure everything is in place and accounted for to ensure the project can run safely.",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S10",
+        "code": "S10",
+        "kind": "Skill",
+        "description": "Identify opportunities within their remit in projects to contribute to net carbon zero and environmental sustainability, and then take action to minimise the environmental impact of the project",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S11",
+        "code": "S11",
+        "kind": "Skill",
+        "description": "Undertake project control work in accordance with ethics, codes of conduct and duty of care.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S12",
+        "code": "S12",
+        "kind": "Skill",
+        "description": "Data assurance: challenge, verify and validate data reports and data to ensure their integrity, timeliness and technical appropriateness",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S13",
+        "code": "S13",
+        "kind": "Skill",
+        "description": "Identify stakeholders across the project for example: those to work with when developing estimates, schedules, and plans and those to deliver controls information and recommendations to. Modify communication style and method to stakeholders, for example to gather information needed.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_STAKE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S14",
+        "code": "S14",
+        "kind": "Skill",
+        "description": "Risk management and analysis: undertake quantitative and qualitative analysis of risks and lead regular reviews of risks and related assumptions in the project risk register such as questioning their presence and relevance in order to underpin the management of the project risk register.",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S15",
+        "code": "S15",
+        "kind": "Skill",
+        "description": "Identify opportunities to use data analysis techniques to benefit project controls delivery such as automating repetitive processes or improving data quality or extracting deeper insights and, validate the related data analysis to ensure correct interpretation against which effective decisions can be made.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S16",
+        "code": "S16",
+        "kind": "Skill",
+        "description": "Commercial matters: identification and application of subcontract/supplier deliverables to project control in order to provide the ability to monitor subcontractor/supplier performance and create, record and store project controls content in support of legal and contractual requirements.;",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S17",
+        "code": "S17",
+        "kind": "Skill",
+        "description": "Create project controls content to inform tenders and evaluate invitations to tender received and bid responses",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S18",
+        "code": "S18",
+        "kind": "Skill",
+        "description": "Prepare an estimating framework and make recommendations on classes of estimate to meet project needs at different project stages",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S19",
+        "code": "S19",
+        "kind": "Skill",
+        "description": "Use an evidence based approach to select and apply the most suitable estimating technique for the purpose and undertake estimate assurance, cost risk analysis, prepare related detailed basis of estimate narratives that are evidenced and explanatory - setting out the risks, assumptions, probabilities, uncertainties and contingencies in order to provide a sound basis for decision making",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S20",
+        "code": "S20",
+        "kind": "Skill",
+        "description": "Prepare planning and scheduling strategic frameworks and make recommendations on different levels of plans and schedules to meet different project needs for example, milestones or detailed engineer schedules.",
+        "owners": {
+          "operational": "SCHEDULE",
+          "strategic": "SCHEDULE",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S21",
+        "code": "S21",
+        "kind": "Skill",
+        "description": "Use an evidence based approach to create credible, achievable control schedules, applying relevant assumptions and contingency and undertaking schedule assurance, schedule risk analysis and compile a related basis of schedule that is explanatory, setting out the risks, assumptions, probabilities, uncertainties, contingencies, dependencies and constraints.",
+        "owners": {
+          "operational": "SCHEDULE",
+          "strategic": "SCHEDULE",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S22",
+        "code": "S22",
+        "kind": "Skill",
+        "description": "Model the potential for efficiency against time, cost and quality, review and make recommendations.",
+        "owners": {
+          "operational": "SCHEDULE",
+          "strategic": "SCHEDULE",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S23",
+        "code": "S23",
+        "kind": "Skill",
+        "description": "Apply cost engineering practice to: recast the estimate and set the budget baseline and; select and apply proven cost control techniques to capture actual commitment and expenditure data with appropriate use of accruals; and integrate cost and schedule data to develop project cashflow projections and assessments of value of work done over time.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S24",
+        "code": "S24",
+        "kind": "Skill",
+        "description": "Monitor and control project progress and performance by establishing a progress baseline and selecting and applying the right analysis techniques (for example, earned value analysis) for the size and complexity of the project.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S25",
+        "code": "S25",
+        "kind": "Skill",
+        "description": "Control and monitor project progress and performance by selecting and applying the right analysis techniques (for example, earned value analysis) for the size and complexity of the project",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S26",
+        "code": "S26",
+        "kind": "Skill",
+        "description": "Identify variations from the progress baseline and assess their potential impact, explain the variations to the project, portfolio or programme manager.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S27",
+        "code": "S27",
+        "kind": "Skill",
+        "description": "Communicate and justify own conclusions and recommendations for example for project recovery or to lead to improved project delivery by influencing and, when necessary, challenging key stakeholders to make informed decisions. Key stakeholders include the project manager, portfolio manager or programme manager",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_STAKE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S28",
+        "code": "S28",
+        "kind": "Skill",
+        "description": "Steer across project controls functions in accordance with organisational core values and specific guidelines; mentor and coach team members such as Project Controls Technicians to meet project control requirements.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_STAKE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-S29",
+        "code": "S29",
+        "kind": "Skill",
+        "description": "Apply continuous improvement approaches for example using emerging technologies and lessons learnt from previous projects.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B1",
+        "code": "B1",
+        "kind": "Behaviour",
+        "description": "Safety: Promotes and adopts a safety culture within the organisation, demonstrating a commitment to personal safety and the safety and wellbeing of others.",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B2",
+        "code": "B2",
+        "kind": "Behaviour",
+        "description": "Leadership: leads by example, demonstrating resilience, acting responsibly, and ethically, taking account of the need to progress environmental, ethical, social and economic outcomes.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_STAKE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B3",
+        "code": "B3",
+        "kind": "Behaviour",
+        "description": "Commercially astute: Recognising when to leverage the contract commercial terms to maximise profitability for example how the commercial agreements generate cost and revenue streams for the organisation and how this links to generation of profit.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_PMO"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B4",
+        "code": "B4",
+        "kind": "Behaviour",
+        "description": "Pre-emptive: Foresees events and issues that might cause instability, uncertainty and phase changes.",
+        "owners": {
+          "operational": "RISK",
+          "strategic": "RISK",
+          "chartered": "CH_RISK"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B5",
+        "code": "B5",
+        "kind": "Behaviour",
+        "description": "Integrity: Challenges areas of concern and acts with assertiveness and confidence.",
+        "owners": {
+          "operational": "PPC",
+          "strategic": "PPC",
+          "chartered": "CH_PLAN"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B6",
+        "code": "B6",
+        "kind": "Behaviour",
+        "description": "Impartial: Responds to feedback and challenging questions professionally and objectively by reference to evidence.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B7",
+        "code": "B7",
+        "kind": "Behaviour",
+        "description": "Accountable: Takes responsibility for the accuracy and integrity of project controls reporting and recommendations.",
+        "owners": {
+          "operational": "FINANCE",
+          "strategic": "FINANCE",
+          "chartered": "FINANCE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B8",
+        "code": "B8",
+        "kind": "Behaviour",
+        "description": "Collaborative: Interacts within a wide, multi-disciplinary project team, building co-operative relationships. Encourages team effort and promotes an interdependent culture.",
+        "owners": {
+          "operational": "PMP",
+          "strategic": "PMP",
+          "chartered": "CH_STAKE"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B9",
+        "code": "B9",
+        "kind": "Behaviour",
+        "description": "Innovation: Learns from innovative solutions and seeks out new ideas to deliver improvements.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B10",
+        "code": "B10",
+        "kind": "Behaviour",
+        "description": "Personal & professional development: Takes responsibility for personal learning and professional development. Demonstrates commitment to learning and improvement, providing and receiving feedback and with a commitment to professional standards.",
+        "owners": {
+          "operational": "AI",
+          "strategic": "AI",
+          "chartered": "AI"
+        }
+      },
+      {
+        "id": "st0845-v1-1-B11",
+        "code": "B11",
+        "kind": "Behaviour",
+        "description": "Adaptable: adapts to evolving circumstances.",
+        "owners": {
+          "operational": "SCHEDULE",
+          "strategic": "SCHEDULE",
+          "chartered": "CH_PLAN"
+        }
+      }
+    ]
+  },
+  "MM_L6": {
+    "programmeId": "MM_L6",
+    "records": [
+      {
+        "id": "st0612-v1-0-K1",
+        "code": "K1",
+        "kind": "Knowledge",
+        "description": "The principles and theories of marketing that support the strategic marketing process, e.g. the extended marketing mix (7P’S: Product, Price, Place, Promotion, Physical environment, Process, People), marketing management processes, product development and how to apply and align these to the business plan and strategic objectives",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-K2",
+        "code": "K2",
+        "kind": "Knowledge",
+        "description": "Brand development and safeguarding, including the analysis and planning of how a brand is perceived in the market , value propositions and delivery of tangible elements such as product pricing, packaging etc",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-K3",
+        "code": "K3",
+        "kind": "Knowledge",
+        "description": "Consumer and organisational behaviour theories and concepts, including the customer (business 2 business/consumer) decision making process and how that influences marketing strategy",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-K4",
+        "code": "K4",
+        "kind": "Knowledge",
+        "description": "Advanced stakeholder management and the application of customer relationship management (CRM), both internal and external, to facilitate the delivery of marketing plans",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-K5",
+        "code": "K5",
+        "kind": "Knowledge",
+        "description": "Marketing Communication planning models and budgetary methodologies.",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-K6",
+        "code": "K6",
+        "kind": "Knowledge",
+        "description": "Their organisation’s vision, mission, values, strategy, plans, stakeholders, customers and competitors to support the decision and planning process",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-K7",
+        "code": "K7",
+        "kind": "Knowledge",
+        "description": "The wider business perspective in which marketing operates nationally and internationally, including the influences of the internal and external market/sector, the opportunities, challenges and issues it faces, and how marketing can address these",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-K8",
+        "code": "K8",
+        "kind": "Knowledge",
+        "description": "How to measure and deliver Return on Investment in relation to marketing activities and plans",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-K9",
+        "code": "K9",
+        "kind": "Knowledge",
+        "description": "The relevant industry/sector specific legal, regulatory and compliance frameworks within which they must work, including current Data Protection regulations.",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-K10",
+        "code": "K10",
+        "kind": "Knowledge",
+        "description": "Effective market research and evaluation techniques and methods and how to use the results to inform marketing planning and activities",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-K11",
+        "code": "K11",
+        "kind": "Knowledge",
+        "description": "Reliable information sources and how to use these to deliver measurable improvements to marketing activities, including how metrics are used to measure these",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-K12",
+        "code": "K12",
+        "kind": "Knowledge",
+        "description": "New and emerging trends and themes in marketing.",
+        "moduleKey": "ai-marketing"
+      },
+      {
+        "id": "st0612-v1-0-K13",
+        "code": "K13",
+        "kind": "Knowledge",
+        "description": "The principles of product and service design and implementation and portfolio management",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-K14",
+        "code": "K14",
+        "kind": "Knowledge",
+        "description": "The features and benefits of different marketing communications, and routes to market, and how to leverage these to maximum effect, including the use of appropriate digital channels and systems.",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-S1",
+        "code": "S1",
+        "kind": "Skill",
+        "description": "Lead and implement a clear marketing plan and strategy, linked to business requirements to sustain a marketing advantage",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-S2",
+        "code": "S2",
+        "kind": "Skill",
+        "description": "Develop effective marketing campaigns and channels, assessing their features and benefits to best meet business requirements and customer needs",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-S3",
+        "code": "S3",
+        "kind": "Skill",
+        "description": "Develop detailed integrated marketing plans for all products/ services using offline and digital media tools - works with marketing team/ specialist agencies to do this.",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-S4",
+        "code": "S4",
+        "kind": "Skill",
+        "description": "Influence, negotiate and persuade at senior level collaborating with a wide range of stakeholders internally and externally to gain support/backing for marketing delivery",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-S5",
+        "code": "S5",
+        "kind": "Skill",
+        "description": "Act as a consultant, providing professional marketing advice to stakeholders around the business or to external clients as relevant",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-S6",
+        "code": "S6",
+        "kind": "Skill",
+        "description": "Present complex information in an understandable and stimulating way whether through effective verbal presentation or creative written copy.",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-S7",
+        "code": "S7",
+        "kind": "Skill",
+        "description": "Oversee, manage and approve key marketing activities/projects",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-S8",
+        "code": "S8",
+        "kind": "Skill",
+        "description": "Deliver measurable marketing outcomes against key performance indicators and identify and drive continuous improvement, challenging existing processes and procedures where needed.",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-S9",
+        "code": "S9",
+        "kind": "Skill",
+        "description": "Effectively plan and manage the marketing budget, to deliver on strategic objectives, and evaluate and justify return on marketing investment",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-S10",
+        "code": "S10",
+        "kind": "Skill",
+        "description": "Effectively engage, negotiate and manage third party suppliers and internal stakeholders.",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-S11",
+        "code": "S11",
+        "kind": "Skill",
+        "description": "Effectively evaluate marketing activities using measurement data and analytics to identify relevant key performance indicators (KPI) and return on marketing investment (ROI) in order to meet business objectives",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-S12",
+        "code": "S12",
+        "kind": "Skill",
+        "description": "Assimilate and analyse complex data and information from a range of sources to evolve, lead and plan marketing activities.",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-S13",
+        "code": "S13",
+        "kind": "Skill",
+        "description": "Seek out opportunities to increase income generation and gain new business e.g. new products, markets and services as relevant",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-S14",
+        "code": "S14",
+        "kind": "Skill",
+        "description": "Construct a robust buness case in support of marketing activities/plans",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-S15",
+        "code": "S15",
+        "kind": "Skill",
+        "description": "Effectively manage and develop stakeholder relationships at senior level",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-S16",
+        "code": "S16",
+        "kind": "Skill",
+        "description": "Assess business risks and reputational impacts of marketing activities.",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-S17",
+        "code": "S17",
+        "kind": "Skill",
+        "description": "Inspire and motivate internally and externally to deliver marketing plans effectively, acting as a role-model for marketing best practice and taking responsibility for improving their own and the team’s and/or stakeholder performance, as relevant.",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-S18",
+        "code": "S18",
+        "kind": "Skill",
+        "description": "Effectively use appropriate business systems and software to deliver marketing outcomes efficiently, for example to analyse data, inform search engine marketing, produce reports and deliver copy",
+        "moduleKey": "ai-marketing"
+      },
+      {
+        "id": "st0612-v1-0-S19",
+        "code": "S19",
+        "kind": "Skill",
+        "description": "Actively interrogate systems and information sources to make judgements on when to introduce new ways of working/identify new systems/processes to improve marketing activities or address those new requirements and /or marketing trends.",
+        "moduleKey": "ai-marketing"
+      },
+      {
+        "id": "st0612-v1-0-B1",
+        "code": "B1",
+        "kind": "Behaviour",
+        "description": "An ability to anticipate and adapt to change",
+        "moduleKey": "ai-marketing"
+      },
+      {
+        "id": "st0612-v1-0-B2",
+        "code": "B2",
+        "kind": "Behaviour",
+        "description": "A highly motivated and driven approach acting with courage to drive through necessary changes and deliver difficult or long-term projects.",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-B3",
+        "code": "B3",
+        "kind": "Behaviour",
+        "description": "A creative and innovative approach",
+        "moduleKey": "ai-marketing"
+      },
+      {
+        "id": "st0612-v1-0-B4",
+        "code": "B4",
+        "kind": "Behaviour",
+        "description": "An analytical mind, with an insight and ideas driven approach to meet business benefits and inspire action in others.",
+        "moduleKey": "commercial-intelligence"
+      },
+      {
+        "id": "st0612-v1-0-B5",
+        "code": "B5",
+        "kind": "Behaviour",
+        "description": "A willingness to learn from mistakes, as not all activities go to plan, and improve future delivery/campaigns as a result",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-B6",
+        "code": "B6",
+        "kind": "Behaviour",
+        "description": "They act as a role model for marketing activities and business changes within the team and organisation, taking others with them.",
+        "moduleKey": "marketing-strategy"
+      },
+      {
+        "id": "st0612-v1-0-B7",
+        "code": "B7",
+        "kind": "Behaviour",
+        "description": "A high level of professionalism, reliability and dependability with a passion for the customer, also encouraging those behaviours in others",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-B8",
+        "code": "B8",
+        "kind": "Behaviour",
+        "description": "A collaborative approach is central to how they work, showing empathy and being mindful to the needs/views of others",
+        "moduleKey": "customer-journey"
+      },
+      {
+        "id": "st0612-v1-0-B9",
+        "code": "B9",
+        "kind": "Behaviour",
+        "description": "Ethical behaviour in the way they approach marketing activities and their work, valuing equality & diversity, they act as a role model for that behaviour.",
+        "moduleKey": "ai-marketing"
+      }
+    ]
+  },
+  "ME_L4": {
+    "programmeId": "ME_L4",
+    "records": [
+      {
+        "id": "st0596-v1-0-K1",
+        "code": "K1",
+        "kind": "Knowledge",
+        "description": "The fundamentals of marketing theory that support the marketing process e.g. the extended marketing mix (7P’S: Product, Price, Place, Promotion, Physical environment, Process, People), product development, and segmentation",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K2",
+        "code": "K2",
+        "kind": "Knowledge",
+        "description": "The concepts of brand positioning and management and implementing process to support corporate reputation",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K3",
+        "code": "K3",
+        "kind": "Knowledge",
+        "description": "The principles of stakeholder management and customer relationship management (CRM), both internal and external, to facilitate effective cross-functional relationships internally, and channel and customer relationships externally.",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-K4",
+        "code": "K4",
+        "kind": "Knowledge",
+        "description": "The characteristics and plans of the business and sector they work within, including their vision and values",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K5",
+        "code": "K5",
+        "kind": "Knowledge",
+        "description": "How marketing contributes to achieving wider business objectives",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K6",
+        "code": "K6",
+        "kind": "Knowledge",
+        "description": "The target audience’s decision making process and how that can influence marketing activities",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K7",
+        "code": "K7",
+        "kind": "Knowledge",
+        "description": "The sector specific legal, regulatory and compliance frameworks within which they must work, including current Data Protection regulations.",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K8",
+        "code": "K8",
+        "kind": "Knowledge",
+        "description": "The principles of effective market research and how this can influence marketing activity e.g. valid data collection sources and methodologies and usage, including digital sources, and when to use quantitative and qualitative methods.",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K9",
+        "code": "K9",
+        "kind": "Knowledge",
+        "description": "Basic principles of product development and product/service portfolios",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K10",
+        "code": "K10",
+        "kind": "Knowledge",
+        "description": "The marketing landscape and how routes to market interplay most efficiently, e.g. franchise model, distribution",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-K11",
+        "code": "K11",
+        "kind": "Knowledge",
+        "description": "The features and benefits of different marketing communications channels and media, both digital and offline, and when and how to apply these.",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-S1",
+        "code": "S1",
+        "kind": "Skill",
+        "description": "Coordinate and maintain key marketing channels (both digital and offline)",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-S2",
+        "code": "S2",
+        "kind": "Skill",
+        "description": "Plan and deliver tactical campaigns against SMART (Specific, Measurable, Achievable, Realistic, Time-bound) objectives",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-S3",
+        "code": "S3",
+        "kind": "Skill",
+        "description": "Manage the production and distribution of marketing materials, e.g. digital, print and video content as appropriate.",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-S4",
+        "code": "S4",
+        "kind": "Skill",
+        "description": "Produce a wide range of creative and effective communications, including ability to write and proofread clear and innovative copy, project briefs, and give confident presentations",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-S5",
+        "code": "S5",
+        "kind": "Skill",
+        "description": "Able to engage and collaborate with a wide range of clients/stakeholders, across departments internally and with clients/suppliers externally to support marketing outcomes as required.",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-S6",
+        "code": "S6",
+        "kind": "Skill",
+        "description": "Use good project and time management to deliver projects/tasks/events as appropriate, effectively. Including the ability to divide time effectively between reporting, planning and delivery",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-S7",
+        "code": "S7",
+        "kind": "Skill",
+        "description": "Coordinate several marketing campaigns/projects/events to agreed deadlines",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-S8",
+        "code": "S8",
+        "kind": "Skill",
+        "description": "Effectively liaise with, and manage, internal and external stakeholders including suppliers to deliver required outcomes.",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-S9",
+        "code": "S9",
+        "kind": "Skill",
+        "description": "Monitor project budgets within their scope of work using appropriate systems and controls.",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-S10",
+        "code": "S10",
+        "kind": "Skill",
+        "description": "Evaluate the effectiveness of marketing campaigns by choosing the appropriate digital and offline data sources.",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-S11",
+        "code": "S11",
+        "kind": "Skill",
+        "description": "Assimilate and analyse data and information from a range of sources to support marketing activities",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-S12",
+        "code": "S12",
+        "kind": "Skill",
+        "description": "Evaluate data and research findings to derive insights to support improvements to future campaigns.",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-S13",
+        "code": "S13",
+        "kind": "Skill",
+        "description": "Effectively use appropriate business systems and software to deliver marketing outcomes efficiently, for example to analyse data, produce reports and deliver copy",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-S14",
+        "code": "S14",
+        "kind": "Skill",
+        "description": "Use appropriate technologies to deliver marketing outcomes e.g. digital/web analytics, social media, CRM.",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-B1",
+        "code": "B1",
+        "kind": "Behaviour",
+        "description": "A tenacious and driven approach to see projects through to completion",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-B2",
+        "code": "B2",
+        "kind": "Behaviour",
+        "description": "Being a proven ‘self-starter’ and have an adaptable approach to meet changing work priorities.",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-B3",
+        "code": "B3",
+        "kind": "Behaviour",
+        "description": "A creative and analytical mind, with a willingness to think of new ways of doing things",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-B4",
+        "code": "B4",
+        "kind": "Behaviour",
+        "description": "They come up with ideas and solutions to support the delivery of their work.",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-B5",
+        "code": "B5",
+        "kind": "Behaviour",
+        "description": "A willingness to learn from mistakes, as not all activities go to plan, and improve their own performance as a result.",
+        "moduleKey": "martech"
+      },
+      {
+        "id": "st0596-v1-0-B6",
+        "code": "B6",
+        "kind": "Behaviour",
+        "description": "A high level of professionalism, reliability and dependability with a passion for the customer",
+        "moduleKey": "marketing-impact"
+      },
+      {
+        "id": "st0596-v1-0-B7",
+        "code": "B7",
+        "kind": "Behaviour",
+        "description": "A collaborative approach is central to how they work, showing empathy and being mindful to the needs/views of others",
+        "moduleKey": "social-media"
+      },
+      {
+        "id": "st0596-v1-0-B8",
+        "code": "B8",
+        "kind": "Behaviour",
+        "description": "Ethical behaviour in the way they approach marketing activities and their work, valuing equality & diversity.",
+        "moduleKey": "marketing-impact"
+      }
+    ]
+  },
+  "APM_L4": {
+    "programmeId": "APM_L4",
+    "records": [
+      {
+        "id": "st0310-v1-5-K1",
+        "code": "K1",
+        "kind": "Knowledge",
+        "description": "The differences between projects and business as usual.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K2",
+        "code": "K2",
+        "kind": "Knowledge",
+        "description": "The importance of alignment between the project and organisational objectives.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K3",
+        "code": "K3",
+        "kind": "Knowledge",
+        "description": "The interdependencies between project, programme, and portfolio management.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K4",
+        "code": "K4",
+        "kind": "Knowledge",
+        "description": "Techniques used to understand the project context, such as PESTLE (political, economic, social, technological, legal, and environmental), SWOT (strength, weakness, opportunities, threats) or VUCA (velocity, uncertainty, complexity, ambiguity).",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K5",
+        "code": "K5",
+        "kind": "Knowledge",
+        "description": "The need and benefit of the project governance structure, requirements, and process and the impact on their role.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K6",
+        "code": "K6",
+        "kind": "Knowledge",
+        "description": "The differences and comparative benefits between functional, matrix and project structures.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K7",
+        "code": "K7",
+        "kind": "Knowledge",
+        "description": "Different roles and responsibilities within a project environment.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K8",
+        "code": "K8",
+        "kind": "Knowledge",
+        "description": "The differences and comparative benefits between linear, iterative and hybrid life cycle approaches.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K9",
+        "code": "K9",
+        "kind": "Knowledge",
+        "description": "Importance, content, and purpose of a business case.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K10",
+        "code": "K10",
+        "kind": "Knowledge",
+        "description": "Approaches to the maintenance of a business case and the management of the benefits which will be achieved upon the successful delivery of the project.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K11",
+        "code": "K11",
+        "kind": "Knowledge",
+        "description": "The purpose, format, and significance of the project management plan.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K12",
+        "code": "K12",
+        "kind": "Knowledge",
+        "description": "Methods used to define, record, integrate, deliver, and manage scope.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K13",
+        "code": "K13",
+        "kind": "Knowledge",
+        "description": "The identification, analysis, and management of stakeholders.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K14",
+        "code": "K14",
+        "kind": "Knowledge",
+        "description": "Communication techniques and approaches to interact with stakeholders to meet their requirements.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K15",
+        "code": "K15",
+        "kind": "Knowledge",
+        "description": "The use of information management.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-K16",
+        "code": "K16",
+        "kind": "Knowledge",
+        "description": "Techniques for managing conflict and negotiation.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K17",
+        "code": "K17",
+        "kind": "Knowledge",
+        "description": "Techniques for working collaboratively within a team and with stakeholders.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K18",
+        "code": "K18",
+        "kind": "Knowledge",
+        "description": "How and when to apply different estimating methods.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K19",
+        "code": "K19",
+        "kind": "Knowledge",
+        "description": "Configuration management and change control.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-K20",
+        "code": "K20",
+        "kind": "Knowledge",
+        "description": "The principles of earned value management (EVM) and the interpretation of EVM information.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-K21",
+        "code": "K21",
+        "kind": "Knowledge",
+        "description": "Project scheduling and maintenance, including critical path analysis.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K22",
+        "code": "K22",
+        "kind": "Knowledge",
+        "description": "Allocation and management of resources throughout the project life cycle.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K23",
+        "code": "K23",
+        "kind": "Knowledge",
+        "description": "Principles of project risk and issue management.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K24",
+        "code": "K24",
+        "kind": "Knowledge",
+        "description": "Procurement strategies and processes that are both ethical and sustainable.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K25",
+        "code": "K25",
+        "kind": "Knowledge",
+        "description": "The role and purpose of quality requirements, planning and control in a project environment.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K26",
+        "code": "K26",
+        "kind": "Knowledge",
+        "description": "Principles for evaluating project success, including how lessons learned are captured and can impact future project delivery.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-K27",
+        "code": "K27",
+        "kind": "Knowledge",
+        "description": "Relevant regulations and legislation such as data protection, and how they impact on their role.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-K28",
+        "code": "K28",
+        "kind": "Knowledge",
+        "description": "The impact of project objectives and how to respond to challenges around sustainability and the UK Government's policy to achieve net carbon zero.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K29",
+        "code": "K29",
+        "kind": "Knowledge",
+        "description": "Principles of conducting project management activities which are ethical and inclusive.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-K30",
+        "code": "K30",
+        "kind": "Knowledge",
+        "description": "Technology and software used in the performance of project management activities.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-K31",
+        "code": "K31",
+        "kind": "Knowledge",
+        "description": "Presentation tools and techniques.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S1",
+        "code": "S1",
+        "kind": "Skill",
+        "description": "Use project monitoring and reporting techniques to track, interpret and report on performance.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S2",
+        "code": "S2",
+        "kind": "Skill",
+        "description": "Manage and engage with stakeholders.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S3",
+        "code": "S3",
+        "kind": "Skill",
+        "description": "Influence and negotiate with others to create a positive outcome for the project.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S4",
+        "code": "S4",
+        "kind": "Skill",
+        "description": "Resolve conflict as and when required with stakeholders within limits of responsibility.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S5",
+        "code": "S5",
+        "kind": "Skill",
+        "description": "Adapt communications to different stakeholders.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S6",
+        "code": "S6",
+        "kind": "Skill",
+        "description": "Communicate and support the project vision, to ensure buy in to the project objectives.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S7",
+        "code": "S7",
+        "kind": "Skill",
+        "description": "Collate and analyse information and provide input to support negotiations relating to project objectives.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S8",
+        "code": "S8",
+        "kind": "Skill",
+        "description": "Monitor and analyse project budgets.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S9",
+        "code": "S9",
+        "kind": "Skill",
+        "description": "Review and provide feedback on a project business case to ensure the project remains valid.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S10",
+        "code": "S10",
+        "kind": "Skill",
+        "description": "Apply change control processes to support the management of project scope.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S11",
+        "code": "S11",
+        "kind": "Skill",
+        "description": "Evaluate an integrated project management plan to provide recommendations on areas for improvement.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S12",
+        "code": "S12",
+        "kind": "Skill",
+        "description": "Prepare, monitor, and schedule activities that contribute to the delivery of the overall project schedule and objectives.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S13",
+        "code": "S13",
+        "kind": "Skill",
+        "description": "Evaluate and make recommendations on the risk management plan to threats to delivery and recommend solutions.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S14",
+        "code": "S14",
+        "kind": "Skill",
+        "description": "Identify and monitor project risks and issues; and plan and implement responses to them.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S15",
+        "code": "S15",
+        "kind": "Skill",
+        "description": "Deliver a Quality Management Plan which contributes to quality control processes.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S16",
+        "code": "S16",
+        "kind": "Skill",
+        "description": "Use an organisation's continual improvement process including lessons learned to improve performance.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S17",
+        "code": "S17",
+        "kind": "Skill",
+        "description": "Support the preparation or maintenance of a resource management plan for project activities.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S18",
+        "code": "S18",
+        "kind": "Skill",
+        "description": "Work with stakeholders to deliver the project.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S19",
+        "code": "S19",
+        "kind": "Skill",
+        "description": "Use digital tools and software to meet project objectives for example research, collaboration, presentations, and resolution of problems.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S20",
+        "code": "S20",
+        "kind": "Skill",
+        "description": "Provide underpinning data to support the written submission through the governance process.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S21",
+        "code": "S21",
+        "kind": "Skill",
+        "description": "Work within the approved project budget.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-S22",
+        "code": "S22",
+        "kind": "Skill",
+        "description": "Ensure that integrated schedules support critical path analysis, interface management, resource forecasting and risk management.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S23",
+        "code": "S23",
+        "kind": "Skill",
+        "description": "Apply relevant legislation, regulations, codes of practice, and ethical guidance where appropriate to their work.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S24",
+        "code": "S24",
+        "kind": "Skill",
+        "description": "Use data to inform decisions on actions to take to mitigate risks on project.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S25",
+        "code": "S25",
+        "kind": "Skill",
+        "description": "Use configuration management and change control to schedule and maintain projects.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-S26",
+        "code": "S26",
+        "kind": "Skill",
+        "description": "Manages resources through the project lifecycle.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-B1",
+        "code": "B1",
+        "kind": "Behaviour",
+        "description": "Works flexibly and adapts to circumstances.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-B2",
+        "code": "B2",
+        "kind": "Behaviour",
+        "description": "Works collaboratively and builds strong relationships with others across the organisation and external stakeholders.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-B3",
+        "code": "B3",
+        "kind": "Behaviour",
+        "description": "Has accountability and ownership of their tasks and workload.",
+        "moduleKey": "pmp"
+      },
+      {
+        "id": "st0310-v1-5-B4",
+        "code": "B4",
+        "kind": "Behaviour",
+        "description": "Operates professionally with integrity and confidentiality.",
+        "moduleKey": "ai-project-management"
+      },
+      {
+        "id": "st0310-v1-5-B5",
+        "code": "B5",
+        "kind": "Behaviour",
+        "description": "Seeks learning opportunities and continuous professional development.",
+        "moduleKey": "ai-project-management"
+      }
+    ]
+  }
+}

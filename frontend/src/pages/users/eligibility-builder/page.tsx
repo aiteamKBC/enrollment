@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
@@ -59,7 +59,6 @@ const clone = (layout: EligibilityLayout): EligibilityLayout => JSON.parse(JSON.
  * dropped: removing a question hides it and keeps its column and answers.
  */
 export default function EligibilityBuilderPage() {
-  const navigate = useNavigate();
   const { success, error } = useToast();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -104,11 +103,6 @@ export default function EligibilityBuilderPage() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  const leave = () => {
-    if (dirty && !window.confirm('You have unpublished changes to the eligibility form. Leave without publishing them?')) return;
-    navigate('/users');
-  };
-
   const edit = useCallback((fn: (l: EligibilityLayout) => EligibilityLayout) => setLayout((l) => (l ? fn(l) : l)), []);
 
   const publish = async () => {
@@ -145,9 +139,6 @@ export default function EligibilityBuilderPage() {
           eyebrow="Enrolment"
           actions={
             <div className="flex flex-wrap items-start gap-2">
-              <button type="button" className={btnSecondary} onClick={leave}>
-                <AppIcon className="ri-arrow-left-line" />Back to users
-              </button>
               <Link className={btnSecondary} to="/apprenticeship_application" target="_blank" rel="noopener noreferrer">
                 <AppIcon className="ri-external-link-line" />Open the form
               </Link>

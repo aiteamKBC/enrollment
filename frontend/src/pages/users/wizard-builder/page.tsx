@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { SuitabilityAdmin } from '@/features/programme-suitability/SuitabilityAdmin';
 import { ModulesAdmin } from '@/features/programme-suitability/modules/ModulesAdmin';
+import { CatalogueAdmin } from '@/features/programme-suitability/skills-radar/catalogue/CatalogueAdmin';
 import { configurationErrors } from '@/features/programme-suitability/modules/configuration';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
+import * as WizardLayoutApi from '@/api/wizardLayout';
 import { fetchWizardLayout, publishWizardLayout } from '@/api/wizardLayout';
+import type { WizardLayoutVersion } from '@/api/wizardLayout';
+import { fetchEnrolmentUsers } from '@/api/enrolmentUsers';
+import type { LearnerKind } from '@/api/extendedIlr';
+import type { UserListRow } from '@/pages/users/types';
 import { btnPrimary, btnSecondary, iconBtn, inputClass } from '../components/ui';
 import { builtinDef, isRequired, itemLabel, resolveLayout } from '../wizard/layout/resolve';
 import { isChoiceFieldType, isContentFieldType, type LayoutItem, type LayoutStep, type WizardLayout } from '../wizard/layout/types';
@@ -61,14 +66,13 @@ const clone = (layout: WizardLayout): WizardLayout => JSON.parse(JSON.stringify(
 /**
  * The "Edit apprenticeship wizard" builder.
  *
- * Edits a copy of the published layout and publishes it in one go. Publishing
- * is what learners see — immediately, for everyone who has not yet submitted —
- * and is where the server adds the columns for new fields to each step's table
- * in the enrolment schema. Nothing is ever dropped: removing a field hides it
- * and keeps its column and answers.
+ * Edits a copy of the published layout and publishes an append-only version.
+ * Unsubmitted learners without an override or checkpoint pin use the latest
+ * global version; reaching Skills Radar pins their current version. Submitted
+ * learners retain their submission version. Removing a field hides it and
+ * keeps its column and answers.
  */
 export default function WizardBuilderPage() {
-  const navigate = useNavigate();
   const { success, error } = useToast();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -82,6 +86,13 @@ export default function WizardBuilderPage() {
   const [confirming, setConfirming] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [versionAction, setVersionAction] = useState<'create' | 'assign' | null>(null);
+  const closeVersionDialog = useCallback(() => setVersionAction(null), []);
+  const reportVersionError = useCallback((message: string) => error('Could not update wizard version', message), [error]);
+  const reportVersionSuccess = useCallback((message: string) => {
+    setVersionAction(null);
+    success('Wizard version updated', message);
+  }, [success]);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,11 +124,6 @@ export default function WizardBuilderPage() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  const leave = () => {
-    if (dirty && !window.confirm('You have unpublished changes to the wizard. Leave without publishing them?')) return;
-    navigate('/users');
-  };
-
   const edit = useCallback((fn: (l: WizardLayout) => WizardLayout) => setLayout((l) => (l ? fn(l) : l)), []);
 
   const publish = async () => {
@@ -134,7 +140,7 @@ export default function WizardBuilderPage() {
       // A new step's temporary slug is replaced by the server's.
       setSelected((cur) => (resolved.steps.some((s) => s.slug === cur) ? cur : resolved.steps[resolved.steps.length - 1]?.slug ?? ''));
       setConfirming(false);
-      success('Wizard published', 'Learners who have not yet submitted will see the changes the next time they open their enrolment.');
+      success('Wizard published', 'Learners who have not reached Skills Radar will use this version. Others keep their pinned version.');
     } catch (e) {
       error('Could not publish the wizard', e instanceof Error ? e.message : 'Unexpected error');
     } finally {
@@ -149,13 +155,16 @@ export default function WizardBuilderPage() {
       <div className="admin-console-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6">
         <AdminPageHeader
           title="Apprenticeship enrolment wizard"
-          description="Add, remove, reorder and require the questions learners answer during onboarding. Published changes apply to every learner who has not yet submitted their enrolment."
+          description="Edit the onboarding wizard. Learners use the latest version until they reach Skills Radar; submitted learners keep their submitted version."
           icon="ri-magic-line"
           eyebrow="Enrolment"
           actions={
             <div className="flex flex-wrap items-start gap-2">
-              <button type="button" className={btnSecondary} onClick={leave}>
-                <AppIcon className="ri-arrow-left-line" />Back to users
+              <button type="button" className={btnSecondary} disabled={!layout || !version} onClick={() => setVersionAction('create')}>
+                <AppIcon className="ri-git-branch-line" />Create targeted version
+              </button>
+              <button type="button" className={btnSecondary} onClick={() => setVersionAction('assign')}>
+                <AppIcon className="ri-user-settings-line" />Assign a version
               </button>
               <button type="button" className={btnSecondary} disabled={!dirty || publishing} onClick={() => published && setLayout(clone(published))}>
                 <AppIcon className="ri-arrow-go-back-line" />Discard changes
@@ -186,6 +195,7 @@ export default function WizardBuilderPage() {
                 'Showing the standard wizard — nothing has been published from the builder yet.'
               )}
             </p>
+            <p className="-mt-2 text-[12px] text-foreground-500">Unsubmitted learners use the latest global version until the successful step change that takes them to Skills Radar, which pins their version. Admins can assign a different published version to unsubmitted learners.</p>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
               <StepList
                 layout={layout}
@@ -216,6 +226,16 @@ export default function WizardBuilderPage() {
 
         {confirming && layout && (
           <PublishDialog layout={layout} publishing={publishing} onCancel={() => setConfirming(false)} onConfirm={publish} />
+        )}
+        {versionAction && layout && (
+          <WizardVersionDialog
+            mode={versionAction}
+            layout={layout}
+            parentVersion={version}
+            onCancel={closeVersionDialog}
+            onSuccess={reportVersionSuccess}
+            onError={reportVersionError}
+          />
         )}
       </div>
     </WorkspaceShell>
@@ -360,6 +380,8 @@ function StepEditor({
       }))} />}
       {step.slug === 'programme-suitability' && <ModulesAdmin version={version} value={layout.programmeModules}
         onChange={(programmeModules) => edit((l) => ({ ...l, programmeModules }))} />}
+      {step.items.some((item) => item.key === 'block.skillsRadar') && <CatalogueAdmin layout={layout} version={version}
+        onChange={(configuration) => edit((l) => ({ ...l, ...configuration }))} />}
       <ol
         className="space-y-2 p-5"
         aria-label={`Items on ${step.label}`}
@@ -607,9 +629,9 @@ function PublishDialog({ layout, publishing, onCancel, onConfirm }: { layout: Wi
       <div role="dialog" aria-modal="true" aria-labelledby="publish-wizard-title" className="w-full max-w-lg rounded-2xl bg-background-50 p-5 shadow-xl">
         <h2 id="publish-wizard-title" className="font-heading text-[16px] font-semibold text-foreground-900">Publish the wizard?</h2>
         <p className="mt-2 text-[13px] text-foreground-600">
-          Every learner who has not yet submitted their enrolment will see these changes the next time they open the wizard.
-          Enrolments already submitted are not reopened.
+          Learners who have not reached Skills Radar will use this global version next time they open the wizard. Reaching Skills Radar saves and pins the version they used; submitted learners retain their submitted version.
         </p>
+        {layout.skillsRadarCatalogues && <p className="mt-2 text-[13px] text-foreground-600">Skills Radar assessments already started keep their saved catalogue version and answers.</p>}
         {columns.length > 0 && (
           <div className="mt-3 rounded-lg border border-foreground-100 bg-background-100/60 p-3 text-[12px] text-foreground-700">
             <p className="font-medium">New database columns ({columns.length}) will be added to the step tables in the enrolment schema:</p>
@@ -623,6 +645,136 @@ function PublishDialog({ layout, publishing, onCancel, onConfirm }: { layout: Wi
           <button type="button" className={btnSecondary} onClick={onCancel} disabled={publishing}>Cancel</button>
           <button ref={confirmRef} type="button" className={btnPrimary} onClick={onConfirm} disabled={publishing || unnamed}>
             {publishing ? <><AppIcon className="ri-loader-4-line animate-spin" />Publishing…</> : <><AppIcon className="ri-upload-cloud-2-line" />Publish</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WizardVersionDialog({
+  mode, layout, parentVersion, onCancel, onSuccess, onError,
+}: {
+  mode: 'create' | 'assign';
+  layout: WizardLayout;
+  parentVersion: number | null;
+  onCancel: () => void;
+  onSuccess: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [users, setUsers] = useState<UserListRow[]>([]);
+  const [versions, setVersions] = useState<WizardLayoutVersion[]>([]);
+  const [kind, setKind] = useState<LearnerKind>('apprenticeship');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [name, setName] = useState('');
+  const [reason, setReason] = useState('');
+  const [version, setVersion] = useState<number | null>(null);
+  const [clearAssignment, setClearAssignment] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(saving);
+  savingRef.current = saving;
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([fetchEnrolmentUsers(), WizardLayoutApi.fetchWizardVersions()])
+      .then(([rows, available]) => {
+        if (cancelled) return;
+        setUsers(rows.filter((row) => row.source === 'apprenticeship' || row.source === 'commercial'));
+        setVersions(available);
+        const first = available[0]?.version;
+        setVersion(first ?? null);
+      })
+      .catch((e: unknown) => { if (!cancelled) onError(e instanceof Error ? e.message : 'Could not load users and versions.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    confirmRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !savingRef.current) onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => { cancelled = true; window.removeEventListener('keydown', onKey); };
+  }, [onCancel, onError]);
+
+  const visibleUsers = users.filter((row) => row.source === kind && `${row.name} ${row.email}`.toLowerCase().includes(search.toLowerCase()));
+  const chosenVersion = versions.find((item) => item.version === version);
+  const toggleUser = (id: string) => setSelected((old) => old.includes(id) ? old.filter((item) => item !== id) : [...old, id]);
+
+  const submit = async () => {
+    if (!selected.length) return;
+    setSaving(true);
+    try {
+      if (mode === 'create') {
+        if (!parentVersion || !name.trim()) return;
+        await publishWizardLayout(layout, parentVersion, {
+          scope: 'targeted', name: name.trim(), parentVersion,
+          assignTo: { learnerKind: kind, learnerIds: selected, reason: reason.trim() },
+        });
+        onSuccess(`Created “${name.trim()}” and assigned it to ${selected.length} learner${selected.length === 1 ? '' : 's'}.`);
+      } else {
+        if (version === null && !clearAssignment) return;
+        await WizardLayoutApi.assignWizardVersion({ learnerKind: kind, learnerIds: selected, version: clearAssignment ? null : version, reason: reason.trim() });
+        onSuccess(clearAssignment
+          ? `The explicit version assignment was removed from ${selected.length} learner${selected.length === 1 ? '' : 's'}.`
+          : `Version ${version}${chosenVersion?.name ? ` · ${chosenVersion.name}` : ''} assigned to ${selected.length} learner${selected.length === 1 ? '' : 's'}.`);
+      }
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Unexpected error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const title = mode === 'create' ? 'Create a targeted wizard version' : 'Assign a published wizard version';
+  const canSubmit = !loading && !saving && selected.length > 0 && (mode === 'create' ? Boolean(parentVersion && name.trim()) : version !== null || clearAssignment);
+  return (
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="wizard-version-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-background-50 p-5 shadow-xl">
+        <h2 id="wizard-version-title" className="font-heading text-[17px] font-semibold text-foreground-900">{title}</h2>
+        <p className="mt-1 text-[12px] leading-relaxed text-foreground-600">
+          {mode === 'create' ? 'This saves the current editor layout as a named version and assigns it to the selected learners.' : 'This assignment makes the selected version take precedence for these unsubmitted learners, including learners who have not reached Skills Radar.'}
+        </p>
+        {mode === 'create' ? (
+          <label className="mt-4 block text-[12px] font-medium text-foreground-700">Version name
+            <input autoFocus className={`${inputClass} mt-1`} maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Additional support information" />
+          </label>
+        ) : (
+          <label className="mt-4 block text-[12px] font-medium text-foreground-700">Published version
+            <select className={`${inputClass} mt-1`} value={clearAssignment ? 'default' : version ?? ''} onChange={(e) => {
+              if (e.target.value === 'default') { setClearAssignment(true); setVersion(null); }
+              else { setClearAssignment(false); setVersion(Number(e.target.value) || null); }
+            }}>
+              <option value="" disabled>Select a version</option>
+              <option value="default">Use the learner’s normal version</option>
+              {versions.map((entry) => <option key={entry.version} value={entry.version}>Version {entry.version} · {entry.name}{entry.createdAt ? ` · ${new Date(entry.createdAt).toLocaleDateString('en-GB')}` : ''}</option>)}
+            </select>
+          </label>
+        )}
+        <div className="mt-4 flex gap-2">
+          {(['apprenticeship', 'commercial'] as LearnerKind[]).map((value) => (
+            <button key={value} type="button" className={kind === value ? btnPrimary : btnSecondary} onClick={() => { setKind(value); setSelected([]); }}>
+              {value === 'apprenticeship' ? 'Apprenticeship learners' : 'Commercial learners'}
+            </button>
+          ))}
+        </div>
+        <label className="mt-3 block text-[12px] font-medium text-foreground-700">Search learners
+          <input className={`${inputClass} mt-1`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or email" />
+        </label>
+        <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-foreground-200">
+          {loading ? <p className="p-4 text-[12px] text-foreground-500">Loading learners and versions…</p> : visibleUsers.length ? visibleUsers.map((row) => (
+            <label key={`${row.source}:${row.id}`} className="flex cursor-pointer items-center gap-2 border-b border-foreground-100 px-3 py-2 last:border-0 hover:bg-background-100">
+              <input type="checkbox" className="accent-primary-600" checked={selected.includes(row.id)} onChange={() => toggleUser(row.id)} />
+              <span className="min-w-0"><span className="block truncate text-[12px] font-medium text-foreground-900">{row.name || row.email}</span><span className="block truncate text-[11px] text-foreground-500">{row.email}</span></span>
+            </label>
+          )) : <p className="p-4 text-[12px] text-foreground-500">No learners match this search.</p>}
+        </div>
+        <p className="mt-1 text-[11px] text-foreground-500">{selected.length} learner{selected.length === 1 ? '' : 's'} selected</p>
+        <label className="mt-3 block text-[12px] font-medium text-foreground-700">Reason (optional)
+          <input className={`${inputClass} mt-1`} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why this version is being assigned" />
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" className={btnSecondary} onClick={onCancel} disabled={saving}>Cancel</button>
+          <button ref={confirmRef} type="button" className={btnPrimary} onClick={submit} disabled={!canSubmit}>
+            {saving ? <><AppIcon className="ri-loader-4-line animate-spin" />Saving…</> : mode === 'create' ? 'Create and assign' : 'Assign version'}
           </button>
         </div>
       </div>

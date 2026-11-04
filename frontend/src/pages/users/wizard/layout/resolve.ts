@@ -109,8 +109,10 @@ export const DEFAULT_LAYOUT: WizardLayout = layoutForLearner(defaultLayout(), fa
 
 /** The published layout, made whole against the registry. */
 export function resolveLayout(saved: WizardLayout | null | undefined): WizardLayout {
+  const radar = { ...(saved?.skillsRadarCatalogues ? { skillsRadarCatalogues: saved.skillsRadarCatalogues } : {}),
+    ...(saved?.skillsRadarImportApprovals ? { skillsRadarImportApprovals: saved.skillsRadarImportApprovals } : {}) };
   if (!saved || !Array.isArray(saved.steps) || saved.steps.length === 0) return {
-    ...defaultLayout(), ...(saved?.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
+    ...defaultLayout(), ...radar, ...(saved?.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
     ...(saved?.programmeModules ? { programmeModules: saved.programmeModules } : {}),
   };
 
@@ -164,7 +166,7 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
   }
 
   const texts = cleanTexts(saved.texts);
-  return { steps, ...(texts ? { texts } : {}), ...(saved.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
+  return { steps, ...radar, ...(texts ? { texts } : {}), ...(saved.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
     ...(saved.programmeModules ? { programmeModules: saved.programmeModules } : {}) };
 }
 

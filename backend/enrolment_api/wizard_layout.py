@@ -43,6 +43,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.db import DatabaseError, connections, transaction
 from django.http import JsonResponse
+from django.core import signing
 from django.views.decorators.csrf import csrf_exempt
 
 from .auth import enrolment_login_required
@@ -55,7 +56,7 @@ CONN = "enrolment"
 LAYOUT_TABLE = "Wizard_Form_Layouts"
 
 #: A layout is a few KB; this only stops a runaway payload.
-MAX_LAYOUT_BYTES = 512 * 1024
+MAX_LAYOUT_BYTES = 4 * 1024 * 1024  # Includes four complete Skills Radar catalogues.
 MAX_STEPS = 40
 MAX_ITEMS_PER_STEP = 200
 MAX_OPTIONS = 200
@@ -167,6 +168,7 @@ def read_current(cursor):
         return None
     cursor.execute(
         f'SELECT id, "Layout", "Created_at", "Created_by" FROM enrolment."{LAYOUT_TABLE}" '
+        'WHERE COALESCE("Scope", \'default\') = \'default\' AND NOT COALESCE("Archived", false) '
         "ORDER BY id DESC LIMIT 1"
     )
     row = cursor.fetchone()
@@ -182,19 +184,73 @@ def current_layout():
     """The published layout as a dict, or None when nothing is published."""
     with connections[CONN].cursor() as cursor:
         current = read_current(cursor)
-    return with_modules(with_suitability_step(current[1])) if current else None
+    from .skills_radar.catalogue import with_catalogues
+    return with_catalogues(with_modules(with_suitability_step(current[1]))) if current else None
 
 
 def _payload(current):
     if current is None:
         return {"layout": None, "version": None, "updatedAt": "", "updatedBy": ""}
     version, layout, created_at, created_by = current
+    from .skills_radar.catalogue import with_catalogues
     return {
-        "layout": with_modules(with_suitability_step(layout)),
+        "layout": with_catalogues(with_modules(with_suitability_step(layout))),
         "version": version,
         "updatedAt": created_at.isoformat() if created_at else "",
         "updatedBy": created_by or "",
     }
+
+
+ASSIGNMENT_TABLE = "Wizard_Layout_Assignments"
+
+
+def read_version(cursor, version):
+    cursor.execute(
+        f'SELECT id, "Layout", "Created_at", "Created_by", "Scope", "Variant_name", "Parent_version" '
+        f'FROM enrolment."{LAYOUT_TABLE}" WHERE id = %s AND NOT COALESCE("Archived", false)',
+        [version],
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    layout = json.loads(row[1]) if isinstance(row[1], str) else row[1]
+    return row[0], layout, row[2], row[3], row[4], row[5], row[6]
+
+
+def effective_layout(cursor, kind, learner_id):
+    """Resolve explicit admin assignment, submission snapshot, checkpoint pin, then default."""
+    cursor.execute(
+        f'SELECT "Override_version", "Submitted_version", "Pinned_version" '
+        f'FROM enrolment."{ASSIGNMENT_TABLE}" WHERE "Learner_kind" = %s AND "Learner_id" = %s',
+        [kind, learner_id],
+    )
+    assignment = cursor.fetchone()
+    version = next((value for value in assignment if value is not None), None) if assignment else None
+    return read_version(cursor, version) if version is not None else read_current(cursor)
+
+
+def record_layout_progress(cursor, kind, learner_id, version, *, checkpoint=False, submitted=False, actor=None):
+    """Pin only after the Skills Radar checkpoint; preserve the first submission reference."""
+    if not version:
+        return
+    if read_version(cursor, version) is None:
+        raise LayoutError("The wizard layout version being saved is no longer available.")
+    cursor.execute(
+        f'''INSERT INTO enrolment."{ASSIGNMENT_TABLE}" AS saved
+            ("Learner_kind", "Learner_id", "Pinned_version", "Submitted_version", "Pinned_at", "Submitted_at", "Updated_at")
+            VALUES (%s, %s, CASE WHEN %s THEN %s ELSE NULL END,
+                    CASE WHEN %s THEN %s ELSE NULL END,
+                    CASE WHEN %s THEN now() ELSE NULL END,
+                    CASE WHEN %s THEN now() ELSE NULL END, now())
+            ON CONFLICT ("Learner_kind", "Learner_id") DO UPDATE SET
+              "Pinned_version" = CASE WHEN %s THEN COALESCE(saved."Pinned_version", EXCLUDED."Pinned_version") ELSE saved."Pinned_version" END,
+              "Pinned_at" = CASE WHEN %s THEN COALESCE(saved."Pinned_at", EXCLUDED."Pinned_at") ELSE saved."Pinned_at" END,
+              "Submitted_version" = CASE WHEN %s THEN COALESCE(saved."Submitted_version", EXCLUDED."Submitted_version") ELSE saved."Submitted_version" END,
+              "Submitted_at" = CASE WHEN %s THEN COALESCE(saved."Submitted_at", EXCLUDED."Submitted_at") ELSE saved."Submitted_at" END,
+              "Updated_at" = now()''',
+        [kind, learner_id, checkpoint, version, submitted, version, checkpoint, submitted,
+         checkpoint, checkpoint, submitted, submitted],
+    )
 
 
 def custom_fields(layout):
@@ -371,6 +427,11 @@ def normalize_layout(raw, previous):
         from programme_suitability.modules_configuration import integrate_layout as integrate_modules
         integrate_modules(raw, previous, layout)
     except ConfigurationError as exc:
+        raise LayoutError(str(exc)) from exc
+    from .skills_radar.catalogue import CatalogueError, integrate_layout as integrate_radar
+    try:
+        integrate_radar(raw, previous, layout)
+    except CatalogueError as exc:
         raise LayoutError(str(exc)) from exc
     return with_suitability_step(layout), plan
 
@@ -566,7 +627,31 @@ def ensure_layout_table(cursor):
             id           bigserial PRIMARY KEY,
             "Layout"     jsonb NOT NULL,
             "Created_by" text,
-            "Created_at" timestamptz NOT NULL DEFAULT now()
+            "Created_at" timestamptz NOT NULL DEFAULT now(),
+            "Scope"      text NOT NULL DEFAULT 'default',
+            "Variant_name" text,
+            "Parent_version" bigint,
+            "Archived"   boolean NOT NULL DEFAULT false
+        )'''
+    )
+    cursor.execute(f'ALTER TABLE enrolment."{LAYOUT_TABLE}" ADD COLUMN IF NOT EXISTS "Scope" text NOT NULL DEFAULT \'default\'')
+    cursor.execute(f'ALTER TABLE enrolment."{LAYOUT_TABLE}" ADD COLUMN IF NOT EXISTS "Variant_name" text')
+    cursor.execute(f'ALTER TABLE enrolment."{LAYOUT_TABLE}" ADD COLUMN IF NOT EXISTS "Parent_version" bigint')
+    cursor.execute(f'ALTER TABLE enrolment."{LAYOUT_TABLE}" ADD COLUMN IF NOT EXISTS "Archived" boolean NOT NULL DEFAULT false')
+    cursor.execute(
+        f'''CREATE TABLE IF NOT EXISTS enrolment."{ASSIGNMENT_TABLE}" (
+            "Learner_kind" text NOT NULL,
+            "Learner_id" bigint NOT NULL,
+            "Pinned_version" bigint,
+            "Override_version" bigint,
+            "Submitted_version" bigint,
+            "Reason" text,
+            "Assigned_by" text,
+            "Assigned_at" timestamptz,
+            "Pinned_at" timestamptz,
+            "Submitted_at" timestamptz,
+            "Updated_at" timestamptz NOT NULL DEFAULT now(),
+            PRIMARY KEY ("Learner_kind", "Learner_id")
         )'''
     )
 
@@ -581,14 +666,32 @@ def _actor(request):
     return None
 
 
+def _target_learners_exist(kind, learner_ids):
+    from learner_api.models import CommercialUser, EnrolmentUser
+
+    model = EnrolmentUser if kind == "apprenticeship" else CommercialUser
+    return model.objects.filter(pk__in=learner_ids).count() == len(learner_ids)
+
+
 @enrolment_login_required
-def wizard_layout(request):
+def wizard_layout(request, kind=None, learner_id=None):
     """The layout in force. Readable by anyone who can open a wizard."""
     if request.method != "GET":
         return _error("Method not allowed.", 405)
+    if kind is not None and kind not in {"apprenticeship", "commercial"}:
+        return _error("Unknown learner kind.", 400)
     try:
         with connections[CONN].cursor() as cursor:
-            return JsonResponse(_payload(read_current(cursor)))
+            current = effective_layout(cursor, kind, learner_id) if kind is not None and learner_id is not None else read_current(cursor)
+            payload = _payload(current)
+            if kind is not None and learner_id is not None and current is not None:
+                payload["layoutToken"] = signing.dumps(
+                    {"kind": kind, "learnerId": int(learner_id), "version": current[0]},
+                    salt="enrolment.wizard-layout.learner-version",
+                )
+            else:
+                payload["layoutToken"] = None
+            return JsonResponse(payload)
     except DatabaseError as exc:
         logger.warning("Could not read the wizard layout: %s", exc)
         return _error("Could not load the wizard layout.", 502)
@@ -611,6 +714,15 @@ def publish_wizard_layout(request):
     if not isinstance(body, dict):
         return _error("Request body must be a JSON object.", 400)
     from programme_suitability.permissions import is_staff
+    if isinstance(body.get('layout'), dict) and 'skillsRadarCatalogues' in body['layout']:
+        if not is_staff(request):
+            return _error('Admissions staff access required to publish Skills Radar configuration.', 403)
+        # Legacy layout clients predate CSRF. Catalogue imports always use the
+        # secure builder client, so enforce CSRF for this new publishing path.
+        from django.middleware.csrf import CsrfViewMiddleware
+        rejection = CsrfViewMiddleware(lambda r: None).process_view(request, lambda r: None, (), {})
+        if rejection is not None:
+            return rejection
     if isinstance(body.get('layout'), dict) and 'programmeModules' in body['layout'] and not is_staff(request):
         return _error('Admissions staff access required to publish modules configuration.', 403)
     if isinstance(body.get("layout"), dict) and "programmeSuitability" in body["layout"] and not is_staff(request):
@@ -618,6 +730,42 @@ def publish_wizard_layout(request):
     base_version = body.get("baseVersion")
     if base_version is not None and not isinstance(base_version, int):
         return _error("'baseVersion' must be a number or null.", 400)
+    scope = body.get("scope", "default")
+    if not isinstance(scope, str) or scope not in {"default", "targeted"}:
+        return _error("'scope' must be 'default' or 'targeted'.", 400)
+    if scope == "targeted":
+        from django.middleware.csrf import CsrfViewMiddleware
+        rejection = CsrfViewMiddleware(lambda r: None).process_view(request, lambda r: None, (), {})
+        if rejection is not None:
+            return rejection
+    variant_name = str(body.get("name") or "").strip()
+    parent_version = body.get("parentVersion", base_version)
+    if scope == "targeted" and (not variant_name or len(variant_name) > 120):
+        return _error("A targeted version name of 1 to 120 characters is required.", 400)
+    if scope == "targeted" and (not isinstance(parent_version, int) or isinstance(parent_version, bool)):
+        return _error("A targeted version must reference a published parent version.", 400)
+    target_assignment = body.get("assignTo") if scope == "targeted" else None
+    target_kind = target_assignment.get("learnerKind") if isinstance(target_assignment, dict) else None
+    target_ids = target_assignment.get("learnerIds") if isinstance(target_assignment, dict) else None
+    target_reason = str(target_assignment.get("reason") or "").strip()[:500] if isinstance(target_assignment, dict) else ""
+    if scope == "targeted":
+        if not isinstance(target_kind, str) or target_kind not in {"apprenticeship", "commercial"}:
+            return _error("Choose the learner type for this targeted version.", 400)
+        if not isinstance(target_ids, list) or not target_ids or len(target_ids) > 500:
+            return _error("Select between 1 and 500 learners for this targeted version.", 400)
+        try:
+            if any(isinstance(value, bool) for value in target_ids):
+                raise ValueError
+            target_ids = list(dict.fromkeys(int(value) for value in target_ids))
+        except (TypeError, ValueError):
+            return _error("Learner ids must be integers.", 400)
+        if any(value <= 0 for value in target_ids):
+            return _error("Learner ids must be positive integers.", 400)
+        try:
+            if not _target_learners_exist(target_kind, target_ids):
+                return _error("One or more selected learners could not be found.", 404)
+        except DatabaseError:
+            return _error("Could not verify the selected learners.", 503)
 
     try:
         with transaction.atomic(using=CONN):
@@ -627,28 +775,147 @@ def publish_wizard_layout(request):
                 # version check below and the later one silently win.
                 cursor.execute(f'LOCK TABLE enrolment."{LAYOUT_TABLE}" IN SHARE ROW EXCLUSIVE MODE')
                 current = read_current(cursor)
-                current_version = current[0] if current else None
-                if current_version != base_version:
-                    return _error(
-                        "Someone else has published the wizard since you opened it. "
-                        "Reload the builder to see their changes, then make yours again.",
-                        409,
+                if scope == "default":
+                    current_version = current[0] if current else None
+                    if current_version != base_version:
+                        return _error(
+                            "Someone else has published the wizard since you opened it. "
+                            "Reload the builder to see their changes, then make yours again.",
+                            409,
+                        )
+                    parent = current
+                else:
+                    parent = read_version(cursor, parent_version)
+                    if parent is None:
+                        return _error("The selected parent wizard version does not exist.", 404)
+                    cursor.execute(
+                        f'SELECT "Learner_id" FROM enrolment."{ASSIGNMENT_TABLE}" '
+                        'WHERE "Learner_kind" = %s AND "Learner_id" = ANY(%s) AND "Submitted_version" IS NOT NULL',
+                        [target_kind, target_ids],
                     )
-                layout, plan = normalize_layout(body.get("layout"), current[1] if current else None)
+                    if cursor.fetchall():
+                        return _error("Submitted learners keep their submitted layout and cannot receive a new assignment.", 409)
+                layout, plan = normalize_layout(body.get("layout"), parent[1] if parent else None)
                 apply_plan(cursor, plan)
                 cursor.execute(
-                    f'INSERT INTO enrolment."{LAYOUT_TABLE}" ("Layout", "Created_by") VALUES (%s::jsonb, %s) '
-                    'RETURNING id, "Created_at"',
-                    [json.dumps(layout), _actor(request)],
+                    f'INSERT INTO enrolment."{LAYOUT_TABLE}" '
+                    '("Layout", "Created_by", "Scope", "Variant_name", "Parent_version") '
+                    'VALUES (%s::jsonb, %s, %s, %s, %s) RETURNING id, "Created_at"',
+                    [json.dumps(layout), _actor(request), scope, variant_name or None, parent_version if scope == "targeted" else None],
                 )
                 version, created_at = cursor.fetchone()
+                if scope == "targeted":
+                    cursor.execute(
+                        f'''INSERT INTO enrolment."{ASSIGNMENT_TABLE}"
+                            ("Learner_kind", "Learner_id", "Override_version", "Reason", "Assigned_by", "Assigned_at", "Updated_at")
+                            SELECT %s, learner_id, %s, %s, %s, now(), now()
+                            FROM unnest(%s::bigint[]) AS selected(learner_id)
+                            ON CONFLICT ("Learner_kind", "Learner_id") DO UPDATE SET
+                              "Override_version" = EXCLUDED."Override_version", "Reason" = EXCLUDED."Reason",
+                              "Assigned_by" = EXCLUDED."Assigned_by", "Assigned_at" = now(), "Updated_at" = now()''',
+                        [target_kind, version, target_reason or None, _actor(request), target_ids],
+                    )
     except LayoutError as exc:
         return _error(str(exc), 400)
     except DatabaseError as exc:
         logger.warning("Could not publish the wizard layout: %s", exc)
         return _error(f"Could not publish the wizard layout: {exc}", 502)
 
-    return JsonResponse(_payload((version, layout, created_at, _actor(request))))
+    response = _payload((version, layout, created_at, _actor(request)))
+    response.update({"scope": scope, "name": variant_name or None, "parentVersion": parent_version if scope == "targeted" else None,
+                     "assigned": len(target_ids) if scope == "targeted" else 0})
+    return JsonResponse(response)
+
+
+@enrolment_login_required
+def wizard_layout_versions(request):
+    if request.method != "GET":
+        return _error("Method not allowed.", 405)
+    try:
+        with connections[CONN].cursor() as cursor:
+            if not _table_exists(cursor):
+                return JsonResponse({"results": []})
+            cursor.execute(
+                f'SELECT id, "Scope", "Variant_name", "Parent_version", "Created_at", "Created_by" '
+                f'FROM enrolment."{LAYOUT_TABLE}" WHERE NOT COALESCE("Archived", false) ORDER BY id DESC'
+            )
+            rows = cursor.fetchall()
+        return JsonResponse({"results": [
+            {"version": row[0], "scope": row[1], "name": row[2] or ("Global version" if row[1] == "default" else "Targeted version"),
+             "parentVersion": row[3], "createdAt": row[4].isoformat() if row[4] else "", "createdBy": row[5] or ""}
+            for row in rows
+        ]})
+    except DatabaseError as exc:
+        logger.warning("Could not list wizard versions: %s", exc)
+        return _error("Could not load wizard versions.", 502)
+
+
+@enrolment_login_required
+@csrf_exempt
+def assign_wizard_layout(request):
+    if request.method not in ("PUT", "POST"):
+        return _error("Method not allowed.", 405)
+    from django.middleware.csrf import CsrfViewMiddleware
+    rejection = CsrfViewMiddleware(lambda r: None).process_view(request, lambda r: None, (), {})
+    if rejection is not None:
+        return rejection
+    try:
+        body = json.loads(request.body or b"{}")
+    except ValueError:
+        return _error("Request body must be valid JSON.", 400)
+    if not isinstance(body, dict):
+        return _error("Request body must be a JSON object.", 400)
+    kind = body.get("learnerKind")
+    learner_ids = body.get("learnerIds")
+    version = body.get("version")
+    reason = str(body.get("reason") or "").strip()[:500]
+    if not isinstance(kind, str) or kind not in {"apprenticeship", "commercial"}:
+        return _error("'learnerKind' must be 'apprenticeship' or 'commercial'.", 400)
+    if not isinstance(learner_ids, list) or not learner_ids or len(learner_ids) > 500:
+        return _error("Select between 1 and 500 learners.", 400)
+    try:
+        if any(isinstance(value, bool) for value in learner_ids):
+            raise ValueError
+        learner_ids = list(dict.fromkeys(int(value) for value in learner_ids))
+    except (TypeError, ValueError):
+        return _error("Learner ids must be integers.", 400)
+    if any(value <= 0 for value in learner_ids):
+        return _error("Learner ids must be positive integers.", 400)
+    try:
+        if not _target_learners_exist(kind, learner_ids):
+            return _error("One or more selected learners could not be found.", 404)
+    except DatabaseError:
+        return _error("Could not verify the selected learners.", 503)
+    clear = body.get("clear") is True
+    if not clear and (not isinstance(version, int) or isinstance(version, bool)):
+        return _error("A published version is required.", 400)
+    try:
+        with transaction.atomic(using=CONN):
+            with connections[CONN].cursor() as cursor:
+                if not clear and read_version(cursor, version) is None:
+                    return _error("The selected wizard version does not exist.", 404)
+                if not clear:
+                    cursor.execute(
+                        f'SELECT "Learner_id" FROM enrolment."{ASSIGNMENT_TABLE}" '
+                        'WHERE "Learner_kind" = %s AND "Learner_id" = ANY(%s) AND "Submitted_version" IS NOT NULL',
+                        [kind, learner_ids],
+                    )
+                    if cursor.fetchall():
+                        return _error("Submitted learners keep their submitted layout and cannot receive a new assignment.", 409)
+                cursor.execute(
+                    f'''INSERT INTO enrolment."{ASSIGNMENT_TABLE}"
+                        ("Learner_kind", "Learner_id", "Override_version", "Reason", "Assigned_by", "Assigned_at", "Updated_at")
+                        SELECT %s, learner_id, %s, %s, %s, CASE WHEN %s THEN NULL ELSE now() END, now()
+                        FROM unnest(%s::bigint[]) AS selected(learner_id)
+                        ON CONFLICT ("Learner_kind", "Learner_id") DO UPDATE SET
+                          "Override_version" = EXCLUDED."Override_version", "Reason" = EXCLUDED."Reason",
+                          "Assigned_by" = EXCLUDED."Assigned_by", "Assigned_at" = EXCLUDED."Assigned_at", "Updated_at" = now()''',
+                    [kind, None if clear else version, reason or None, _actor(request), clear, learner_ids],
+                )
+        return JsonResponse({"assigned": len(learner_ids), "version": None if clear else version, "cleared": clear})
+    except DatabaseError as exc:
+        logger.warning("Could not assign wizard version: %s", exc)
+        return _error("Could not assign the wizard version.", 502)
 
 
 # ── answers -> columns ───────────────────────────────────────────────────────

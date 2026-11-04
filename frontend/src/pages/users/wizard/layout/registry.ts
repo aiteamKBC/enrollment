@@ -413,6 +413,7 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
        */
       missing: (d, r) => {
         if (!r) return [];
+        if (d.skillsRadar.configurationError) return [d.skillsRadar.configurationError];
         const assessments = d.skillsRadar.assessments ?? {};
         const asked = d.skillsRadar.programmeKsbIds;
         // Only the programme's own KSBs count. Before the profile has loaded,

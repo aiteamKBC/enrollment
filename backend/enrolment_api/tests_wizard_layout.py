@@ -396,7 +396,11 @@ class PublishViewTests(SimpleTestCase):
         cursor = FakeCursor([("x",), (5, {"steps": []}, None, "someone")])
         res = self._put({"baseVersion": 4, "layout": {"steps": [step("cv-job", [])]}}, cursor)
         self.assertEqual(res.status_code, 409)
-        self.assertFalse(any(s.startswith("INSERT") or "ALTER" in s for s, _ in cursor.executed))
+        # Main's layout-table compatibility bootstrap runs before the version
+        # check; a rejected publish must still write no version or answer schema.
+        self.assertFalse(any(s.startswith("INSERT") or
+                             ("ALTER TABLE" in s and '"Wizard_Form_Layouts"' not in s)
+                             for s, _ in cursor.executed))
 
     def test_invalid_layout_is_a_400_with_the_reason(self):
         cursor = FakeCursor([("x",), None])

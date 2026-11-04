@@ -191,6 +191,7 @@ class FinalisationEndpointTests(SimpleTestCase):
                 patch.object(extended_ilr, 'signed_snapshot', return_value=None), \
                 patch.object(extended_ilr, 'validate_finalisation'), \
                 patch.object(extended_ilr, 'project_draft', side_effect=DatabaseError('synthetic failure')), \
+                patch.object(extended_ilr.ExtendedIlr.objects, 'filter', return_value=SimpleNamespace(first=lambda: None)), \
                 patch.object(extended_ilr.ExtendedIlr.objects, 'update_or_create', return_value=(MagicMock(), True)), \
                 patch.object(extended_ilr.WizardIlrLearnerDetails.objects, 'filter') as details:
             response = extended_ilr.extended_ilr(self.request({
@@ -213,6 +214,7 @@ class FinalisationEndpointTests(SimpleTestCase):
                 patch.object(extended_ilr, 'validate_finalisation'), \
                 patch.object(extended_ilr, 'project_draft'), \
                 patch.object(extended_ilr, 'project_custom_fields'), \
+                patch.object(extended_ilr.ExtendedIlr.objects, 'filter', return_value=SimpleNamespace(first=lambda: None)), \
                 patch.object(extended_ilr, 'published_ilr_custom_keys', return_value=set()), \
                 patch.object(extended_ilr, 'learner_record', return_value={'title': 'Ms'}), \
                 patch.object(extended_ilr.ExtendedIlr.objects, 'update_or_create', return_value=(row, True)), \

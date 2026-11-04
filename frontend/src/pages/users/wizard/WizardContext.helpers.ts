@@ -39,6 +39,7 @@ export function ageFromDob(iso?: string): number | undefined {
 
 
 export interface WizardContextValue {
+  radarCatalogue?: import('@/features/programme-suitability/skills-radar/catalogue/types').ManagedRadar;
   moduleSaveQueue?: import('@/features/programme-suitability/modules/moduleSaveQueue').ModuleSaveQueue;
   modules?: import('@/features/programme-suitability/modules/useModulesConfiguration').ModulesController;
   suitability?: import('@/features/programme-suitability/useSuitability').SuitabilityController;
@@ -67,7 +68,7 @@ export interface WizardContextValue {
    */
   readOnly: boolean;
   /** Persist the Extended ILR answers to enrolment."Extended_ILR". */
-  saveIlr: (finalizeIlr?: boolean) => Promise<void>;
+  saveIlr: (options?: { finalizeIlr?: boolean; skillsRadarCheckpoint?: boolean; submitted?: boolean }) => Promise<void>;
   ilrFinalisedAt?: string;
   ilrLegacyReadOnly?: boolean;
   /** Persist only module choices through their revision-checked endpoint. */

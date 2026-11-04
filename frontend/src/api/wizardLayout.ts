@@ -8,6 +8,7 @@
 import type { LearnerKind } from './extendedIlr';
 import { createCachedResource } from './cachedRequest';
 import type { CustomUploadRef, WizardLayout, WizardLayoutResponse } from '@/pages/users/wizard/layout/types';
+import { prefetchAssessmentSecurity } from '@/features/programme-suitability/api';
 
 const BASE = '/enrolment_api/wizard-layout';
 
@@ -33,16 +34,19 @@ async function send<T>(url: string, init?: Parameters<typeof fetch>[1]): Promise
   return data as T;
 }
 
-// One layout for everybody, so one cache key.
-const layoutResource = createCachedResource<WizardLayoutResponse>('wizard-layout', () => send<WizardLayoutResponse>(`${BASE}/`));
+const layoutResource = createCachedResource<WizardLayoutResponse>('wizard-layout', (key) => send<WizardLayoutResponse>(
+  key === 'current' ? `${BASE}/` : `${BASE}/${key}/`,
+));
 
-export function fetchWizardLayout(options: { force?: boolean } = {}): Promise<WizardLayoutResponse> {
-  return layoutResource.read('current', options);
+export function fetchWizardLayout(options: { force?: boolean; kind?: LearnerKind; learnerId?: string } = {}): Promise<WizardLayoutResponse> {
+  const key = options.kind && options.learnerId ? `${options.kind}/${encodeURIComponent(options.learnerId)}` : 'current';
+  return layoutResource.read(key, options);
 }
 
 /** The layout already in memory, if any — lets the wizard render it on its first frame. */
-export function peekWizardLayout(): WizardLayoutResponse | undefined {
-  return layoutResource.peek('current');
+export function peekWizardLayout(options: { kind?: LearnerKind; learnerId?: string } = {}): WizardLayoutResponse | undefined {
+  const key = options.kind && options.learnerId ? `${options.kind}/${encodeURIComponent(options.learnerId)}` : 'current';
+  return layoutResource.peek(key);
 }
 
 /**
@@ -50,14 +54,52 @@ export function peekWizardLayout(): WizardLayoutResponse | undefined {
  * the server refuses (409) when someone else published in between, rather than
  * silently overwriting their changes.
  */
-export async function publishWizardLayout(layout: WizardLayout, baseVersion: number | null): Promise<WizardLayoutResponse> {
+export interface PublishWizardLayoutOptions {
+  scope?: 'default' | 'targeted';
+  name?: string;
+  parentVersion?: number | null;
+  assignTo?: { learnerKind: LearnerKind; learnerIds: string[]; reason?: string };
+}
+
+export async function publishWizardLayout(layout: WizardLayout, baseVersion: number | null, options: PublishWizardLayoutOptions = {}): Promise<WizardLayoutResponse> {
+  const security = layout.skillsRadarCatalogues || options.scope === 'targeted'
+    ? { 'X-CSRFToken': (await prefetchAssessmentSecurity()).csrfToken }
+    : {};
   const saved = await send<WizardLayoutResponse>(`${BASE}/publish/`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ layout, baseVersion }),
+    headers: { 'Content-Type': 'application/json', ...security },
+    body: JSON.stringify({ layout, baseVersion, ...options }),
   });
-  layoutResource.prime('current', saved);
+  if ((options.scope ?? 'default') === 'default') layoutResource.prime('current', saved);
   return saved;
+}
+
+export interface WizardLayoutVersion {
+  version: number;
+  scope: 'default' | 'targeted';
+  name: string;
+  parentVersion: number | null;
+  createdAt: string;
+  createdBy: string;
+}
+
+export async function fetchWizardVersions(): Promise<WizardLayoutVersion[]> {
+  const data = await send<{ results: WizardLayoutVersion[] }>(`${BASE}/versions/`);
+  return data.results;
+}
+
+export async function assignWizardVersion(input: {
+  learnerKind: LearnerKind;
+  learnerIds: string[];
+  version: number | null;
+  reason?: string;
+}): Promise<{ assigned: number; version: number | null; cleared: boolean }> {
+  const security = { 'X-CSRFToken': (await prefetchAssessmentSecurity()).csrfToken };
+  return send<{ assigned: number; version: number | null; cleared: boolean }>(`${BASE}/assignments/`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...security },
+    body: JSON.stringify({ ...input, clear: input.version === null }),
+  });
 }
 
 // ── custom upload fields ────────────────────────────────────────────────────
