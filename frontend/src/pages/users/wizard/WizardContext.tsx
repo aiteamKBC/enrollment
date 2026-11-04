@@ -261,7 +261,12 @@ export function WizardProvider({
   );
   const steps = useMemo(() => visibleSteps(layout), [layout]);
   const completed = useMemo(() => steps.map(step => Boolean(completedBySlug[step.slug])), [steps, completedBySlug]);
-  const suitability = useSuitability(kindForSeed, userId, Boolean(layout.programmeSuitability), publishedVersion,
+  // Older version-pinned layouts predate suitability. The assessment endpoint
+  // owns its saved configuration snapshot, so read it for those apprentices
+  // without replacing their assigned wizard steps or Skills Radar catalogue.
+  const loadSuitability = Boolean(layout.programmeSuitability) || (!isCommercial && !readOnlyLearnerSteps && publishedLayout !== null && layoutSettled &&
+    steps.some(step => step.slug === 'programme-suitability'));
+  const suitability = useSuitability(kindForSeed, userId, loadSuitability, publishedVersion,
     ['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) || layout.programmeSuitability?.enabled === false);
   const modules = useModulesConfiguration(kindForSeed, userId, suitability.selectionConfirmed, publishedVersion);
   const apmStaffReview = isApmStaffReview(readOnlyLearnerSteps, board.programme.name || '', suitability.state);

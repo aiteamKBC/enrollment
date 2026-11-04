@@ -107,7 +107,7 @@ export function WizardShell({
   const previewIlr = mode === 'learner' && !isCommercial && canPreviewIlrStep(steps[currentIndex]?.slug);
   const continuedAssessment = useRef(0);
   const assessmentIndex = steps.findIndex((step) => step.slug === SUITABILITY_STEP.slug);
-  const assessmentMissing = Boolean(layout.programmeSuitability?.enabled && draft.programmeSuitability?.required !== false && (draft.programmeSuitability?.status !== 'SUBMITTED' || !draft.programmeSuitability.selectionConfirmed));
+  const assessmentMissing = Boolean((layout.programmeSuitability?.enabled || draft.programmeSuitability?.required) && draft.programmeSuitability?.required !== false && (draft.programmeSuitability?.status !== 'SUBMITTED' || !draft.programmeSuitability.selectionConfirmed));
   const modulesMissing = Boolean(draft.programmeModulesCompletion?.required && !draft.programmeModulesCompletion.complete);
   const moduleMessage = 'Please complete and save your PCP pathway and module choices before continuing.';
   const { success, error } = useToast();
