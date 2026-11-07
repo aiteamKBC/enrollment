@@ -89,10 +89,10 @@ export const REQUIRED_ADDRESS_FIELDS = new Set(['employerAddressLine1', 'employe
 function addressQuestions(prefix: 'employer' | 'residential'): BuiltinQuestion[] {
   const title = prefix === 'employer' ? 'Employer' : 'Residential';
   return [
-    ['AddressLine1', 'Address Line 1', 200, 'address-line1', 'House number and street name'],
-    ['AddressLine2', 'Address Line 2', 200, 'address-line2', 'Flat number, building name or area'],
-    ['TownCity', 'Address Line 3', 100, 'address-level2', 'Town or City'],
-    ['County', 'Address Line 4', 100, 'address-level1', 'County and Country'],
+    ['AddressLine1', 'Street Address', 200, 'address-line1', 'Street Address'],
+    ['AddressLine2', 'Town/City', 200, 'address-line2', 'Town or City'],
+    ['TownCity', 'County', 100, 'address-level2', 'County and Country'],
+    ['County', 'Address Line 4', 100, 'address-level1', 'Additional Address Details (Optional)'],
   ].map(([suffix, label, limit, autoComplete, placeholder]) => {
     const key = `${prefix}${suffix}` as ApplicationField;
     return { kind: 'text', key, label: `${title} ${label}`, required: REQUIRED_ADDRESS_FIELDS.has(key),
