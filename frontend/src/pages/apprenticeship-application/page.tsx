@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, ClipboardList, Info, Loader2, MapPin, RotateCcw, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, Info, Loader2, MapPin, RotateCcw, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   ApplicationSubmitError,
@@ -499,7 +499,6 @@ function Frame({ hero, children }: { hero?: { eyebrow: string; title: string; in
       <div className={frame.container}>
         <div className={`${frame.brandBar} ${styles.brandBar}`}>
           <img src="/assets/kbc-logo.png" alt="Kent Business College" width="175" height="80" />
-          <span><ClipboardList size={17} aria-hidden="true" />Apprenticeship application</span>
         </div>
         {hero && (
           <header className={frame.hero}>
