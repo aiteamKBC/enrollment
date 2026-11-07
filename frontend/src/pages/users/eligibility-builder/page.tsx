@@ -455,7 +455,7 @@ function ItemRow({
   const hint = question ? textFor(layout.texts, `${item.key}.hint`) : item.helpText;
   // Information is all wording, so it opens with its wording showing.
   const [panel, setPanel] = useState<'wording' | 'answers' | null>(note ? 'wording' : null);
-  const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string');
+  const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string' && textFor(layout.texts, s.key) !== s.default);
 
   const remove = () => {
     if (deps.length && !window.confirm(`${deps.length} question${deps.length === 1 ? '' : 's'} only asked for an answer to this question will stop being asked.\n\nRemove it from the form?`)) return;
