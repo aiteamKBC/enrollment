@@ -229,7 +229,7 @@ export function isLocked(item: EligibilityItem): boolean {
 
 /** What the builder calls an item. */
 export function itemLabel(layout: EligibilityLayout, item: EligibilityItem): string {
-  if (!item.builtin) return item.label?.trim() || 'Untitled question';
+  if (!item.builtin) return item.label?.trim() || (item.type === 'heading' ? 'Untitled heading' : item.type === 'description' ? 'Untitled description' : 'Untitled question');
   const def = BUILTIN_ITEMS[item.key];
   if (!def) return item.key;
   if (def.kind === 'note') return 'Information: employer representative';

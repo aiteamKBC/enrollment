@@ -402,6 +402,12 @@ export default function ApprenticeshipApplicationPage() {
 
           <div className={styles.questions}>
             {section.items.map(item => {
+              if (item.kind === 'heading') {
+                return <h3 key={item.key} className="border-b border-foreground-200 pb-1.5 pt-4 text-[16px] font-semibold text-foreground-900">{item.text}</h3>;
+              }
+              if (item.kind === 'description') {
+                return <div key={item.key} className="whitespace-pre-line py-2.5 text-[13px] leading-relaxed text-foreground-600">{item.text}</div>;
+              }
               if (!isQuestion(item)) {
                 if (!isNoteShown(item, answers)) return null;
                 const [title, ...paragraphs] = item.text.split('\n\n');

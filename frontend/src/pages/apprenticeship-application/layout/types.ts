@@ -10,7 +10,7 @@
  * enrolment_api/eligibility_layout.py) -- the client never chooses storage.
  */
 
-export type EligibilityQuestionType = 'text' | 'number' | 'date' | 'yesno' | 'dropdown';
+export type EligibilityQuestionType = 'text' | 'number' | 'date' | 'yesno' | 'dropdown' | 'heading' | 'description';
 
 export const QUESTION_TYPES: { value: EligibilityQuestionType; label: string }[] = [
   { value: 'text', label: 'Text' },
@@ -18,6 +18,8 @@ export const QUESTION_TYPES: { value: EligibilityQuestionType; label: string }[]
   { value: 'date', label: 'Date' },
   { value: 'yesno', label: 'Yes / No' },
   { value: 'dropdown', label: 'Dropdown' },
+  { value: 'heading', label: 'Heading' },
+  { value: 'description', label: 'Description' },
 ];
 
 /** Show a question only while another question's answer is one of `values` ("Yes"/"No" for a yes/no question). */

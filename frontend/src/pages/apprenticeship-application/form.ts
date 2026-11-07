@@ -35,6 +35,7 @@ export type Question =
   | (Base & { kind: 'choice' | 'select'; options: readonly string[]; optionLabels?: Readonly<Record<string, string>> })
   | (Base & { kind: 'yesno' });
 export type Note = { kind: 'note'; key: string; text: string; shown?: (answers: Answers, depth: number) => boolean };
+export type ContentBlock = { kind: 'heading' | 'description'; key: string; text: string };
 
 export interface Section {
   workplaceEnabled?: boolean;
@@ -42,7 +43,7 @@ export interface Section {
   title: string;
   description: string;
   icon: LucideIcon;
-  items: (Question | Note)[];
+  items: (Question | Note | ContentBlock)[];
 }
 
 export interface FormPage {
@@ -70,7 +71,8 @@ export function isEmploymentRestricted(value: AnswerValue | undefined): boolean 
     && EMPLOYMENT_STATUSES.includes(value as typeof EMPLOYMENT_STATUSES[number]);
 }
 
-export const isQuestion = (item: Question | Note): item is Question => item.kind !== 'note';
+export const isQuestion = (item: Question | Note | ContentBlock): item is Question =>
+  item.kind !== 'note' && item.kind !== 'heading' && item.kind !== 'description';
 export const isShown = (question: Question, answers: Answers, depth = 0) => !question.shown || question.shown(answers, depth);
 export const isNoteShown = (note: Note, answers: Answers, depth = 0) => !note.shown || note.shown(answers, depth);
 export const emptyAnswer = (question: Question): AnswerValue => (question.kind === 'yesno' ? null : '');
@@ -115,8 +117,11 @@ function combineShown(...predicates: Array<((answers: Answers, depth: number) =>
   return active.length ? (answers: Answers, depth: number) => active.every(predicate => predicate(answers, depth)) : undefined;
 }
 
-function toItem(item: EligibilityItem, layout: EligibilityLayout, questions: Map<string, Question>): Question | Note | null {
+function toItem(item: EligibilityItem, layout: EligibilityLayout, questions: Map<string, Question>): Question | Note | ContentBlock | null {
   if (!item.builtin) {
+    if (item.type === 'heading' || item.type === 'description') {
+      return { kind: item.type, key: item.key, text: item.label ?? '' };
+    }
     const base = {
       key: item.key,
       label: item.label ?? '',
@@ -185,7 +190,7 @@ export function formSections(layout: EligibilityLayout): Section[] {
   const sections: Section[] = [];
   for (const section of layout.sections) {
     if (section.hidden) continue;
-    const items: (Question | Note)[] = [];
+    const items: (Question | Note | ContentBlock)[] = [];
     for (const item of section.items) {
       if (WORKPLACE_FIELDS.has(item.key) && !layout.workplaceEnabled) continue;
       if (item.hidden && !isLocked(item)) continue;
@@ -194,7 +199,7 @@ export function formSections(layout: EligibilityLayout): Section[] {
       if (isQuestion(built)) questions.set(built.key, built);
       items.push(built);
     }
-    if (!items.some(isQuestion)) continue;
+    if (items.length === 0) continue;
     sections.push({
       workplaceEnabled: layout.workplaceEnabled,
       slug: section.slug,
