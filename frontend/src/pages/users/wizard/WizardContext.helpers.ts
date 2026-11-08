@@ -57,6 +57,8 @@ export interface WizardContextValue {
    * is loading.
    */
   layout: WizardLayout;
+  /** True once the learner's published layout request has settled. */
+  layoutReady: boolean;
   /** The steps the learner walks through, in order — the layout's visible steps. */
   steps: LayoutStep[];
   completed: boolean[];

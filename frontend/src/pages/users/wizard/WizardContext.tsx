@@ -547,6 +547,7 @@ export function WizardProvider({
       },
       setCustom: (fieldKey, val) => setDraft((prev) => ({ ...prev, custom: { ...(prev.custom ?? {}), [fieldKey]: val } })),
       layout,
+      layoutReady: layoutSettled,
       steps,
       completed,
       markComplete: (index, done) => {
