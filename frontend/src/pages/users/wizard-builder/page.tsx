@@ -66,15 +66,6 @@ const TYPE_LABEL: Record<string, string> = {
 
 const clone = (layout: WizardLayout): WizardLayout => JSON.parse(JSON.stringify(layout)) as WizardLayout;
 
-/** Preserve the old apprenticeship journey when moving an older version into the new editor. */
-const editableLayout = (saved: WizardLayout | null, kind: LearnerKind): WizardLayout => {
-  const layout = resolveLayout(saved);
-  if (kind === 'apprenticeship' && !layout.stepVisibilityManaged) {
-    layout.steps = layout.steps.map((step) => step.slug === 'personal-details' ? { ...step, hidden: true } : step);
-  }
-  return { ...layout, stepVisibilityManaged: true };
-};
-
 /**
  * The "Edit apprenticeship wizard" builder.
  *
@@ -109,7 +100,7 @@ export default function WizardBuilderPage() {
   const reportVersionSuccess = useCallback((message: string, created?: WizardLayoutResponse, createdKind?: LearnerKind) => {
     setVersionAction(null);
     if (created && createdKind === kind) {
-      const resolved = editableLayout(created.layout, kind);
+      const resolved = resolveLayout(created.layout);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(created.version);
@@ -131,7 +122,7 @@ export default function WizardBuilderPage() {
       .then(([res, available]) => {
         if (cancelled || sequence !== loadSequence.current) return;
         setVersions(available);
-        const resolved = editableLayout(res.layout, kind);
+        const resolved = resolveLayout(res.layout);
         setPublished(resolved);
         setLayout(clone(resolved));
         setVersion(res.version);
@@ -153,7 +144,7 @@ export default function WizardBuilderPage() {
     try {
       const res = value === 'current' ? await fetchWizardLayout({ kind, force: true }) : await WizardLayoutApi.fetchWizardVersion(Number(value));
       if (sequence !== loadSequence.current) return;
-      const resolved = editableLayout(res.layout, kind);
+      const resolved = resolveLayout(res.layout);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(res.version);
@@ -209,7 +200,7 @@ export default function WizardBuilderPage() {
     setPublishing(true);
     try {
       const saved = await publishWizardLayout(layout, defaultVersion, { learnerKind: kind });
-      const resolved = editableLayout(saved.layout, kind);
+      const resolved = resolveLayout(saved.layout);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(saved.version);
@@ -858,7 +849,7 @@ function WizardVersionDialog({
     let cancelled = false;
     setOtherSource(null);
     fetchWizardLayout({ kind, force: true }).then((res) => {
-      if (!cancelled && res.version) setOtherSource({ layout: editableLayout(res.layout, kind), version: res.version });
+      if (!cancelled && res.version) setOtherSource({ layout: resolveLayout(res.layout), version: res.version });
     }).catch((e: unknown) => { if (!cancelled) onError(e instanceof Error ? e.message : 'Could not load this form type.'); });
     return () => { cancelled = true; };
   }, [mode, kind, builderKind, onError]);

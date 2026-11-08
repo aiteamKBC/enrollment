@@ -263,10 +263,10 @@ describe('the builder page', () => {
     renderBuilder();
     expect(await screen.findByText(/nothing has been published from the builder yet/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Removed steps (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Removed steps (0)' })).toBeInTheDocument();
     await openStep('Personal Details');
     expect(screen.getByText('First Name')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
     await openStep('ILR');
     expect(screen.getByText(/Apprenticeships have one required Your signature field/)).toBeInTheDocument();
   });
@@ -283,7 +283,6 @@ describe('the builder page', () => {
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
     await waitFor(() => expect(publishWizardLayout).toHaveBeenCalled());
     const sent = publishWizardLayout.mock.calls[0][0] as WizardLayout;
-    expect(sent.stepVisibilityManaged).toBe(true);
     expect(sent.steps.find((step) => step.slug === 'cv-job')).toMatchObject({ hidden: true, items: expect.any(Array) });
     await userEvent.click(within(nav).getByRole('button', { name: 'Restore CV/Job Description' }));
     expect(within(nav).getByRole('button', { name: 'CV/Job Description' })).toBeInTheDocument();
@@ -536,7 +535,7 @@ describe('the builder page', () => {
     expect(screen.getByText('“Home address”')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Reset to standard wording' }));
     expect(screen.getByLabelText('Label')).toHaveValue('Address');
-    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
   });
 
   it('formats rich text from the toolbar', async () => {

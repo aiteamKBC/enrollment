@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it('retires the apprenticeship page in any publication and moves its stable signature key to ILR last', () => {
+it('respects the published apprenticeship Personal Details step and moves its stable signature key to ILR last', () => {
   const base = defaultLayout();
   const pd = base.steps.find(step => step.slug === 'personal-details')!;
   pd.hidden = false;
@@ -40,7 +40,7 @@ it('retires the apprenticeship page in any publication and moves its stable sign
   base.texts = { 'pd.signature.help': 'Historic paperwork wording' };
   const before = structuredClone(base);
   const active = layoutForLearner(resolveLayout(base), false);
-  expect(visibleSteps(active).some(step => step.slug === 'personal-details')).toBe(false);
+  expect(visibleSteps(active).some(step => step.slug === 'personal-details')).toBe(true);
   expect(active.steps.find(step => step.slug === 'ilr-details')!.items.at(-1)).toMatchObject({ key: 'pd.signature', required: true, hidden: false });
   expect(active.texts?.['pd.signature.help']).toBe('Historic paperwork wording');
   expect(base).toEqual(before);
@@ -53,13 +53,11 @@ it('retires the apprenticeship page in any publication and moves its stable sign
   ).every(item => item.hidden)).toBe(true);
 });
 
-it('uses the published Personal Details step state in new layouts while keeping old versions unchanged', () => {
-  const legacy = resolveLayout(defaultLayout());
-  expect(layoutForLearner(legacy, false).steps.find(step => step.slug === 'personal-details')!.hidden).toBe(true);
-  const managed = resolveLayout({ ...defaultLayout(), stepVisibilityManaged: true });
-  expect(layoutForLearner(managed, false).steps.find(step => step.slug === 'personal-details')!.hidden).toBe(false);
-  managed.steps.find(step => step.slug === 'personal-details')!.hidden = true;
-  expect(layoutForLearner(managed, false).steps.find(step => step.slug === 'personal-details')!.hidden).toBe(true);
+it('uses the saved Personal Details visibility for both older and newer layouts', () => {
+  const layout = resolveLayout(defaultLayout());
+  expect(layoutForLearner(layout, false).steps.find(step => step.slug === 'personal-details')!.hidden).toBe(false);
+  layout.steps.find(step => step.slug === 'personal-details')!.hidden = true;
+  expect(layoutForLearner(layout, false).steps.find(step => step.slug === 'personal-details')!.hidden).toBe(true);
 });
 
 it('requires the relocated signature while retired identity questions no longer gate apprenticeships', () => {

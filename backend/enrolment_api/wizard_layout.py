@@ -442,8 +442,6 @@ def normalize_layout(raw, previous):
             entry = plan.setdefault(table, {"index": index, "create": create, "columns": {}})
             entry["columns"][item["column"]] = COLUMN_TYPES[item["type"]]
     layout = {"steps": steps}
-    if raw.get("stepVisibilityManaged") is True:
-        layout["stepVisibilityManaged"] = True
     if texts:
         layout["texts"] = texts
     from programme_suitability.configuration import ConfigurationError, integrate_layout

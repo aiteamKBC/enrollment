@@ -231,6 +231,6 @@ describe('the wizard with a published layout', () => {
     );
     await waitFor(() => expect(fetchWizardLayout).toHaveBeenCalled());
     expect(screen.getAllByRole('tab')).toHaveLength(WIZARD_STEPS.length);
-    expect(screen.getByRole('heading', { name: 'ILR' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Personal Details' })).toBeInTheDocument();
   });
 });

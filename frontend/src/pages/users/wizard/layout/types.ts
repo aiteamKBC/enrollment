@@ -108,8 +108,6 @@ export interface LayoutStep {
 }
 
 export interface WizardLayout {
-  /** New publications use their stored step visibility; older versions keep their historical routing. */
-  stepVisibilityManaged?: boolean;
   skillsRadarCatalogues?: import('@/features/programme-suitability/skills-radar/catalogue/types').RadarCatalogues;
   skillsRadarImportApprovals?: import('@/features/programme-suitability/skills-radar/catalogue/types').CatalogueDraft['skillsRadarImportApprovals'];
   programmeModules?: import('@/features/programme-suitability/modules/configuration').ModulesConfiguration;
