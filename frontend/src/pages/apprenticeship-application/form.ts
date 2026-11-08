@@ -223,6 +223,16 @@ export function isValidDate(value: unknown): value is string {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+/** Native date-picker minimum for date fields whose earliest value depends on another answer. */
+export function minimumDate(question: Question, answers: Answers): string {
+  if (question.key === 'expectedLeavingDate' && isValidDate(answers.dateOfBirth)) {
+    const dayAfterBirth = new Date(`${answers.dateOfBirth}T00:00:00Z`);
+    dayAfterBirth.setUTCDate(dayAfterBirth.getUTCDate() + 1);
+    return dayAfterBirth.toISOString().slice(0, 10);
+  }
+  return '1900-01-01';
+}
+
 const ageToday = (birth: string, today: string) => Number(today.slice(0, 4)) - Number(birth.slice(0, 4))
   - Number(today.slice(5) < birth.slice(5));
 

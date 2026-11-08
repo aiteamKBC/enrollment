@@ -28,6 +28,7 @@ import {
   isQuestion,
   isRequired,
   isShown,
+  minimumDate,
   toPayload,
   validateSection,
   type AnswerValue,
@@ -460,6 +461,7 @@ export default function ApprenticeshipApplicationPage() {
                   value={value}
                   error={errors[item.key]}
                   today={today}
+                  minimumDate={minimumDate(item, answers)}
                   onChange={next => setAnswer(item.key, next)}
                   onBlur={postcode ? () => void checkPostcode(String(value ?? '')) : undefined}
                   check={postcode && isUkPostcode(String(value ?? '')) ? checks[compactPostcode(String(value))] : undefined}
@@ -532,6 +534,7 @@ interface QuestionRowProps {
   value: AnswerValue;
   error?: string;
   today: string;
+  minimumDate: string;
   onChange: (value: string | boolean) => void;
   onBlur?: () => void;
   /** Postcode questions: the lookup of the current answer. */
@@ -539,7 +542,7 @@ interface QuestionRowProps {
   onRetry?: () => void;
 }
 
-function QuestionRow({ question, number, value, error, today, onChange, onBlur, check, onRetry }: QuestionRowProps) {
+function QuestionRow({ question, number, value, error, today, minimumDate, onChange, onBlur, check, onRetry }: QuestionRowProps) {
   const id = `application-${question.key}`;
   const labelId = `${id}-label`;
   const hintId = question.hint ? `${id}-hint` : undefined;
@@ -628,7 +631,7 @@ function QuestionRow({ question, number, value, error, today, onChange, onBlur, 
             placeholder={question.placeholder}
             maxLength={'maxLength' in question ? question.maxLength : undefined}
             max={question.kind === 'date' && !question.allowFuture ? today : undefined}
-            min={question.kind === 'date' ? '1900-01-01' : undefined}
+            min={question.kind === 'date' ? minimumDate : undefined}
             step={question.kind === 'number' ? 'any' : undefined}
             inputMode={question.kind === 'number' ? 'decimal' : undefined}
             autoComplete={'autoComplete' in question ? question.autoComplete : undefined}
