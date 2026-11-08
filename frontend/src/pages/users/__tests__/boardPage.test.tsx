@@ -15,7 +15,8 @@ import { fetchCoachOptions } from '@/api/staffUsers';
 vi.mock('@/components/feature/WorkspaceShell', () => ({ WorkspaceShell: ({ children }: { children: ReactNode }) => children }));
 const toast = vi.hoisted(() => ({ info: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock("@/hooks/useToast.helpers", () => ({ useToast: () => toast }));
-vi.mock("@/hooks/useAuth.helpers", () => ({ useAuth: () => ({ isAdmin: true, auth: { user: { fullName: 'Staff Member' } } }) }));
+const authState = vi.hoisted(() => ({ isAdmin: true }));
+vi.mock("@/hooks/useAuth.helpers", () => ({ useAuth: () => ({ isAdmin: authState.isAdmin, auth: { user: { fullName: 'Staff Member' } } }) }));
 vi.mock('../components/LearnerHeaderDates', () => ({ LearnerHeaderDates: () => <div>Learner dates</div> }));
 vi.mock('../components/FirstSessionReschedule', () => ({ FirstSessionReschedule: () => null }));
 
@@ -49,6 +50,12 @@ const reviews = vi.hoisted(() => ({ fetchOnboardingReviewSlots: vi.fn(), issueOn
 vi.mock('@/api/reviewForm', async (original) => ({ ...(await original<typeof import('@/api/reviewForm')>()), ...reviews }));
 vi.mock('@/api/coach', () => ({ fetchLearnerCoach: vi.fn(async () => { throw new Error('not active'); }), updateLearnerCoach: vi.fn() }));
 vi.mock('@/api/staffUsers', () => ({ fetchCoachOptions: vi.fn(async () => []) }));
+const rplApi = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn(), generate: vi.fn() }));
+vi.mock('@/api/suitabilityRplReport', () => ({
+  fetchSuitabilityRplReport: rplApi.fetch,
+  saveSuitabilityRplReport: rplApi.save,
+  generateSuitabilityRplJustification: rplApi.generate,
+}));
 
 import BoardPage from '../BoardPage';
 
@@ -116,6 +123,24 @@ const SIGNATURES = { learner: unsigned, admin: unsigned, signable: false };
 const notIssued = (type: string, label: string) => ({ type, label, issued: false });
 
 beforeEach(() => {
+  authState.isAdmin = true;
+  rplApi.fetch.mockResolvedValue({
+    report: null,
+    aiEnabled: false,
+    history: [],
+    sourceVersions: {},
+    context: { key: 'synthetic', programmeId: 'ME-L4', programmeName: 'Marketing Executive Level 4', enrolmentReference: 'SYN-20', practicalStartDate: '2026-09-01' },
+    evidence: {
+      learner: { id: '20', name: 'Sam Example', reference: 'SYN-20', employer: 'Example Ltd', jobTitle: 'Marketing Assistant', responsibilities: [] },
+      programme: { id: 'ME-L4', name: 'Marketing Executive Level 4', level: '4', startDate: '2026-09-01' },
+      programmeUnderstanding: [{ question: 'Question one', answer: 'Answer one' }, { question: 'Question two', answer: 'Answer two' }],
+      programmeSuitability: { status: 'available', responses: [] },
+      skillsRadar: { status: 'available', scaleMaximum: 9, catalogueVersion: '1', items: [{ id: 'k1', code: 'K1', kind: 'knowledge', description: 'Synthetic score', level: 'capable', score: 5, moduleKey: 'module-a' }] },
+      evidence: { cv: { status: 'provided', experience: 'Synthetic experience', documents: [] }, qualifications: { status: 'provided', items: [{ label: 'Highest qualification', value: 'Level 3 Diploma', source: 'ILR learner details' }], documents: [] }, plr: { status: 'not_available', message: 'Not available - integration not implemented' } },
+      trainingPlan: { available: true, source: 'authoritative_training_plan', plannedHours: 100, modules: [{ moduleId: 'module-a', title: 'Saved module', plannedHours: 100, ksbCodes: ['K1'] }], message: '' },
+      limitations: [], capturedAt: '2026-11-05T12:00:00Z',
+    },
+  });
   reviews.fetchOnboardingReviewSlots.mockResolvedValue({
     programme: 'Marketing Executive Level 4', allIssued: false, allCompleted: false,
     reviews: [
@@ -130,6 +155,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 
 describe('the enrolment board', () => {
+  it('does not flash a report-evidence error while the initial report request is pending', async () => {
+    let resolveReport!: (value: unknown) => void;
+    rplApi.fetch.mockReturnValueOnce(new Promise((resolve) => { resolveReport = resolve; }));
+    renderBoard('/users/20?tab=suitability-rpl');
+    await screen.findByRole('heading', { name: 'Sam Example' });
+    expect(screen.getByText(/Loading report evidence/)).toBeVisible();
+    expect(screen.queryByText('The report evidence is unavailable.')).not.toBeInTheDocument();
+    resolveReport({ report: null, aiEnabled: false, history: [], sourceVersions: {}, context: { key: 'synthetic', programmeId: 'ME-L4', programmeName: 'Marketing Executive Level 4', enrolmentReference: 'SYN-20', practicalStartDate: '2026-09-01' }, evidence: { learner: { id: '20', name: 'Sam Example', reference: 'SYN-20', employer: '', jobTitle: '', responsibilities: [] }, programme: { id: 'ME-L4', name: 'Marketing Executive Level 4', level: '4', startDate: '' }, programmeUnderstanding: [], programmeSuitability: { status: 'available', responses: [] }, skillsRadar: { status: 'available', scaleMaximum: 9, catalogueVersion: '', items: [] }, evidence: { cv: { status: 'not_provided', experience: '', documents: [] }, qualifications: { status: 'not_provided', items: [], documents: [] }, plr: { status: 'not_available', message: 'Not available' } }, trainingPlan: { available: false, source: 'authoritative_training_plan', plannedHours: null, modules: [], message: '' }, limitations: [], capturedAt: '' } });
+    await waitFor(() => expect(screen.getByText('Learner and programme evidence')).toBeVisible());
+    expect(screen.queryByText('The report evidence is unavailable.')).not.toBeInTheDocument();
+  });
+
   it('reports a blocked Review handover after saving the new Coach assignment', async () => {
     vi.mocked(fetchLearnerCoach).mockResolvedValueOnce({ coachName: 'Previous Coach', coachEmail: 'old@example.invalid' });
     vi.mocked(fetchCoachOptions).mockResolvedValueOnce([{ name: 'New Coach', email: 'new@example.invalid' }]);
@@ -164,8 +201,8 @@ describe('the enrolment board', () => {
     await screen.findByRole('heading', { name: 'Sam Example' });
     tab(/Overview/).focus();
     fireEvent.keyDown(tab(/Overview/), { key: 'ArrowRight' });
-    expect(tab(/Documents/)).toHaveAttribute('aria-selected', 'true');
-    expect(tab(/Documents/)).toHaveFocus();
+    expect(tab(/Suitability & RPL Report/)).toHaveAttribute('aria-selected', 'true');
+    expect(tab(/Suitability & RPL Report/)).toHaveFocus();
     fireEvent.click(tab(/Skills & progress/));
     expect(location).toBe('/users/20?tab=skills');
 
@@ -177,6 +214,31 @@ describe('the enrolment board', () => {
     for (const name of ['Milestones', 'Functional Skills', 'Placements', 'Onboarding tracker', 'Sub-programmes']) {
       expect(screen.queryByRole('region', { name })).not.toBeInTheDocument();
     }
+  });
+
+  it('shows the dynamic report tab only to administrators', async () => {
+    renderBoard('/users/20?tab=suitability-rpl');
+    const heading = await screen.findByRole('heading', { name: 'Suitability & RPL Report' });
+    expect(heading).toBeVisible();
+    expect(heading).toHaveClass('text-white');
+    expect(rplApi.fetch).toHaveBeenCalledWith('apprenticeship', '20', expect.any(AbortSignal));
+    expect(screen.getByText('Marketing Assistant')).toBeVisible();
+    expect(screen.getByText('Not available - integration not implemented')).toBeVisible();
+    expect(screen.getByText(/Section 08 includes assessor, learner and employer \/ line manager/)).toBeVisible();
+    expect(screen.getAllByText(/If an AI draft is not acceptable, edit or replace it first/)).toHaveLength(2);
+    cleanup();
+
+    authState.isAdmin = false;
+    renderBoard('/users/20?tab=suitability-rpl');
+    await screen.findByRole('heading', { name: 'Sam Example' });
+    expect(screen.queryByRole('tab', { name: /Suitability & RPL Report/ })).not.toBeInTheDocument();
+    expect(tab(/Overview/)).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('loads the report with the commercial learner context', async () => {
+    renderBoard('/users/20?source=commercial&tab=suitability-rpl');
+    expect(await screen.findByRole('heading', { name: 'Suitability & RPL Report' })).toBeVisible();
+    expect(rplApi.fetch).toHaveBeenCalledWith('commercial', '20', expect.any(AbortSignal));
   });
 
   it('shows older imported data only for learners who have it', async () => {

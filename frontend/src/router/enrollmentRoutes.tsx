@@ -14,6 +14,7 @@ const EligibilityBuilder = lazy(() => import('@/pages/users/eligibility-builder/
 const EligibilityApplications = lazy(() => import('@/pages/users/eligibility-applications/page'));
 const FirstSessions = lazy(() => import('@/pages/users/first-sessions/page'));
 const CoachDirectory = lazy(() => import('@/pages/admin/coach-directory/page'));
+const SuitabilityRplReport = lazy(() => import('@/pages/admin/suitability-rpl-report/page'));
 const CoachBooking = lazy(() => import('@/pages/coach-booking/page'));
 const Introduction = lazy(() => import('@/pages/lms-introduction/page'));
 const Welcome = lazy(() => import('@/pages/learner/welcome/page'));
@@ -43,6 +44,7 @@ export const enrollmentRoutes: RouteObject[] = [
     { path: '/users/eligibility-applications/:applicationId', element: <EligibilityApplications /> },
     { path: '/users/first-sessions', element: <FirstSessions /> },
     { path: '/users/coach-directory', element: <CoachDirectory workspaceRole="compliance" /> },
+    { path: '/admin/suitability-rpl-report', element: <SuitabilityRplReport /> },
     { path: '/users/:userId', element: <Board /> },
     { path: '/users/:userId/wizard', element: <Wizard /> },
     { path: '/users/:userId/wizard/:stepSlug', element: <Wizard /> },

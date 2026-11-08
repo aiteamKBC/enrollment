@@ -341,6 +341,10 @@ CHAT_DEMO_BOOTSTRAP_ENABLED = os.environ.get(
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
+# Suitability/RPL prompts contain learner evidence. They remain off until the
+# deployment owner explicitly approves this data class for the configured AI
+# provider. Tests override the flag and mock the provider; they never call it.
+SUITABILITY_RPL_AI_ENABLED = os.environ.get("SUITABILITY_RPL_AI_ENABLED", "false").lower() == "true"
 EVIDENCE_AUDIT_SERVICE_URL = os.environ.get(
     "EVIDENCE_AUDIT_SERVICE_URL", "https://fetch-evidence.kentbusinesscollege.net"
 ).rstrip("/")

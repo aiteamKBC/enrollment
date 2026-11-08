@@ -61,10 +61,11 @@ import SignReviewModal from '@/pages/learner/onboarding/reviews/SignReviewModal'
 import { downloadReviewPdf } from '@/pages/learner/onboarding/reviews/reviewDocument';
 import { REVIEW_QUESTION_LABELS } from '@/pages/learner/onboarding/reviews/questions';
 import type { LearnerKind } from '@/api/extendedIlr';
+import { SuitabilityRplReportTab } from './suitability-rpl/SuitabilityRplReportTab';
 import type { EnrolmentBoard, FsBlock } from './types';
 import { competenceMeta } from '@/mocks/enrolment-console';
 import {
-  AlertTriangle, Award, Briefcase, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, Flag,
+  AlertTriangle, Award, Briefcase, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, FileCheck2, Flag,
   FolderOpen, GraduationCap, History, LayoutGrid, ListChecks, MessageSquareText, Network, PenLine, Search,
   ShieldCheck, Target, Trash2, Upload, UserX, Users, Wand2, Wrench, type LucideIcon,
 } from 'lucide-react';
@@ -1329,7 +1330,7 @@ export default function BoardPage() {
 // writes any more appear only for learners who have some.                     //
 // --------------------------------------------------------------------------- //
 
-type TabId = 'overview' | 'documents' | 'skills' | 'activity';
+type TabId = 'overview' | 'suitability-rpl' | 'documents' | 'skills' | 'activity';
 
 /** A titled card, with an optional count and actions. */
 function Card({
@@ -1458,6 +1459,7 @@ function BoardView({
   refreshError: string | null;
 }) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [search, setSearch] = useSearchParams();
   const { info, success, error } = useToast();
   const userId = board.user.id;
@@ -1470,6 +1472,7 @@ function BoardView({
   // ---- tabs: kept in the URL, so a reload or a shared link reopens the same one ----
   const tabs: { id: TabId; label: string; icon: LucideIcon; count?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
+    ...(isAdmin ? [{ id: 'suitability-rpl' as const, label: 'Suitability & RPL Report', icon: FileCheck2 }] : []),
     // The compliance paperwork, reviews and uploads are apprenticeship-only.
     ...(isCommercial ? [] : [{ id: 'documents' as const, label: 'Documents', icon: FolderOpen }]),
     { id: 'skills', label: 'Skills & progress', icon: Target, count: board.competencies.length },
@@ -1654,6 +1657,10 @@ function BoardView({
         <BoardTabs tabs={tabs} active={tab} onChange={selectTab} />
 
         <div role="tabpanel" id={`board-panel-${tab}`} aria-labelledby={`board-tab-${tab}`} className="space-y-4">
+          {tab === 'suitability-rpl' && isAdmin && (
+            <SuitabilityRplReportTab kind={kind} learnerId={userId} learnerName={board.user.name} />
+          )}
+
           {tab === 'overview' && (
             <>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

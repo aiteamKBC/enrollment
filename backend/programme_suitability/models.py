@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 
 
 class Assessment(models.Model):
@@ -39,3 +40,149 @@ class ModuleConfigurationDraft(models.Model):
 
     class Meta:
         db_table = 'programme_modules_admin_drafts'
+
+
+class SuitabilityRplReport(models.Model):
+    """Admin-owned suitability/RPL assessment for one enrolment context.
+
+    ``context_key`` identifies the learner's programme/enrolment combination,
+    rather than the learner alone.  The JSON snapshot is deliberately frozen
+    when a report is first saved so later wizard or programme publications do
+    not rewrite what the assessor reviewed.
+    """
+
+    STATUS_DRAFT = 'draft'
+    STATUS_FINALISED = 'finalised'
+    STATUS_CHOICES = ((STATUS_DRAFT, 'Draft'), (STATUS_FINALISED, 'Finalised'))
+
+    SUITABILITY_NOT_ASSESSED = 'not_assessed'
+    SUITABILITY_SUITABLE = 'suitable'
+    SUITABILITY_FURTHER_ASSESSMENT = 'further_assessment'
+    SUITABILITY_CHOICES = (
+        (SUITABILITY_NOT_ASSESSED, 'Not assessed'),
+        (SUITABILITY_SUITABLE, 'Suitable'),
+        (SUITABILITY_FURTHER_ASSESSMENT, 'Further assessment required'),
+    )
+
+    learner_kind = models.CharField(max_length=20)
+    learner_id = models.BigIntegerField()
+    context_key = models.CharField(max_length=64)
+    programme_id = models.CharField(max_length=100, blank=True)
+    programme_name = models.TextField(blank=True)
+    enrolment_reference = models.CharField(max_length=200, blank=True)
+    practical_start_date = models.CharField(max_length=32, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    report_reference = models.CharField(max_length=100, unique=True)
+    report_version = models.PositiveIntegerField(default=1)
+    revision = models.PositiveIntegerField(default=1)
+
+    relevant_prior_learning = models.BooleanField(null=True, blank=True)
+    reduction_justified = models.BooleanField(null=True, blank=True)
+    assessor_evidence_review = models.TextField(blank=True)
+    no_reduction_reason = models.TextField(blank=True)
+    suitability_outcome = models.CharField(
+        max_length=32, choices=SUITABILITY_CHOICES, default=SUITABILITY_NOT_ASSESSED,
+    )
+    final_summary = models.TextField(blank=True)
+
+    suitability_justification = models.TextField(blank=True)
+    suitability_ai_metadata = models.JSONField(default=dict, blank=True)
+    suitability_reviewed_by = models.BigIntegerField(null=True, blank=True)
+    suitability_reviewed_by_name = models.CharField(max_length=200, blank=True)
+    suitability_reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    rpl_justification = models.TextField(blank=True)
+    rpl_ai_metadata = models.JSONField(default=dict, blank=True)
+    rpl_reviewed_by = models.BigIntegerField(null=True, blank=True)
+    rpl_reviewed_by_name = models.CharField(max_length=200, blank=True)
+    rpl_reviewed_at = models.DateTimeField(null=True, blank=True)
+    cv_extraction_acknowledged = models.BooleanField(default=False)
+    cv_extraction_acknowledged_by = models.BigIntegerField(null=True, blank=True)
+    cv_extraction_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    cv_extraction_acknowledgement_reason = models.TextField(blank=True)
+    cv_source_document_id = models.CharField(max_length=200, blank=True)
+    cv_source_container = models.CharField(max_length=100, blank=True)
+    cv_source_blob_name = models.TextField(blank=True)
+    cv_source_blob_hash = models.CharField(max_length=64, blank=True)
+    cv_extractor_version = models.CharField(max_length=40, blank=True)
+
+    source_snapshot = models.JSONField(default=dict)
+    source_versions = models.JSONField(default=dict)
+    source_snapshot_hash = models.CharField(max_length=64)
+
+    created_by = models.BigIntegerField(null=True, blank=True)
+    updated_by = models.BigIntegerField(null=True, blank=True)
+    finalised_by = models.BigIntegerField(null=True, blank=True)
+    finalised_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'suitability_rpl_reports'
+        constraints = [
+            models.UniqueConstraint(
+                fields=('learner_kind', 'learner_id', 'context_key'),
+                condition=Q(status='draft'),
+                name='unique_draft_suitability_rpl_context',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=('learner_kind', 'learner_id', 'context_key'),
+                name='suit_rpl_context_idx',
+            ),
+        ]
+
+
+class SuitabilityRplReduction(models.Model):
+    report = models.ForeignKey(
+        SuitabilityRplReport, on_delete=models.CASCADE, related_name='reductions',
+    )
+    module_id = models.CharField(max_length=200)
+    module_title = models.TextField()
+    planned_hours = models.DecimalField(max_digits=9, decimal_places=2)
+    reduced_hours = models.DecimalField(max_digits=9, decimal_places=2)
+    ksb_codes = models.JSONField(default=list, blank=True)
+    evidence = models.TextField()
+    assessor_comments = models.TextField(blank=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'suitability_rpl_reductions'
+        ordering = ('display_order', 'id')
+        constraints = [
+            models.UniqueConstraint(
+                fields=('report', 'module_id'), name='unique_suitability_rpl_module',
+            ),
+        ]
+
+
+class SuitabilityCvExtraction(models.Model):
+    """Private, versioned text extracted from one approved CV blob."""
+    STATUS_PENDING = 'pending'
+    STATUS_READY = 'ready'
+    STATUS_UNSUPPORTED = 'unsupported'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = tuple((value, value.replace('_', ' ').title()) for value in (STATUS_PENDING, STATUS_READY, STATUS_UNSUPPORTED, STATUS_FAILED))
+
+    learner_kind = models.CharField(max_length=20)
+    learner_id = models.BigIntegerField()
+    source_document_id = models.CharField(max_length=200)
+    source_container = models.CharField(max_length=100)
+    source_blob_name = models.TextField()
+    source_blob_hash = models.CharField(max_length=64)
+    source_filename = models.CharField(max_length=255, blank=True)
+    source_content_type = models.CharField(max_length=160, blank=True)
+    extractor_version = models.CharField(max_length=40, default='cv-text-v1')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    extracted_text = models.TextField(blank=True)
+    error_code = models.CharField(max_length=80, blank=True)
+    extracted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'suitability_cv_extractions'
+        constraints = [models.UniqueConstraint(fields=('learner_kind', 'learner_id', 'source_document_id', 'source_blob_hash'), name='unique_suitability_cv_source')]
+        indexes = [models.Index(fields=('learner_kind', 'learner_id', 'source_document_id'), name='suit_cv_learner_doc_idx')]
