@@ -410,7 +410,13 @@ def normalize_layout(raw, previous):
             seen_keys.add(key)
             items.append(item)
 
-        step = {"slug": slug, "label": label, "builtin": builtin, "hidden": bool(raw_step.get("hidden")), "items": items}
+        hidden = bool(raw_step.get("hidden"))
+        suitability = raw.get("programmeSuitability")
+        suitability_enabled = isinstance(suitability, dict) and suitability.get("enabled")
+        if hidden and (slug in {"ilr-details", "skills-radar"} or
+                       slug == "programme-suitability" and suitability_enabled):
+            raise LayoutError(f"'{label}' is required for this wizard and cannot be removed.")
+        step = {"slug": slug, "label": label, "builtin": builtin, "hidden": hidden, "items": items}
         if not builtin:
             step["table"] = table
         steps.append(step)
@@ -436,6 +442,8 @@ def normalize_layout(raw, previous):
             entry = plan.setdefault(table, {"index": index, "create": create, "columns": {}})
             entry["columns"][item["column"]] = COLUMN_TYPES[item["type"]]
     layout = {"steps": steps}
+    if raw.get("stepVisibilityManaged") is True:
+        layout["stepVisibilityManaged"] = True
     if texts:
         layout["texts"] = texts
     from programme_suitability.configuration import ConfigurationError, integrate_layout

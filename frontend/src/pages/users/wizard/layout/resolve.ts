@@ -61,16 +61,15 @@ const APPRENTICESHIP_ONLY_ITEMS = new Set(['block.inclusion', 'ild.niApplied', '
  */
 export function layoutForLearner(layout: WizardLayout, commercial: boolean): WizardLayout {
   if (!commercial) {
-    // Keep the common builder catalog for commercial delivery and historical
-    // answers. Apprenticeships always retire its Personal Details page, even
-    // when an older publication explicitly showed or reordered that page.
+    // Older publications relied on this implicit retirement. New publications
+    // record the step state explicitly, so Remove/Restore controls the journey.
     const steps = layout.steps.map(step => ({ ...step, items: step.items.map(item => ({ ...item })) }));
     const signature = steps.flatMap(step => step.items).find(item => item.builtin && item.key === 'pd.signature')
       ?? { key: 'pd.signature', builtin: true, hidden: false };
     const declaration = steps.flatMap(step => step.items).find(item => item.builtin && item.key === 'ild.signature')
       ?? { key: 'ild.signature', builtin: true };
     for (const step of steps) {
-      if (step.slug === 'personal-details') step.hidden = true;
+      if (step.slug === 'personal-details' && !layout.stepVisibilityManaged) step.hidden = true;
       step.items = step.items.filter(item => !(item.builtin && ['pd.signature', 'ild.signature', 'ild.postcodePrior'].includes(item.key)));
     }
     const ilr = steps.find(step => step.slug === 'ilr-details');
@@ -114,6 +113,7 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
   if (!saved || !Array.isArray(saved.steps) || saved.steps.length === 0) return {
     ...defaultLayout(), ...radar, ...(saved?.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
     ...(saved?.programmeModules ? { programmeModules: saved.programmeModules } : {}),
+    ...(saved?.stepVisibilityManaged ? { stepVisibilityManaged: true } : {}),
   };
 
   const known = new Set(BUILTIN_STEPS.map((s) => s.slug));
@@ -167,7 +167,8 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
 
   const texts = cleanTexts(saved.texts);
   return { steps, ...radar, ...(texts ? { texts } : {}), ...(saved.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
-    ...(saved.programmeModules ? { programmeModules: saved.programmeModules } : {}) };
+    ...(saved.programmeModules ? { programmeModules: saved.programmeModules } : {}),
+    ...(saved.stepVisibilityManaged ? { stepVisibilityManaged: true } : {}) };
 }
 
 /** The steps a learner walks through, in order. */

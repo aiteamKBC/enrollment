@@ -117,6 +117,10 @@ function renderBuilder() {
 
 const openStep = async (name: string) => {
   const nav = await screen.findByRole('navigation', { name: 'Wizard steps' });
+  if (name === 'Personal Details' && !within(nav).queryByRole('button', { name })) {
+    await userEvent.click(within(nav).getByRole('button', { name: /Removed steps/ }));
+    await userEvent.click(within(nav).getByRole('button', { name: 'Restore Personal Details' }));
+  }
   await userEvent.click(within(nav).getByRole('button', { name }));
 };
 
@@ -244,7 +248,7 @@ describe('the builder page', () => {
     renderBuilder();
     await openStep('Programme Suitability & Modules');
     expect(screen.getByRole('region', { name: 'Programme Suitability Assessment configuration' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Show this step to learners')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove Programme Suitability & Modules step' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
     await userEvent.click(screen.getByRole('tab', { name: 'Marketing Assessment' }));
     expect(screen.getByDisplayValue('marketing responsibilities')).toBeInTheDocument();
@@ -257,13 +261,41 @@ describe('the builder page', () => {
 
   it('starts from the standard wizard and cannot publish until something changes', async () => {
     renderBuilder();
-    await openStep('Personal Details');
-    expect(screen.getByText(/nothing has been published from the builder yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/nothing has been published from the builder yet/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Removed steps (1)' })).toBeInTheDocument();
+    await openStep('Personal Details');
     expect(screen.getByText('First Name')).toBeInTheDocument();
-    expect(screen.getByText(/This step applies to commercial onboarding only/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeEnabled();
     await openStep('ILR');
     expect(screen.getByText(/Apprenticeships have one required Your signature field/)).toBeInTheDocument();
+  });
+
+  it('removes and restores a step while keeping its questions in the published layout', async () => {
+    renderBuilder();
+    await openStep('CV/Job Description');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove CV/Job Description step' }));
+    const nav = screen.getByRole('navigation', { name: 'Wizard steps' });
+    expect(within(nav).queryByRole('button', { name: 'CV/Job Description' })).toBeNull();
+    await userEvent.click(within(nav).getByRole('button', { name: /Removed steps/ }));
+    expect(within(nav).getByRole('button', { name: 'Restore CV/Job Description' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
+    await waitFor(() => expect(publishWizardLayout).toHaveBeenCalled());
+    const sent = publishWizardLayout.mock.calls[0][0] as WizardLayout;
+    expect(sent.stepVisibilityManaged).toBe(true);
+    expect(sent.steps.find((step) => step.slug === 'cv-job')).toMatchObject({ hidden: true, items: expect.any(Array) });
+    await userEvent.click(within(nav).getByRole('button', { name: 'Restore CV/Job Description' }));
+    expect(within(nav).getByRole('button', { name: 'CV/Job Description' })).toBeInTheDocument();
+    expect(screen.getByText('Highest-level qualification')).toBeInTheDocument();
+  });
+
+  it('keeps required journey steps available', async () => {
+    renderBuilder();
+    await openStep('ILR');
+    expect(screen.getByRole('button', { name: 'Remove ILR step' })).toBeDisabled();
+    await openStep('Skills Radar');
+    expect(screen.getByRole('button', { name: 'Remove Skills Radar step' })).toBeDisabled();
   });
 
   it('offers separate single-line and multi-line text fields', async () => {
@@ -504,7 +536,7 @@ describe('the builder page', () => {
     expect(screen.getByText('“Home address”')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Reset to standard wording' }));
     expect(screen.getByLabelText('Label')).toHaveValue('Address');
-    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeEnabled();
   });
 
   it('formats rich text from the toolbar', async () => {

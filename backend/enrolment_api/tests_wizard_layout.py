@@ -55,6 +55,15 @@ def cv_step(layout):
 
 
 class NormalizeLayoutTests(SimpleTestCase):
+    def test_new_step_visibility_is_persisted_and_journey_steps_are_protected(self):
+        raw = {"stepVisibilityManaged": True, "steps": [step("personal-details", [], hidden=True), step("ilr-details", [])]}
+        layout, _ = wl.normalize_layout(raw, None)
+        self.assertTrue(layout["stepVisibilityManaged"])
+        self.assertTrue(layout["steps"][0]["hidden"])
+        for slug in ("ilr-details", "skills-radar"):
+            with self.subTest(slug=slug), self.assertRaises(wl.LayoutError):
+                wl.normalize_layout({"steps": [step(slug, [], hidden=True)]}, None)
+
     def test_content_blocks_have_no_answer_storage(self):
         layout, plan = wl.normalize_layout({"steps": [step("cv-job", [
             custom("GCSEs", "heading"),

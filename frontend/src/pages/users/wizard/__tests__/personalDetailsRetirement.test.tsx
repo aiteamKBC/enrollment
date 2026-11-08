@@ -53,6 +53,15 @@ it('retires the apprenticeship page in any publication and moves its stable sign
   ).every(item => item.hidden)).toBe(true);
 });
 
+it('uses the published Personal Details step state in new layouts while keeping old versions unchanged', () => {
+  const legacy = resolveLayout(defaultLayout());
+  expect(layoutForLearner(legacy, false).steps.find(step => step.slug === 'personal-details')!.hidden).toBe(true);
+  const managed = resolveLayout({ ...defaultLayout(), stepVisibilityManaged: true });
+  expect(layoutForLearner(managed, false).steps.find(step => step.slug === 'personal-details')!.hidden).toBe(false);
+  managed.steps.find(step => step.slug === 'personal-details')!.hidden = true;
+  expect(layoutForLearner(managed, false).steps.find(step => step.slug === 'personal-details')!.hidden).toBe(true);
+});
+
 it('requires the relocated signature while retired identity questions no longer gate apprenticeships', () => {
   const layout = layoutForLearner(resolveLayout(null), false);
   const ilr = layout.steps.find(step => step.slug === 'ilr-details')!;

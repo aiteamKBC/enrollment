@@ -32,6 +32,9 @@ import {
   moveStep,
   pendingColumns,
   removeItem,
+  removeStep,
+  restoreStep,
+  canRemoveStep,
   saveCustomField,
   setText,
   updateItem,
@@ -62,6 +65,15 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const clone = (layout: WizardLayout): WizardLayout => JSON.parse(JSON.stringify(layout)) as WizardLayout;
+
+/** Preserve the old apprenticeship journey when moving an older version into the new editor. */
+const editableLayout = (saved: WizardLayout | null, kind: LearnerKind): WizardLayout => {
+  const layout = resolveLayout(saved);
+  if (kind === 'apprenticeship' && !layout.stepVisibilityManaged) {
+    layout.steps = layout.steps.map((step) => step.slug === 'personal-details' ? { ...step, hidden: true } : step);
+  }
+  return { ...layout, stepVisibilityManaged: true };
+};
 
 /**
  * The "Edit apprenticeship wizard" builder.
@@ -97,13 +109,13 @@ export default function WizardBuilderPage() {
   const reportVersionSuccess = useCallback((message: string, created?: WizardLayoutResponse, createdKind?: LearnerKind) => {
     setVersionAction(null);
     if (created && createdKind === kind) {
-      const resolved = resolveLayout(created.layout);
+      const resolved = editableLayout(created.layout, kind);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(created.version);
       setUpdatedAt(created.updatedAt);
       setUpdatedBy(created.updatedBy);
-      setSelected((current) => resolved.steps.some((step) => step.slug === current) ? current : resolved.steps[0]?.slug ?? '');
+      setSelected((current) => resolved.steps.some((step) => step.slug === current && !step.hidden) ? current : resolved.steps.find((step) => !step.hidden)?.slug ?? '');
       setEditing(null);
     }
     success('Wizard version updated', message);
@@ -119,14 +131,14 @@ export default function WizardBuilderPage() {
       .then(([res, available]) => {
         if (cancelled || sequence !== loadSequence.current) return;
         setVersions(available);
-        const resolved = resolveLayout(res.layout);
+        const resolved = editableLayout(res.layout, kind);
         setPublished(resolved);
         setLayout(clone(resolved));
         setVersion(res.version);
         setDefaultVersion(res.version);
         setUpdatedAt(res.updatedAt);
         setUpdatedBy(res.updatedBy);
-        setSelected((cur) => (resolved.steps.some((s) => s.slug === cur) ? cur : resolved.steps[0]?.slug ?? ''));
+        setSelected((cur) => (resolved.steps.some((s) => s.slug === cur && !s.hidden) ? cur : resolved.steps.find((s) => !s.hidden)?.slug ?? ''));
       })
       .catch((e: Error) => { if (!cancelled && sequence === loadSequence.current) setLoadError(e.message); })
       .finally(() => { if (!cancelled && sequence === loadSequence.current) setLoading(false); });
@@ -141,13 +153,13 @@ export default function WizardBuilderPage() {
     try {
       const res = value === 'current' ? await fetchWizardLayout({ kind, force: true }) : await WizardLayoutApi.fetchWizardVersion(Number(value));
       if (sequence !== loadSequence.current) return;
-      const resolved = resolveLayout(res.layout);
+      const resolved = editableLayout(res.layout, kind);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(res.version);
       setUpdatedAt(res.updatedAt);
       setUpdatedBy(res.updatedBy);
-      setSelected(resolved.steps[0]?.slug ?? '');
+      setSelected(resolved.steps.find((step) => !step.hidden)?.slug ?? '');
       setEditing(null);
     } catch (e) {
       if (sequence === loadSequence.current) setLoadError(e instanceof Error ? e.message : 'Could not load this version.');
@@ -197,7 +209,7 @@ export default function WizardBuilderPage() {
     setPublishing(true);
     try {
       const saved = await publishWizardLayout(layout, defaultVersion, { learnerKind: kind });
-      const resolved = resolveLayout(saved.layout);
+      const resolved = editableLayout(saved.layout, kind);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(saved.version);
@@ -206,7 +218,7 @@ export default function WizardBuilderPage() {
       setUpdatedAt(saved.updatedAt);
       setUpdatedBy(saved.updatedBy);
       // A new step's temporary slug is replaced by the server's.
-      setSelected((cur) => (resolved.steps.some((s) => s.slug === cur) ? cur : resolved.steps[resolved.steps.length - 1]?.slug ?? ''));
+      setSelected((cur) => (resolved.steps.some((s) => s.slug === cur && !s.hidden) ? cur : [...resolved.steps].reverse().find((s) => !s.hidden)?.slug ?? ''));
       setConfirming(false);
       success('Wizard published', 'Learners who have not reached Skills Radar will use this version. Others keep their pinned version.');
     } catch (e) {
@@ -216,7 +228,22 @@ export default function WizardBuilderPage() {
     }
   };
 
-  const step = layout?.steps.find((s) => s.slug === selected) ?? null;
+  const step = layout?.steps.find((s) => s.slug === selected && !s.hidden) ?? null;
+  const removeSelectedStep = () => {
+    if (!layout || !step || !canRemoveStep(layout, step.slug)) return;
+    const shown = layout.steps.filter((entry) => !entry.hidden);
+    if (shown.length <= 1) return;
+    const index = shown.findIndex((entry) => entry.slug === step.slug);
+    const next = shown[index + 1] ?? shown[index - 1];
+    setLayout(removeStep(layout, step.slug));
+    setSelected(next.slug);
+    setEditing(null);
+  };
+  const restoreRemovedStep = (slug: string) => {
+    edit((current) => restoreStep(current, slug));
+    setSelected(slug);
+    setEditing(null);
+  };
   const currentVersionName = versions.find((item) => item.version === defaultVersion)?.name;
 
   return (
@@ -315,6 +342,7 @@ export default function WizardBuilderPage() {
                 selected={selected}
                 onSelect={(slug) => { setSelected(slug); setEditing(null); }}
                 onMove={(slug, delta) => edit((l) => moveStep(l, slug, delta))}
+                onRestore={restoreRemovedStep}
                 onAdd={() => {
                   const res = addStep(layout, 'New step');
                   setLayout(res.layout);
@@ -331,6 +359,7 @@ export default function WizardBuilderPage() {
                   editing={editing}
                   setEditing={setEditing}
                   edit={edit}
+                  onRemove={removeSelectedStep}
                 />
               )}
             </div>
@@ -362,22 +391,25 @@ function StepList({
   onSelect,
   onMove,
   onAdd,
+  onRestore,
 }: {
   layout: WizardLayout;
   selected: string;
   onSelect: (slug: string) => void;
   onMove: (slug: string, delta: -1 | 1) => void;
   onAdd: () => void;
+  onRestore: (slug: string) => void;
 }) {
-  let number = 0;
+  const shown = layout.steps.filter((step) => !step.hidden);
+  const removed = layout.steps.filter((step) => step.hidden);
+  const [showRemoved, setShowRemoved] = useState(false);
   return (
     <nav aria-label="Wizard steps" className="shrink-0 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm lg:w-72">
       <div className="border-b border-foreground-100 px-4 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Steps</p>
       </div>
       <ol className="space-y-0.5 p-2">
-        {layout.steps.map((s, i) => {
-          if (!s.hidden) number += 1;
+        {shown.map((s, i) => {
           const active = s.slug === selected;
           return (
             <li key={s.slug} className={`flex items-center gap-1 rounded-xl ${active ? 'bg-primary-50' : 'hover:bg-background-100'}`}>
@@ -385,21 +417,21 @@ function StepList({
                 type="button"
                 onClick={() => onSelect(s.slug)}
                 aria-current={active ? 'step' : undefined}
-                aria-label={s.hidden ? `${s.label} (hidden)` : s.label}
-                className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 py-2 text-left ${s.hidden ? 'text-foreground-300' : active ? 'text-primary-700' : 'text-foreground-700'}`}
+                aria-label={s.label}
+                className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 py-2 text-left ${active ? 'text-primary-700' : 'text-foreground-700'}`}
               >
                 <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${active ? 'border-primary-300 bg-primary-100' : 'border-foreground-200'}`}>
-                  {s.hidden ? <AppIcon className="ri-eye-off-line text-[11px]" /> : number}
+                  {i + 1}
                 </span>
                 <span className="min-w-0">
                   <span className={`block truncate text-[12.5px] ${active ? 'font-semibold' : 'font-medium'}`}>{s.label}</span>
-                  <span className="block text-[10.5px] text-foreground-400">{s.hidden ? 'Hidden' : s.builtin ? 'Standard step' : 'Added step'}</span>
+                  <span className="block text-[10.5px] text-foreground-400">{s.builtin ? 'Standard step' : 'Added step'}</span>
                 </span>
               </button>
               <button type="button" className={iconBtn} disabled={i === 0} aria-label={`Move ${s.label} up`} onClick={() => onMove(s.slug, -1)}>
                 <AppIcon className="ri-arrow-up-s-line" />
               </button>
-              <button type="button" className={iconBtn} disabled={i === layout.steps.length - 1} aria-label={`Move ${s.label} down`} onClick={() => onMove(s.slug, 1)}>
+              <button type="button" className={iconBtn} disabled={i === shown.length - 1} aria-label={`Move ${s.label} down`} onClick={() => onMove(s.slug, 1)}>
                 <AppIcon className="ri-arrow-down-s-line" />
               </button>
             </li>
@@ -410,6 +442,18 @@ function StepList({
         <button type="button" onClick={onAdd} className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-foreground-200 px-3 py-2 text-[12px] font-medium text-primary-700 hover:bg-primary-50">
           <AppIcon className="ri-add-line" />Add step
         </button>
+      </div>
+      <div className="border-t border-foreground-100 p-2">
+        <button type="button" className="flex w-full items-center justify-between px-2 py-1 text-left text-[12px] font-medium text-foreground-700" aria-expanded={showRemoved} onClick={() => setShowRemoved((value) => !value)}>
+          Removed steps ({removed.length}) <AppIcon className={showRemoved ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} />
+        </button>
+        {showRemoved && <div className="mt-2 space-y-1">
+          {removed.length === 0 && <p className="px-2 text-[11px] text-foreground-400">No removed steps.</p>}
+          {removed.map((step) => <div key={step.slug} className="flex items-center justify-between gap-2 rounded-lg border border-foreground-200 px-2 py-1.5 text-[11px]">
+            <span className="min-w-0 truncate">{step.label}</span>
+            <button type="button" className="font-medium text-primary-700" aria-label={`Restore ${step.label}`} onClick={() => onRestore(step.slug)}>Restore</button>
+          </div>)}
+        </div>}
       </div>
     </nav>
   );
@@ -422,6 +466,7 @@ function StepEditor({
   editing,
   setEditing,
   edit,
+  onRemove,
 }: {
   version: number | null;
   layout: WizardLayout;
@@ -429,6 +474,7 @@ function StepEditor({
   editing: string | 'new' | null;
   setEditing: (v: string | 'new' | null) => void;
   edit: (fn: (l: WizardLayout) => WizardLayout) => void;
+  onRemove: () => void;
 }) {
   const shown = step.items.filter((it) => !it.hidden);
   const removed = step.items.filter((it) => it.hidden);
@@ -460,14 +506,10 @@ function StepEditor({
           Step name
           <input id="builder-step-name" className={`${inputClass} mt-1`} value={step.label} onChange={(e) => edit((l) => updateStep(l, step.slug, { label: e.target.value }))} />
         </label>
-        <label className="flex items-center gap-2 pb-2 text-[12px] font-medium text-foreground-700">
-          <input type="checkbox" className="accent-primary-500" checked={!step.hidden} disabled={step.slug === 'programme-suitability' && layout.programmeSuitability?.enabled} onChange={(e) => edit((l) => updateStep(l, step.slug, { hidden: !e.target.checked }))} />
-          Show this step to learners
-        </label>
+        <button type="button" className={`${btnSecondary} mb-1`} disabled={!canRemoveStep(layout, step.slug) || layout.steps.filter((entry) => !entry.hidden).length <= 1} onClick={onRemove} aria-label={`Remove ${step.label} step`}>
+          <AppIcon className="ri-delete-bin-line" />Remove step
+        </button>
       </div>
-      {step.slug === 'personal-details' && <p className="mx-5 mt-4 rounded-lg border border-foreground-200 p-3 text-[12px] text-foreground-600">
-        This step applies to commercial onboarding only. Apprenticeship learners skip Personal Details. Your signature is required at the end of ILR and covers the ILR accuracy declaration and enrolment paperwork; its existing storage identifier is retained.
-      </p>}
       {step.slug === 'ilr-details' && <p className="mx-5 mt-4 rounded-lg border border-foreground-200 p-3 text-[12px] text-foreground-600">
         Apprenticeships have one required Your signature field at the end of ILR. The legacy Declaration signature item displays the accuracy declaration only; publishing or restoring it cannot add another signing box. Historical signatures are preserved and require explicit confirmation for the combined wording.
       </p>}
@@ -816,7 +858,7 @@ function WizardVersionDialog({
     let cancelled = false;
     setOtherSource(null);
     fetchWizardLayout({ kind, force: true }).then((res) => {
-      if (!cancelled && res.version) setOtherSource({ layout: resolveLayout(res.layout), version: res.version });
+      if (!cancelled && res.version) setOtherSource({ layout: editableLayout(res.layout, kind), version: res.version });
     }).catch((e: unknown) => { if (!cancelled) onError(e instanceof Error ? e.message : 'Could not load this form type.'); });
     return () => { cancelled = true; };
   }, [mode, kind, builderKind, onError]);
