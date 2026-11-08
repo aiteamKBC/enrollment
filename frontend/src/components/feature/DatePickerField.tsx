@@ -187,52 +187,53 @@ export function DatePickerField({
       if (close) closePanel(true);
       return;
     }
-    const parsed = parseTypedDate(trimmed, viewDate);
+    const parsed = parseCompleteDate(trimmed);
     if (!parsed) {
-      inputRef.current?.setCustomValidity('Use dd/mm/yyyy');
-      setTypedError('Use dd/mm/yyyy');
+      const message = dateEntryError(trimmed) || 'Enter a complete date as dd/mm/yyyy';
+      inputRef.current?.setCustomValidity(message);
+      setTypedError(message);
       return;
     }
-    if (minDate && parsed.date < minDate) {
+    if (minDate && parsed < minDate) {
       inputRef.current?.setCustomValidity('Date is before the allowed minimum');
       setTypedError(`Cannot be before ${formatDatePickerValue(min || '')}`);
       return;
     }
-    if (maxDate && parsed.date > maxDate) {
+    if (maxDate && parsed > maxDate) {
       inputRef.current?.setCustomValidity('Date is after the allowed maximum');
       setTypedError(`Cannot be after ${formatDatePickerValue(max || '')}`);
       return;
     }
     setTypedError('');
     inputRef.current?.setCustomValidity('');
-    setText(formatDate(parsed.date));
-    setViewDate(startOfMonth(parsed.date));
-    setFocusedDate(parsed.date);
-    onChange(toDateInput(parsed.date));
+    setText(formatDate(parsed));
+    setViewDate(startOfMonth(parsed));
+    setFocusedDate(parsed);
+    onChange(toDateInput(parsed));
     if (close) closePanel(true);
   };
 
-  // Typing drives the calendar live: a partial entry (no year yet) just moves the
-  // view so the user can see where they are, a complete one commits straight away.
-  const handleTextChange = (next: string) => {
+  const handleTextChange = (raw: string, caret = raw.length) => {
+    const next = formatTypedDate(raw);
     setText(next);
-    setTypedError('');
-    if (value && next.trim() !== formatDatePickerValue(value)) onChange('');
-    const parsed = parseTypedDate(next.trim(), viewDate);
-    const invalidText = next.trim() && !parsed ? 'Use dd/mm/yyyy' : '';
-    const outsideRange = parsed && isDateDisabled(parsed.date) ? 'Date is outside the allowed range' : '';
-    inputRef.current?.setCustomValidity(invalidText || outsideRange);
+    if (value && next !== formatDatePickerValue(value)) onChange('');
+    const parsed = parseCompleteDate(next);
+    const error = dateEntryError(next)
+      || (parsed && minDate && parsed < minDate ? `Cannot be before ${formatDatePickerValue(min || '')}` : '')
+      || (parsed && maxDate && parsed > maxDate ? `Cannot be after ${formatDatePickerValue(max || '')}` : '');
+    setTypedError(error);
+    inputRef.current?.setCustomValidity(error || (next && !parsed ? 'Enter a complete date as dd/mm/yyyy' : ''));
+    if (inputRef.current === document.activeElement) {
+      const nextCaret = Math.min(formatTypedDate(raw.slice(0, caret)).length, next.length);
+      window.requestAnimationFrame(() => inputRef.current?.setSelectionRange(nextCaret, nextCaret));
+    }
     if (!open) setOpen(true);
     setView('days');
     setGridFocusActive(false);
-    if (!parsed) return;
-    // A year still being typed (2, 20, 202…) reads as 2002 then 2020 then 2026 and
-    // would drag the calendar through three wrong decades, so ignore half-typed ones
-    // and only follow entries that are complete or carry no year at all.
-    if (parsed.yearDigits !== 0 && parsed.yearDigits !== 4) return;
-    setViewDate(startOfMonth(parsed.date));
-    setFocusedDate(parsed.date);
-    if (parsed.yearDigits === 4 && !isDateDisabled(parsed.date)) onChange(toDateInput(parsed.date));
+    if (!parsed || error) return;
+    setViewDate(startOfMonth(parsed));
+    setFocusedDate(parsed);
+    onChange(toDateInput(parsed));
   };
 
   const selectDate = (date: Date, returnFocus = false) => {
@@ -270,6 +271,17 @@ export function DatePickerField({
   };
 
   const handleInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    const caret = event.currentTarget.selectionStart;
+    if (event.key === 'Backspace' && caret !== null && caret === event.currentTarget.selectionEnd && caret > 1 && text[caret - 1] === '/') {
+      event.preventDefault();
+      handleTextChange(`${text.slice(0, caret - 2)}/${text.slice(caret)}`, caret - 2);
+      return;
+    }
+    if (event.key === 'Delete' && caret !== null && caret === event.currentTarget.selectionEnd && text[caret] === '/') {
+      event.preventDefault();
+      handleTextChange(`${text.slice(0, caret + 1)}${text.slice(caret + 2)}`, caret + 1);
+      return;
+    }
     if (event.key === 'Enter') {
       event.preventDefault();
       commitText(text, { close: true });
@@ -505,7 +517,7 @@ export function DatePickerField({
       {!hideLabel && <span className="text-[10px] font-bold uppercase text-foreground-400">{label}{required ? ' *' : ''}</span>}
       <div
         ref={fieldRef}
-        className={`mt-1 flex h-[42px] w-full items-center gap-2 rounded-lg border bg-background-50 pl-3 pr-1 transition-smooth ${disabled ? 'cursor-not-allowed bg-background-100' : ''} ${open ? 'border-primary-300 ring-2 ring-primary-100' : shownError ? 'border-red-300' : 'border-background-200 hover:border-primary-200'}`}
+        className={`mt-1 flex h-[42px] w-full items-center gap-2 rounded-lg border bg-background-50 pl-3 pr-1 transition-smooth ${disabled ? 'cursor-not-allowed bg-background-100' : ''} ${shownError ? 'border-red-300 ring-2 ring-red-100' : open ? 'border-primary-300 ring-2 ring-primary-100' : 'border-background-200 hover:border-primary-200'}`}
       >
         <AppIcon className="ri-calendar-event-line shrink-0 text-foreground-400"></AppIcon>
         <input
@@ -524,7 +536,7 @@ export function DatePickerField({
           value={text}
           placeholder={placeholder}
           disabled={disabled}
-          onChange={event => handleTextChange(event.target.value)}
+          onChange={event => handleTextChange(event.target.value, event.target.selectionStart ?? event.target.value.length)}
           onFocus={() => {
             if (suppressOpenRef.current) {
               suppressOpenRef.current = false;
@@ -637,85 +649,35 @@ function buildDate(year: number, month: number, day: number) {
   return date;
 }
 
-/** Two-digit years are read as this century (26 -> 2026); three digits are rejected. */
-function normaliseYear(raw: string) {
-  if (raw.length <= 2) return 2000 + Number(raw);
-  if (raw.length === 4) return Number(raw);
-  return NaN;
+/** Keep a single text box, with two day digits, two month digits and four year digits. */
+function formatTypedDate(raw: string): string {
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+
+  const parts = raw.replace(/[^\d/]/g, '').split('/');
+  if (parts.length > 1) {
+    const day = parts[0].slice(0, 2);
+    const monthDigits = parts[0].slice(2) + parts[1];
+    const month = monthDigits.slice(0, 2);
+    const year = (monthDigits.slice(2) + parts.slice(2).join('')).slice(0, 4);
+    return `${day}/${month}${parts.length > 2 || year ? `/${year}` : ''}`;
+  }
+  const digits = parts[0].slice(0, 8);
+  return digits.length > 4
+    ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+    : digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
 }
 
-function monthFromName(raw: string) {
-  const needle = raw.toLowerCase();
-  if (needle.length < 3) return 0;
-  const index = MONTH_NAMES.findIndex(month => month.toLowerCase().startsWith(needle));
-  return index < 0 ? 0 : index + 1;
+function parseCompleteDate(text: string): Date | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text);
+  return match ? buildDate(Number(match[3]), Number(match[2]), Number(match[1])) : null;
 }
 
-/**
- * Reads the shapes people actually type: 19/08/2026, 19-8-26, 2026-08-19,
- * "19 Aug 2026", "Aug 19", 19082026, 190826, 1908 and a bare day. Anything without
- * an explicit year falls back to the month currently on screen, and `yearDigits`
- * reports how much of a year was actually typed so the caller can tell a finished
- * entry from one still being keyed in.
- */
-function parseTypedDate(raw: string, fallback: Date): { date: Date; yearDigits: number } | null {
-  const input = raw.trim().replace(/\s+/g, ' ');
-  if (!input) return null;
-  const fallbackYear = fallback.getFullYear();
-  const fallbackMonth = fallback.getMonth() + 1;
-
-  // "19 Aug 2026" / "19 August" / "19aug26"
-  const dayFirstName = input.match(/^(\d{1,2})[ \-./]*([A-Za-z]{3,})(?:[ \-./]*(\d{1,4}))?$/);
-  if (dayFirstName) {
-    const month = monthFromName(dayFirstName[2]);
-    const year = dayFirstName[3] ? normaliseYear(dayFirstName[3]) : fallbackYear;
-    const date = buildDate(year, month, Number(dayFirstName[1]));
-    return date ? { date, yearDigits: dayFirstName[3] ? dayFirstName[3].length : 0 } : null;
-  }
-
-  // "Aug 19 2026" / "August 19"
-  const monthFirstName = input.match(/^([A-Za-z]{3,})[ \-./]*(\d{1,2})(?:[ \-./]*(\d{1,4}))?$/);
-  if (monthFirstName) {
-    const month = monthFromName(monthFirstName[1]);
-    const year = monthFirstName[3] ? normaliseYear(monthFirstName[3]) : fallbackYear;
-    const date = buildDate(year, month, Number(monthFirstName[2]));
-    return date ? { date, yearDigits: monthFirstName[3] ? monthFirstName[3].length : 0 } : null;
-  }
-
-  // Separated numbers: dd/mm/yyyy, dd/mm, or yyyy-mm-dd
-  const separated = input.match(/^(\d{1,4})[ \-./](\d{1,2})(?:[ \-./](\d{1,4}))?$/);
-  if (separated) {
-    const [, first, second, third] = separated;
-    if (first.length === 4) {
-      if (!third) return null;
-      const date = buildDate(Number(first), Number(second), Number(third));
-      return date ? { date, yearDigits: 4 } : null;
-    }
-    const year = third ? normaliseYear(third) : fallbackYear;
-    const date = buildDate(year, Number(second), Number(first));
-    return date ? { date, yearDigits: third ? third.length : 0 } : null;
-  }
-
-  // Bare digit runs: ddmmyyyy, ddmmyy, ddmm, dd
-  const digits = /^\d+$/.test(input) ? input : '';
-  if (digits) {
-    if (digits.length === 8) {
-      const date = buildDate(Number(digits.slice(4)), Number(digits.slice(2, 4)), Number(digits.slice(0, 2)));
-      return date ? { date, yearDigits: 4 } : null;
-    }
-    if (digits.length === 6) {
-      const date = buildDate(normaliseYear(digits.slice(4)), Number(digits.slice(2, 4)), Number(digits.slice(0, 2)));
-      return date ? { date, yearDigits: 2 } : null;
-    }
-    if (digits.length === 4) {
-      const date = buildDate(fallbackYear, Number(digits.slice(2)), Number(digits.slice(0, 2)));
-      return date ? { date, yearDigits: 0 } : null;
-    }
-    if (digits.length <= 2) {
-      const date = buildDate(fallbackYear, fallbackMonth, Number(digits));
-      return date ? { date, yearDigits: 0 } : null;
-    }
-  }
-
-  return null;
+function dateEntryError(text: string): string {
+  if (!text) return '';
+  const [day, month, year] = text.split('/');
+  if (day.length === 2 && (Number(day) < 1 || Number(day) > 31)) return 'Day must be between 01 and 31';
+  if (month?.length === 2 && (Number(month) < 1 || Number(month) > 12)) return 'Month must be between 01 and 12';
+  if (day.length === 2 && month?.length === 2 && year?.length === 4 && !parseCompleteDate(text)) return 'Enter a real calendar date';
+  return '';
 }
