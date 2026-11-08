@@ -5,6 +5,7 @@ import { CatalogueAdmin } from '@/features/programme-suitability/skills-radar/ca
 import { configurationErrors } from '@/features/programme-suitability/modules/configuration';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
+import { SelectMenu, type SelectOption } from '@/components/feature/SelectField';
 import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
@@ -236,6 +237,21 @@ export default function WizardBuilderPage() {
     setEditing(null);
   };
   const currentVersionName = versions.find((item) => item.version === defaultVersion)?.name;
+  const versionOptions: SelectOption[] = [
+    {
+      value: 'current',
+      label: `Current default${defaultVersion ? ` · v${defaultVersion}` : ''}${currentVersionName ? ` · ${currentVersionName}` : ''}`,
+      labelContent: <><strong>Current default{defaultVersion ? ` · v${defaultVersion}` : ''}</strong>{currentVersionName && <> · <span className="font-normal">{currentVersionName}</span></>}</>,
+    },
+    ...versions.filter((item) => item.version !== defaultVersion && (showArchivedVersions || !item.archived)).map((item) => {
+      const kindLabel = item.scope === 'targeted' ? 'Targeted' : 'Previous default';
+      return {
+        value: String(item.version),
+        label: `${kindLabel} · v${item.version} · ${item.name}${item.archived ? ' (archived)' : ''}`,
+        labelContent: <><strong>{kindLabel} · v{item.version}</strong> · <span className="font-normal">{item.name}{item.archived ? ' (archived)' : ''}</span></>,
+      };
+    }),
+  ];
 
   return (
     <WorkspaceShell role="compliance" roleLabel={enrolmentNav.label} navItems={enrolmentNav.items} workspaceLabel={enrolmentNav.workspaceLabel} pageTitle="Enrolment wizard" pageSubtitle="Edit the enrolment wizard learners complete at onboarding">
@@ -282,12 +298,8 @@ export default function WizardBuilderPage() {
             </select>
           </label>
           <label className="min-w-64 flex-1 text-[12px] font-medium text-foreground-700">Version to edit
-            <select className={`${inputClass} mt-1`} value={version === defaultVersion ? 'current' : version ?? 'current'} onChange={(e) => void loadVersion(e.target.value)} disabled={loading}>
-              <option value="current">Current default{defaultVersion ? ` · v${defaultVersion}` : ''}{currentVersionName ? ` · ${currentVersionName}` : ''}</option>
-              {versions.filter((item) => item.version !== defaultVersion && (showArchivedVersions || !item.archived)).map((item) => (
-                <option key={item.version} value={item.version}>{item.scope === 'targeted' ? 'Targeted' : 'Previous default'} · v{item.version} · {item.name}{item.archived ? ' (archived)' : ''}</option>
-              ))}
-            </select>
+            <SelectMenu className="mt-1" value={version === defaultVersion ? 'current' : String(version ?? 'current')} options={versionOptions}
+              ariaLabel="Version to edit" onChange={(value) => void loadVersion(value)} disabled={loading} />
           </label>
           <label className="flex min-h-10 items-center gap-2 text-[12px] font-medium text-foreground-700">
             <input type="checkbox" checked={showArchivedVersions} onChange={(e) => {
@@ -833,6 +845,7 @@ function WizardVersionDialog({
   const [reason, setReason] = useState('');
   const [version, setVersion] = useState<number | null>(null);
   const [clearAssignment, setClearAssignment] = useState(false);
+  const [showArchivedVersions, setShowArchivedVersions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(saving);
@@ -841,7 +854,7 @@ function WizardVersionDialog({
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([mode === 'assign' ? fetchEnrolmentUsers() : Promise.resolve([]), WizardLayoutApi.fetchWizardVersions()])
+    Promise.all([mode === 'assign' ? fetchEnrolmentUsers() : Promise.resolve([]), WizardLayoutApi.fetchWizardVersions({ includeArchived: true })])
       .then(([rows, available]) => {
         if (cancelled) return;
         setUsers(rows.filter((row) => row.source === 'apprenticeship' || row.source === 'commercial'));
@@ -868,8 +881,10 @@ function WizardVersionDialog({
   }, [mode, kind, builderKind, onError]);
 
   const visibleUsers = users.filter((row) => row.source === kind && `${row.name} ${row.email}`.toLowerCase().includes(search.toLowerCase()));
-  const compatibleVersions = versions.filter((item) => !item.archived && (item.learnerKind === kind || item.learnerKind === null));
-  const chosenVersion = compatibleVersions.find((item) => item.version === version);
+  const compatibleVersions = versions.filter((item) => item.learnerKind === kind || item.learnerKind === null);
+  const assignableVersions = compatibleVersions.filter((item) => !item.archived);
+  const displayedVersions = compatibleVersions.filter((item) => showArchivedVersions || !item.archived);
+  const chosenVersion = assignableVersions.find((item) => item.version === version);
   const source = kind === builderKind ? { layout, version: parentVersion } : otherSource;
   const toggleUser = (id: string) => setSelected((old) => old.includes(id) ? old.filter((item) => item !== id) : [...old, id]);
 
@@ -911,16 +926,31 @@ function WizardVersionDialog({
             <input autoFocus className={`${inputClass} mt-1`} maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Additional support information" />
           </label>
         ) : (
-          <label className="mt-4 block text-[12px] font-medium text-foreground-700">Published version
-            <select className={`${inputClass} mt-1`} value={clearAssignment ? 'default' : version ?? ''} onChange={(e) => {
-              if (e.target.value === 'default') { setClearAssignment(true); setVersion(null); }
-              else { setClearAssignment(false); setVersion(Number(e.target.value) || null); }
-            }}>
-              <option value="" disabled>Select a version</option>
-              <option value="default">Use the learner’s normal version</option>
-              {compatibleVersions.map((entry) => <option key={entry.version} value={entry.version}>v{entry.version} · {entry.name}{entry.createdAt ? ` · ${new Date(entry.createdAt).toLocaleDateString('en-GB')}` : ''}</option>)}
-            </select>
-          </label>
+          <div className="mt-4 text-[12px] font-medium text-foreground-700">
+            <p>Published version</p>
+            <SelectMenu className="mt-1" value={clearAssignment ? 'default' : String(version ?? '')} placeholder="Select a version" ariaLabel="Published version"
+              options={[
+                { value: '', label: 'Select a version', disabled: true },
+                { value: 'default', label: 'Remove assignment · follow automatic version rules' },
+                ...displayedVersions.map((entry) => ({
+                  value: String(entry.version),
+                  label: `v${entry.version} · ${entry.name}${entry.createdAt ? ` · ${new Date(entry.createdAt).toLocaleDateString('en-GB')}` : ''}${entry.archived ? ' · Archived' : ''}`,
+                  labelContent: <><strong>v{entry.version}</strong> · <span className="font-normal">{entry.name}{entry.createdAt ? ` · ${new Date(entry.createdAt).toLocaleDateString('en-GB')}` : ''}{entry.archived ? ' · Archived' : ''}</span></>,
+                  disabled: entry.archived,
+                })),
+              ]}
+              onChange={(value) => {
+                if (value === 'default') { setClearAssignment(true); setVersion(null); }
+                else { setClearAssignment(false); setVersion(Number(value) || null); }
+              }} />
+            <label className="mt-2 flex items-center gap-2 text-[12px] font-medium text-foreground-700">
+              <input type="checkbox" checked={showArchivedVersions} onChange={(event) => setShowArchivedVersions(event.target.checked)} />
+              Show archived versions
+            </label>
+            <p className="mt-1 text-[11px] font-normal leading-relaxed text-foreground-500">
+              Automatic rules use the current default until the learner is pinned, then retain their pinned or submitted version. Archived versions are shown for reference and cannot be newly assigned.
+            </p>
+          </div>
         )}
         <div className="mt-4 flex gap-2">
           {(['apprenticeship', 'commercial'] as LearnerKind[]).map((value) => (
