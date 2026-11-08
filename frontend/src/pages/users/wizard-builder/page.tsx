@@ -283,9 +283,9 @@ export default function WizardBuilderPage() {
           </label>
           <label className="min-w-64 flex-1 text-[12px] font-medium text-foreground-700">Version to edit
             <select className={`${inputClass} mt-1`} value={version === defaultVersion ? 'current' : version ?? 'current'} onChange={(e) => void loadVersion(e.target.value)} disabled={loading}>
-              <option value="current">Current default{defaultVersion ? ` · version ${defaultVersion}` : ''}{currentVersionName ? ` · ${currentVersionName}` : ''}</option>
+              <option value="current">Current default{defaultVersion ? ` · v${defaultVersion}` : ''}{currentVersionName ? ` · ${currentVersionName}` : ''}</option>
               {versions.filter((item) => item.version !== defaultVersion && (showArchivedVersions || !item.archived)).map((item) => (
-                <option key={item.version} value={item.version}>{item.scope === 'targeted' ? 'Targeted' : 'Previous default'} · version {item.version} · {item.name}{item.archived ? ' (archived)' : ''}</option>
+                <option key={item.version} value={item.version}>{item.scope === 'targeted' ? 'Targeted' : 'Previous default'} · v{item.version} · {item.name}{item.archived ? ' (archived)' : ''}</option>
               ))}
             </select>
           </label>
@@ -918,7 +918,7 @@ function WizardVersionDialog({
             }}>
               <option value="" disabled>Select a version</option>
               <option value="default">Use the learner’s normal version</option>
-              {compatibleVersions.map((entry) => <option key={entry.version} value={entry.version}>Version {entry.version} · {entry.name}{entry.createdAt ? ` · ${new Date(entry.createdAt).toLocaleDateString('en-GB')}` : ''}</option>)}
+              {compatibleVersions.map((entry) => <option key={entry.version} value={entry.version}>v{entry.version} · {entry.name}{entry.createdAt ? ` · ${new Date(entry.createdAt).toLocaleDateString('en-GB')}` : ''}</option>)}
             </select>
           </label>
         )}
