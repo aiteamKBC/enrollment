@@ -280,25 +280,25 @@ export default function WizardBuilderPage() {
         />
 
         <div className="flex flex-wrap items-end gap-3 rounded-xl border border-foreground-200 bg-background-50 p-3">
-          <label className="text-[12px] font-medium text-foreground-700">Form type
-            <select className={`${inputClass} mt-1`} value={kind} onChange={(e) => {
-              const next = e.target.value as LearnerKind;
-              if (dirty && !window.confirm('Discard your unpublished edits and switch form type?')) return;
-              ++loadSequence.current;
-              setPublished(null);
-              setLayout(null);
-              setVersion(null);
-              setDefaultVersion(null);
-              setVersions([]);
-              setLoadError(null);
-              setLoading(true);
-              setKind(next);
-            }}>
-              <option value="apprenticeship">Apprenticeship</option><option value="commercial">Commercial</option>
-            </select>
+          <label className="w-64 max-w-full text-[12px] font-medium text-foreground-700">Form type
+            <SelectMenu className="mt-1" triggerClassName="!h-10" value={kind} ariaLabel="Form type"
+              options={[{ value: 'apprenticeship', label: 'Apprenticeship' }, { value: 'commercial', label: 'Commercial' }]}
+              onChange={(value) => {
+                const next = value as LearnerKind;
+                if (dirty && !window.confirm('Discard your unpublished edits and switch form type?')) return;
+                ++loadSequence.current;
+                setPublished(null);
+                setLayout(null);
+                setVersion(null);
+                setDefaultVersion(null);
+                setVersions([]);
+                setLoadError(null);
+                setLoading(true);
+                setKind(next);
+              }} />
           </label>
           <label className="min-w-64 flex-1 text-[12px] font-medium text-foreground-700">Version to edit
-            <SelectMenu className="mt-1" value={version === defaultVersion ? 'current' : String(version ?? 'current')} options={versionOptions}
+            <SelectMenu className="mt-1" triggerClassName="!h-10" value={version === defaultVersion ? 'current' : String(version ?? 'current')} options={versionOptions}
               ariaLabel="Version to edit" onChange={(value) => void loadVersion(value)} disabled={loading} />
           </label>
           <label className="flex min-h-10 items-center gap-2 text-[12px] font-medium text-foreground-700">
