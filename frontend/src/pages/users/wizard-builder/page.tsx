@@ -16,7 +16,7 @@ import type { LearnerKind } from '@/api/extendedIlr';
 import type { UserListRow } from '@/pages/users/types';
 import { btnPrimary, btnSecondary, iconBtn, inputClass } from '../components/ui';
 import { builtinDef, isRequired, itemLabel, resolveLayout } from '../wizard/layout/resolve';
-import { isChoiceFieldType, isContentFieldType, type LayoutItem, type LayoutStep, type WizardLayout } from '../wizard/layout/types';
+import { isChoiceFieldType, isContentFieldType, type LayoutItem, type LayoutStep, type WizardLayout, type WizardLayoutResponse } from '../wizard/layout/types';
 import { FieldEditor } from './FieldEditor';
 import { TextEditor } from './TextEditor';
 import { TEXT_SLOTS_BY_ITEM, textFor } from '../wizard/layout/texts';
@@ -74,6 +74,10 @@ const clone = (layout: WizardLayout): WizardLayout => JSON.parse(JSON.stringify(
  */
 export default function WizardBuilderPage() {
   const { success, error } = useToast();
+  const [kind, setKind] = useState<LearnerKind>('apprenticeship');
+  const [versions, setVersions] = useState<WizardLayoutVersion[]>([]);
+  const [showArchivedVersions, setShowArchivedVersions] = useState(false);
+  const [defaultVersion, setDefaultVersion] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [version, setVersion] = useState<number | null>(null);
@@ -85,34 +89,96 @@ export default function WizardBuilderPage() {
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const loadSequence = useRef(0);
   const [reloadToken, setReloadToken] = useState(0);
   const [versionAction, setVersionAction] = useState<'create' | 'assign' | null>(null);
   const closeVersionDialog = useCallback(() => setVersionAction(null), []);
   const reportVersionError = useCallback((message: string) => error('Could not update wizard version', message), [error]);
-  const reportVersionSuccess = useCallback((message: string) => {
+  const reportVersionSuccess = useCallback((message: string, created?: WizardLayoutResponse, createdKind?: LearnerKind) => {
     setVersionAction(null);
+    if (created && createdKind === kind) {
+      const resolved = resolveLayout(created.layout);
+      setPublished(resolved);
+      setLayout(clone(resolved));
+      setVersion(created.version);
+      setUpdatedAt(created.updatedAt);
+      setUpdatedBy(created.updatedBy);
+      setSelected((current) => resolved.steps.some((step) => step.slug === current) ? current : resolved.steps[0]?.slug ?? '');
+      setEditing(null);
+    }
     success('Wizard version updated', message);
-  }, [success]);
+    WizardLayoutApi.fetchWizardVersions({ kind, includeArchived: true }).then(setVersions).catch(() => {});
+  }, [success, kind]);
 
   useEffect(() => {
     let cancelled = false;
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setLoadError(null);
-    fetchWizardLayout({ force: true })
-      .then((res) => {
-        if (cancelled) return;
+    Promise.all([fetchWizardLayout({ force: true, kind }), WizardLayoutApi.fetchWizardVersions({ kind, includeArchived: true }).catch(() => [])])
+      .then(([res, available]) => {
+        if (cancelled || sequence !== loadSequence.current) return;
+        setVersions(available);
         const resolved = resolveLayout(res.layout);
         setPublished(resolved);
         setLayout(clone(resolved));
         setVersion(res.version);
+        setDefaultVersion(res.version);
         setUpdatedAt(res.updatedAt);
         setUpdatedBy(res.updatedBy);
         setSelected((cur) => (resolved.steps.some((s) => s.slug === cur) ? cur : resolved.steps[0]?.slug ?? ''));
       })
-      .catch((e: Error) => { if (!cancelled) setLoadError(e.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .catch((e: Error) => { if (!cancelled && sequence === loadSequence.current) setLoadError(e.message); })
+      .finally(() => { if (!cancelled && sequence === loadSequence.current) setLoading(false); });
     return () => { cancelled = true; };
-  }, [reloadToken]);
+  }, [reloadToken, kind]);
+
+  const loadVersion = async (value: string) => {
+    if (dirty && !window.confirm('Discard your unpublished edits and open another version?')) return;
+    const sequence = ++loadSequence.current;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = value === 'current' ? await fetchWizardLayout({ kind, force: true }) : await WizardLayoutApi.fetchWizardVersion(Number(value));
+      if (sequence !== loadSequence.current) return;
+      const resolved = resolveLayout(res.layout);
+      setPublished(resolved);
+      setLayout(clone(resolved));
+      setVersion(res.version);
+      setUpdatedAt(res.updatedAt);
+      setUpdatedBy(res.updatedBy);
+      setSelected(resolved.steps[0]?.slug ?? '');
+      setEditing(null);
+    } catch (e) {
+      if (sequence === loadSequence.current) setLoadError(e instanceof Error ? e.message : 'Could not load this version.');
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false);
+    }
+  };
+
+  const manageVersion = async (action: 'rename' | 'archive') => {
+    if (version === null) return;
+    const entry = versions.find((item) => item.version === version);
+    if (!entry) return;
+    if (action === 'rename') {
+      const name = window.prompt('Version name', entry.name);
+      if (name === null || !name.trim()) return;
+      try {
+        await WizardLayoutApi.updateWizardVersion(version, { name: name.trim() });
+        setVersions((current) => current.map((item) => item.version === version ? { ...item, name: name.trim() } : item));
+        success('Version renamed', `Version ${version} is now named ${name.trim()}.`);
+      } catch (e) { error('Could not rename version', e instanceof Error ? e.message : 'Unexpected error'); }
+      return;
+    }
+    const next = !entry.archived;
+    if (next && !window.confirm(`Archive version ${version}? Existing learners keep it, but it will no longer be available for new assignments.${dirty && !showArchivedVersions ? ' Your unpublished edits will be discarded.' : ''}`)) return;
+    try {
+      await WizardLayoutApi.updateWizardVersion(version, { archived: next });
+      setVersions((current) => current.map((item) => item.version === version ? { ...item, archived: next } : item));
+      if (next && !showArchivedVersions) setReloadToken((value) => value + 1);
+      success(next ? 'Version archived' : 'Version restored', `Version ${version} remains available to learners who already use it.`);
+    } catch (e) { error('Could not update version', e instanceof Error ? e.message : 'Unexpected error'); }
+  };
 
   const dirty = useMemo(() => Boolean(layout && published && JSON.stringify(layout) !== JSON.stringify(published)), [layout, published]);
 
@@ -130,11 +196,13 @@ export default function WizardBuilderPage() {
     if (!layout) return;
     setPublishing(true);
     try {
-      const saved = await publishWizardLayout(layout, version);
+      const saved = await publishWizardLayout(layout, defaultVersion, { learnerKind: kind });
       const resolved = resolveLayout(saved.layout);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(saved.version);
+      setDefaultVersion(saved.version);
+      WizardLayoutApi.fetchWizardVersions({ kind, includeArchived: true }).then(setVersions).catch(() => {});
       setUpdatedAt(saved.updatedAt);
       setUpdatedBy(saved.updatedBy);
       // A new step's temporary slug is replaced by the server's.
@@ -149,12 +217,13 @@ export default function WizardBuilderPage() {
   };
 
   const step = layout?.steps.find((s) => s.slug === selected) ?? null;
+  const currentVersionName = versions.find((item) => item.version === defaultVersion)?.name;
 
   return (
-    <WorkspaceShell role="compliance" roleLabel={enrolmentNav.label} navItems={enrolmentNav.items} workspaceLabel={enrolmentNav.workspaceLabel} pageTitle="Apprenticeship wizard" pageSubtitle="Edit the enrolment wizard learners complete at onboarding">
+    <WorkspaceShell role="compliance" roleLabel={enrolmentNav.label} navItems={enrolmentNav.items} workspaceLabel={enrolmentNav.workspaceLabel} pageTitle="Enrolment wizard" pageSubtitle="Edit the enrolment wizard learners complete at onboarding">
       <div className="admin-console-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6">
         <AdminPageHeader
-          title="Apprenticeship enrolment wizard"
+          title={`${kind === 'apprenticeship' ? 'Apprenticeship' : 'Commercial'} enrolment wizard`}
           description="Edit the onboarding wizard. Learners use the latest version until they reach Skills Radar; submitted learners keep their submitted version."
           icon="ri-magic-line"
           eyebrow="Enrolment"
@@ -169,12 +238,56 @@ export default function WizardBuilderPage() {
               <button type="button" className={btnSecondary} disabled={!dirty || publishing} onClick={() => published && setLayout(clone(published))}>
                 <AppIcon className="ri-arrow-go-back-line" />Discard changes
               </button>
-              <button type="button" className={btnPrimary} disabled={!dirty || publishing || Boolean(layout?.programmeModules && configurationErrors(layout.programmeModules).length)} onClick={() => setConfirming(true)}>
+              <button type="button" className={btnPrimary} disabled={!dirty || publishing || version !== defaultVersion || Boolean(layout?.programmeModules && configurationErrors(layout.programmeModules).length)} onClick={() => setConfirming(true)}>
                 <AppIcon className="ri-upload-cloud-2-line" />Publish changes
               </button>
             </div>
           }
         />
+
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-foreground-200 bg-background-50 p-3">
+          <label className="text-[12px] font-medium text-foreground-700">Form type
+            <select className={`${inputClass} mt-1`} value={kind} onChange={(e) => {
+              const next = e.target.value as LearnerKind;
+              if (dirty && !window.confirm('Discard your unpublished edits and switch form type?')) return;
+              ++loadSequence.current;
+              setPublished(null);
+              setLayout(null);
+              setVersion(null);
+              setDefaultVersion(null);
+              setVersions([]);
+              setLoadError(null);
+              setLoading(true);
+              setKind(next);
+            }}>
+              <option value="apprenticeship">Apprenticeship</option><option value="commercial">Commercial</option>
+            </select>
+          </label>
+          <label className="min-w-64 flex-1 text-[12px] font-medium text-foreground-700">Version to edit
+            <select className={`${inputClass} mt-1`} value={version === defaultVersion ? 'current' : version ?? 'current'} onChange={(e) => void loadVersion(e.target.value)} disabled={loading}>
+              <option value="current">Current default{defaultVersion ? ` · version ${defaultVersion}` : ''}{currentVersionName ? ` · ${currentVersionName}` : ''}</option>
+              {versions.filter((item) => item.version !== defaultVersion && (showArchivedVersions || !item.archived)).map((item) => (
+                <option key={item.version} value={item.version}>{item.scope === 'targeted' ? 'Targeted' : 'Previous default'} · version {item.version} · {item.name}{item.archived ? ' (archived)' : ''}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-h-10 items-center gap-2 text-[12px] font-medium text-foreground-700">
+            <input type="checkbox" checked={showArchivedVersions} onChange={(e) => {
+              const show = e.target.checked;
+              if (!show && versions.find((item) => item.version === version)?.archived) {
+                if (dirty && !window.confirm('Discard your unpublished edits and return to the current default?')) return;
+                setReloadToken((value) => value + 1);
+              }
+              setShowArchivedVersions(show);
+            }} />
+            Show archived versions
+          </label>
+          <button type="button" className={btnSecondary} disabled={!versions.some((item) => item.version === version)} onClick={() => void manageVersion('rename')}>Rename version</button>
+          <button type="button" className={btnSecondary} disabled={!versions.some((item) => item.version === version)} onClick={() => void manageVersion('archive')}>
+            {versions.find((item) => item.version === version)?.archived ? 'Restore version' : 'Archive version'}
+          </button>
+        </div>
+        {version !== defaultVersion && <p className="text-[12px] text-foreground-600">You are editing a copy of an earlier or targeted version. Use Create targeted version to save it as a new named version.</p>}
 
         {loading && <p className="text-[13px] text-foreground-400"><AppIcon className="ri-loader-4-line mr-2 animate-spin" />Loading the wizard…</p>}
         {!loading && loadError && (
@@ -225,13 +338,14 @@ export default function WizardBuilderPage() {
         )}
 
         {confirming && layout && (
-          <PublishDialog layout={layout} publishing={publishing} onCancel={() => setConfirming(false)} onConfirm={publish} />
+          <PublishDialog layout={layout} kind={kind} publishing={publishing} onCancel={() => setConfirming(false)} onConfirm={publish} />
         )}
         {versionAction && layout && (
           <WizardVersionDialog
             mode={versionAction}
             layout={layout}
             parentVersion={version}
+            builderKind={kind}
             onCancel={closeVersionDialog}
             onSuccess={reportVersionSuccess}
             onError={reportVersionError}
@@ -614,7 +728,7 @@ function ItemRow({
   );
 }
 
-function PublishDialog({ layout, publishing, onCancel, onConfirm }: { layout: WizardLayout; publishing: boolean; onCancel: () => void; onConfirm: () => void }) {
+function PublishDialog({ layout, kind, publishing, onCancel, onConfirm }: { layout: WizardLayout; kind: LearnerKind; publishing: boolean; onCancel: () => void; onConfirm: () => void }) {
   const columns = pendingColumns(layout);
   const unnamed = layout.steps.some((s) => !s.label.trim());
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -629,7 +743,7 @@ function PublishDialog({ layout, publishing, onCancel, onConfirm }: { layout: Wi
       <div role="dialog" aria-modal="true" aria-labelledby="publish-wizard-title" className="w-full max-w-lg rounded-2xl bg-background-50 p-5 shadow-xl">
         <h2 id="publish-wizard-title" className="font-heading text-[16px] font-semibold text-foreground-900">Publish the wizard?</h2>
         <p className="mt-2 text-[13px] text-foreground-600">
-          Learners who have not reached Skills Radar will use this global version next time they open the wizard. Reaching Skills Radar saves and pins the version they used; submitted learners retain their submitted version.
+          {kind === 'apprenticeship' ? 'Apprenticeship' : 'Commercial'} learners who have not reached Skills Radar will use this default version next time they open the wizard. Reaching Skills Radar saves and pins the version they used; submitted learners retain their submitted version.
         </p>
         {layout.skillsRadarCatalogues && <p className="mt-2 text-[13px] text-foreground-600">Skills Radar assessments already started keep their saved catalogue version and answers.</p>}
         {columns.length > 0 && (
@@ -653,18 +767,20 @@ function PublishDialog({ layout, publishing, onCancel, onConfirm }: { layout: Wi
 }
 
 function WizardVersionDialog({
-  mode, layout, parentVersion, onCancel, onSuccess, onError,
+  mode, layout, parentVersion, builderKind, onCancel, onSuccess, onError,
 }: {
   mode: 'create' | 'assign';
   layout: WizardLayout;
   parentVersion: number | null;
+  builderKind: LearnerKind;
   onCancel: () => void;
-  onSuccess: (message: string) => void;
+  onSuccess: (message: string, created?: WizardLayoutResponse, createdKind?: LearnerKind) => void;
   onError: (message: string) => void;
 }) {
   const [users, setUsers] = useState<UserListRow[]>([]);
   const [versions, setVersions] = useState<WizardLayoutVersion[]>([]);
-  const [kind, setKind] = useState<LearnerKind>('apprenticeship');
+  const [kind, setKind] = useState<LearnerKind>(builderKind);
+  const [otherSource, setOtherSource] = useState<{ layout: WizardLayout; version: number } | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [name, setName] = useState('');
@@ -679,12 +795,12 @@ function WizardVersionDialog({
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchEnrolmentUsers(), WizardLayoutApi.fetchWizardVersions()])
+    Promise.all([mode === 'assign' ? fetchEnrolmentUsers() : Promise.resolve([]), WizardLayoutApi.fetchWizardVersions()])
       .then(([rows, available]) => {
         if (cancelled) return;
         setUsers(rows.filter((row) => row.source === 'apprenticeship' || row.source === 'commercial'));
         setVersions(available);
-        const first = available[0]?.version;
+        const first = available.find((item) => !item.archived && (item.learnerKind === kind || item.learnerKind === null))?.version;
         setVersion(first ?? null);
       })
       .catch((e: unknown) => { if (!cancelled) onError(e instanceof Error ? e.message : 'Could not load users and versions.'); })
@@ -693,23 +809,34 @@ function WizardVersionDialog({
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !savingRef.current) onCancel(); };
     window.addEventListener('keydown', onKey);
     return () => { cancelled = true; window.removeEventListener('keydown', onKey); };
-  }, [onCancel, onError]);
+  }, [onCancel, onError, kind, mode]);
+
+  useEffect(() => {
+    if (mode !== 'create' || kind === builderKind) { setOtherSource(null); return; }
+    let cancelled = false;
+    setOtherSource(null);
+    fetchWizardLayout({ kind, force: true }).then((res) => {
+      if (!cancelled && res.version) setOtherSource({ layout: resolveLayout(res.layout), version: res.version });
+    }).catch((e: unknown) => { if (!cancelled) onError(e instanceof Error ? e.message : 'Could not load this form type.'); });
+    return () => { cancelled = true; };
+  }, [mode, kind, builderKind, onError]);
 
   const visibleUsers = users.filter((row) => row.source === kind && `${row.name} ${row.email}`.toLowerCase().includes(search.toLowerCase()));
-  const chosenVersion = versions.find((item) => item.version === version);
+  const compatibleVersions = versions.filter((item) => !item.archived && (item.learnerKind === kind || item.learnerKind === null));
+  const chosenVersion = compatibleVersions.find((item) => item.version === version);
+  const source = kind === builderKind ? { layout, version: parentVersion } : otherSource;
   const toggleUser = (id: string) => setSelected((old) => old.includes(id) ? old.filter((item) => item !== id) : [...old, id]);
 
   const submit = async () => {
-    if (!selected.length) return;
+    if (mode === 'assign' && !selected.length) return;
     setSaving(true);
     try {
       if (mode === 'create') {
-        if (!parentVersion || !name.trim()) return;
-        await publishWizardLayout(layout, parentVersion, {
-          scope: 'targeted', name: name.trim(), parentVersion,
-          assignTo: { learnerKind: kind, learnerIds: selected, reason: reason.trim() },
+        if (!source?.version || !name.trim()) return;
+        const created = await publishWizardLayout(source.layout, source.version, {
+          scope: 'targeted', name: name.trim(), parentVersion: source.version, learnerKind: kind,
         });
-        onSuccess(`Created “${name.trim()}” and assigned it to ${selected.length} learner${selected.length === 1 ? '' : 's'}.`);
+        onSuccess(`Created "${name.trim()}" for ${kind} learners. Use Assign a version to choose learners.`, created, kind);
       } else {
         if (version === null && !clearAssignment) return;
         await WizardLayoutApi.assignWizardVersion({ learnerKind: kind, learnerIds: selected, version: clearAssignment ? null : version, reason: reason.trim() });
@@ -725,13 +852,13 @@ function WizardVersionDialog({
   };
 
   const title = mode === 'create' ? 'Create a targeted wizard version' : 'Assign a published wizard version';
-  const canSubmit = !loading && !saving && selected.length > 0 && (mode === 'create' ? Boolean(parentVersion && name.trim()) : version !== null || clearAssignment);
+  const canSubmit = !loading && !saving && (mode === 'create' ? Boolean(source?.version && name.trim()) : selected.length > 0 && (version !== null && Boolean(chosenVersion) || clearAssignment));
   return (
     <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="wizard-version-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-background-50 p-5 shadow-xl">
         <h2 id="wizard-version-title" className="font-heading text-[17px] font-semibold text-foreground-900">{title}</h2>
         <p className="mt-1 text-[12px] leading-relaxed text-foreground-600">
-          {mode === 'create' ? 'This saves the current editor layout as a named version and assigns it to the selected learners.' : 'This assignment makes the selected version take precedence for these unsubmitted learners, including learners who have not reached Skills Radar.'}
+          {mode === 'create' ? 'Save a named version for one learner type. Assign learners separately with Assign a version.' : 'This assignment makes the selected version take precedence for these unsubmitted learners, including learners who have not reached Skills Radar.'}
         </p>
         {mode === 'create' ? (
           <label className="mt-4 block text-[12px] font-medium text-foreground-700">Version name
@@ -745,17 +872,19 @@ function WizardVersionDialog({
             }}>
               <option value="" disabled>Select a version</option>
               <option value="default">Use the learner’s normal version</option>
-              {versions.map((entry) => <option key={entry.version} value={entry.version}>Version {entry.version} · {entry.name}{entry.createdAt ? ` · ${new Date(entry.createdAt).toLocaleDateString('en-GB')}` : ''}</option>)}
+              {compatibleVersions.map((entry) => <option key={entry.version} value={entry.version}>Version {entry.version} · {entry.name}{entry.createdAt ? ` · ${new Date(entry.createdAt).toLocaleDateString('en-GB')}` : ''}</option>)}
             </select>
           </label>
         )}
         <div className="mt-4 flex gap-2">
           {(['apprenticeship', 'commercial'] as LearnerKind[]).map((value) => (
-            <button key={value} type="button" className={kind === value ? btnPrimary : btnSecondary} onClick={() => { setKind(value); setSelected([]); }}>
+            <button key={value} type="button" className={kind === value ? btnPrimary : btnSecondary} onClick={() => { setKind(value); setSelected([]); setVersion(versions.find((item) => !item.archived && (item.learnerKind === value || item.learnerKind === null))?.version ?? null); }}>
               {value === 'apprenticeship' ? 'Apprenticeship learners' : 'Commercial learners'}
             </button>
           ))}
         </div>
+        {mode === 'create' && kind !== builderKind && <p className="mt-2 text-[12px] text-foreground-600">This will use the current {kind} default as its starting layout. Switch the builder form type to edit it before creating a version.</p>}
+        {mode === 'assign' && <>
         <label className="mt-3 block text-[12px] font-medium text-foreground-700">Search learners
           <input className={`${inputClass} mt-1`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or email" />
         </label>
@@ -771,10 +900,11 @@ function WizardVersionDialog({
         <label className="mt-3 block text-[12px] font-medium text-foreground-700">Reason (optional)
           <input className={`${inputClass} mt-1`} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why this version is being assigned" />
         </label>
+        </>}
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" className={btnSecondary} onClick={onCancel} disabled={saving}>Cancel</button>
           <button ref={confirmRef} type="button" className={btnPrimary} onClick={submit} disabled={!canSubmit}>
-            {saving ? <><AppIcon className="ri-loader-4-line animate-spin" />Saving…</> : mode === 'create' ? 'Create and assign' : 'Assign version'}
+            {saving ? <><AppIcon className="ri-loader-4-line animate-spin" />Saving…</> : mode === 'create' ? 'Create version' : 'Assign version'}
           </button>
         </div>
       </div>

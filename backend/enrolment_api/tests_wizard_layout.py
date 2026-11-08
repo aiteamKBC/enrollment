@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.test import RequestFactory, SimpleTestCase
+from django.urls import resolve
 
 from enrolment_api import wizard_layout as wl
 
@@ -370,6 +371,7 @@ class PublishViewTests(SimpleTestCase):
         for p in (
             patch.dict(os.environ, {"ENROLMENT_API_REQUIRE_AUTH": "0"}),
             patch.object(wl.transaction, "atomic", lambda **_: nullcontext()),
+            patch.object(wl, "_kind_column_exists", return_value=True),
         ):
             p.start()
             self.addCleanup(p.stop)
@@ -408,6 +410,71 @@ class PublishViewTests(SimpleTestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("needs a label", json.loads(res.content)["error"])
 
+    def test_targeted_version_is_typed_and_does_not_assign_learners(self):
+        now = datetime(2026, 11, 8, tzinfo=timezone.utc)
+        previous = {"steps": [step("cv-job", [])]}
+        cursor = FakeCursor([
+            ("x",), (5, previous, now, "Admin"),
+            (5, previous, now, "Admin", "default", None, None, None, False),
+            (6, now),
+        ])
+        request = self.factory.put("/enrolment_api/wizard-layout/publish/", data=json.dumps({
+            "baseVersion": 5, "parentVersion": 5, "scope": "targeted", "name": "Commercial cohort",
+            "learnerKind": "commercial", "layout": previous,
+        }), content_type="application/json")
+        request._dont_enforce_csrf_checks = True
+        with patch.object(wl, "connections", FakeConnections(cursor)):
+            response = wl.publish_wizard_layout(request)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(json.loads(response.content)["assigned"], 0)
+        self.assertFalse(any('INSERT INTO enrolment."Wizard_Layout_Assignments"' in sql for sql, _ in cursor.executed))
+        inserted = next(params for sql, params in cursor.executed if sql.startswith('INSERT INTO enrolment."Wizard_Form_Layouts"'))
+        self.assertEqual(inserted[-1], "commercial")
+
+    def test_legacy_version_is_readable_when_archived(self):
+        now = datetime(2026, 11, 8, tzinfo=timezone.utc)
+        cursor = FakeCursor([(3, '{"steps": []}', now, "Admin", "targeted", "Older", 2, "apprenticeship", True)])
+        row = wl.read_version(cursor, 3)
+        self.assertEqual(row[1], {"steps": []})
+        self.assertTrue(row[8])
+        self.assertNotIn('NOT COALESCE("Archived", false)', cursor.executed[0][0])
+
+    def test_current_default_is_filtered_by_learner_type(self):
+        now = datetime(2026, 11, 8, tzinfo=timezone.utc)
+        cursor = FakeCursor([("x",), (8, {"steps": []}, now, "Admin")])
+        current = wl.read_current(cursor, "commercial")
+        self.assertEqual(current[0], 8)
+        sql, params = cursor.executed[-1]
+        self.assertIn('"Learner_kind" = %s', sql)
+        self.assertIn('NULLS LAST', sql)
+        self.assertEqual(params, ["commercial", "commercial"])
+
+    def test_assignment_rejects_archived_and_wrong_type_versions(self):
+        now = datetime(2026, 11, 8, tzinfo=timezone.utc)
+        for saved_kind, archived in (("commercial", False), ("apprenticeship", True)):
+            with self.subTest(saved_kind=saved_kind, archived=archived):
+                cursor = FakeCursor([(3, {"steps": []}, now, "Admin", "targeted", "Older", 2, saved_kind, archived)])
+                request = self.factory.put("/enrolment_api/wizard-layout/assignments/", data=json.dumps({
+                    "learnerKind": "apprenticeship", "learnerIds": [41], "version": 3,
+                }), content_type="application/json")
+                request._dont_enforce_csrf_checks = True
+                with patch.object(wl, "connections", FakeConnections(cursor)), patch.object(wl, "_target_learners_exist", return_value=True):
+                    response = wl.assign_wizard_layout(request)
+                self.assertEqual(response.status_code, 400, response.content)
+                self.assertFalse(any('INSERT INTO enrolment."Wizard_Layout_Assignments"' in sql for sql, _ in cursor.executed))
+
+    def test_cannot_archive_the_current_default(self):
+        now = datetime(2026, 11, 8, tzinfo=timezone.utc)
+        cursor = FakeCursor([
+            ("x",), (7, {"steps": []}, now, "Admin", "default", None, None, "apprenticeship", False),
+        ])
+        request = self.factory.patch("/enrolment_api/wizard-layout/versions/7/", data=json.dumps({"archived": True}), content_type="application/json")
+        request._dont_enforce_csrf_checks = True
+        with patch.object(wl, "connections", FakeConnections(cursor)), patch.object(wl, "read_current", return_value=(7, {"steps": []}, now, "Admin")):
+            response = wl.wizard_layout_version(request, 7)
+        self.assertEqual(response.status_code, 409, response.content)
+        self.assertFalse(any(sql.startswith("UPDATE") for sql, _ in cursor.executed))
+
 
 class LayoutAccessTests(SimpleTestCase):
     """The layout is readable by learners; publishing it is not."""
@@ -429,6 +496,11 @@ class LayoutAccessTests(SimpleTestCase):
             res = wl.wizard_layout(self._as_learner(self.factory.get("/enrolment_api/wizard-layout/")))
         self.assertEqual(res.status_code, 200)
         self.assertEqual(json.loads(res.content)["layout"], None)
+
+    def test_version_detail_url_does_not_match_learner_layout_route(self):
+        match = resolve('/enrolment_api/wizard-layout/versions/7/')
+        self.assertEqual(match.func, wl.wizard_layout_version)
+        self.assertEqual(match.kwargs, {'version': 7})
 
     def test_learner_cannot_publish(self):
         request = self._as_learner(self.factory.put("/enrolment_api/wizard-layout/publish/", data="{}", content_type="application/json"))

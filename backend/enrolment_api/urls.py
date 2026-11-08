@@ -45,10 +45,11 @@ urlpatterns = [
     path('wizard/<str:kind>/<int:learner_id>/initial-assessments/bksb-account/', bksb.auto_login_account, name='wizard-bksb-auto-login'),
     path('wizard/<str:kind>/<int:learner_id>/initial-assessments/<str:subject>/launch/', bksb.launch_initial_assessment, name='wizard-initial-assessment-launch'),
     path('wizard-layout/', wizard_layout.wizard_layout, name='wizard-layout'),
-    path('wizard-layout/<str:kind>/<int:learner_id>/', wizard_layout.wizard_layout, name='wizard-layout-learner'),
     path('wizard-layout/publish/', wizard_layout.publish_wizard_layout, name='wizard-layout-publish'),
     path('wizard-layout/versions/', wizard_layout.wizard_layout_versions, name='wizard-layout-versions'),
+    path('wizard-layout/versions/<int:version>/', wizard_layout.wizard_layout_version, name='wizard-layout-version'),
     path('wizard-layout/assignments/', wizard_layout.assign_wizard_layout, name='wizard-layout-assignments'),
+    path('wizard-layout/<str:kind>/<int:learner_id>/', wizard_layout.wizard_layout, name='wizard-layout-learner'),
     # Files on the builder's custom upload fields (Azure-backed, path in the field's own column)
     path('wizard/<str:kind>/<int:learner_id>/custom-uploads/<str:field_key>/', wizard_custom_uploads.custom_uploads, name='wizard-custom-uploads'),
     path('wizard/<str:kind>/<int:learner_id>/custom-uploads/<str:field_key>/<uuid:file_id>/', wizard_custom_uploads.delete_custom_upload, name='wizard-custom-upload-delete'),
