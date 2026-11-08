@@ -14,7 +14,7 @@ import type { WizardLayoutVersion } from '@/api/wizardLayout';
 import { fetchEnrolmentUsers } from '@/api/enrolmentUsers';
 import type { LearnerKind } from '@/api/extendedIlr';
 import type { UserListRow } from '@/pages/users/types';
-import { btnPrimary, btnSecondary, iconBtn, inputClass } from '../components/ui';
+import { btnPrimary, btnSecondary, btnDestructive, iconBtn, inputClass } from '../components/ui';
 import { builtinDef, isRequired, itemLabel, resolveLayout } from '../wizard/layout/resolve';
 import { isChoiceFieldType, isContentFieldType, type LayoutItem, type LayoutStep, type WizardLayout, type WizardLayoutResponse } from '../wizard/layout/types';
 import { FieldEditor } from './FieldEditor';
@@ -470,6 +470,7 @@ function StepEditor({
   const shown = step.items.filter((it) => !it.hidden);
   const removed = step.items.filter((it) => it.hidden);
   const [showRemoved, setShowRemoved] = useState(false);
+  const [confirmRemoveStep, setConfirmRemoveStep] = useState(false);
   const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const addRef = useRef<HTMLButtonElement>(null);
 
@@ -497,10 +498,22 @@ function StepEditor({
           Step name
           <input id="builder-step-name" className={`${inputClass} mt-1`} value={step.label} onChange={(e) => edit((l) => updateStep(l, step.slug, { label: e.target.value }))} />
         </label>
-        <button type="button" className={`${btnSecondary} mb-1`} disabled={!canRemoveStep(layout, step.slug) || layout.steps.filter((entry) => !entry.hidden).length <= 1} onClick={onRemove} aria-label={`Remove ${step.label} step`}>
+        <button type="button" className={`${btnSecondary} mb-1`} disabled={!canRemoveStep(layout, step.slug) || layout.steps.filter((entry) => !entry.hidden).length <= 1} onClick={() => setConfirmRemoveStep(true)} aria-label={`Remove ${step.label} step`}>
           <AppIcon className="ri-delete-bin-line" />Remove step
         </button>
       </div>
+      {confirmRemoveStep && (
+        <div role="alert" className="mx-5 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-[13px] text-amber-950">
+          <div className="flex min-w-0 items-start gap-2">
+            <AppIcon className="ri-alert-line mt-0.5 shrink-0 text-amber-700" />
+            <p><strong>Remove “{step.label}”?</strong> This step will be removed and hidden once you publish. Existing responses will be retained for learners who have already completed it, and you can restore the step at any time from Removed Steps.</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" className={btnSecondary} onClick={() => setConfirmRemoveStep(false)}>Cancel</button>
+            <button type="button" className={btnDestructive} onClick={onRemove}><AppIcon className="ri-delete-bin-line" />Remove step</button>
+          </div>
+        </div>
+      )}
       {step.slug === 'ilr-details' && <p className="mx-5 mt-4 rounded-lg border border-foreground-200 p-3 text-[12px] text-foreground-600">
         Apprenticeships have one required Your signature field at the end of ILR. The legacy Declaration signature item displays the accuracy declaration only; publishing or restoring it cannot add another signing box. Historical signatures are preserved and require explicit confirmation for the combined wording.
       </p>}

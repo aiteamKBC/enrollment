@@ -275,6 +275,7 @@ describe('the builder page', () => {
     renderBuilder();
     await openStep('CV/Job Description');
     await userEvent.click(screen.getByRole('button', { name: 'Remove CV/Job Description step' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove step' }));
     const nav = screen.getByRole('navigation', { name: 'Wizard steps' });
     expect(within(nav).queryByRole('button', { name: 'CV/Job Description' })).toBeNull();
     await userEvent.click(within(nav).getByRole('button', { name: /Removed steps/ }));
