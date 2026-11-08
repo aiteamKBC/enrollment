@@ -440,6 +440,7 @@ function ItemRow({
   const def = item.builtin ? BUILTIN_ITEMS[item.key] : undefined;
   const question = isBuiltinQuestion(def) ? def : undefined;
   const note = def?.kind === 'note';
+  const contentOnly = !item.builtin && (item.type === 'heading' || item.type === 'description');
   const label = itemLabel(layout, item);
   const locked = isLocked(item);
   const workplace = item.builtin && WORKPLACE_FIELDS.has(item.key);
@@ -454,7 +455,7 @@ function ItemRow({
   const hint = question ? textFor(layout.texts, `${item.key}.hint`) : item.helpText;
   // Information is all wording, so it opens with its wording showing.
   const [panel, setPanel] = useState<'wording' | 'answers' | null>(note ? 'wording' : null);
-  const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string');
+  const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string' && textFor(layout.texts, s.key) !== s.default);
 
   const remove = () => {
     if (deps.length && !window.confirm(`${deps.length} question${deps.length === 1 ? '' : 's'} only asked for an answer to this question will stop being asked.\n\nRemove it from the form?`)) return;
@@ -473,7 +474,7 @@ function ItemRow({
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {note ? 'Information' : item.builtin ? 'Standard question' : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
-            {!item.builtin && !item.column && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
+            {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
             {locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Identifies the applicant — always asked</span>}
             {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
             {trigger && shownFor.length > 0 && (
@@ -486,7 +487,7 @@ function ItemRow({
           </div>
         </div>
 
-        {!note && (
+        {!note && !contentOnly && (
           <label className={`flex shrink-0 items-center gap-1.5 text-[12px] ${locked ? 'text-foreground-400' : 'text-foreground-700'}`}>
             <input
               type="checkbox"

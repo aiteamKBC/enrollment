@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, ClipboardList, Info, Loader2, MapPin, RotateCcw, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, Info, Loader2, MapPin, RotateCcw, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   ApplicationSubmitError,
@@ -28,6 +28,7 @@ import {
   isQuestion,
   isRequired,
   isShown,
+  minimumDate,
   toPayload,
   validateSection,
   type AnswerValue,
@@ -402,6 +403,12 @@ export default function ApprenticeshipApplicationPage() {
 
           <div className={styles.questions}>
             {section.items.map(item => {
+              if (item.kind === 'heading') {
+                return <h3 key={item.key} className="border-b border-foreground-200 pb-1.5 pt-4 text-[16px] font-semibold text-foreground-900">{item.text}</h3>;
+              }
+              if (item.kind === 'description') {
+                return <div key={item.key} className="whitespace-pre-line py-2.5 text-[13px] leading-relaxed text-foreground-600">{item.text}</div>;
+              }
               if (!isQuestion(item)) {
                 if (!isNoteShown(item, answers)) return null;
                 const [title, ...paragraphs] = item.text.split('\n\n');
@@ -454,6 +461,7 @@ export default function ApprenticeshipApplicationPage() {
                   value={value}
                   error={errors[item.key]}
                   today={today}
+                  minimumDate={minimumDate(item, answers)}
                   onChange={next => setAnswer(item.key, next)}
                   onBlur={postcode ? () => void checkPostcode(String(value ?? '')) : undefined}
                   check={postcode && isUkPostcode(String(value ?? '')) ? checks[compactPostcode(String(value))] : undefined}
@@ -499,7 +507,6 @@ function Frame({ hero, children }: { hero?: { eyebrow: string; title: string; in
       <div className={frame.container}>
         <div className={`${frame.brandBar} ${styles.brandBar}`}>
           <img src="/assets/kbc-logo.png" alt="Kent Business College" width="175" height="80" />
-          <span><ClipboardList size={17} aria-hidden="true" />Apprenticeship application</span>
         </div>
         {hero && (
           <header className={frame.hero}>
@@ -527,6 +534,7 @@ interface QuestionRowProps {
   value: AnswerValue;
   error?: string;
   today: string;
+  minimumDate: string;
   onChange: (value: string | boolean) => void;
   onBlur?: () => void;
   /** Postcode questions: the lookup of the current answer. */
@@ -534,7 +542,7 @@ interface QuestionRowProps {
   onRetry?: () => void;
 }
 
-function QuestionRow({ question, number, value, error, today, onChange, onBlur, check, onRetry }: QuestionRowProps) {
+function QuestionRow({ question, number, value, error, today, minimumDate, onChange, onBlur, check, onRetry }: QuestionRowProps) {
   const id = `application-${question.key}`;
   const labelId = `${id}-label`;
   const hintId = question.hint ? `${id}-hint` : undefined;
@@ -623,7 +631,7 @@ function QuestionRow({ question, number, value, error, today, onChange, onBlur, 
             placeholder={question.placeholder}
             maxLength={'maxLength' in question ? question.maxLength : undefined}
             max={question.kind === 'date' && !question.allowFuture ? today : undefined}
-            min={question.kind === 'date' ? '1900-01-01' : undefined}
+            min={question.kind === 'date' ? minimumDate : undefined}
             step={question.kind === 'number' ? 'any' : undefined}
             inputMode={question.kind === 'number' ? 'decimal' : undefined}
             autoComplete={'autoComplete' in question ? question.autoComplete : undefined}

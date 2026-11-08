@@ -89,10 +89,10 @@ export const REQUIRED_ADDRESS_FIELDS = new Set(['employerAddressLine1', 'employe
 function addressQuestions(prefix: 'employer' | 'residential'): BuiltinQuestion[] {
   const title = prefix === 'employer' ? 'Employer' : 'Residential';
   return [
-    ['AddressLine1', 'Address Line 1', 200, 'address-line1', 'House number and street name'],
-    ['AddressLine2', 'Address Line 2', 200, 'address-line2', 'Flat number, building name or area'],
-    ['TownCity', 'Address Line 3', 100, 'address-level2', 'Town or City'],
-    ['County', 'Address Line 4', 100, 'address-level1', 'County and Country'],
+    ['AddressLine1', 'Street Address', 200, 'address-line1', 'Street Address'],
+    ['AddressLine2', 'Address Line 2', 200, 'address-line2', 'Address Line 2'],
+    ['TownCity', 'Town/City', 100, 'address-level2', 'Town or City'],
+    ['County', 'County', 100, 'address-level1', 'County'],
   ].map(([suffix, label, limit, autoComplete, placeholder]) => {
     const key = `${prefix}${suffix}` as ApplicationField;
     return { kind: 'text', key, label: `${title} ${label}`, required: REQUIRED_ADDRESS_FIELDS.has(key),
@@ -253,13 +253,17 @@ export const TEXT_SLOTS: Record<string, TextSlot> = Object.fromEntries(
 /** The wording for `key`: the published edit, else the standard wording. */
 export function textFor(texts: Record<string, string> | undefined, key: string): string {
   const edited = texts?.[key];
-  // Some old publications stored the then-standard labels explicitly. Treat
-  // those as defaults, while retaining genuinely customised address wording.
-  const oldAddressLabels: Record<string, string> = {
-    'employerTownCity.label': 'Employer Town or City', 'employerCounty.label': 'Employer County',
-    'residentialTownCity.label': 'Residential Town or City', 'residentialCounty.label': 'Residential County',
+  // Older layouts may have stored the former default address labels explicitly.
+  // Treat those as defaults after correcting the visible line-to-key mapping.
+  const oldAddressLabels: Record<string, string[]> = {
+    'employerAddressLine2.label': ['Employer Town/City'],
+    'employerTownCity.label': ['Employer Town or City', 'Employer County'],
+    'employerCounty.label': ['Employer County', 'Employer Address Line 4'],
+    'residentialAddressLine2.label': ['Residential Town/City'],
+    'residentialTownCity.label': ['Residential Town or City', 'Residential County'],
+    'residentialCounty.label': ['Residential County', 'Residential Address Line 4'],
   };
-  if (edited === oldAddressLabels[key] && edited !== undefined) return TEXT_SLOTS[key]?.default ?? '';
+  if (edited !== undefined && oldAddressLabels[key]?.includes(edited)) return TEXT_SLOTS[key]?.default ?? '';
   if (typeof edited === 'string' && edited.trim() !== '') return edited;
   return TEXT_SLOTS[key]?.default ?? '';
 }
