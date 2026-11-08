@@ -11,6 +11,7 @@ import {
 } from '@/api/learnerCalendar';
 import type { LearnerKind } from '@/api/learnerDetail';
 import { SessionSlotPicker } from './SessionSlotPicker';
+import { DatePickerField } from './DatePickerField';
 import { slotLabel } from "./SessionSlotPicker.helpers";
 import { RouteLoadingSkeleton } from './RouteLoadingSkeleton';
 
@@ -322,22 +323,15 @@ export function Booking({ state, kind, learnerId, onBooked }: {
       </p>
 
       <div className="mt-5 flex flex-wrap items-start gap-4">
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-500">
             Date
           </span>
-          <input
-            type="date"
-            value={date}
-            min={earliestBookable()}
-            disabled={saving}
-            onChange={event => { setDate(event.target.value); setError(''); }}
-            className="rounded-lg border border-foreground-200 bg-background-50 px-3 py-2 text-[13px] font-medium text-foreground-900 outline-none focus:border-primary-400 disabled:opacity-60"
-          />
+          <DatePickerField label="Date" hideLabel value={date} min={earliestBookable()} disabled={saving} onChange={value => { setDate(value); setError(''); }} />
           <span className="text-[11px] text-foreground-400">
             Weekdays only — not weekends or UK bank holidays.
           </span>
-        </label>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-1.5">

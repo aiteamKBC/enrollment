@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppIcon } from '@/components/feature/AppIcon';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { useWizard } from "../WizardContext.helpers";
 import { useToast } from "@/hooks/useToast.helpers";
 import type { LearnerKind } from '@/api/extendedIlr';
@@ -239,15 +240,9 @@ function PlrForm({
         <input value={form.level} onChange={(e) => set({ level: e.target.value })} className={control('level')} />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-3">
-        <Field label="Start date">
-          <input type="date" value={form.startDate} onChange={(e) => set({ startDate: e.target.value })} className={inputClass} />
-        </Field>
-        <Field label="End date">
-          <input type="date" value={form.endDate} onChange={(e) => set({ endDate: e.target.value })} className={inputClass} />
-        </Field>
-        <Field label="Award date" required error={errors.awardDate}>
-          <input type="date" value={form.awardDate} onChange={(e) => set({ awardDate: e.target.value })} className={control('awardDate')} />
-        </Field>
+        <div className="mb-3"><DatePickerField label="Start date" value={form.startDate} onChange={value => set({ startDate: value })} /></div>
+        <div className="mb-3"><DatePickerField label="End date" value={form.endDate} onChange={value => set({ endDate: value })} /></div>
+        <div className="mb-3"><DatePickerField label="Award date" required error={errors.awardDate} value={form.awardDate} onChange={value => set({ awardDate: value })} /></div>
       </div>
       <Field label="Credits" error={errors.credits}>
         <input inputMode="numeric" value={form.credits} onChange={(e) => set({ credits: e.target.value })} className={control('credits')} />

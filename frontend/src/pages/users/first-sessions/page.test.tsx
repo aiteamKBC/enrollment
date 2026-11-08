@@ -139,11 +139,13 @@ describe('First sessions page', () => {
 
     fireEvent.change(screen.getByLabelText('Case owner'), { target: { value: 'olivia@example.org' } });
     fireEvent.change(screen.getByLabelText('Session from'), { target: { value: '2026-10-01' } });
+    expect(screen.getByLabelText('Session from')).toHaveValue('01/10/2026');
     const filtered = within(screen.getByRole('table')).getAllByRole('row');
     expect(filtered).toHaveLength(2);
     expect(within(filtered[1]).getByText('Alex Example')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Booked to'), { target: { value: '2026-09-19' } });
+    expect(screen.getByLabelText('Booked to')).toHaveValue('19/09/2026');
     expect(screen.getByText('No first-session bookings match these filters.')).toBeInTheDocument();
   });
 

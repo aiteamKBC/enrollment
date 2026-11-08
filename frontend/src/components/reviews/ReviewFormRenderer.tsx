@@ -1,5 +1,6 @@
 import { fieldAnswered, fieldAllowsRespondent, importedTableRows, computeVisibleRequiredFields, computeWritableFieldIds, computeVisibleWritableFieldIds, computeMissingRequiredFieldsForRole, computeMissingRequiredFields } from './ReviewFormRenderer.helpers';
 import { AppIcon } from '@/components/feature/AppIcon';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { cn } from '@/lib/cn';
 import { flattenReviewFields, type ReviewFieldDefinition, type ReviewSectionDefinition } from '@/api/reviewInstances';
 import type { ReactNode } from 'react';
@@ -488,13 +489,7 @@ function ReviewFieldInput({
       );
     case 'date':
       return (
-        <input
-          type="date"
-          value={stringValue}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={readOnly}
-          className="h-11 w-full max-w-sm rounded-lg border border-background-300 bg-white px-3.5 text-sm font-semibold text-foreground-800 outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-200"
-        />
+        <DatePickerField label={field.title} hideLabel value={stringValue} onChange={onChange} disabled={readOnly} className="max-w-sm" />
       );
     case 'boolean':
     case 'boolean_case_block':

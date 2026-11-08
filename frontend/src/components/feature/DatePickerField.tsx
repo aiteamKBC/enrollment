@@ -1,4 +1,4 @@
-import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppIcon } from '@/components/feature/AppIcon';
 
@@ -15,6 +15,11 @@ interface DatePickerFieldProps {
   helper?: string;
   /** Non-blocking notice — shown in place of `helper` without disabling the picked date. */
   warning?: string;
+  /** Use an existing visible label outside this component. */
+  hideLabel?: boolean;
+  inputId?: string;
+  className?: string;
+  autoComplete?: string;
 }
 
 type PanelView = 'days' | 'months' | 'years';
@@ -39,7 +44,13 @@ export function DatePickerField({
   error,
   helper,
   warning,
+  hideLabel = false,
+  inputId,
+  className = '',
+  autoComplete = 'off',
 }: DatePickerFieldProps) {
+  const generatedId = useId();
+  const resolvedId = inputId ?? generatedId;
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<PanelView>('days');
   const [viewDate, setViewDate] = useState<Date>(() => startOfMonth(dateFromInput(value) || new Date()));
@@ -169,6 +180,7 @@ export function DatePickerField({
   const commitText = (raw: string, { close = false } = {}) => {
     const trimmed = raw.trim();
     if (!trimmed) {
+      inputRef.current?.setCustomValidity('');
       setTypedError('');
       setText('');
       if (value) onChange('');
@@ -177,18 +189,22 @@ export function DatePickerField({
     }
     const parsed = parseTypedDate(trimmed, viewDate);
     if (!parsed) {
+      inputRef.current?.setCustomValidity('Use dd/mm/yyyy');
       setTypedError('Use dd/mm/yyyy');
       return;
     }
     if (minDate && parsed.date < minDate) {
+      inputRef.current?.setCustomValidity('Date is before the allowed minimum');
       setTypedError(`Cannot be before ${formatDatePickerValue(min || '')}`);
       return;
     }
     if (maxDate && parsed.date > maxDate) {
+      inputRef.current?.setCustomValidity('Date is after the allowed maximum');
       setTypedError(`Cannot be after ${formatDatePickerValue(max || '')}`);
       return;
     }
     setTypedError('');
+    inputRef.current?.setCustomValidity('');
     setText(formatDate(parsed.date));
     setViewDate(startOfMonth(parsed.date));
     setFocusedDate(parsed.date);
@@ -201,10 +217,14 @@ export function DatePickerField({
   const handleTextChange = (next: string) => {
     setText(next);
     setTypedError('');
+    if (value && next.trim() !== formatDatePickerValue(value)) onChange('');
+    const parsed = parseTypedDate(next.trim(), viewDate);
+    const invalidText = next.trim() && !parsed ? 'Use dd/mm/yyyy' : '';
+    const outsideRange = parsed && isDateDisabled(parsed.date) ? 'Date is outside the allowed range' : '';
+    inputRef.current?.setCustomValidity(invalidText || outsideRange);
     if (!open) setOpen(true);
     setView('days');
     setGridFocusActive(false);
-    const parsed = parseTypedDate(next.trim(), viewDate);
     if (!parsed) return;
     // A year still being typed (2, 20, 202…) reads as 2002 then 2020 then 2026 and
     // would drag the calendar through three wrong decades, so ignore half-typed ones
@@ -217,6 +237,7 @@ export function DatePickerField({
 
   const selectDate = (date: Date, returnFocus = false) => {
     if (isDateDisabled(date)) return;
+    inputRef.current?.setCustomValidity('');
     setTypedError('');
     setText(formatDate(date));
     setViewDate(startOfMonth(date));
@@ -456,6 +477,7 @@ export function DatePickerField({
           onClick={() => {
             setText('');
             setTypedError('');
+            inputRef.current?.setCustomValidity('');
             onChange('');
             closePanel(true);
           }}
@@ -479,8 +501,8 @@ export function DatePickerField({
   const shownError = typedError || error;
 
   return (
-    <div className="block">
-      <span className="text-[10px] font-bold uppercase text-foreground-400">{label}{required ? ' *' : ''}</span>
+    <div className={`block ${className}`}>
+      {!hideLabel && <span className="text-[10px] font-bold uppercase text-foreground-400">{label}{required ? ' *' : ''}</span>}
       <div
         ref={fieldRef}
         className={`mt-1 flex h-[42px] w-full items-center gap-2 rounded-lg border bg-background-50 pl-3 pr-1 transition-smooth ${disabled ? 'cursor-not-allowed bg-background-100' : ''} ${open ? 'border-primary-300 ring-2 ring-primary-100' : shownError ? 'border-red-300' : 'border-background-200 hover:border-primary-200'}`}
@@ -488,9 +510,13 @@ export function DatePickerField({
         <AppIcon className="ri-calendar-event-line shrink-0 text-foreground-400"></AppIcon>
         <input
           ref={inputRef}
+          id={resolvedId}
           type="text"
           inputMode="numeric"
-          autoComplete="off"
+          autoComplete={autoComplete}
+          required={required}
+          aria-invalid={Boolean(shownError) || undefined}
+          aria-describedby={shownError ? `${resolvedId}-error` : undefined}
           role="combobox"
           aria-haspopup="dialog"
           aria-expanded={open}
@@ -524,7 +550,7 @@ export function DatePickerField({
       </div>
       {picker}
       {shownError ? (
-        <p className="mt-1 text-[11px] font-medium text-red-600">{shownError}</p>
+        <p id={`${resolvedId}-error`} className="mt-1 text-[11px] font-medium text-red-600">{shownError}</p>
       ) : warning ? (
         <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-amber-700">
           <AppIcon className="ri-alert-line shrink-0 text-[12px]"></AppIcon>

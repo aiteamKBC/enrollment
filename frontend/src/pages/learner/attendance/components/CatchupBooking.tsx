@@ -2,6 +2,7 @@ import { useEffect, useState, type MutableRefObject } from 'react';
 import { bookLearnerCalendarSession, fetchCatchupSlots, fetchLearnerCalendarEvents, ukOffsetForDate, type BookingCalendarRules, type LearnerCalendarEvent } from '@/api/learnerCalendar';
 import type { MissedAttendanceSession } from '@/api/absenceReports';
 import { useMyLearner } from '@/hooks/useMyLearner';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import styles from '../attendance.module.css';
 
 /** Books the chosen time for a parent that submits the booking with its own button.
@@ -149,7 +150,7 @@ export default function CatchupBooking({ lecture, selectedKey, onSelect, onBooke
     {loading ? null : selected ? <p className={styles.bookingConfirmation}>{selected.scheduledDate} at {selected.scheduledTime} · {selected.durationMinutes} minutes{selected.status === 'not-scheduled' ? ' · Existing pending request' : ' · Booked'}</p> : <>
       <p>Choose a date and one of your coach’s available times. The booking is confirmed immediately.</p>
       <div className={styles.bookingFields}>
-        <label>Date<input aria-label="Catch-up date" aria-invalid={Boolean(dateRestriction)} type="date" min={earliestDate} value={date} disabled={busy || disabled} onChange={event => { setDate(event.target.value); setError(''); }} /></label>
+        <div>Date<DatePickerField label="Catch-up date" hideLabel error={dateRestriction || undefined} min={earliestDate} value={date} disabled={busy || disabled} onChange={value => { setDate(value); setError(''); }} /></div>
         <label>Time (UK)<select aria-label="Catch-up time" value={time} disabled={busy || disabled || !date || Boolean(dateRestriction) || slotsLoading || !slots.length} onChange={event => { setTime(event.target.value); setError(''); }}>
           <option value="">{!date ? 'Choose a date first' : slotsLoading ? 'Checking…' : slots.length ? 'Choose a time' : 'No free times'}</option>
           {slots.map(slot => <option key={slot} value={slot}>{slot}</option>)}

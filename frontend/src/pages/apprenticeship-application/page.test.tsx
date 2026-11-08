@@ -361,8 +361,8 @@ it.each(['standard', 'legacy'])('shows the future leaving date immediately after
   expect(screen.queryByLabelText(/Please provide expected leaving date/)).not.toBeInTheDocument();
   choose(/full-time education or training prior to enrolment/, 'Yes');
   const date = screen.getByLabelText(/Please provide expected leaving date/);
-  expect(date).toHaveAttribute('type', 'date');
-  expect(date).not.toHaveAttribute('max');
+  expect(date).toHaveAttribute('placeholder', 'dd/mm/yyyy');
+  expect(date).toHaveAttribute('type', 'text');
   const parent = screen.getByRole('radiogroup', { name: /full-time education or training prior to enrolment/ });
   expect(parent.parentElement!.parentElement!.nextElementSibling).toContainElement(date);
   type(/Please provide expected leaving date/, '2027-06-30');

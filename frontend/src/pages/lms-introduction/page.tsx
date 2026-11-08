@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarCheck2, CalendarDays, CheckCircle2, ExternalLink
 import styles from '../coach-booking/booking.module.css';
 import form from './lmsIntroduction.module.css';
 import { SYSTEM_TIME_ZONE } from '@/lib/format';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { getLmsIntroduction, getLmsIntroductionTimes, LmsIntroductionError, requestLmsIntroduction, slotLabel, type LmsIntroductionState } from '@/api/lmsIntroduction';
 
 // Today in the business time zone, as the YYYY-MM-DD a date input expects.
@@ -92,7 +93,7 @@ export default function LmsIntroductionPage() {
           <div className={styles.sectionHeading}><span className={styles.stepNumber}>01</span><div><h2>Choose a time</h2><p>{state.durationMinutes} minutes with {owner} on Microsoft Teams, Monday to Friday. Times are UK time.</p></div></div>
           {legacyRequest && <p className={form.hint}>You asked for {slotLabel(request?.date ?? null, request?.time ?? null)}. Choose a time below to book it now.</p>}
           <div className={form.fields}>
-            <label className={form.field}>Date<input type="date" required min={businessToday()} value={date} onChange={event => setDate(event.target.value)} /></label>
+            <div className={form.field}>Date<DatePickerField label="Date" hideLabel required min={businessToday()} value={date} onChange={setDate} /></div>
             <label className={form.field}>Start time<select required value={time} disabled={!freeTimes || freeTimes.length === 0} onChange={event => setTime(event.target.value)}>
               <option value="">{!date ? 'Choose a date first' : timesLoading ? 'Checking availability...' : freeTimes && freeTimes.length === 0 ? 'No free times this day' : 'Choose a time'}</option>
               {(freeTimes ?? []).map(option => <option key={option} value={option}>{option}</option>)}
