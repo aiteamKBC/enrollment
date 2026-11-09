@@ -1,3 +1,8 @@
+import { useAdminDocumentPreview } from '@/features/compliance-documents/useAdminDocumentPreview';
+import { LearnerDocumentRevisions } from '@/features/compliance-documents/LearnerDocumentRevisions';
+import { DocumentHistory } from '@/features/compliance-documents/DocumentHistory';
+import { downloadOriginalPdf } from '@/features/compliance-documents/persistOriginalPdf';
+import { REVIEW_DOCUMENT_KEYS } from '@/features/compliance-documents/revisionApi';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
@@ -8,7 +13,7 @@ import { fetchCommercialBoard } from '@/api/commercialUsers';
 import { fetchEnrolmentDocuments, getEnrolmentDocumentUrl, uploadEnrolmentDocument, DOC_SIGNING_PARTIES, type EnrolmentDocument, type EnrolmentDocType } from '@/api/enrolmentDocuments';
 import { fetchAgreement, issueAgreement, type Agreement } from '@/api/apprenticeshipAgreement';
 import { renderAgreementPdf, agreementFilename } from '@/lib/apprenticeshipAgreementPdf';
-import { fetchIlrDocument, issueIlrDocument, signIlrDocument, type IlrDocument } from '@/api/ilrDocument';
+import { fetchIlrDocument, issueIlrDocument, type IlrDocument } from '@/api/ilrDocument';
 import { SignaturePad } from './wizard/steps/SignaturePad';
 import { LearnerHeaderDates } from './components/LearnerHeaderDates';
 import { FirstSessionReschedule } from './components/FirstSessionReschedule';
@@ -17,14 +22,12 @@ import { renderIlrPdf, ilrFilename } from '@/lib/ilrDocumentPdf';
 import {
   fetchTrainingPlanDocument,
   issueTrainingPlanDocument,
-  signTrainingPlanDocument,
   type TrainingPlanDocument,
 } from '@/api/trainingPlanDocument';
 import { renderTrainingPlanPdf, trainingPlanFilename } from '@/lib/trainingPlanPdf';
 import {
   fetchWrittenAgreement,
   issueWrittenAgreement,
-  signWrittenAgreement,
   type WrittenAgreementDocument,
 } from '@/api/writtenAgreement';
 import { renderWrittenAgreementPdf, writtenAgreementFilename } from '@/lib/writtenAgreementPdf';
@@ -33,26 +36,30 @@ import { reviewHandoverMessage } from '@/api/reviewHandover';
 import { fetchCoachOptions, type CoachOption } from '@/api/staffUsers';
 
 /** Render the Written Agreement from its record and save it. */
-function downloadWrittenAgreement(document: WrittenAgreementDocument) {
+async function downloadWrittenAgreement(document: WrittenAgreementDocument, learnerId: string) {
+  if (await downloadOriginalPdf(learnerId, document)) return;
   renderWrittenAgreementPdf(document).save(
     writtenAgreementFilename(document.particulars.apprenticeName || ''),
   );
 }
 
 /** Render the Training Plan from its record and save it. */
-function downloadTrainingPlan(document: TrainingPlanDocument) {
+async function downloadTrainingPlan(document: TrainingPlanDocument, learnerId: string) {
+  if (await downloadOriginalPdf(learnerId, document)) return;
   renderTrainingPlanPdf(document).save(
     trainingPlanFilename(document.programme.apprenticeName || ''),
   );
 }
 
 /** Render the agreement from its record and save it. */
-function downloadAgreement(agreement: Agreement) {
+async function downloadAgreement(agreement: Agreement, learnerId: string) {
+  if (await downloadOriginalPdf(learnerId, agreement)) return;
   renderAgreementPdf(agreement).save(agreementFilename(agreement.particulars.apprenticeName));
 }
 
 /** Likewise for the ILR. */
-function downloadIlr(document: IlrDocument) {
+async function downloadIlr(document: IlrDocument, learnerId: string) {
+  if (await downloadOriginalPdf(learnerId, document)) return;
   const { givenNames, familyName } = document.learnerDetails;
   renderIlrPdf(document).save(ilrFilename([givenNames, familyName].filter(Boolean).join(' ')));
 }
@@ -665,6 +672,7 @@ function WrittenAgreementParties({ document }: { document: WrittenAgreementDocum
 }
 
 function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind; learnerId: string; programme: string }) {
+  const adminPreview = useAdminDocumentPreview(learnerId);
   const [docs, setDocs] = useState<EnrolmentDocument[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
@@ -789,7 +797,8 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
   const signWrittenAsProvider = async (mark: string) => {
     setErr(null);
     try {
-      setWritten(await signWrittenAgreement(learnerId, 'provider', providerName || 'Provider', mark));
+      if (!written) return;
+      setWritten((await adminPreview.sign<{ document: WrittenAgreementDocument }>('written-agreement', written.id, providerName || 'Provider', mark)).document);
       setSigningWritten(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not save the signature');
@@ -800,7 +809,8 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
   const signPlanAsProvider = async (mark: string) => {
     setErr(null);
     try {
-      setPlan(await signTrainingPlanDocument(learnerId, 'provider', providerName || 'Provider', mark));
+      if (!plan) return;
+      setPlan((await adminPreview.sign<{ document: TrainingPlanDocument }>('training-plan', plan.id, providerName || 'Provider', mark)).document);
       setSigningPlan(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not save the signature');
@@ -812,7 +822,8 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
   const signIlrAsProvider = async (mark: string) => {
     setErr(null);
     try {
-      setIlr(await signIlrDocument(learnerId, 'provider', providerName || 'Provider', mark));
+      if (!ilr) return;
+      setIlr((await adminPreview.sign<{ document: IlrDocument }>('ilr', ilr.id, providerName || 'Provider', mark)).document);
       setSigningIlr(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not save the signature');
@@ -821,6 +832,7 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
 
   return (
     <>
+      {adminPreview.dialog}
       <p className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider mb-2">{programme || 'Programme Name'}</p>
       {err && <p className="text-[12px] text-red-600 mb-2"><i className="ri-error-warning-line mr-1" />{err}</p>}
       {!loaded && !err && <p className="text-[12px] text-foreground-400 py-2"><i className="ri-loader-4-line animate-spin mr-1.5" />Loading documents…</p>}
@@ -833,24 +845,32 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
             <i className="ri-file-add-line text-foreground-400 shrink-0" />
             <span className="truncate">Apprenticeship Agreement not issued yet</span>
           </span>
+          <span className="flex flex-wrap items-center gap-2">
+            {adminPreview.button('apprenticeship-agreement')}
           <ActionLink
             label={issuing === 'agreement' ? 'Issuing…' : 'Issue agreement'}
             icon="ri-quill-pen-line"
             onClick={() => { void issue(); }}
           />
+          </span>
         </div>
       )}
       {agreement && (
+        <DocumentHistory key={`${learnerId}:apprenticeship-agreement:${agreement.id}`} title="Apprenticeship Agreement">{({ chevron, count, historyControl }) => (
         <div className="divide-y divide-foreground-100 border border-foreground-100 rounded-lg mb-2">
-          <div className="flex items-center justify-between gap-3 px-3 py-2">
-            <span className="text-[12px] text-foreground-700 inline-flex items-center gap-1.5 min-w-0">
-              <i className="ri-file-pdf-line text-red-500 shrink-0" />
-              <span className="truncate">Apprenticeship Agreement</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+            <span className="text-[12px] text-foreground-700 inline-flex flex-wrap items-center gap-1.5 min-w-0">
+              <span className="inline-flex max-w-full items-center gap-1.5 min-w-0">
+                {chevron}
+                <i className="ri-file-pdf-line text-red-500 shrink-0" />
+                <span>Apprenticeship Agreement</span>
+              </span>
+              {count}
               {agreement.fullySigned && (
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded-full shrink-0">signed</span>
               )}
             </span>
-            <span className="flex items-center gap-3 shrink-0">
+            <span className="flex flex-wrap items-center gap-3 min-w-0">
               {/* Apprentice and employer only — the provider does not sign it. */}
               <AgreementParties agreement={agreement} />
               <span className="text-[11px] text-foreground-400">
@@ -859,14 +879,17 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
               {/* Rendered from the agreement record on demand rather than
                   downloaded from storage, so it always carries the signatures
                   actually on record and the particulars that were signed. */}
+              {adminPreview.button('apprenticeship-agreement', agreement.id)}
               <ActionLink
                 label="Download"
                 icon="ri-download-line"
-                onClick={() => downloadAgreement(agreement)}
+                onClick={() => { void downloadAgreement(agreement, learnerId); }}
               />
             </span>
           </div>
+          <LearnerDocumentRevisions learnerId={learnerId} documentKey="apprenticeship-agreement" sourceId={agreement.id} historyControl={historyControl} />
         </div>
+        )}</DocumentHistory>
       )}
       {/* The Individual Learner Record. Signed by the learner and the provider;
           the employer has no part in it and never sees it. */}
@@ -876,24 +899,32 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
             <i className="ri-file-add-line text-foreground-400 shrink-0" />
             <span className="truncate">Individual Learner Record not issued yet</span>
           </span>
+          <span className="flex flex-wrap items-center gap-2">
+            {adminPreview.button('ilr')}
           <ActionLink
             label={issuing === 'ilr' ? 'Issuing…' : 'Issue ILR'}
             icon="ri-quill-pen-line"
             onClick={() => { void issueIlr(); }}
           />
+          </span>
         </div>
       )}
       {ilr && (
+        <DocumentHistory key={`${learnerId}:ilr:${ilr.id}`} title="Individual Learner Record">{({ chevron, count, historyControl }) => (
         <div className="divide-y divide-foreground-100 border border-foreground-100 rounded-lg mb-2">
-          <div className="flex items-center justify-between gap-3 px-3 py-2">
-            <span className="text-[12px] text-foreground-700 inline-flex items-center gap-1.5 min-w-0">
-              <i className="ri-file-pdf-line text-red-500 shrink-0" />
-              <span className="truncate">Individual Learner Record</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+            <span className="text-[12px] text-foreground-700 inline-flex flex-wrap items-center gap-1.5 min-w-0">
+              <span className="inline-flex max-w-full items-center gap-1.5 min-w-0">
+                {chevron}
+                <i className="ri-file-pdf-line text-red-500 shrink-0" />
+                <span>Individual Learner Record</span>
+              </span>
+              {count}
               {ilr.fullySigned && (
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded-full shrink-0">signed</span>
               )}
             </span>
-            <span className="flex items-center gap-3 shrink-0">
+            <span className="flex flex-wrap items-center gap-3 min-w-0">
               <IlrParties document={ilr} />
               <span className="text-[11px] text-foreground-400">
                 {ilr.createdAt ? new Date(ilr.createdAt).toLocaleString('en-GB') : ''}
@@ -902,13 +933,14 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
                 <ActionLink
                   label="Sign as provider"
                   icon="ri-quill-pen-line"
-                  onClick={() => setSigningIlr(true)}
+                  onClick={() => { void adminPreview.open('ilr', ilr.id, () => setSigningIlr(true)); }}
                 />
               )}
+              {adminPreview.button('ilr', ilr.id)}
               <ActionLink
                 label="Download"
                 icon="ri-download-line"
-                onClick={() => downloadIlr(ilr)}
+                onClick={() => { void downloadIlr(ilr, learnerId); }}
               />
             </span>
           </div>
@@ -927,7 +959,9 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
               />
             </div>
           )}
+          <LearnerDocumentRevisions learnerId={learnerId} documentKey="ilr" sourceId={ilr.id} historyControl={historyControl} />
         </div>
+        )}</DocumentHistory>
       )}
       {/* The tripartite Training Plan: apprentice, employer and provider. */}
       {loaded && plan === null && (
@@ -936,24 +970,32 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
             <i className="ri-file-add-line text-foreground-400 shrink-0" />
             <span className="truncate">Training Plan not issued yet</span>
           </span>
+          <span className="flex flex-wrap items-center gap-2">
+            {adminPreview.button('training-plan')}
           <ActionLink
             label={issuing === 'plan' ? 'Issuing…' : 'Issue training plan'}
             icon="ri-quill-pen-line"
             onClick={() => { void issuePlan(); }}
           />
+          </span>
         </div>
       )}
       {plan && (
+        <DocumentHistory key={`${learnerId}:training-plan:${plan.id}`} title="Training Plan">{({ chevron, count, historyControl }) => (
         <div className="divide-y divide-foreground-100 border border-foreground-100 rounded-lg mb-2">
-          <div className="flex items-center justify-between gap-3 px-3 py-2">
-            <span className="text-[12px] text-foreground-700 inline-flex items-center gap-1.5 min-w-0">
-              <i className="ri-file-pdf-line text-red-500 shrink-0" />
-              <span className="truncate">Training Plan</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+            <span className="text-[12px] text-foreground-700 inline-flex flex-wrap items-center gap-1.5 min-w-0">
+              <span className="inline-flex max-w-full items-center gap-1.5 min-w-0">
+                {chevron}
+                <i className="ri-file-pdf-line text-red-500 shrink-0" />
+                <span>Training Plan</span>
+              </span>
+              {count}
               {plan.fullySigned && (
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded-full shrink-0">signed</span>
               )}
             </span>
-            <span className="flex items-center gap-3 shrink-0">
+            <span className="flex flex-wrap items-center gap-3 min-w-0">
               <TrainingPlanParties document={plan} />
               <span className="text-[11px] text-foreground-400">
                 {plan.createdAt ? new Date(plan.createdAt).toLocaleString('en-GB') : ''}
@@ -962,13 +1004,14 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
                 <ActionLink
                   label="Sign as provider"
                   icon="ri-quill-pen-line"
-                  onClick={() => setSigningPlan(true)}
+                  onClick={() => { void adminPreview.open('training-plan', plan.id, () => setSigningPlan(true)); }}
                 />
               )}
+              {adminPreview.button('training-plan', plan.id)}
               <ActionLink
                 label="Download"
                 icon="ri-download-line"
-                onClick={() => downloadTrainingPlan(plan)}
+                onClick={() => { void downloadTrainingPlan(plan, learnerId); }}
               />
             </span>
           </div>
@@ -984,7 +1027,9 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
               />
             </div>
           )}
+          <LearnerDocumentRevisions learnerId={learnerId} documentKey="training-plan" sourceId={plan.id} historyControl={historyControl} />
         </div>
+        )}</DocumentHistory>
       )}
       {/* The Written Agreement: learner, employer and provider all sign. */}
       {loaded && written === null && (
@@ -993,24 +1038,32 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
             <i className="ri-file-add-line text-foreground-400 shrink-0" />
             <span className="truncate">Written Agreement not issued yet</span>
           </span>
+          <span className="flex flex-wrap items-center gap-2">
+            {adminPreview.button('written-agreement')}
           <ActionLink
             label={issuing === 'written' ? 'Issuing…' : 'Issue written agreement'}
             icon="ri-quill-pen-line"
             onClick={() => { void issueWritten(); }}
           />
+          </span>
         </div>
       )}
       {written && (
+        <DocumentHistory key={`${learnerId}:written-agreement:${written.id}`} title="Written Agreement">{({ chevron, count, historyControl }) => (
         <div className="divide-y divide-foreground-100 border border-foreground-100 rounded-lg mb-2">
-          <div className="flex items-center justify-between gap-3 px-3 py-2">
-            <span className="text-[12px] text-foreground-700 inline-flex items-center gap-1.5 min-w-0">
-              <i className="ri-file-pdf-line text-red-500 shrink-0" />
-              <span className="truncate">Written Agreement</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+            <span className="text-[12px] text-foreground-700 inline-flex flex-wrap items-center gap-1.5 min-w-0">
+              <span className="inline-flex max-w-full items-center gap-1.5 min-w-0">
+                {chevron}
+                <i className="ri-file-pdf-line text-red-500 shrink-0" />
+                <span>Written Agreement</span>
+              </span>
+              {count}
               {written.fullySigned && (
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded-full shrink-0">signed</span>
               )}
             </span>
-            <span className="flex items-center gap-3 shrink-0">
+            <span className="flex flex-wrap items-center gap-3 min-w-0">
               <WrittenAgreementParties document={written} />
               <span className="text-[11px] text-foreground-400">
                 {written.createdAt ? new Date(written.createdAt).toLocaleString('en-GB') : ''}
@@ -1019,13 +1072,14 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
                 <ActionLink
                   label="Sign as provider"
                   icon="ri-quill-pen-line"
-                  onClick={() => setSigningWritten(true)}
+                  onClick={() => { void adminPreview.open('written-agreement', written.id, () => setSigningWritten(true)); }}
                 />
               )}
+              {adminPreview.button('written-agreement', written.id)}
               <ActionLink
                 label="Download"
                 icon="ri-download-line"
-                onClick={() => downloadWrittenAgreement(written)}
+                onClick={() => { void downloadWrittenAgreement(written, learnerId); }}
               />
             </span>
           </div>
@@ -1041,7 +1095,9 @@ function ComplianceDocuments({ kind, learnerId, programme }: { kind: LearnerKind
               />
             </div>
           )}
+          <LearnerDocumentRevisions learnerId={learnerId} documentKey="written-agreement" sourceId={written.id} historyControl={historyControl} />
         </div>
+        )}</DocumentHistory>
       )}
       {docs !== null && docs.length > 0 && (
         <div className="divide-y divide-foreground-100 border border-foreground-100 rounded-lg">
@@ -1142,6 +1198,7 @@ function SignatureParties({ signatures }: { signatures: ReviewSignatures }) {
  * has signed, with sign-off and the PDF once finished.
  */
 function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; learnerId: string; programme: string }) {
+  const adminPreview = useAdminDocumentPreview(learnerId);
   const navigate = useNavigate();
   const [reviews, setReviews] = useState<OnboardingReviewSlot[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -1150,6 +1207,7 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
   // which the list omits — so it is fetched for the row being acted on.
   const [signing, setSigning] = useState<ReviewFormResponse | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [issueRetry, setIssueRetry] = useState<OnboardingReviewSlot | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1175,8 +1233,10 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
     if (busy) return;
     setBusy(review.type);
     setErr(null);
+    setIssueRetry(review);
     try {
       setReviews((await issueOnboardingReview(kind, learnerId, review.type)).reviews);
+      setIssueRetry(null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not issue the review.');
       // Someone else may have issued it meanwhile: show what is there now.
@@ -1188,17 +1248,23 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
 
   return (
     <>
+      {adminPreview.dialog}
       <p className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider mb-2">{programme || 'Programme Name'}</p>
-      {err && <p role="alert" className="text-[12px] text-red-600 mb-2"><i className="ri-error-warning-line mr-1" />{err}</p>}
+      {err && <p role="alert" className="text-[12px] text-red-600 mb-2"><i className="ri-error-warning-line mr-1" />{err}{issueRetry && <button type="button" className={`${btnSecondary} ml-2`} disabled={Boolean(busy)} onClick={() => { void issue(issueRetry); }}>Retry issuing document</button>}</p>}
       {reviews === null && !err && <p className="text-[12px] text-foreground-400 py-2"><i className="ri-loader-4-line animate-spin mr-1.5" />Loading reviews…</p>}
       {reviews !== null && reviews.length === 0 && <EmptyState text="No enrolment reviews for this learner" />}
       {reviews !== null && reviews.length > 0 && (
         <div className="space-y-2">
           {reviews.map((r) => r.issued && r.eventKey ? (
-            <div key={r.type} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-foreground-100 px-3 py-2">
-              <span className="text-[12px] text-foreground-700 inline-flex items-center gap-1.5 min-w-0">
-                <i className="ri-file-list-3-line text-foreground-400 shrink-0" />
-                <span className="truncate">{r.label}</span>
+            <DocumentHistory key={`${learnerId}:${REVIEW_DOCUMENT_KEYS[r.type]}:${r.eventKey}`} title={r.label}>{({ chevron, count, historyControl }) => (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-foreground-100 px-3 py-2">
+              <span className="text-[12px] text-foreground-700 inline-flex flex-wrap items-center gap-1.5 min-w-0">
+                <span className="inline-flex max-w-full items-center gap-1.5 min-w-0">
+                  {chevron}
+                  <i className="ri-file-list-3-line text-foreground-400 shrink-0" />
+                  <span>{r.label}</span>
+                </span>
+                {count}
                 {r.completed ? (
                   <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded-full shrink-0">completed</span>
                 ) : r.started ? (
@@ -1219,7 +1285,8 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
                   </span>
                 )}
               </span>
-              <span className="flex items-center gap-3 shrink-0">
+              <span className="flex flex-wrap items-center gap-3 min-w-0">
+                {adminPreview.button(REVIEW_DOCUMENT_KEYS[r.type], r.eventKey!)}
                 {/* Who has signed, one cell per party. */}
                 {r.signatures && <SignatureParties signatures={r.signatures} />}
                 {r.reviewedBy && <span className="text-[11px] text-foreground-400 hidden xl:inline">{r.reviewedBy}</span>}
@@ -1229,7 +1296,7 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
                     <ActionLink
                       label={busy === r.eventKey ? 'Opening…' : r.signatures?.admin.signed ? 'Signed' : 'Sign'}
                       icon={r.signatures?.admin.signed ? 'ri-check-line' : 'ri-pen-nib-line'}
-                      onClick={() => withReview(r.eventKey!, setSigning)}
+                      onClick={() => { void adminPreview.open(REVIEW_DOCUMENT_KEYS[r.type], r.eventKey!, value => setSigning(value.data as unknown as ReviewFormResponse)); }}
                     />
                     <ActionLink
                       label="PDF"
@@ -1244,18 +1311,23 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
                   onClick={() => navigate(`/learner/onboarding/reviews/${encodeURIComponent(r.eventKey!)}`)}
                 />
               </span>
+              <div className="w-full"><LearnerDocumentRevisions learnerId={learnerId} documentKey={REVIEW_DOCUMENT_KEYS[r.type]} sourceId={r.eventKey} historyControl={historyControl} /></div>
             </div>
+            )}</DocumentHistory>
           ) : (
             <div key={r.type} className="flex items-center justify-between gap-3 px-3 py-2 border border-dashed border-foreground-200 rounded-lg">
               <span className="text-[12px] text-foreground-500 inline-flex items-center gap-1.5 min-w-0">
                 <i className="ri-file-add-line text-foreground-400 shrink-0" />
                 <span className="truncate">{r.label} not issued yet</span>
               </span>
+              <span className="flex flex-wrap items-center gap-2">
+                {adminPreview.button(REVIEW_DOCUMENT_KEYS[r.type])}
               <ActionLink
                 label={busy === r.type ? 'Issuing…' : 'Issue review'}
                 icon="ri-quill-pen-line"
                 onClick={() => { void issue(r); }}
               />
+              </span>
             </div>
           ))}
         </div>
@@ -1266,6 +1338,7 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
           kind={kind}
           learnerId={learnerId}
           eventKey={signing.eventKey}
+          submitSignature={body => adminPreview.sign<ReviewFormResponse>(REVIEW_DOCUMENT_KEYS[signing.reviewType as OnboardingReviewSlot['type']], signing.eventKey, body.name, body.signature)}
           party="admin"
           defaultName={signing.reviewedBy}
           signatures={signing.signatures}

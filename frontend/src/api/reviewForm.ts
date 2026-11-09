@@ -1,3 +1,5 @@
+import { persistOriginalPdf } from '@/features/compliance-documents/persistOriginalPdf';
+import { pendingSignaturesChanged } from '@/features/pending-signatures/events';
 import { readLearnerJson, invalidateLearnerReads } from './learnerRead';
 import type { LearnerKind } from '@/api/learnerDetail';
 import { formatSystemTimestamp } from '@/lib/format';
@@ -153,6 +155,7 @@ export interface PlrRecord {
 }
 
 export interface ReviewFormResponse {
+  template?: import('@/features/compliance-documents/types').IssuedTemplate;
   eventKey: string;
   reviewType: string;
   reviewLabel: string;
@@ -203,6 +206,7 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
     throw new Error(message);
   }
   invalidateLearnerReads();
+  pendingSignaturesChanged();
   return data as T;
 }
 
@@ -301,6 +305,7 @@ export interface OnboardingReviewSlot {
 }
 
 export interface OnboardingReviewSlotsResponse {
+  issuedDocumentSnapshot?: ReviewFormResponse;
   programme: string;
   reviews: OnboardingReviewSlot[];
   allIssued: boolean;
@@ -317,6 +322,10 @@ export function issueOnboardingReview(kind: LearnerKind, id: string, type: Onboa
   return call<OnboardingReviewSlotsResponse>(`${BASE}/${kind}/${id}/issue/`, {
     method: 'POST',
     body: JSON.stringify({ type }),
+    headers: { 'Content-Type': 'application/json', 'X-Document-Issue-Mode': 'initial' },
+  }).then(async result => {
+    if (result.issuedDocumentSnapshot) await persistOriginalPdf(id, result.issuedDocumentSnapshot);
+    return result;
   });
 }
 

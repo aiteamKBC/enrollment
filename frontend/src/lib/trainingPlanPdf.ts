@@ -14,6 +14,8 @@
 // prints what was signed.
 // ============================================================================
 import jsPDF from 'jspdf';
+import { renderManagedDocument } from '@/features/compliance-documents/render';
+import type { IssuedTemplate } from '@/features/compliance-documents/types';
 
 const PAGE_W = 210;
 const PAGE_H = 297;
@@ -493,6 +495,7 @@ export function trainingPlanFilename(learnerName: string): string {
 
 /** Render an issued Training Plan from its record, with the marks on file. */
 export function renderTrainingPlanPdf(document: {
+  template?: IssuedTemplate;
   programme: TrainingPlanProgramme;
   employment: TrainingPlanEmployment;
   learningPlan: TrainingPlanRow[];
@@ -506,6 +509,8 @@ export function renderTrainingPlanPdf(document: {
   };
   marks: { apprentice: string; employer: string; provider: string };
 }) {
+  const managed = renderManagedDocument(document.template, document);
+  if (managed) return managed;
   const pick = (
     state: { signed: boolean; name: string; position: string; signedAt: string | null },
     mark: string,

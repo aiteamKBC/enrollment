@@ -1,9 +1,13 @@
 from django.urls import include, path
+from .pending_signatures import pending_signatures
 from . import eligibility_applications, eligibility_review
 
 from . import bksb, cv_job_documents, documents, eligibility_form, eligibility_layout, extended_ilr, ilr_eligibility_evidence, ilr_employer_details, ilr_learner_record, plr_evidence, policy_documents, postcode_lookup, views, wizard_bootstrap, wizard_custom_uploads, wizard_inclusion, wizard_layout
 
 urlpatterns = [
+    path('pending-signatures/', pending_signatures, name='learner-pending-signatures'),
+    path('document-revisions/', include('enrolment_api.document_templates.revision_urls')),
+    path('document-templates/', include('enrolment_api.document_templates.urls')),
     # Saved applications: enrolment staff only; strictly read-only.
     path('eligibility-applications/', eligibility_applications.eligibility_applications, name='eligibility-applications'),
     path('eligibility-applications/<int:application_id>/', eligibility_applications.eligibility_application_detail, name='eligibility-application-detail'),

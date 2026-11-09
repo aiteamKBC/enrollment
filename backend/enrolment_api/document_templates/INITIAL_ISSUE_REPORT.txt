@@ -1,0 +1,156 @@
+First-time original Issue -- shared purple PDF integration
+
+ROOT CAUSE (verified from code and read-only configuration)
+The live configuration check found zero published template versions and zero
+admin drafts. That check was database-enforced READ ONLY and read no learner rows.
+Issue selected service.applicable()'s unchanged built-in seed, whose content had
+no purple designTheme. Its legacyEquivalent flag was true. The existing PDF
+entry points therefore selected their retained plain legacy generators.
+The purple designDraft() helper applied to editable copies/previews; it did not
+set the original issued binding's default theme. This was not a React CSS issue.
+
+FIX / PUBLISHING RULES
+service.issuance_reference() now gives only NEW built-in original issuances the
+existing purple-reference-v2 design. All eight issuers share bind_issue(), so
+no extra PDF theme or document-specific renderer was created. Published template
+content, programme-specific applicability and template versions stay authoritative.
+
+For an actual published template, the original Issue action requires the selected
+published content to use purple-reference-v2. A published classic/older-purple
+version is never silently restyled or republished. Issue returns an explicit
+publicationRequired response before creating any document. The exact admin step:
+Compliance Documents > select the applicable shared/programme template > Edit >
+Document design: Purple -- supplied reference design > Save Draft > Preview saved
+draft > confirm the organisational review > Publish new version > retry Issue.
+An unpublished purple draft never overrides a published older design.
+
+No publishing action is needed for the currently verified zero-publication
+installation: future first-time Issue uses the built-in purple default. No global
+template rows were inserted, modified or published automatically. Existing issued
+bindings, old plain PDFs and signed versions were not upgraded in place.
+
+ACTUAL ISSUE / ORIGINAL PDF STORAGE
+The real Admin Issue buttons send X-Document-Issue-Mode: initial. A shared wrapper
+locks the learner and returns the existing active original on a retry instead of
+superseding it or creating a duplicate. Legacy explicit server reissue behavior
+without that header is retained. Review retries reuse their existing event key.
+Commercial review rejection and existing authentication/signing rules remain.
+
+The first response freezes the exact original render payload in the existing
+immutable Document_Template_Render_History table. It then returns the issued
+snapshot to the existing frontend API clients. persistOriginalPdf() renders that
+ACTUAL snapshot through previewPdf() and the existing jsPDF document entry points,
+which now select renderManagedDocument() / purpleReferencePainter for the pinned
+purple theme. This is not a builder-only preview or a second learner revision.
+
+The client stores the resulting original PDF bytes and SHA-256 in the SAME
+immutable render-history table, associated with the existing template issue.
+No schema migration, new table, replacement signature store or Azure-blob rewrite
+was needed. The artifact endpoint is learner-scoped, uses CSRF protection for
+writes, requires staff to upload, verifies the exact issued snapshot, validates
+PDF encoding/header/EOF and length, and refuses replacement. Stored originals
+remain immutable, including on retries and after signatures are subsequently made.
+A delayed upload must match the original frozen unsigned snapshot, not altered
+or signed content. Old documents without the new opt-in metadata are excluded.
+
+Unsigned Compliance Download buttons use the exact stored original bytes. Signed
+and historical downloads retain their existing rendering/signature behavior.
+Review originals are also stored and accessible through the scoped artifact
+endpoint; the normal later Review PDF continues to include subsequently completed
+answers and actual signatures through its existing workflow. Issuing does NOT
+mark a review as started just to generate its initial PDF. A failed review PDF
+upload exposes Retry issuing document, reusing the original rather than duplicating
+it. A new original remains Version 1 / R1 in the existing source/issue convention;
+no R2 is created just to change its design.
+
+DATA / CREATE / EDIT / SIGNATURE SAFETY
+No wording, learner/employer/programme/cohort data, student dates, ILR answers,
+OTJ calculations, curriculum rows, activities or signature requirements changed.
+All existing data derivation and missing-data handling remain in place.
+
+Create is unchanged: latest applicable PUBLISHED template, full content, available
+current learner data, fresh unsigned signatures and a new independent draft.
+service.applicable(), learner_documents.py, revision creation/editing and the
+existing full-page editor were not changed for this task.
+Edit remains tied to the exact historical version and template; original signed
+PDFs, Keep Existing Signatures, Sign Again, notifications and signing locks retain
+their existing behavior. Tests verify signed originals and their stored PDF
+checksums remain unchanged when retrying or issuing another learner's original.
+
+FILES CHANGED FOR THIS TASK (relative to enrollment/)
+backend/enrolment_api/document_templates/service.py
+backend/enrolment_api/document_templates/initial_issue.py (new)
+backend/enrolment_api/document_templates/original_pdf.py (new)
+backend/enrolment_api/document_templates/urls.py
+backend/enrolment_api/document_templates/test_initial_issue.py (new)
+backend/enrolment_api/document_templates/INITIAL_ISSUE_REPORT.txt (this report)
+backend/learner_api/apprenticeship_agreement.py (issuer wrapper/import)
+backend/learner_api/ilr_document.py (issuer wrapper/import)
+backend/learner_api/training_plan_document.py (issuer wrapper/import)
+backend/learner_api/written_agreement.py (issuer wrapper/import)
+backend/learner_api/review_form.py (issuer wrapper/import)
+frontend/src/api/apprenticeshipAgreement.ts
+frontend/src/api/ilrDocument.ts
+frontend/src/api/trainingPlanDocument.ts
+frontend/src/api/writtenAgreement.ts
+frontend/src/api/reviewForm.ts
+frontend/src/features/compliance-documents/types.ts
+frontend/src/features/compliance-documents/persistOriginalPdf.ts (new)
+frontend/src/features/compliance-documents/__tests__/persistOriginalPdf.test.ts (new)
+frontend/src/features/compliance-documents/__tests__/createDocument.test.tsx (await rendering effect)
+frontend/src/pages/users/BoardPage.tsx (original downloads and review retry)
+
+ACTUAL VERIFICATION
+126 Django tests passed in isolated SQLite storage using document_templates.test_settings.
+Covers all eight original Issue APIs, purple built-in fallback, published programme
+variants, blocking unpublished/old-design substitutions, explicit subsequent
+publication, idempotent retries, original PDF persistence/bytes/permissions,
+late original uploads, unchanged signed source records and historical checksums,
+plus Create/Edit, signing and notification regressions.
+
+211 frontend tests passed across 21 relevant files. TypeScript no-emit, scoped
+ESLint, git diff --check and the production frontend build passed. Existing
+realistic long learning-plan PDF regression cases remain included.
+
+Browser end to end: the actual BoardPage and actual eight Issue buttons ran in
+headless Chrome against real Django Issue/artifact handlers in a separate local
+in-memory SQLite test API. No production rows or real signing notifications were
+created. All eight originals were created unsigned, frozen and stored, with zero
+learner revision rows, zero global publications, zero started review records and
+zero browser errors. All four Compliance Download files exactly matched their
+stored original PDF bytes. The isolated server was stopped and temporary frontend
+harness files removed; the user's normal frontend/backend processes were retained.
+
+Downloaded/stored originals inspected (all contain only synthetic learner A data):
+Apprenticeship Agreement: 4 pages
+Individual Learner Record: 5 pages
+Training Plan: 6 pages
+Written Agreement: 4 pages
+Eligibility Review & FS Discussion: 2 pages
+RPL and Experience: 3 pages
+Workplace Health & Safety Declaration: 2 pages
+ULN Privacy Notice & Learner Acknowledgement: 3 pages
+
+Actual PDF vector analysis verified curved decorations and reference-purple
+colors on every page. Visually compared the reference PDF with actual original
+agreement/ILR/Training Plan/Written Agreement/Review pages, including teaching
+activities, planned dates, exact OTJ values, costs and unsigned signature blocks.
+No missing activities, clipped totals or overlapping tables were observed. The
+existing shared layout and pagination code was reused without redesign.
+
+Artifacts: .cache/initial-stored-*.pdf, .cache/initial-issued-*.pdf,
+.cache/initial-issue-visual/, .cache/initial-issue-browser-results.json and
+.cache/initial-issue-*-regression.log.
+
+LIMITS / COLLABORATION
+Published non-reference themes require the explicit admin publish step above.
+The new original artifact is stored in immutable database render history (base64
+PDF plus snapshot/hash), not written over existing Azure blobs. A 12 MB artifact
+limit and normal server request limits apply. Review answer completion and signed
+PDF evolution remain the pre-existing workflow, distinct from the original file.
+Real parallel PostgreSQL races were not run against a live database; source/learner
+transactions, existing uniqueness rules and immutable render-history constraints
+remain the production safeguards. Coordinate the small issuer/API/BoardPage edits
+with teammates. Unrelated shared wizard/assessment/Skills Radar files were not
+changed. No commit, push, merge, rebase, reset or branch switch performed; earlier
+uncommitted work was preserved on compliance-documents.

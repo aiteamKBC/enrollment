@@ -1,0 +1,145 @@
+PDF HEADER CORRECTION — 9 November 2026
+Branch: compliance-documents. No commit, push, merge, rebase or branch switch.
+
+Root cause
+----------
+brandedPage previously selected different image sizes and coordinates according
+to page number. First-page KBC/DfE widths were 47/37 mm; continuation-page widths
+were 30/24 mm. Body clearance also changed from 29 to 21 mm. Transparent padding
+in the DfE PNG made its image rectangle an unsuitable visible alignment guide.
+
+Shared geometry for new PDFs
+---------------------------
+documentHeader.ts now calculates one header for every page from the supplied
+PNGs' nontransparent bounds. Natural image proportions are preserved.
+
+                             KBC                         DfE
+Old first image W x H (mm)    47 x 21.57                   37 x 35.15
+Old later image W x H (mm)    30 x 13.77                   24 x 22.80
+New image W x H (mm)          42.16 x 19.35                32.73 x 31.09
+New visible W x H (mm)        40.62 x 18.00                30.44 x 18.00
+New image x / y (mm)          9.13 / 15.23                 168.42 / 9.45
+New visible x / y (mm)        10.00 / 16.00                169.56 / 16.00
+
+The image rectangles include transparent padding. BOTH visible artworks start
+16 mm below the paper edge, end at 34 mm, and retain 8 mm clearance to the normal
+42 mm body start. Custom header text and larger configured margins can reserve
+additional space. DfE's apparent y=9.45 is transparent padding, not visible art.
+
+The requested 22–25 / 20–23 mm heights were suggested starting points. Actual
+inspection favoured 18 mm visible height: smaller than the old first-page visible
+heights (KBC 20.07 / DfE 20.35 mm), larger than continuation heights (12.81 / 13.20),
+and balanced on A4. Original PNG resolution and aspect ratios are unchanged.
+
+Colour and original artwork
+---------------------------
+Target: existing BRANDED_PURPLE.heading = RGB(77,24,111), #4D186F.
+This is the actual existing document-title colour. Existing table headers use
+#642783; that distinct existing shade and the overall palette were left intact.
+The build reads the actual theme export instead of duplicating a new palette.
+
+Separate asset:
+frontend/public/assets/document-branding/kbc-logo-deep-purple.png
+438 x 201 RGBA pixels, matching the original resolution and alpha bounds.
+
+Selective purple pixel masking preserves gold, white, transparent pixels and
+every alpha byte. Purple antialiased edges receive a proportional colour delta;
+there is no uniform filter, redraw, rescale or DfE recolouring.
+Verified: 25,133 purple pixels changed; 4,892 gold pixels, 5,230 light/white pixels,
+52,252 fully transparent pixels and all 88,038 alpha bytes unchanged. 19,676
+foreground pixels have the exact target RGB. Remaining edge shades retain
+antialiasing rather than forcing all edge pixels to one opaque colour.
+
+Unmodified originals, SHA-256:
+kbc-logo.png 9e1b69be5626bf13e324bb46922e8db167e50c2e4aee68446274b302b4ff1111
+dfe-logo.png 32f58e7547a9eec1dbf8ddedb341c71527da7a27179b5928a559099ec91228e9
+DfE artwork, crest, colours and exact source bytes remain unchanged.
+
+Workflow and historical safety
+------------------------------
+New presentation identity: kbc-dfe-purple-v4. This only versions PDF appearance;
+it does not change template publication versions or learner revision numbering.
+The existing shared renderer is used by Django and the frontend. New pre-issue
+previews, first issues, Create drafts, new revisions, draft previews/finalisation
+and their signing-ready PDFs use the current presentation through the existing
+new_presentation path. Preview and Issue share the same header calculation.
+
+Old kbc-dfe-purple-v3 presentations retain the original assets, dimensions and
+clearances, including signature continuations on those frozen presentations.
+Existing issued/history/download endpoints continue returning stored PDF bytes;
+viewing a historical document does not regenerate it with new branding.
+All eight preserved pre-change sample PDF checksums still match their manifest.
+An additional real-backend test checks old v3 PDF bytes remain unchanged after
+new v4 issuance and that signing an old source retains its original presentation.
+
+No schema/migrations, database deployment, live learner writes, content/binding
+changes, signature business-rule changes or template publishing changes.
+No changes to Programme Suitability, cohorts, modules, Skills Radar or wizard.
+Top/bottom waves, icons, table styling, title styling, fonts and footer stay intact.
+
+Actual PDF verification (isolated fixtures; no production database)
+-----------------------------------------------------------------
+Generated using real Django first-Issue handlers and the compiled Node renderer:
+  .cache/header-pdfs/apprenticeship-agreement.pdf       4 pages
+  .cache/header-pdfs/ilr.pdf                            5 pages
+  .cache/header-pdfs/training-plan.pdf                  6 pages
+  .cache/header-pdfs/written-agreement.pdf              5 pages
+  .cache/header-pdfs/review-eligibility.pdf              3 pages
+  .cache/header-pdfs/review-rpl.pdf                      3 pages
+  .cache/header-pdfs/review-health-safety.pdf            2 pages
+  .cache/header-pdfs/review-uln.pdf                      3 pages
+
+PyMuPDF measured identical logo image geometry on EVERY page of all eight PDFs,
+including alpha-bound visible top=16 mm and height=18 mm, preserved proportions,
+body text below the reserved header, nonblank pages and correct Page N of Total.
+Measurements: .cache/header-pdfs/verification.json.
+Rendered PNGs inspected: ILR pages 1, 2, 3, 5; Written Agreement pages 1, 2, 3, 5.
+No visible logo/wave/content overlap, clipping or signature/footer collision.
+All eight PDF body-text comparisons passed against preserved pre-change PDFs,
+normalising whitespace, repeated standalone table headers and page footers only.
+Evidence: .cache/header-pdfs/content-comparison.json.
+
+Tests and build
+---------------
+Backend: 168 passed, enrolment_api.document_templates using isolated test_settings.
+Includes all-eight real Issue/Preview/PDF retrieval, historical cache immutability,
+Create/Edit/finalise, permissions, signatures, failure rollback and old-v3 safety.
+Frontend regression: 249 passed across 23 files, including 12 new header tests.
+Header tests cover original asset hashes, exact alpha/gold/white preservation,
+new variant embedding, geometry across pages, all eight types and frozen v3.
+TypeScript type-check passed. Targeted ESLint passed. git diff --check passed.
+Production build passed, including shared backend PDF runtime generation.
+Build/test logs: .cache/header-{backend-regression,front-regression,types,lint,
+production-build}.log. Existing non-failing dynamic-import/plugin-timing and
+Node localStorage warnings remain; they do not indicate PDF rendering failures.
+
+Files changed for THIS correction (other existing working-tree work preserved)
+-----------------------------------------------------------------------------
+NEW tools/document_logo_variant.mjs
+MOD tools/build_document_pdf.mjs
+NEW frontend/public/assets/document-branding/kbc-logo-deep-purple.png
+MOD frontend/src/features/compliance-documents/brandingAssets.json (generated)
+NEW frontend/src/features/compliance-documents/documentHeader.ts
+MOD frontend/src/features/compliance-documents/brandedPurpleTheme.ts
+MOD frontend/src/features/compliance-documents/brandedPurplePdf.ts
+MOD frontend/src/features/compliance-documents/render.ts
+MOD frontend/src/features/compliance-documents/types.ts
+NEW frontend/src/features/compliance-documents/__tests__/documentHeader.test.ts
+MOD backend/enrolment_api/document_templates/pdf_artifacts.py
+MOD backend/enrolment_api/document_templates/test_z_branded_pdf.py
+NEW backend/enrolment_api/document_templates/HEADER_CORRECTION_REPORT.txt
+
+Generated build output: ignored backend/.../pdf_runtime/renderer.cjs.
+Build with npm --prefix frontend run build when deploying these source changes.
+The original kbc-logo.png and dfe-logo.png were not modified by this correction.
+
+Limits / review notes
+---------------------
+Reserving the same comfortable header on all pages reduces usable page height.
+Normal pagination may therefore change (sample Apprenticeship Agreement: 3 to 4
+pages). Content was not shortened, fonts were not shrunk, explicit page breaks
+were retained, and no empty page was found in the eight generated samples.
+Header appearance changes apply to new presentation snapshots. Viewing an old
+issued/signed document deliberately continues showing its stored old header.
+No interactive production-account or external signing action was performed;
+workflow regressions used isolated test fixtures and the actual PDF renderer.

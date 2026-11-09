@@ -1,0 +1,43 @@
+{
+  "review:ilr": {
+    "over16": "radio",
+    "withinContractTime": "radio",
+    "payeScheme": "radio"
+  },
+  "review:extendedIlr": {
+    "eligibleResidency": "radio",
+    "identityDocumentsSeen": "radio",
+    "eligibilityEvidence": "multi_line",
+    "rightToWorkEngland": "radio",
+    "fiftyPercentEngland": "radio",
+    "minimumWage": "radio"
+  },
+  "review:fsJobRoleDiscussion": {
+    "holdsLevel2": "radio",
+    "levelMatchesRole": "radio",
+    "productivePurpose": "radio",
+    "ksbExposure": "radio",
+    "releaseForOtj": "radio",
+    "embedOtj": "radio",
+    "warningAreas": "radio"
+  },
+  "review:rplExperience": {
+    "apprenticeshipAppropriate": "radio",
+    "planAlignsStandard": "radio",
+    "priorEducation": "radio",
+    "priorWorkExperience": "radio",
+    "planNeedsAdjusting": "radio"
+  },
+  "review:healthSafetyVetting": {
+    "basicArrangements": "radio",
+    "dayOneInduction": "radio",
+    "fireSafety": "radio",
+    "firstAid": "radio",
+    "supervision": "radio",
+    "ppe": "radio",
+    "accidentRecording": "radio",
+    "informChanges": "radio",
+    "hsPolicy": "radio",
+    "liabilityInsurance": "radio"
+  }
+}

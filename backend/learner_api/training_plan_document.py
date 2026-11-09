@@ -25,6 +25,8 @@ from django.db import DatabaseError, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from enrolment_api.document_templates import service as template_service
+from enrolment_api.document_templates.initial_issue import initial_issue
 
 from curriculum_api.week_visibility import visible_child_sql, visible_week_sql
 from enrolment_api.auth import employer_signing_party_error, enrolment_login_required
@@ -68,14 +70,8 @@ def _extended_ilr_answers(learner_id):
 
 def _plan_modules(learner):
     """The learner's learning plan, falling back to their group's preset."""
-    catalogue = {m["moduleId"]: m for m in learner_programme_modules(learner)}
-    saved = _saved_modules(learner)
-    ids = (
-        [_s(m.get("moduleId")) for m in saved]
-        if saved
-        else learner_group_module_ids(learner)
-    )
-    return [catalogue[i] for i in ids if i in catalogue]
+    from enrolment_api.document_templates.learner_sources import plan_modules
+    return plan_modules(learner)
 
 
 # How a component's `type` reads in the Method column of the printed plan.
@@ -161,24 +157,27 @@ def _module_breakdown(module_ids):
 
 def derive_content(learner):
     """Everything the Training Plan states, from the learner's own records."""
-    start, end, dates_from = _group_dates(learner)
+    from enrolment_api.document_templates.learner_sources import document_dates
+    start, end, dates_from = document_dates(learner)
     modules = _plan_modules(learner)
     total_hours = round(sum(float(m.get("hours") or 0) for m in modules), 2)
     answers = _extended_ilr_answers(learner.pk)
     employer_block = answers.get("employer") if isinstance(answers.get("employer"), dict) else {}
 
     weeks = _weeks_between(start, end)
+    from enrolment_api.document_templates.learner_sources import employment_details, programme_level
+    ilr_details = employment_details(learner)
 
     programme = {
         "apprenticeName": _s(learner.username),
         "programme": _s(learner.programme),
         "cohort": _s(learner.cohort),
         "group": _s(learner.group),
-        # We hold no separate standard name/level/reference, so the programme
-        # name is what we can honestly state; an officer completes the rest.
+        # Standard name follows the assigned programme. Its level is resolved
+        # separately from the catalogue; the reference remains learner-owned.
         "standard": _s(learner.programme),
         "reference": _s(learner.reference_number),
-        "level": "",
+        "level": programme_level(learner),
         "startDate": _iso(start),
         "endDate": _iso(end),
         "practicalStartDate": _iso(start),
@@ -190,11 +189,11 @@ def derive_content(learner):
     employment = {
         "employerName": _s(learner.employer) or _s(employer_block.get("organisationName")),
         "deliveryAddress": _employer_address(learner) or _s(employer_block.get("address")),
-        "jobTitle": "",
+        "jobTitle": _s(getattr(ilr_details, 'job_title', '')),
         "workingHoursPerWeek": "",
         "lineManager": _s(learner.line_manager) or _s(employer_block.get("lineManagerName")),
         "lineManagerTitle": "",
-        "startDateWithEmployer": "",
+        "startDateWithEmployer": _iso(getattr(ilr_details, 'employment_start_date', None)),
     }
 
     # Each module with the weeks and components that deliver it, so the printed
@@ -214,7 +213,7 @@ def derive_content(learner):
             "moduleId": module_id,
             "activity": _s(m.get("moduleTitle")),
             "deliveryLead": delivery_lead,
-            "plannedDate": _iso(start),
+            "plannedDate": _s(m.get('startDate')) or _iso(start),
             "plannedEmHours": None,
             "plannedOtjHours": float(m.get("hours") or 0),
             "groupName": _s(m.get("groupName")),
@@ -284,7 +283,7 @@ def _party_json(signature, name, position, at):
 def _document_json(document):
     if document is None:
         return None
-    return {
+    payload = {
         "id": str(document.id),
         "status": _s(document.status),
         "fullySigned": bool(document.fully_signed),
@@ -323,6 +322,9 @@ def _document_json(document):
             "provider": _s(document.provider_signature),
         },
     }
+
+
+    return template_service.with_template('training-plan', document, payload)
 
 
 def _active_document(learner_kind, learner_id, lock=False):
@@ -387,6 +389,7 @@ def training_plan_document(request, pk):
 
 @enrolment_login_required
 @csrf_exempt
+@initial_issue('training-plan')
 def issue_training_plan(request, pk):
     """Issue the plan, snapshotting the current content onto a new row."""
     if request.method != "POST":
@@ -418,6 +421,7 @@ def issue_training_plan(request, pk):
                 epa=derived["epa"],
                 contacts=derived["contacts"],
             )
+            template_service.bind_issue('training-plan', document, learner, _document_json(document))
     except DatabaseError as exc:
         logger.exception("issue_training_plan: failed")
         return _error(f"Database error: {exc}", 502)
@@ -427,7 +431,7 @@ def issue_training_plan(request, pk):
 
 @enrolment_login_required
 @csrf_exempt
-def sign_training_plan(request, pk):
+def sign_training_plan(request, pk, _revision_source=None):
     """Record one party's signature. Empty signature withdraws that sign-off."""
     if request.method != "POST":
         return _error("Method not allowed.", 405)
@@ -466,9 +470,13 @@ def sign_training_plan(request, pk):
         # Lock the row for the read-modify-write so concurrent signers can't
         # overwrite each other's signature. See BE-4.
         with transaction.atomic(using="enrolment"):
-            document = _active_document(_learner_kind(learner), learner.pk, lock=True)
+            document = _revision_source if _revision_source is not None else _active_document(_learner_kind(learner), learner.pk, lock=True)
             if document is None:
                 return _error("No training plan has been issued for this learner yet.", 404)
+
+            from enrolment_api.document_templates.revisions import source_locked
+            if source_locked('training-plan', document):
+                return _error('This historical document is locked. Create a new learner revision for changes.', 409)
 
             now = timezone.now() if signature else None
             setattr(document, f"{party}_signature", signature)
@@ -478,6 +486,7 @@ def sign_training_plan(request, pk):
 
             document.recalculate_signed()
             document.save()
+            template_service.archive_render('training-plan', document, _document_json(document), name)
         promoted = advance_learner(learner)
     except DatabaseError as exc:
         logger.exception("sign_training_plan: failed")

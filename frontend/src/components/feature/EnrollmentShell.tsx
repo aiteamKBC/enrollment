@@ -5,6 +5,8 @@ import { useAuth } from '@/hooks/useAuth.helpers';
 import type { SidebarNavItem } from './Sidebar';
 import { hasOwnEnrolment } from '@/lib/enrollmentAccess';
 import styles from './EnrollmentShell.module.css';
+import { usePendingSignatures } from '@/features/pending-signatures/usePendingSignatures';
+import { PendingSignatureBadge, SignatureNotifications } from '@/features/pending-signatures/SignatureNotifications';
 
 interface Props {
   children: ReactNode;
@@ -19,6 +21,7 @@ interface Props {
 
 export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras }: Props) {
   const { auth, logout } = useAuth();
+  const signatures = usePendingSignatures(auth.account);
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -35,6 +38,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
   ] : employer ? [[`/employers/${auth.account?.subjectId}/documents`, 'Documents to sign']] : [
     ['/users', 'Learners & contacts'], ['/users/coach-directory', 'Coach directory'], ['/users/first-sessions', 'First-session bookings'],
     ['/users/eligibility-applications', 'Eligibility applications'], ['/users/eligibility-builder', 'Eligibility form builder'], ['/users/wizard-builder', 'Enrolment form builder'],
+    ['/users/compliance-documents', 'Compliance Documents'], ['/lms', 'Open LMS'],
     ...(auth.account && hasOwnEnrolment(auth.account) ? [['/learner/home?self=1', 'My enrolment']] : []),
   ];
   const displayName = auth.account?.displayName?.trim() || 'Account';
@@ -98,6 +102,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
       <header className="flex items-center justify-between gap-4 border-b border-foreground-200 bg-background-50 px-5 py-4" inert={open}>
         <Link to="/enrollment" className="font-heading text-lg font-semibold text-primary-700">Enrolment Corner</Link>
         <div className="flex items-center gap-3">
+          {auth.account?.role === 'learner' && <SignatureNotifications {...signatures} />}
           <div ref={accountRef} className="relative">
             <button
               type="button"
@@ -151,9 +156,10 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
                   to={to}
                   end
                   onClick={() => closeNavigation(false)}
-                  className={({ isActive }) => `block rounded-lg px-4 py-3 text-sm ${isActive ? 'bg-primary-100 font-semibold text-primary-800' : 'hover:bg-background-200'}`}
+                  className={({ isActive }) => `flex items-center justify-between gap-2 rounded-lg px-4 py-3 text-sm ${isActive ? 'bg-primary-100 font-semibold text-primary-800' : 'hover:bg-background-200'}`}
                 >
-                  {label}
+                  <span>{label}</span>
+                  {auth.account?.role === 'learner' && to === '/learner/compliance-documents' && <PendingSignatureBadge count={signatures.data.count} label="documents requiring your signature" />}
                 </NavLink>
               </li>
             ))}
