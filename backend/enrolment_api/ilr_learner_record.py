@@ -32,7 +32,14 @@ def learner_record(learner):
     # The record holds one display name. Family name is its last word, matching
     # how the rest of the wizard splits it (WizardContext.makeInitialDraft).
     given, family = (" ".join(parts[:-1]), parts[-1]) if len(parts) > 1 else (_s(learner.username), "")
+    if getattr(learner, 'pk', None) and getattr(learner, 'learner_type', '') != 'commercial':
+        from .eligibility_link import verified_application
+        source = verified_application(learner.pk)
+        if source and _s(learner.username) == ' '.join(filter(None, (source['first_name'], source['surname']))):
+            given, family = source['first_name'], source['surname']
     return {
+        "title": _s(getattr(learner, "title", None)),
+        "country": _s(getattr(learner, "country", None)),
         "familyName": family,
         "givenNames": given,
         "dateOfBirth": _s(learner.date_of_birth),
@@ -60,4 +67,13 @@ def ilr_learner_record(request, kind, learner_id):
         return JsonResponse({"error": "The learner record could not be loaded."}, status=502)
     if learner is None:
         return JsonResponse({"error": "Learner not found."}, status=404)
+    account = getattr(request, 'login_account', None)
+    if kind == 'apprenticeship' and account is not None and account.role == 'learner':
+        from .ilr_finalisation import signed_snapshot
+        try:
+            snapshot = signed_snapshot(int(learner_id))
+        except DatabaseError:
+            return JsonResponse({'error': 'The signed ILR record could not be loaded.'}, status=503)
+        if snapshot and snapshot.get('learnerRecord'):
+            return JsonResponse(snapshot['learnerRecord'])
     return JsonResponse(learner_record(learner))

@@ -33,7 +33,7 @@ const BOARD = {
 function renderPersonalDetails(mode: 'learner' | 'staff', onNavigateStep = vi.fn()) {
   render(
     <ToastProvider>
-      <WizardProvider userId="20" board={BOARD}>
+      <WizardProvider userId="20" board={BOARD} isCommercial>
         <WizardShell currentIndex={2} mode={mode} onNavigateStep={onNavigateStep} onFinish={vi.fn()} />
       </WizardProvider>
     </ToastProvider>

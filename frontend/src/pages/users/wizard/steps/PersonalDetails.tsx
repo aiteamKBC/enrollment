@@ -1,6 +1,7 @@
 import { ageFromDob, useWizard } from "../WizardContext.helpers";
 import { SEX_OPTIONS } from '@/mocks/enrolment-console';
-import { LabeledInput, LabeledSelect, SignatureField, StepHeading } from './fields';
+import { LabeledInput, LabeledSelect, StepHeading } from './fields';
+import EnrolmentSignature from './EnrolmentSignature';
 import { StepItems, type ItemRenderer } from '../layout/StepItems';
 import { useStepTitle } from '../layout/useLayout';
 import { useText } from '../layout/textsContext';
@@ -39,24 +40,7 @@ export default function PersonalDetails() {
     'pd.sex': () => <LabeledSelect label={t('pd.sex.label')} missingKey="Sex" value={pd.sex} options={SEX_OPTIONS} onChange={(v) => set({ sex: v })} />,
     // Signature — the learner's own name in a script face; stored on
     // Wizard_Personal_Details.
-    'pd.signature': () => (
-      <div className="pt-2 border-t border-foreground-100 mt-2">
-        <SignatureField
-          label={t('pd.signature.label')}
-          missingKey="Your signature"
-          signatoryName={[pd.firstName, pd.lastName].filter(Boolean).join(' ')}
-          value={pd.signature}
-          onChange={(v) =>
-            set({
-              signature: v || undefined,
-              // Stamp the date on signing, clear it when the signature is removed.
-              signatureDate: v ? pd.signatureDate || new Date().toISOString().slice(0, 10) : undefined,
-            })
-          }
-        />
-        <p className="text-[12px] text-foreground-500">{t('pd.signature.help')}</p>
-      </div>
-    ),
+    'pd.signature': () => <EnrolmentSignature />,
   };
 
   return (

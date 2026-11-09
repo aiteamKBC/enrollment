@@ -50,10 +50,6 @@ function WizardInner({ stepSlug }: { stepSlug: string }) {
         });
       } else {
         await updateEnrolmentUser(userId, {
-          username: name || board.user.name,
-          email: pd.email,
-          phone: pd.phone,
-          dob: pd.dob,
           onboardingStatus: 'Completed',
           onboardingCompleted: new Date().toLocaleString('en-GB'),
         });
@@ -126,6 +122,7 @@ function WizardPageContent() {
   // generic next-step link reaches the ILR route, land on the next real step.
   // Neither ILR step applies to commercial delivery.
   const resolvedStepSlug = isCommercial && (stepSlug === 'ilr' || stepSlug === 'ilr-details') ? 'plr' : stepSlug;
+  if (!isCommercial && stepSlug === 'personal-details') return <Navigate to={`/users/${userId}/wizard/ilr-details${suffix}`} replace />;
 
   if (loading || loadError || !board) {
     return (

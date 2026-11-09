@@ -2,6 +2,7 @@ import copy
 import io
 import json
 import os
+from contextlib import nullcontext
 from datetime import date
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -119,6 +120,7 @@ class ProgrammeAssignmentIntegrationTests(TestCase):
         request = self.factory.patch('/', json.dumps({"phone": "07123456789"}), content_type="application/json")
         request.login_account = SimpleNamespace(is_active=True, role="staff", subject_type="staff", subject_id=99)
         with patch.object(user_views, "advance_learner"), \
+             patch.object(user_views.transaction, "atomic", lambda **_: nullcontext()), \
              patch("learner_api.board_wizard.saved_signature", return_value=(None, None)), \
              patch("learner_api.board_wizard.merge_wizard_sections", side_effect=lambda board, *args, **kwargs: board):
             response = user_views.enrolment_user_detail(request, pk=self.source.pk)

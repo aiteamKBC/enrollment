@@ -45,7 +45,7 @@ MAX_CHECKS_PER_MINUTE = 60
 #: inward code (sector, unit), e.g. CT11AA, SW1A1AA, M11AE.
 POSTCODE_RE = re.compile(r"^[A-Z]{1,2}[0-9][A-Z0-9]?[0-9][A-Z]{2}$")
 
-INVALID_POSTCODE = "Enter a valid UK postcode, for example CT1 1AA."
+INVALID_POSTCODE = "Enter a valid UK postcode."
 UNKNOWN_POSTCODE = "We could not find this postcode. Check it and try again."
 
 

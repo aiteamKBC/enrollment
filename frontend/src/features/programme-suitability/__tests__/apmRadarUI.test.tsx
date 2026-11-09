@@ -127,4 +127,3 @@ it('keeps overlapping K1 responses scoped to the APM profile and preserves a his
   expect(saved[own.ksbId]).toMatchObject({ level: 'frequently', note: 'APM K1 note', evidenceFiles: ['apm.pdf'] });
   expect(saved[foreign.ksbId]).toEqual(foreign);
 });
-

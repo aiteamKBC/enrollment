@@ -75,6 +75,17 @@ class SavedSignatureTests(SimpleTestCase):
         self.assertTrue(sql.startswith('update enrolment."Staff_users" set "Saved_signature"'))
         self.assertEqual(params, [PNG, "Test Person", 12])
 
+    def test_clearing_removes_only_the_reusable_sample(self):
+        self.cursor.fetchone.return_value = (None,)
+
+        response = self._put(_account(), "")
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(json.loads(response.content), {"signature": "", "savedAt": ""})
+        sql, params = self.cursor.execute.call_args.args
+        self.assertIn('"Learner_signature_saved_at" = null', sql)
+        self.assertEqual(params, ["", "", 41])
+
     def test_a_signature_that_is_not_a_bounded_png_is_refused(self):
         for bad in ("data:image/jpeg;base64,AAAA", "not an image", PNG + "A" * view.MAX_SIGNATURE_CHARS):
             with self.subTest(bad[:24]):

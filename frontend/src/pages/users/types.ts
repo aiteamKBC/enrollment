@@ -285,6 +285,9 @@ export interface EnrolmentBoard {
     employerId?: number | null;
   };
   contact: {
+    title?: string;
+    /** False only for existing signed/submitted records grandfathered without Title. */
+    titleRequired?: boolean;
     email: string;
     phone: string;
     dob: string;
@@ -293,10 +296,19 @@ export interface EnrolmentBoard {
     hasMandate: boolean;
     /** Home address on the learner's record, as one line ('' when none). */
     address?: string;
+    /** Structured residential profile values used by the ILR editor. */
+    country?: string;
+    currentPostcode?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    addressLine3?: string;
+    addressLine4?: string;
     /** The learner's reusable signature (PNG data URL), saved at first sign-in. */
     savedSignature?: string;
     /** "YYYY-MM-DD" the reusable signature was saved. */
     savedSignatureDate?: string;
+    eligibilityLinked?: boolean;
+    eligibilityRepresentative?: { name: string; email: string };
   };
   activity: {
     aptemUsage: string;
@@ -345,11 +357,22 @@ export interface EnrolmentBoard {
 
 // ---- Wizard ----
 export interface PersonalDetails {
+  /** Write-through to the existing Created_users.Title, not duplicate storage. */
+  title?: string;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  /** Legacy one-line address; retained for older drafts and Commercial onboarding. */
   address: string;
+  /** Structured residential values already used by ILR and Eligibility prefill.
+   * Optional because older saved drafts may not contain these keys. */
+  country?: string;
+  currentPostcode?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  addressLine4?: string;
   dob: string;
   age?: number;
   sex: string;
@@ -357,6 +380,8 @@ export interface PersonalDetails {
   signature?: string;
   /** ISO date the signature was captured. */
   signatureDate?: string;
+  /** Explicit agreement to the combined ILR/paperwork wording; never inferred for old marks. */
+  signatureDeclaration?: { text: string; confirmedAt: string } | null;
 }
 
 /**
@@ -377,6 +402,10 @@ export interface IlrLearnerDetails {
   pronouns: string;
   ethnicity: string;
   longTermDisability: boolean | null;
+  /** DfE LLDDCat code strings; empty on older records. */
+  healthConditionCodes?: string[];
+  primaryHealthConditionCode?: string;
+  additionalSupportDetails?: string;
   highestQualification: string;
   employmentStatus: string;
   /** In paid employment only. ISO date. */
@@ -386,6 +415,8 @@ export interface IlrLearnerDetails {
   /** In paid employment only. */
   selfEmployed?: boolean | null;
   fullTimeEducation: boolean | null;
+  /** Decimal hours as typed, e.g. "37.5"; only for paid employment. */
+  workingHoursPerWeek?: string;
   /** In full-time education or training only. ISO date. */
   expectedLeavingDate?: string;
   /** Not in paid employment only. */
@@ -634,7 +665,6 @@ export const WIZARD_STEPS: WizardStepDef[] = [
   // labels follow the onboarding flow.
   { slug: 'introduction', label: 'Welcome' },
   { slug: 'before-you-begin', label: 'Before You Begin' },
-  { slug: 'personal-details', label: 'Personal Details' },
   { slug: 'ilr-details', label: 'ILR' },
   { slug: 'ilr', label: 'Extended ILR' },
   { slug: 'programme-suitability', label: 'Programme Suitability & Modules' },

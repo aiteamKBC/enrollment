@@ -619,7 +619,9 @@ class BksbHelpersTests(SimpleTestCase):
             }
         ), patch.object(bksb, "_candidate_usernames", return_value=[]), patch.object(
             bksb.BksbInitialAssessment.objects, "select_for_update", return_value=SimpleNamespace(get=lambda **kwargs: row)
-        ), patch.object(bksb.transaction, "atomic", return_value=nullcontext()):
+        ), patch.object(bksb.transaction, "atomic", return_value=nullcontext()), patch.dict(
+            os.environ, {"BKSB_REMOVE_REQUEST_CHANGE_PASSWORD_ON_CREATE": "true"}
+        ):
             provisioned_row, user_id = bksb._provision_account_for_auto_login(
                 row, client, "apprenticeship", 1601, learner
             )

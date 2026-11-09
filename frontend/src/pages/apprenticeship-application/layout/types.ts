@@ -10,7 +10,7 @@
  * enrolment_api/eligibility_layout.py) -- the client never chooses storage.
  */
 
-export type EligibilityQuestionType = 'text' | 'number' | 'date' | 'yesno' | 'dropdown';
+export type EligibilityQuestionType = 'text' | 'number' | 'date' | 'yesno' | 'dropdown' | 'heading' | 'description';
 
 export const QUESTION_TYPES: { value: EligibilityQuestionType; label: string }[] = [
   { value: 'text', label: 'Text' },
@@ -18,6 +18,8 @@ export const QUESTION_TYPES: { value: EligibilityQuestionType; label: string }[]
   { value: 'date', label: 'Date' },
   { value: 'yesno', label: 'Yes / No' },
   { value: 'dropdown', label: 'Dropdown' },
+  { value: 'heading', label: 'Heading' },
+  { value: 'description', label: 'Description' },
 ];
 
 /** Show a question only while another question's answer is one of `values` ("Yes"/"No" for a yes/no question). */
@@ -55,6 +57,8 @@ export interface EligibilitySection {
 }
 
 export interface EligibilityLayout {
+  /** Runtime capability supplied by Django, never enabled by a saved layout. */
+  workplaceEnabled?: boolean;
   sections: EligibilitySection[];
   /** Edited wording, by text slot (see registry.ts). A slot not listed here shows its standard wording. */
   texts?: Record<string, string>;
@@ -62,6 +66,7 @@ export interface EligibilityLayout {
 
 /** What the layout endpoints return. `layout` is null until one is published; the public one carries no names. */
 export interface EligibilityLayoutResponse {
+  workplaceEnabled?: boolean;
   layout: EligibilityLayout | null;
   version: number | null;
   updatedAt?: string;

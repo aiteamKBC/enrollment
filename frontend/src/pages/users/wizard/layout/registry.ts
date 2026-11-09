@@ -15,6 +15,7 @@
  */
 import { POLICY_DOCS_KBC, SEX_OPTIONS, YES_NO_SELECT } from '@/mocks/enrolment-console';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/lib/countries';
+import { LEARNER_TITLE_OPTIONS } from '@/lib/learnerTitles';
 import { formatError } from "../steps/fields.helpers";
 import { IlrText } from '../steps/ilrAdditionalText';
 import { CvJobText } from '../steps/cvJobText';
@@ -156,7 +157,7 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
         options: () => SEX_OPTIONS,
         path: 'personalDetails.sex',
       }),
-      field('pd.signature', 'Your signature', (d, r) => text('Your signature', d.personalDetails.signature, r)),
+      field('pd.signature', 'Your signature', (d, r) => text('Your signature', d.personalDetails?.signature, r)),
     ],
   },
   {
@@ -167,6 +168,11 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
     items: [
       heading('ild.h.learner', 'Learner Details'),
       content('ild.record', 'Details from the learner record (name, date of birth, address)'),
+      field('ild.currentPostcode', 'Current postcode', (d, r) => text('Current postcode', d.personalDetails.currentPostcode, r)),
+      field('ild.title', 'Title', (d, r) => text('Title', d.personalDetails.title, r && d.personalDetails.title !== undefined), {
+        options: () => LEARNER_TITLE_OPTIONS,
+        path: 'personalDetails.title',
+      }),
       field('ild.yearsAtAddress', 'How long have you been at this address (years)?', (d, r) => {
         const i = ild(d);
         return r && i.yearsAtAddress == null && i.sinceBirth !== true ? ['How long have you been at this address (years)?'] : [];
@@ -177,9 +183,12 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
       field('ild.ni', 'National Insurance number', (d, r) => {
         const i = ild(d);
         const ni = (i.niNumber ?? '').trim();
-        if (!ni) return r && i.niApplied !== true ? [NI_OR_APPLIED_KEY] : [];
+        if (!ni) return [];
         return NI_RE.test(ni) ? [] : ['National Insurance number — enter a valid number, for example AB 12 34 56 C'];
       }),
+      field('ild.niApplied', 'NI number application confirmation', (d, r) =>
+        r && !ild(d).niNumber?.trim() && ild(d).niApplied !== true
+          ? ['NI number application confirmation'] : []),
       content('ild.email', 'Email address (from the learner record)'),
       field('ild.legalSex', 'Legal Sex', (d, r) => text('Legal Sex', ild(d).legalSex, r), {
         options: () => LEGAL_SEX_OPTIONS,
@@ -195,6 +204,16 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
       heading('ild.h.health', 'Health'),
       field('ild.disability', 'Long-term disability, health problem or learning difficulty', (d, r) =>
         yesNo('Long-term disability, health problem or learning difficulty', ild(d).longTermDisability, r)),
+      field('ild.healthConditions', 'Health conditions', (d, r) =>
+        r && ild(d).longTermDisability === true && !ild(d).healthConditionCodes?.length
+          ? ['Health conditions'] : []),
+      field('ild.primaryHealth', 'Primary health condition', (d, r) => {
+        const i = ild(d);
+        return r && i.longTermDisability === true && i.healthConditionCodes?.length
+          && !['98', '99'].includes(i.healthConditionCodes[0]) && !i.healthConditionCodes.includes(i.primaryHealthConditionCode ?? '')
+          ? ['Primary health condition'] : [];
+      }),
+      field('ild.additionalSupport', 'Additional support details', () => [], { defaultRequired: false }),
       heading('ild.h.education', 'Education level'),
       field('ild.highestQualification', 'Highest qualification achieved', (d, r) =>
         text('Highest qualification achieved', ild(d).highestQualification, r), {
@@ -215,6 +234,12 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
       }),
       field('ild.fullTimeEducation', 'Full-time education or training', (d, r) =>
         yesNo('Full-time education or training', ild(d).fullTimeEducation, r)),
+      field('ild.workingHours', 'Working hours per week', (d, r) => {
+        if (!r || ild(d).employmentStatus !== IN_PAID_EMPLOYMENT) return [];
+        const hours = Number(ild(d).workingHoursPerWeek);
+        return !ild(d).workingHoursPerWeek || !Number.isFinite(hours) || hours <= 0 || hours > 168 || !/^\d+(?:\.\d{1,2})?$/.test(ild(d).workingHoursPerWeek || '')
+          ? ['Working hours per week'] : [];
+      }),
       field('ild.stateBenefits', 'State benefits', (d, r) => text('State benefits', ild(d).stateBenefits, r), {
         defaultRequired: false,
         options: () => labels(STATE_BENEFIT_OPTIONS),
@@ -327,7 +352,6 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
         yesNo('Known by another name', d.ilr.declarations.knownByOtherName, r)),
       field('xilr.plrAccessAware', 'Aware provider will access PLR', (d, r) =>
         yesNo('Aware provider will access PLR', d.ilr.declarations.plrAccessAware, r)),
-      content('xilr.documentActions', 'Download / file the ILR document buttons'),
     ],
   },
   {

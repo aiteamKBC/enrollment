@@ -290,6 +290,13 @@ def to_board(u):
             "employerId": employer_id,
         },
         "contact": {
+            "title": _s(getattr(u, "title", None)),
+            "country": _s(getattr(u, 'country', None)),
+            "currentPostcode": _s(u.current_postcode),
+            "addressLine1": _s(u.address_line_1) or _s(u.address),
+            "addressLine2": _s(u.address_line_2),
+            "addressLine3": _s(u.address_line_3),
+            "addressLine4": _s(u.address_line_4),
             "email": _s(u.email),
             "phone": _s(u.phone_number),
             "dob": fmt_date(u.date_of_birth),

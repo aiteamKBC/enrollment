@@ -981,37 +981,50 @@ def enrolment_user_detail(request, pk):
         except ValidationError as exc:
             return _error(str(exc), 400)
         try:
-            for attr, value in fields.items():
-                setattr(user, attr, value)
-            if fields:
-                handover = save_enrolment_fields(user, fields)
-                # The address and name on this row ARE the sign-in identity, and
-                # the login account keeps its own copy — which is what an
-                # invitation is sent to. Correcting an email here without this
-                # left the invitation going to the old address for ever, since
-                # the account only refreshes itself when its owner signs in and
-                # an invited learner has not yet.
-                if any(field in fields for field in ACCOUNT_IDENTITY_FIELDS):
-                    sync_account("learner", user.pk, subject=user)
-                if any(field in fields for field in PLACEMENT_SOURCE_FIELDS):
-                    # A learner placed after they were created has none of the
-                    # cohort's dates, and progression cannot start them without
-                    # one. Stamped before advance_learner runs, so a learner who
-                    # is already past their start date activates on this save.
-                    stamp_cohort_window(user)
-                    # Where a learner sits is read from their permanent profile
-                    # by the workspace, the coach tools and the reports, so the
-                    # change has to reach that row too.
-                    mirror_learner_placement(user)
-                advance_learner(user)
-                if 'programme_status' in fields:
-                    # An explicit staff status edit has already changed the
-                    # source before advance_learner runs. Its transition-only
-                    # hook cannot notice Active -> Active, leaving the profile
-                    # in Delivery and hiding coach/review/calendar records.
-                    sync_active_user(user)
-        except DatabaseError as exc:
-            return _error(f"Database error: {exc}", 502)
+            with transaction.atomic(using="enrolment"):
+                if getattr(request, "learner_self_write", False) and any(
+                    key in fields for key in ("username", "phone_number", "date_of_birth")
+                ):
+                    user = EnrolmentUser.all_learners.select_for_update().get(pk=pk)
+                    if str(getattr(user, 'learner_type', '') or '').strip().casefold() != 'commercial':
+                        from enrolment_api.ilr_finalisation import signed_snapshot
+                        if signed_snapshot(int(pk)):
+                            protected = ("username", "phone_number", "date_of_birth")
+                            if any(key in fields and str(fields[key] or '') != str(getattr(user, key) or '')
+                                   for key in protected):
+                                return _error("Your signed ILR details can no longer be changed.", 409)
+                            fields = {key: value for key, value in fields.items() if key not in protected}
+                for attr, value in fields.items():
+                    setattr(user, attr, value)
+                if fields:
+                    handover = save_enrolment_fields(user, fields)
+                    # The address and name on this row ARE the sign-in identity, and
+                    # the login account keeps its own copy — which is what an
+                    # invitation is sent to. Correcting an email here without this
+                    # left the invitation going to the old address for ever, since
+                    # the account only refreshes itself when its owner signs in and
+                    # an invited learner has not yet.
+                    if any(field in fields for field in ACCOUNT_IDENTITY_FIELDS):
+                        sync_account("learner", user.pk, subject=user)
+                    if any(field in fields for field in PLACEMENT_SOURCE_FIELDS):
+                        # A learner placed after they were created has none of the
+                        # cohort's dates, and progression cannot start them without
+                        # one. Stamped before advance_learner runs, so a learner who
+                        # is already past their start date activates on this save.
+                        stamp_cohort_window(user)
+                        # Where a learner sits is read from their permanent profile
+                        # by the workspace, the coach tools and the reports, so the
+                        # change has to reach that row too.
+                        mirror_learner_placement(user)
+                    advance_learner(user)
+                    if 'programme_status' in fields:
+                        # An explicit staff status edit has already changed the
+                        # source before advance_learner runs. Its transition-only
+                        # hook cannot notice Active -> Active, leaving the profile
+                        # in Delivery and hiding coach/review/calendar records.
+                        sync_active_user(user)
+        except DatabaseError:
+            return _error("The learner could not be saved. Please try again.", 503)
         return JsonResponse({**to_board(user), **(handover or {})})
     return _error("Method not allowed.", 405)
 

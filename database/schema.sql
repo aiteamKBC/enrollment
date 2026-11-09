@@ -2338,7 +2338,28 @@ CREATE TABLE enrolment."Wizard_Form_Layouts" (
     id bigint NOT NULL,
     "Layout" jsonb NOT NULL,
     "Created_by" text,
-    "Created_at" timestamp with time zone DEFAULT now() NOT NULL
+    "Created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "Scope" text DEFAULT 'default'::text NOT NULL,
+    "Variant_name" text,
+    "Parent_version" bigint,
+    "Archived" boolean DEFAULT false NOT NULL
+);
+
+-- Sparse wizard-version pins and assignments. Prepared by
+-- apply_wizard_form_layout_table on existing installations.
+CREATE TABLE enrolment."Wizard_Layout_Assignments" (
+    "Learner_kind" text NOT NULL,
+    "Learner_id" bigint NOT NULL,
+    "Pinned_version" bigint,
+    "Override_version" bigint,
+    "Submitted_version" bigint,
+    "Reason" text,
+    "Assigned_by" text,
+    "Assigned_at" timestamp with time zone,
+    "Pinned_at" timestamp with time zone,
+    "Submitted_at" timestamp with time zone,
+    "Updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+    PRIMARY KEY ("Learner_kind", "Learner_id")
 );
 
 
@@ -2423,12 +2444,19 @@ CREATE TABLE enrolment."Wizard_Ilr_Learner_Details" (
     "Pronouns" text,
     "Ethnicity" text,
     "Long_term_disability" boolean,
+    "Health_condition_codes" jsonb,
+    "Primary_health_condition_code" text,
+    "Additional_support_details" text,
     "Highest_qualification" text,
     "Employment_status" text,
     "Full_time_education" boolean,
+    "Working_hours_per_week" numeric(5,2),
     "State_benefits" text,
     "Declaration_signature" text,
     "Declaration_signed_date" date,
+    "Ilr_finalised_at" timestamp with time zone,
+    "Ilr_finalised_by" bigint,
+    "Ilr_signed_snapshot" jsonb,
     "Created_at" timestamp with time zone DEFAULT now() NOT NULL,
     "Updated_at" timestamp with time zone DEFAULT now() NOT NULL,
     "Employment_start_date" date,
@@ -2762,6 +2790,17 @@ CREATE TABLE enrolment."Written_Agreements" (
 --
 
 CREATE TABLE enrolment.eligibility_form (
+    title text,
+    employer_address_line1 text,
+    employer_address_line2 text,
+    employer_address_line3 text,
+    employer_town_city text,
+    employer_county text,
+    residential_address_line1 text,
+    residential_address_line2 text,
+    residential_address_line3 text,
+    residential_town_city text,
+    residential_county text,
     id bigint NOT NULL,
     first_name text NOT NULL,
     surname text NOT NULL,
@@ -2774,6 +2813,8 @@ CREATE TABLE enrolment.eligibility_form (
     postcode_district text,
     date_of_birth date,
     employment_status text,
+    start_date_with_employer date,
+    job_title text,
     majority_hours_in_england boolean,
     employer_name text,
     employer_address text,
@@ -2781,11 +2822,30 @@ CREATE TABLE enrolment.eligibility_form (
     employer_postcode_country text,
     employer_postcode_region text,
     employer_postcode_district text,
+    workplace_arrangement text CONSTRAINT eligibility_workplace_arrangement_check CHECK (workplace_arrangement IN ('same', 'different', 'remote_hybrid_multiple')),
+    main_workplace_postcode text CONSTRAINT eligibility_workplace_postcode_length CHECK (char_length(main_workplace_postcode) <= 12),
+    main_workplace_country text CONSTRAINT eligibility_workplace_country_length CHECK (char_length(main_workplace_country) <= 100),
+    main_workplace_region text CONSTRAINT eligibility_workplace_region_length CHECK (char_length(main_workplace_region) <= 100),
+    main_workplace_district text CONSTRAINT eligibility_workplace_district_length CHECK (char_length(main_workplace_district) <= 100),
+    assessment_status text CONSTRAINT eligibility_assessment_status_check CHECK (assessment_status IN ('provisional_eligible', 'pending_assessment', 'not_eligible')),
+    assessment_reason text CONSTRAINT eligibility_assessment_reason_length CHECK (char_length(assessment_reason) BETWEEN 1 AND 1000),
+    submission_fingerprint text CONSTRAINT eligibility_submission_fingerprint_check CHECK (submission_fingerprint ~ '^[0-9a-f]{64}$') CONSTRAINT eligibility_submission_fingerprint_unique UNIQUE,
+    submission_response jsonb CONSTRAINT eligibility_submission_response_check CHECK (jsonb_typeof(submission_response) = 'object'),
+    review_status text CONSTRAINT eligibility_review_status_check CHECK (review_status IN ('approved', 'rejected', 'more_evidence_required')),
+    review_version integer CONSTRAINT eligibility_review_version_check CHECK (review_version >= 1),
+    CONSTRAINT eligibility_review_consistency CHECK ((review_status IS NULL AND review_version IS NULL) OR (review_status IS NOT NULL AND review_version IS NOT NULL AND assessment_status IS NOT DISTINCT FROM 'pending_assessment' AND eligible IS NULL)),
+    CONSTRAINT eligibility_assessment_consistency CHECK (assessment_status IS NULL OR (assessment_status = 'pending_assessment' AND eligible IS NULL AND assessment_reason IS NOT NULL) OR (assessment_status = 'provisional_eligible' AND eligible IS TRUE AND assessment_reason IS NULL) OR (assessment_status = 'not_eligible' AND eligible IS FALSE AND assessment_reason IS NOT NULL)),
     representative_name text,
     representative_email text,
     lives_in_uk boolean,
     residence_not_for_education boolean,
+    expected_leaving_date date,
     residency_status text,
+    country_of_residence text,
+    nationality text,
+    resident_prev_3_years boolean,
+    years_in_uk text,
+    full_time_education_prior boolean,
     programme text,
     attended_funded_training boolean,
     funded_training_completed_on date,
@@ -3204,10 +3264,8 @@ ALTER TABLE ONLY enrolment."Wizard_Skills_Radar" ALTER COLUMN id SET DEFAULT nex
 ALTER TABLE ONLY enrolment.eligibility_form ALTER COLUMN id SET DEFAULT nextval('enrolment.eligibility_form_id_seq'::regclass);
 
 
---
 -- PostgreSQL database dump complete
 --
-
 
 --
 -- PostgreSQL database dump
@@ -5759,5 +5817,56 @@ ALTER TABLE ONLY login."Password_resets"
 
 
 --
+-- Phase 2C.2A review history (after application primary keys).
+CREATE TABLE IF NOT EXISTS enrolment.eligibility_application_reviews (
+    id bigserial PRIMARY KEY,
+    application_id bigint NOT NULL REFERENCES enrolment.eligibility_form(id) ON DELETE RESTRICT,
+    version integer NOT NULL CHECK (version >= 1),
+    request_id uuid NOT NULL,
+    reviewer_id bigint NOT NULL CHECK (reviewer_id >= 1),
+    reviewer_name text NOT NULL CHECK (char_length(btrim(reviewer_name)) BETWEEN 1 AND 200),
+    previous_status text NOT NULL,
+    new_status text NOT NULL CHECK (new_status IN ('approved', 'rejected', 'more_evidence_required')),
+    reason text NOT NULL CHECK (char_length(btrim(reason)) BETWEEN 1 AND 2000),
+    decided_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT eligibility_review_application_version UNIQUE (application_id, version),
+    CONSTRAINT eligibility_review_application_request UNIQUE (application_id, request_id),
+    CONSTRAINT eligibility_review_transition CHECK (
+        (previous_status = 'pending_assessment' AND new_status IN ('approved', 'rejected', 'more_evidence_required')) OR
+        (previous_status = 'more_evidence_required' AND new_status IN ('approved', 'rejected'))
+    )
+);
+
+-- Reviewer id is a stable authenticated account id; name is a historical
+-- snapshot. No FK to a mutable/deletable login identity can erase the audit.
+-- Normal application credentials cannot edit/delete/truncate history.
+CREATE OR REPLACE FUNCTION enrolment.reject_eligibility_review_mutation() RETURNS trigger
+LANGUAGE plpgsql AS $$ BEGIN
+    RAISE EXCEPTION 'Eligibility review history is append-only';
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'enrolment.eligibility_application_reviews'::regclass AND tgname = 'eligibility_reviews_no_edit') THEN
+        CREATE TRIGGER eligibility_reviews_no_edit BEFORE UPDATE OR DELETE ON enrolment.eligibility_application_reviews
+            FOR EACH ROW EXECUTE FUNCTION enrolment.reject_eligibility_review_mutation();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'enrolment.eligibility_application_reviews'::regclass AND tgname = 'eligibility_reviews_no_truncate') THEN
+        CREATE TRIGGER eligibility_reviews_no_truncate BEFORE TRUNCATE ON enrolment.eligibility_application_reviews
+            FOR EACH STATEMENT EXECUTE FUNCTION enrolment.reject_eligibility_review_mutation();
+    END IF;
+END $$;
+
+-- Eligibility provenance and committed invitation recovery; no historical backfill.
+-- Both referenced primary keys have been installed above.
+CREATE TABLE IF NOT EXISTS enrolment.eligibility_learner_links (
+    application_id bigint PRIMARY KEY REFERENCES enrolment.eligibility_form(id) ON DELETE RESTRICT,
+    learner_id bigint NOT NULL UNIQUE REFERENCES enrolment."Created_users"(id) ON DELETE RESTRICT,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    activation_verified_at timestamptz,
+    invitation_status text NOT NULL DEFAULT 'pending' CHECK (invitation_status IN ('pending', 'sending', 'sent', 'failed')),
+    invitation_claim uuid,
+    invitation_claimed_at timestamptz,
+    invitation_error text
+);
+
 -- PostgreSQL database dump complete
 --

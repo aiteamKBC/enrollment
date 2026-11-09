@@ -50,7 +50,9 @@ export function missingForStep(stepIndex: number, draft: WizardDraft, layout: Wi
   if (!step) return [];
   const missing = missingForLayoutStep(step, draft, layout);
   if (step.slug === SUITABILITY_STEP.slug && draft.programmeModulesCompletion?.required && !draft.programmeModulesCompletion.complete) missing.push('PCP pathway and modules (complete and save your selection)');
-  if (!layout.programmeSuitability?.enabled) return missing;
+  // A version-pinned wizard layout can predate suitability while the separate
+  // assessment API still requires it for this learner.
+  if (!layout.programmeSuitability?.enabled && !draft.programmeSuitability?.required) return missing;
   if (step.slug === 'cv-job') return missing.filter((label) => label !== 'Previous experience (or N/A)');
   if (step.slug === SUITABILITY_STEP.slug && draft.programmeSuitability?.required !== false && (draft.programmeSuitability?.status !== 'SUBMITTED' || !draft.programmeSuitability.selectionConfirmed)) missing.push(ASSESSMENT_LABEL);
   return missing;

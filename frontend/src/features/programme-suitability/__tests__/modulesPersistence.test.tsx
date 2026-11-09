@@ -11,12 +11,15 @@ import { WizardProvider } from '@/pages/users/wizard/WizardContext';
 import type { EnrolmentBoard, WizardDraft } from '@/pages/users/types';
 import ProgrammeSuitabilityStep from '../ProgrammeSuitabilityStep';
 import { fresh, result, configuration } from './fixtures';
+import { missingForStep } from '@/pages/users/wizard/validation';
+import { resolveLayout, visibleSteps } from '@/pages/users/wizard/layout/resolve';
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), olderPinnedLayout: false }));
 vi.mock('@/api/extendedIlr', () => ({ fetchExtendedIlr: mocks.read, saveExtendedIlr: mocks.write, peekExtendedIlr: () => undefined }));
 vi.mock('@/api/curriculum', () => ({ fetchKsbProfile: vi.fn(async () => ({ results: [] })), peekKsbProfile: () => undefined }));
 vi.mock('@/api/wizardInclusion', () => ({ fetchInclusionStatus: vi.fn(async () => ({ applicable: false, completed: false })) }));
-vi.mock('@/api/wizardLayout', () => ({ fetchWizardLayout: async () => ({ layout: { steps: [], programmeSuitability: configuration }, version: 3 }), peekWizardLayout: () => undefined }));
+vi.mock('@/api/wizardLayout', () => ({ fetchWizardLayout: async () => ({ layout: { steps: [],
+  ...(!mocks.olderPinnedLayout ? { programmeSuitability: configuration } : {}) }, version: 3 }), peekWizardLayout: () => undefined }));
 vi.mock('@/api/enrolmentDocuments', () => ({ uploadEnrolmentDocument: vi.fn() }));
 vi.mock('@/hooks/useToast.helpers', () => ({ useToast: () => ({ error: vi.fn(), success: vi.fn() }) }));
 vi.mock('../api', () => ({ getAssessment: async () => ({ ...fresh(), pathway: 'project-controls',
@@ -37,7 +40,7 @@ async function persist(_kind: string, _id: string, selection: ProgrammeModuleSel
 }
 beforeAll(() => { HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; });
 beforeEach(() => {
-  vi.clearAllMocks(); revision = 0; serverSelection = undefined; publishedModules = modulesConfiguration;
+  vi.clearAllMocks(); mocks.olderPinnedLayout = false; revision = 0; serverSelection = undefined; publishedModules = modulesConfiguration;
   vi.mocked(getModules).mockImplementation(async () => ({ configuration: publishedModules, configurationVersion: 3, selectedProgramme: 'PCP_L6',
     savedSelection: serverSelection, selectionRevision: revision, selectionComplete: moduleSelectionComplete(publishedModules, serverSelection, 3) }));
   vi.mocked(saveModuleSelection).mockImplementation(persist);
@@ -48,6 +51,24 @@ beforeEach(() => {
   });
 });
 const page = () => <WizardProvider userId="41" board={board} isCommercial={false}><ProgrammeSuitabilityStep /></WizardProvider>;
+
+it('uses the assessment API when an older pinned wizard layout has no suitability metadata', async () => {
+  mocks.olderPinnedLayout = true;
+  render(page());
+  expect(await screen.findByRole('heading', { name: 'Programme Suitability Assessment' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Preview Assessment' })).toBeInTheDocument();
+  expect(await screen.findByRole('region', { name: 'Programme Modules' })).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'Chartered Pathway' })).toBeInTheDocument();
+});
+
+it('keeps assessment validation for a pinned layout without suitability metadata', () => {
+  const layout = resolveLayout({ steps: [] });
+  const index = visibleSteps(layout).findIndex(step => step.slug === 'programme-suitability');
+  const draft = { programmeSuitability: { required: true, status: 'NOT_STARTED', selectionConfirmed: false } } as WizardDraft;
+  expect(missingForStep(index, draft, layout)).toContain('Programme Suitability Assessment');
+  draft.programmeSuitability = { required: true, status: 'SUBMITTED', selectionConfirmed: true };
+  expect(missingForStep(index, draft, layout)).toEqual([]);
+});
 
 it('persists PCP choices through only the modules API and restores them on reopening without losing CV data', async () => {
   const first = render(page());

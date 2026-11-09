@@ -119,6 +119,13 @@ describe('learner suitability journey', () => {
     expect(wizard.saveIlr).not.toHaveBeenCalled();
   });
 
+  it('explains an unpublished assessment instead of showing an empty step or an unusable start button', async () => {
+    vi.mocked(api.getAssessment).mockResolvedValue({ ...fresh(), available: false, configuration: null, required: false });
+    render(<CvSuitabilityPanel />);
+    expect(await screen.findByText(/assessment is not currently available/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Assessment' })).not.toBeInTheDocument();
+  });
+
   it('stays on the questionnaire after a failed submit and shows the result after a successful Retry', async () => {
     const continued = vi.fn();
     render(<AssessmentDialog initial={{ ...fresh(), pathway: 'marketing', responses: { marketing: ['marketing_D'] }, result }}

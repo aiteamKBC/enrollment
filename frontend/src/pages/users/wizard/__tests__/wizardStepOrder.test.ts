@@ -4,7 +4,6 @@ import { WIZARD_STEPS } from '../../types';
 import { STEP_BODIES } from '../WizardShell';
 import Introduction from '../steps/Introduction';
 import BeforeYouBegin from '../steps/BeforeYouBegin';
-import PersonalDetails from '../steps/PersonalDetails';
 import IlrLearnerDetails from '../steps/IlrLearnerDetails';
 import Ilr from '../steps/Ilr';
 import ProgrammeSuitabilityStep from '@/features/programme-suitability/ProgrammeSuitabilityStep';
@@ -21,7 +20,6 @@ describe('wizard step order', () => {
     expect(WIZARD_STEPS.map((s) => [s.slug, s.label])).toEqual([
       ['introduction', 'Welcome'],
       ['before-you-begin', 'Before You Begin'],
-      ['personal-details', 'Personal Details'],
       ['ilr-details', 'ILR'],
       ['ilr', 'Extended ILR'],
       ['programme-suitability', 'Programme Suitability & Modules'],
@@ -44,7 +42,7 @@ describe('wizard step order', () => {
     expect(STEP_BODIES).toHaveLength(WIZARD_STEPS.length);
     expect(bodyFor('introduction')).toBe(Introduction);
     expect(bodyFor('before-you-begin')).toBe(BeforeYouBegin);
-    expect(bodyFor('personal-details')).toBe(PersonalDetails);
+    expect(WIZARD_STEPS.some(step => step.slug === 'personal-details')).toBe(false);
     expect(bodyFor('ilr-details')).toBe(IlrLearnerDetails);
     expect(bodyFor('ilr')).toBe(Ilr);
     expect(bodyFor('programme-suitability')).toBe(ProgrammeSuitabilityStep);

@@ -1,6 +1,11 @@
-"""The two screens a new apprentice completes on their first sign-in.
+"""Retired apprenticeship Welcome API; retained for historical compatibility.
 
-Before the enrolment wizard opens, a newly created apprenticeship learner is
+Apprenticeship learners now enter the existing wizard directly, where Title is
+saved to its existing profile column and signing remains an explicit ILR action.
+GET never requires Welcome and POST cannot overwrite apprenticeship identity or
+signatures. Historical completion timestamps and marks remain readable.
+
+Previously, before the enrolment wizard opened, a newly created apprenticeship learner was
 asked for the details the enrolment team does not usually hold yet -- their home
 address, title, date of birth and mobile -- and for an electronic signature they
 agree to use on this platform. Both are saved on their own row in
@@ -158,13 +163,10 @@ def _details(learner):
 
 
 def _state(request, learner, cur):
-    available, completed_at = _completion(cur, learner.pk)
-    required = (
-        available
-        and completed_at is None
-        and _is_apprenticeship(learner)
-        and _is_fresh(learner)
-    )
+    _available, completed_at = _completion(cur, learner.pk)
+    # Apprentices now enter the wizard directly. Keep the historical receipt
+    # and reusable signature readable, without synthesising completion/signing.
+    required = False
     return {
         "required": required,
         "completedAt": completed_at.isoformat() if completed_at else None,
@@ -256,6 +258,9 @@ def first_login_details(request, pk):
     except DatabaseError:
         logger.exception("Could not read first-login details for learner %s.", pk)
         return _error("Your details could not be loaded. Please try again.", 503)
+
+    if _is_apprenticeship(learner):
+        return _error("Please complete your details in the enrolment wizard.", 409, code="not_required")
 
     try:
         payload = json.loads(request.body or b"{}")

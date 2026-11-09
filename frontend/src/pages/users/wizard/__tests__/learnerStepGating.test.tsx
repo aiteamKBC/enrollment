@@ -7,10 +7,11 @@
  * are deliberately not gated, so that is asserted too — a regression there would
  * stop the enrolment team correcting a single field on a half-filled record.
  */
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
+import { signatureDeclaration } from '../signatureDeclaration';
 
 const fetchExtendedIlr = vi.fn();
 const saveExtendedIlr = vi.fn();
@@ -55,21 +56,24 @@ const BOARD = {
 } as unknown as EnrolmentBoard;
 
 const COMPLETE_PERSONAL_DETAILS: PersonalDetails = {
+  title: 'Ms',
   firstName: 'Test',
   lastName: 'Learner',
   email: 'test@example.com',
   phone: '07123456789',
   address: '1 High Street, Kent',
+  currentPostcode: 'CT1 1AA',
   dob: '2000-01-01',
   age: 26,
   sex: 'Female',
   signature: 'data:image/png;base64,AAAA',
+  signatureDeclaration: { text: signatureDeclaration(), confirmedAt: '2026-11-03T10:00:00Z' },
 };
 
 const COMPLETE_ILR_DETAILS: IlrLearnerDetails = {
   yearsAtAddress: 3, sinceBirth: false, postcodePriorToEnrolment: 'CT1 1AA', niNumber: 'AB 12 34 56 C', niApplied: null,
   legalSex: 'Female', pronouns: '', ethnicity: 'Irish', longTermDisability: false, highestQualification: 'Full level 3',
-  employmentStatus: 'In paid employment', employmentStartDate: '2024-01-15', fullTimeEducation: false, stateBenefits: 'None',
+  employmentStatus: 'In paid employment', employmentStartDate: '2024-01-15', fullTimeEducation: false, workingHoursPerWeek: '37.5', stateBenefits: 'None',
   signature: 'data:image/png;base64,AAAA', signatureDate: '2026-09-27',
 };
 
@@ -129,8 +133,22 @@ beforeEach(() => {
   // their programme gives them nothing to answer.
   fetchKsbProfile.mockResolvedValue({ results: [] });
 });
+afterEach(() => vi.unstubAllEnvs());
 
 describe('learner step gating', () => {
+  it('temporarily allows ILR to Extended ILR navigation without answers only in local preview', async () => {
+    vi.stubEnv('DEV', true);
+    vi.stubEnv('MODE', 'eligibility-local');
+    vi.stubEnv('VITE_LOCAL_ILR_NAVIGATION_PREVIEW', '1');
+    const navigate = renderShell('learner');
+    await waitForHydration();
+    await waitFor(() => expect(screen.getByRole('tab', {name:'Extended ILR'})).not.toHaveAttribute('aria-disabled','true'));
+    await waitFor(() => expect(screen.getByRole('tab', {name:'Policies'})).toHaveAttribute('aria-disabled','true'));
+    await userEvent.click(screen.getByRole('button', {name:'Next'}));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(3));
+    expect(saveExtendedIlr).toHaveBeenCalled();
+  });
+
   it('blocks Next on an unfinished step and names what is missing', async () => {
     const onNavigateStep = renderShell('learner');
     await waitForHydration();
@@ -139,9 +157,24 @@ describe('learner step gating', () => {
 
     expect(await screen.findByText(/Please complete this step before continuing/i)).toBeInTheDocument();
     // Listed by field name — the same label the form shows.
-    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toContain('Address');
+    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toContain('Legal Sex');
     expect(onNavigateStep).not.toHaveBeenCalled();
     expect(saveExtendedIlr).not.toHaveBeenCalled();
+  });
+
+  it('blocks ILR Next on missing Title, then saves and proceeds once it is selected', async () => {
+    fetchExtendedIlr.mockResolvedValue({ answers: null,
+      draft: { personalDetails: { ...COMPLETE_PERSONAL_DETAILS, title: '' }, ilrDetails: COMPLETE_ILR_DETAILS },
+      meta: { updatedAt: 'saved' } });
+    const navigate = renderShell('learner');
+    const title = await screen.findByRole('combobox', { name: 'Title' });
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+    await userEvent.selectOptions(title, 'Ms');
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(3));
+    expect(saveExtendedIlr).toHaveBeenCalled();
   });
 
   it('blocks the tab-bar arrow on an unfinished step', async () => {
@@ -180,20 +213,20 @@ describe('learner step gating', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
   });
 
-  it('fires the save and moves on without waiting for it', async () => {
+  it('waits for ILR and its signatures to save before moving on', async () => {
     fetchExtendedIlr.mockResolvedValue({
       answers: null,
-      draft: { personalDetails: COMPLETE_PERSONAL_DETAILS },
+      draft: { personalDetails: COMPLETE_PERSONAL_DETAILS, ilrDetails: COMPLETE_ILR_DETAILS },
       meta: { updatedAt: '2026-08-01T00:00:00Z' },
     });
     const onNavigateStep = renderShell('learner');
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'Skills Radar' })).not.toHaveAttribute('aria-disabled'));
+    await screen.findByDisplayValue('2024-01-15');
 
     // Something the learner actually changed — a save is only owed on answers
     // that differ from what was hydrated (see the no-op test below).
     // Found by its hydrated value — the wizard's labels aren't wired to their
     // inputs with htmlFor, so getByLabelText doesn't reach them.
-    await userEvent.type(screen.getByDisplayValue(COMPLETE_PERSONAL_DETAILS.address), ', Flat 2');
+    fireEvent.change(screen.getByDisplayValue('2024-01-15'), { target: { value: '2024-01-16' } });
 
     // Held open so the write is still in flight when the move is asserted: the
     // learner must not be made to wait for the network to read the next step.
@@ -204,47 +237,47 @@ describe('learner step gating', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
-    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(3));
-    // Requested on the way out, and the step changed while it was unresolved.
+    expect(onNavigateStep).not.toHaveBeenCalled();
     expect(saveExtendedIlr).toHaveBeenCalled();
-    expect(saveExtendedIlr.mock.invocationCallOrder[0]).toBeLessThan(onNavigateStep.mock.invocationCallOrder[0]);
     release();
+    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(3));
   });
 
-  it('keeps the learner moving when the save fails', async () => {
+  it('keeps the learner on ILR when its signature save fails', async () => {
     // The save no longer gates navigation, so a dropped write costs a toast
     // rather than trapping the learner on the step.
     fetchExtendedIlr.mockResolvedValue({
       answers: null,
-      draft: { personalDetails: COMPLETE_PERSONAL_DETAILS },
+      draft: { personalDetails: COMPLETE_PERSONAL_DETAILS, ilrDetails: COMPLETE_ILR_DETAILS },
       meta: { updatedAt: '2026-08-01T00:00:00Z' },
     });
     saveExtendedIlr.mockRejectedValue(new Error('network down'));
     const onNavigateStep = renderShell('learner');
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'Skills Radar' })).not.toHaveAttribute('aria-disabled'));
+    await screen.findByDisplayValue('2024-01-15');
 
-    await userEvent.type(screen.getByDisplayValue(COMPLETE_PERSONAL_DETAILS.address), ', Flat 2');
+    fireEvent.change(screen.getByDisplayValue('2024-01-15'), { target: { value: '2024-01-16' } });
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
-    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(3));
+    await waitFor(() => expect(saveExtendedIlr).toHaveBeenCalledTimes(1));
+    expect(onNavigateStep).not.toHaveBeenCalled();
   });
 
-  it('writes nothing when moving off a step the learner never touched', async () => {
-    // The whole draft is stored in one row, so without a dirty check every step
-    // change re-wrote all eight steps — a step with no inputs at all still sat
-    // there showing "Saving…" on the way out of it.
+  it('records Sign + Next even when the completed ILR was already saved as a draft', async () => {
     fetchExtendedIlr.mockResolvedValue({
       answers: null,
-      draft: { personalDetails: COMPLETE_PERSONAL_DETAILS },
+      draft: { personalDetails: COMPLETE_PERSONAL_DETAILS, ilrDetails: COMPLETE_ILR_DETAILS },
       meta: { updatedAt: '2026-08-01T00:00:00Z' },
     });
     const onNavigateStep = renderShell('learner');
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'Skills Radar' })).not.toHaveAttribute('aria-disabled'));
+    await screen.findByDisplayValue('2024-01-15');
 
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(3));
-    expect(saveExtendedIlr).not.toHaveBeenCalled();
+    expect(saveExtendedIlr).toHaveBeenCalledWith(
+      'apprenticeship', '20', expect.anything(), expect.anything(),
+      expect.objectContaining({ finalizeIlr: true }),
+    );
   });
 
   it('still saves an untouched draft that has never been stored', async () => {
@@ -330,7 +363,7 @@ describe('learner step gating', () => {
         },
         plr: { uln: '1234567890', records: [] },
       },
-      meta: { updatedAt: '2026-08-01T00:00:00Z' },
+      meta: { updatedAt: '2026-08-01T00:00:00Z', ilrFinalisedAt: '2026-08-01T00:00:00Z' },
     });
     const onNavigateStep = renderShell('learner');
 
@@ -338,7 +371,7 @@ describe('learner step gating', () => {
     await waitFor(() => expect(within(screen.getByRole('tab', { name: 'Inclusion' })).getByText('Complete')).toBeInTheDocument());
     expect(screen.getByRole('tab', { name: 'Policies' })).not.toHaveAttribute('aria-disabled');
     await userEvent.click(screen.getByRole('tab', { name: 'Policies' }));
-    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(10));
+    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(9));
   });
 
   it('claims no progress until the saved answers have loaded', async () => {
@@ -351,7 +384,7 @@ describe('learner step gating', () => {
       () => new Promise((resolve) => {
         release = () => resolve({
           answers: null,
-          draft: { personalDetails: COMPLETE_PERSONAL_DETAILS },
+          draft: { personalDetails: COMPLETE_PERSONAL_DETAILS, ilrDetails: COMPLETE_ILR_DETAILS },
           meta: { updatedAt: '2026-08-01T00:00:00Z' },
         });
       })
@@ -377,8 +410,8 @@ describe('learner step gating', () => {
     // Details is still unanswered. Next Steps is not counted: it only counts
     // once the learner has reached it with every earlier step done, and the
     // Inclusion assessment has not been answered.
-    await waitFor(() => expect(screen.getByText(/7 of 13 steps complete/i)).toBeInTheDocument());
-    expect(screen.getByText('54%')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/7 of 12 steps complete/i)).toBeInTheDocument());
+    expect(screen.getByText('58%')).toBeInTheDocument();
   });
 
   it('claims no progress until the programme competencies have seeded either', async () => {
@@ -389,7 +422,7 @@ describe('learner step gating', () => {
     // lower now that Next Steps is no longer counted before it is reached).
     fetchExtendedIlr.mockResolvedValue({
       answers: null,
-      draft: { personalDetails: COMPLETE_PERSONAL_DETAILS },
+      draft: { personalDetails: COMPLETE_PERSONAL_DETAILS, ilrDetails: COMPLETE_ILR_DETAILS },
       meta: { updatedAt: '2026-08-01T00:00:00Z' },
     });
     let releaseKsbs!: () => void;
@@ -416,8 +449,8 @@ describe('learner step gating', () => {
     // Now measurable — and the Skills Radar is correctly outstanding, so the
     // count settles at 6, including unconfigured suitability and the Initial
     // Assessments page, without first showing 7 while the competencies load.
-    await waitFor(() => expect(screen.getByText(/6 of 13 steps complete/i)).toBeInTheDocument());
-    expect(screen.queryByText(/7 of 13 steps complete/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/6 of 12 steps complete/i)).toBeInTheDocument());
+    expect(screen.queryByText(/7 of 12 steps complete/i)).not.toBeInTheDocument();
   });
 
   it('does not gate the staff wizard, and keeps its Save progress button', async () => {
@@ -428,6 +461,6 @@ describe('learner step gating', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: 'Policies' }));
     // Policies sits after the Inclusion step.
-    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(10));
+    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(9));
   });
 });

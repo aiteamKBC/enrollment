@@ -108,6 +108,7 @@
   font: inherit;
   font-size: 14px;
 }
+.input::placeholder { color: #9ca3af; opacity: 1; }
 .input:hover { border-color: var(--app-brand); }
 .input:focus-visible { border-color: var(--action-primary-hover); outline: none; box-shadow: 0 0 0 4px var(--action-primary-focus); }
 .select {
@@ -150,7 +151,12 @@
 .optionsInvalid .option:not(.optionSelected) { border-color: var(--app-danger-border); }
 
 .error { margin: 0; color: var(--app-danger); font-size: 12.5px; }
-.note { margin: 14px 0; padding: 16px 20px; border: 1px solid var(--app-border); border-radius: 14px; background: var(--app-surface-soft); color: var(--app-text); font-size: 13.5px; line-height: 1.65; }
+.note { margin: 14px 0; padding: 16px 20px; border: 1px solid var(--app-border); border-radius: 14px; background: var(--app-surface-soft); color: var(--app-text); font-size: 13.5px; line-height: 1.65; white-space: pre-line; }
+.employmentNotice { border-color: var(--app-border-strong); background: var(--app-brand-soft); }
+.noticeTitle { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--app-text); }
+.noticeTitle svg { width: 18px; height: 18px; flex: none; color: var(--app-brand); }
+.employmentNotice p { margin: 8px 0 0; }
+.employmentNotice a { color: var(--app-brand); font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
 .alert { margin: 8px 0 0; padding: 12px 16px; border: 1px solid var(--app-danger-border); border-radius: 12px; background: var(--app-danger-soft); color: var(--app-danger); font-size: 13px; }
 
 .footer { margin-top: 4px; }
@@ -173,7 +179,7 @@
 .primary:active:not(:disabled) { background: var(--action-primary-active); }
 .secondary { border: 1px solid var(--app-border-strong); background: var(--app-surface); color: var(--app-text); }
 .secondary:hover:not(:disabled) { border-color: var(--app-brand); }
-.primary:disabled,
+.primary:disabled { background: #9ca3af; color: #fff; box-shadow: none; opacity: 1; cursor: not-allowed; }
 .secondary:disabled { opacity: 0.6; cursor: not-allowed; }
 .primary svg,
 .secondary svg { width: 17px; height: 17px; }
@@ -183,6 +189,7 @@
 .success h2:focus { outline: none; }
 .success p { margin: 0; max-width: 560px; color: var(--app-text-secondary); font-size: 14px; line-height: 1.7; }
 .success strong { color: var(--app-text); }
+.success a[href^="mailto:"] { color: var(--app-brand); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .successIcon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 20px; background: var(--app-brand-soft); color: var(--app-brand); }
 .successIcon svg { width: 30px; height: 30px; }
 

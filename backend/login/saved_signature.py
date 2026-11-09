@@ -97,17 +97,20 @@ def my_signature(request):
     except ValueError as exc:
         return _error(str(exc), 400)
     signature = payload.get("signature")
-    problem = invalid_signature(signature)
-    if problem:
-        return _error(problem, 400)
+    clearing = signature == ""
+    if not clearing:
+        problem = invalid_signature(signature)
+        if problem:
+            return _error(problem, 400)
 
     table, sig_col, name_col, at_col = store
     try:
         with _conn().cursor() as cur:
             cur.execute(
-                f'update {table} set "{sig_col}" = %s, "{name_col}" = %s, "{at_col}" = now() '
+                f'update {table} set "{sig_col}" = %s, "{name_col}" = %s, '
+                f'"{at_col}" = {"null" if clearing else "now()"} '
                 f'where id = %s returning "{at_col}"',
-                [signature, account.display_name or "", account.subject_id],
+                [signature, "" if clearing else (account.display_name or ""), account.subject_id],
             )
             row = cur.fetchone()
     except DatabaseError as exc:

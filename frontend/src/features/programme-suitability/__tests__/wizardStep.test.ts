@@ -1,13 +1,19 @@
 import { expect, it } from 'vitest';
-import { defaultLayout, resolveLayout } from '@/pages/users/wizard/layout/resolve';
+import { defaultLayout, layoutForLearner, resolveLayout, visibleSteps } from '@/pages/users/wizard/layout/resolve';
 import { configuration } from './fixtures';
 import { SUITABILITY_STEP } from '../wizardStep';
 
-it('registers twelve default steps with suitability sixth and CV seventh', () => {
+it('keeps the thirteen-step builder catalogue and twelve-step apprenticeship journey distinct', () => {
   const layout = defaultLayout();
-  expect(layout.steps).toHaveLength(12);
+  expect(layout.steps).toHaveLength(13);
+  expect(layout.steps[2].slug).toBe('personal-details');
   expect(layout.steps[5]).toMatchObject(SUITABILITY_STEP);
   expect(layout.steps[6].slug).toBe('cv-job');
+  const apprentice = visibleSteps(layoutForLearner(layout, false));
+  expect(apprentice).toHaveLength(12);
+  expect(apprentice.map(step => step.slug)).not.toContain('personal-details');
+  expect(apprentice[4]).toMatchObject(SUITABILITY_STEP);
+  expect(apprentice[5].slug).toBe('cv-job');
 });
 
 it('adapts an old published layout before CV without mutating saved configuration or duplicating the step', () => {

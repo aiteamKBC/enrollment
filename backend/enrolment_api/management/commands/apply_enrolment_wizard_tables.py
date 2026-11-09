@@ -190,8 +190,11 @@ TABLES = [
             "Legal_sex"               text,
             "Pronouns"                text,
             "Ethnicity"               text,
-            -- Health, education, employment. Stored as the DfE ILR option labels.
+            -- Health categories use DfE LLDDCat codes; other dropdowns retain labels.
             "Long_term_disability"    boolean,
+            "Health_condition_codes" jsonb,
+            "Primary_health_condition_code" text,
+            "Additional_support_details" text,
             "Highest_qualification"   text,
             "Employment_status"       text,
             -- Asked only of learners in paid employment.
@@ -199,6 +202,7 @@ TABLES = [
             "Job_title"               text,
             "Self_employed"           boolean,
             "Full_time_education"     boolean,
+            "Working_hours_per_week" numeric(5,2),
             -- Asked only when in full-time education or training.
             "Expected_leaving_date"   date,
             -- Asked only of learners not in paid employment.
@@ -211,6 +215,9 @@ TABLES = [
             -- signature column in this schema.
             "Declaration_signature"   text,
             "Declaration_signed_date" date,
+            "Ilr_finalised_at"       timestamptz,
+            "Ilr_finalised_by"       bigint,
+            "Ilr_signed_snapshot"    jsonb,
             "Created_at"              timestamptz NOT NULL DEFAULT now(),
             "Updated_at"              timestamptz NOT NULL DEFAULT now()
         )
@@ -223,6 +230,13 @@ TABLES = [
             ('"Length_of_unemployment"', "text"),
             ('"Volunteers"', "boolean"),
             ('"Benefit_claim_basis"', "text"),
+            ('"Ilr_finalised_at"', "timestamptz"),
+            ('"Ilr_finalised_by"', "bigint"),
+            ('"Ilr_signed_snapshot"', "jsonb"),
+            ('"Health_condition_codes"', "jsonb"),
+            ('"Primary_health_condition_code"', "text"),
+            ('"Additional_support_details"', "text"),
+            ('"Working_hours_per_week"', "numeric(5,2)"),
         ],
         [
             'CREATE UNIQUE INDEX IF NOT EXISTS wizard_ilr_learner_details_learner_uniq '

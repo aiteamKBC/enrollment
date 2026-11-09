@@ -190,6 +190,7 @@ const SLOTS: Record<string, Def[]> = {
   ],
 
   // ── ILR (learner details) ──
+  'ild.title': [['ild.title.label', 'Label', 'line', 'Title']],
   'ild.h.learner': [
     ['ild.h.learner.title', 'Section heading', 'line', 'Learner Details'],
     ['ild.h.learner.intro', 'Section intro', 'paragraph', 'The greyed-out details come from your learner record. If any of them are wrong, please tell the enrolment team.'],
@@ -221,6 +222,9 @@ const SLOTS: Record<string, Def[]> = {
   'ild.ethnicity': [['ild.ethnicity.label', 'Label', 'line', 'Ethnicity']],
   'ild.h.health': [['ild.h.health.title', 'Section heading', 'line', 'Health']],
   'ild.disability': [['ild.disability.label', 'Question', 'line', 'Do you consider yourself to have a long-term disability, health problem or any learning difficulties?']],
+  'ild.healthConditions': [['ild.healthConditions.label', 'Question', 'line', 'Please select the health problems, disabilities and/or learning difficulties (select all that apply)']],
+  'ild.primaryHealth': [['ild.primaryHealth.label', 'Question', 'line', 'Which of these do you consider to be your primary health problem, disability or learning difficulty?']],
+  'ild.additionalSupport': [['ild.additionalSupport.label', 'Question', 'line', 'If you require any additional support in order for you to successfully complete your course, please specify the details below']],
   'ild.h.education': [['ild.h.education.title', 'Section heading', 'line', 'Education level']],
   'ild.highestQualification': [['ild.highestQualification.label', 'Question', 'line', 'Please select from the drop-down list the highest-level qualification you have achieved to date.']],
   'ild.h.employment': [['ild.h.employment.title', 'Section heading', 'line', 'Employment Status']],
@@ -236,6 +240,7 @@ const SLOTS: Record<string, Def[]> = {
     ['ild.fullTimeEducation.unemployment', 'Length of unemployment label', 'line', 'Length of unemployment'],
     ['ild.fullTimeEducation.volunteer', 'Volunteering question', 'line', 'Do you volunteer?'],
   ],
+  'ild.workingHours': [['ild.workingHours.label', 'Question', 'line', 'Working hours per week']],
   'ild.stateBenefits': [
     ['ild.stateBenefits.label', 'Question', 'line', 'If you are in receipt of any additional state benefits please select the correct option from the drop down menu'],
     ['ild.stateBenefits.claimBasis', 'Claim question', 'line', 'Please confirm this is in your own right or as part of a joint claim (not as a dependant)'],
@@ -326,7 +331,6 @@ const SLOTS: Record<string, Def[]> = {
     ['xilr.plrAccessAware.sharing', 'PLR sharing note', 'paragraph', IlrText.plrSharing],
     ['xilr.plrAccessAware.label', 'Question', 'paragraph', IlrText.plrAccessAware],
   ],
-  'xilr.documentActions': [['xilr.documentActions.note', 'Note under the buttons', 'paragraph', 'The document contains every answer above plus the signature blocks, ready to print and sign. Filing it stores a copy against this learner’s Compliance documents.']],
 
   // ── CV/Job Description ──
   'cv.h.experience': [

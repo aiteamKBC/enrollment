@@ -408,14 +408,9 @@ export default function UsersListPage() {
   const showingStart = filtered.length ? (page - 1) * PAGE_SIZE + 1 : 0;
   const showingEnd = filtered.length ? Math.min(page * PAGE_SIZE, filtered.length) : 0;
 
-  // By source, like the two counts below it: a learner whose Type has been set
-  // to Referrer or Caseowner is still a learner, and dropping them out of this
-  // count made the three tiles stop adding up to the table.
+  // Count by source: a learner whose Type has been set to Referrer or Caseowner
+  // is still a learner.
   const learners = rows.filter(isLearnerRow).length;
-  // Counted by source, not "not a learner": employers are in the table too now,
-  // and lumping them under Admins would misreport both.
-  const admins = rows.filter((r) => r.source === 'staff').length;
-  const employerCount = rows.filter((r) => r.source === 'employer').length;
   const active = rows.filter((r) => r.programmeStatus === 'Active').length;
 
   // Choosing a programme or cohort invalidates the levels below it, so a stale
@@ -507,12 +502,6 @@ export default function UsersListPage() {
           eyebrow={isAdmin ? 'Administration' : 'Enrolment'}
           actions={
             <div className="flex flex-wrap items-start gap-2">
-              <button type="button" className={btnSecondary} onClick={() => navigate('/users/wizard-builder')}>
-                <AppIcon className="ri-magic-line" />Edit apprenticeship wizard
-              </button>
-              <button type="button" className={btnSecondary} onClick={() => navigate('/users/eligibility-builder')}>
-                <AppIcon className="ri-task-line" />Edit eligibility form
-              </button>
               <DownloadLearnerTemplateButton />
               <button type="button" className={btnSecondary} onClick={() => setImportModalOpen(true)}>
                 <AppIcon className="ri-upload-2-line" />Upload learners
@@ -551,11 +540,9 @@ export default function UsersListPage() {
           }
         />
 
-        <div aria-label="User totals" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 min-[1600px]:grid-cols-5">
+        <div aria-label="User totals" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <UserMetricCard icon="ri-group-line" label="Total users" value={rows.length} detail="Across all roles" active={summaryFilter === 'all'} onClick={() => selectSummary('all')} />
           <UserMetricCard icon="ri-graduation-cap-line" label="Learners" value={learners} detail={`${rows.length ? Math.round((learners / rows.length) * 100) : 0}% of total`} active={summaryFilter === 'learners'} onClick={() => selectSummary('learners')} />
-          <UserMetricCard icon="ri-user-line" label="Admins" value={admins} detail={`${rows.length ? Math.round((admins / rows.length) * 100) : 0}% of total`} active={summaryFilter === 'admins'} onClick={() => selectSummary('admins')} />
-          <UserMetricCard icon="ri-briefcase-line" label="Employers" value={employerCount} detail={`${rows.length ? Math.round((employerCount / rows.length) * 100) : 0}% of total`} active={summaryFilter === 'employers'} onClick={() => selectSummary('employers')} />
           <ActiveProgrammeCard active={active} total={rows.length} selected={summaryFilter === 'active'} onClick={() => selectSummary('active')} />
         </div>
 
@@ -660,7 +647,7 @@ export default function UsersListPage() {
             <table id="users-directory-table" className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-foreground-200/70 bg-background-100/50">
-                  {['User', 'Type', 'Email', 'Group', 'Programme', 'Cohort', 'Subscription status', 'Learning plan', 'Programme status', 'Attendance mode', 'Actions'].map((h) => (
+                  {['User', 'Type', 'Email', 'Programme', 'Cohort', 'Group', 'Subscription status', 'Learning plan', 'Programme status', 'Attendance mode', 'Actions'].map((h) => (
                     <th key={h} className="text-left py-3 px-3 text-[11px] font-semibold text-foreground-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -708,7 +695,6 @@ export default function UsersListPage() {
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isLearner ? 'bg-primary-50 text-primary-700 border-primary-200/50' : 'bg-secondary-50 text-secondary-700 border-secondary-200/50'}`}>{row.type}</span>
                     </td>
                     <td className="py-2.5 px-3 text-foreground-600 max-w-[220px] break-words">{row.email}</td>
-                    <td className="py-2.5 px-3 text-foreground-600">{row.group}</td>
                     {/* Learners only: staff, admins and employers have no
                         programme, so a dash is more honest than an empty cell. */}
                     <td className="py-2.5 px-3 text-foreground-600 max-w-[180px] break-words">
@@ -723,6 +709,7 @@ export default function UsersListPage() {
                         ? row.cohort
                         : <span className="text-foreground-300">—</span>}
                     </td>
+                    <td className="py-2.5 px-3 text-foreground-600">{row.group}</td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <span className="text-foreground-700">{row.subscriptionStatus}</span>
                       {row.subscriptionStatus ? (row.subscriptionVerified ? <AppIcon className="ri-checkbox-circle-fill text-emerald-500 ml-1.5 align-middle" title="Verified" /> : <AppIcon className="ri-close-circle-fill text-red-500 ml-1.5 align-middle" title="Unverified" />) : null}

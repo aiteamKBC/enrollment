@@ -1,13 +1,11 @@
 import type { ReactNode } from 'react';
 import { useWizard } from "../WizardContext.helpers";
-import { useToast } from "@/hooks/useToast.helpers";
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/lib/countries';
 import { YES_NO_SELECT } from '@/mocks/enrolment-console';
-import { YesNoRadio, inputClass, btnPrimary, btnSecondary } from '../../components/ui';
+import { YesNoRadio, inputClass } from '../../components/ui';
 import IlrEligibilityEvidence from './IlrEligibilityEvidence';
 import { useEmployerDetailsPrefill } from './useEmployerDetailsPrefill';
 import { LabeledInput, LabeledSelect, LabeledTextarea, StepHeading } from './fields';
-import { downloadIlrDocument } from './ilrDocument';
 import { IlrText } from './ilrAdditionalText';
 import { FieldError, invalidClass } from '../stepErrors';
 import { requiredMessage, useMissingCheck } from "../stepErrors.helpers";
@@ -29,9 +27,8 @@ function Fieldset({ legend, intro, children }: { legend: string; intro?: string;
 const EVIDENCE_KEY = 'Proof of identification and residency';
 
 export default function Ilr() {
-  const { board, draft, setSection, saveIlr, ilrSaving, ilrSavedAt, fileIlrDocument, ilrFiling } = useWizard();
+  const { board, draft, setSection, isCommercial } = useWizard();
   const layout = useLayout();
-  const { success, error } = useToast();
   const ilr = draft.ilr;
   const set = (patch: Partial<typeof ilr>) => setSection('ilr', { ...ilr, ...patch });
   const title = useStepTitle('ilr', 'Extended ILR');
@@ -49,18 +46,6 @@ export default function Ilr() {
   // The learning and provider declarations (and their signature blocks) are no
   // longer on this step, so the Personal details signature is no longer copied
   // into the ILR either: it would sign a declaration the learner never saw.
-
-  // Save the answers and file the PDF together: a filed document that doesn't
-  // match the stored answers would be worse than not filing at all.
-  const saveAndFile = async () => {
-    try {
-      await saveIlr();
-      await fileIlrDocument();
-      success('Document filed', 'The ILR PDF is now under Compliance documents on this learner’s profile.');
-    } catch (e) {
-      error('Could not file the ILR document', e instanceof Error ? e.message : 'Unexpected error');
-    }
-  };
 
   // One renderer per item in layout/registry.ts; the layout decides order,
   // which are shown and which are required.
@@ -116,7 +101,11 @@ export default function Ilr() {
       </div>
     ),
 
-    'xilr.h.employer': ({ children }) => <Fieldset legend={t('xilr.h.employer.title')} intro={t('xilr.h.employer.intro')}>{children}</Fieldset>,
+    'xilr.h.employer': ({ children }) => <Fieldset legend={t('xilr.h.employer.title')} intro={!isCommercial && layout.texts?.['xilr.h.employer.intro'] == null ? "Please provide your employer's company address:" : t('xilr.h.employer.intro')}>
+      {board?.contact?.eligibilityRepresentative && <p className="mb-3 text-[12px] text-foreground-600">
+        Employer representative recorded in your Eligibility Application: {board.contact.eligibilityRepresentative.name} {board.contact.eligibilityRepresentative.email}.
+        Please enter your line manager separately below.
+      </p>}{children}</Fieldset>,
     'xilr.employerName': () => <LabeledInput label={t('xilr.employerName.label')} missingKey="Employer — organisation name" value={ilr.employer.organisationName} onChange={(v) => set({ employer: { ...ilr.employer, organisationName: v } })} />,
     'xilr.employerPostcode': () => <LabeledInput label={t('xilr.employerPostcode.label')} missingKey="Employer — postcode" value={ilr.employer.postcode} onChange={(v) => set({ employer: { ...ilr.employer, postcode: v } })} />,
     'xilr.employerAddress': () => <LabeledInput label={t('xilr.employerAddress.label')} missingKey="Employer — address" value={ilr.employer.address} onChange={(v) => set({ employer: { ...ilr.employer, address: v } })} />,
@@ -186,29 +175,6 @@ export default function Ilr() {
       </>
     ),
 
-    // Save + export. The document renders whatever is on screen, so it can
-    // be produced before saving; saving persists to enrolment."Extended_ILR".
-    'xilr.documentActions': () => (
-      <>
-        <div className="flex flex-wrap items-center gap-3 mb-2">
-          <button className={btnPrimary} onClick={() => downloadIlrDocument(ilr, board, layout.texts)}>
-            <AppIcon className="ri-file-download-line" />Download ILR document
-          </button>
-          {/* A plain save is the wizard footer's job — Next on the learner side,
-              "Save progress" on the staff side; this one additionally files the
-              PDF into Compliance documents. */}
-          <button className={btnSecondary} onClick={saveAndFile} disabled={ilrSaving || ilrFiling}>
-            {ilrFiling ? <><AppIcon className="ri-loader-4-line animate-spin" />Filing…</> : <><AppIcon className="ri-folder-upload-line" />Save &amp; file document</>}
-          </button>
-          {ilrSavedAt && !ilrSaving && !ilrFiling && (
-            <span className="text-[12px] text-emerald-600 inline-flex items-center gap-1">
-              <AppIcon className="ri-check-line" />Saved
-            </span>
-          )}
-        </div>
-        <p className="text-[12px] text-foreground-500 mb-2">{t('xilr.documentActions.note')}</p>
-      </>
-    ),
   };
 
   return (

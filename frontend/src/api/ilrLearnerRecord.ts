@@ -7,6 +7,8 @@ import type { LearnerKind } from './learnerDetail';
  * enrolment."Created_users". See backend/enrolment_api/ilr_learner_record.py.
  */
 export interface IlrLearnerRecord {
+  title?: string;
+  country?: string;
   familyName: string;
   givenNames: string;
   /** As stored on the record — usually YYYY-MM-DD. */

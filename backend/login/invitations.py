@@ -180,8 +180,11 @@ class TokenError(ValueError):
     """Raised when a token is unknown, already used, or expired."""
 
 
-def _load_token(model, token):
-    row = model.objects.select_related("account").filter(token_hash=hash_token(token)).first()
+def _load_token(model, token, *, lock=False):
+    query = model.objects.select_related("account")
+    if lock:
+        query = query.select_for_update()
+    row = query.filter(token_hash=hash_token(token)).first()
     # One message for all three failure modes: distinguishing "expired" from
     # "never existed" tells an attacker holding a guessed token whether it was
     # ever real.
@@ -208,7 +211,7 @@ def peek_invitation(token):
 @transaction.atomic(using="enrolment")
 def accept_invitation(token, new_password, *, ip=None, user_agent=None):
     """Redeem an invitation: set the first password and activate the account."""
-    invitation = _load_token(Invitation, token)
+    invitation = _load_token(Invitation, token, lock=True)
     account = invitation.account
 
     validate_password_strength(
@@ -229,6 +232,8 @@ def accept_invitation(token, new_password, *, ip=None, user_agent=None):
 
     invitation.used_at = timezone.now()
     invitation.save(update_fields=["used_at"])
+    from enrolment_api.eligibility_link import mark_activated
+    mark_activated(account)
 
     # An invitation being redeemed a second time (or a stale session from before
     # onboarding) should not survive setting the first password.

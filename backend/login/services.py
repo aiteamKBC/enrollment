@@ -182,7 +182,7 @@ def invite_subject(subject_type, subject_id, *, subject=None, inviter=None,
     return result
 
 
-def invite_eligible_applicant(learner, *, ip=None, user_agent=None):
+def invite_eligible_applicant(learner, *, ip=None, user_agent=None, linked_application_id=None):
     """Invite a learner just created from the public eligibility form.
 
     The one invitation issued with no signed-in inviter: the applicant passed
@@ -192,9 +192,9 @@ def invite_eligible_applicant(learner, *, ip=None, user_agent=None):
 
     * the subject is always a learner row, so the role is always learner --
       never staff, admin or employer;
-    * only a brand-new account with no password is invited. An address that
-      already signs in (``ensure_account`` hands back its existing account)
-      gets nothing, so this never mails a set-password link for a live login.
+    * only a brand-new account, or its exact server-linked committed delivery
+      retry, with no password is invited. An unrelated existing account never
+      receives a link through this path.
 
     Returns ``(sent, detail)``: ``sent`` is False when no invitation went out,
     with ``detail`` saying why. Never raises for a mail failure; the invitation
@@ -203,10 +203,14 @@ def invite_eligible_applicant(learner, *, ip=None, user_agent=None):
     from .models import SUBJECT_LEARNER
 
     account, created = ensure_account(SUBJECT_LEARNER, learner.id, subject=learner)
-    if not created or account.has_password or account.subject_type != SUBJECT_LEARNER:
+    linked_delivery = False
+    if linked_application_id is not None:
+        from enrolment_api.eligibility_link import delivery_authorized
+        linked_delivery = account.subject_type == SUBJECT_LEARNER and account.subject_id == learner.pk and delivery_authorized(linked_application_id, learner.pk)
+    if (not created and not linked_delivery) or account.has_password or account.subject_type != SUBJECT_LEARNER:
         return False, "existing-account"
     _invitation, sent, detail = send_invitation(
-        account, invited_by="eligibility form", ip=ip, user_agent=user_agent
+        account, invited_by=f"eligibility application {linked_application_id}" if linked_delivery else "eligibility form", ip=ip, user_agent=user_agent
     )
     return sent, detail
 
@@ -377,6 +381,7 @@ def default_password_setup(email, *, ip=None, user_agent=None):
     from .identity import account_for_email
     from .models import SUBJECT_LEARNER, LoginAccount
     from .security import is_locked
+    from enrolment_api.eligibility_link import link_for_learner
 
     account = account_for_email(email)
     if account is None:
@@ -385,12 +390,18 @@ def default_password_setup(email, *, ip=None, user_agent=None):
         learner_ids = list(EnrolmentUser.all_learners.filter(email__iexact=email).values_list("pk", flat=True)[:2])
         if len(learner_ids) != 1:
             return None
+        if link_for_learner(learner_ids[0]) is not None:
+            return None
         try:
             account, _created = ensure_account(SUBJECT_LEARNER, learner_ids[0])
         except AccountError:
             return None
     if (account.subject_type != SUBJECT_LEARNER or account.has_password
             or not account.is_active or is_locked(account)):
+        return None
+    # New Eligibility identities require possession of a separately delivered
+    # invitation. Existing unlinked learners retain their accepted legacy flow.
+    if link_for_learner(account.subject_id) is not None:
         return None
     _invitation, token = _delivered_invitation(
         account, invited_by="default-password sign-in",

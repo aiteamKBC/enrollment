@@ -22,6 +22,7 @@ import { StepItems } from './layout/StepItems';
 import { REQUIRED_MESSAGE } from '@/features/programme-suitability/useSuitability';
 import ProgrammeSuitabilityStep from '@/features/programme-suitability/ProgrammeSuitabilityStep';
 import { SUITABILITY_STEP } from '@/features/programme-suitability/wizardStep';
+import { canPreviewIlrStep } from '@/lib/localIlrPreview';
 
 /**
  * The step bodies are mode-agnostic — every one reads and writes only through
@@ -102,10 +103,11 @@ export function WizardShell({
   header?: ReactNode;
   sidebar?: ReactNode;
 }) {
-  const { draft, hydrated, ready, saveIlr, ilrSaving, layout, steps, suitability } = useWizard();
+  const { draft, hydrated, ready, saveIlr, ilrSaving, ilrFinalisedAt, ilrLegacyReadOnly, layout, steps, suitability, isCommercial } = useWizard();
+  const previewIlr = mode === 'learner' && !isCommercial && canPreviewIlrStep(steps[currentIndex]?.slug);
   const continuedAssessment = useRef(0);
   const assessmentIndex = steps.findIndex((step) => step.slug === SUITABILITY_STEP.slug);
-  const assessmentMissing = Boolean(layout.programmeSuitability?.enabled && draft.programmeSuitability?.required !== false && (draft.programmeSuitability?.status !== 'SUBMITTED' || !draft.programmeSuitability.selectionConfirmed));
+  const assessmentMissing = Boolean((layout.programmeSuitability?.enabled || draft.programmeSuitability?.required) && draft.programmeSuitability?.required !== false && (draft.programmeSuitability?.status !== 'SUBMITTED' || !draft.programmeSuitability.selectionConfirmed));
   const modulesMissing = Boolean(draft.programmeModulesCompletion?.required && !draft.programmeModulesCompletion.complete);
   const moduleMessage = 'Please complete and save your PCP pathway and module choices before continuing.';
   const { success, error } = useToast();
@@ -132,12 +134,14 @@ export function WizardShell({
    */
   const gated = mode === 'learner' && ready;
   const stepComplete = useMemo(
-    () => steps.map((_, i) => isStepComplete(i, draft, layout)),
-    [draft, steps, layout]
+    () => steps.map((step, i) => mode === 'learner' && !isCommercial && (ilrFinalisedAt || ilrLegacyReadOnly) && step.slug === 'ilr-details'
+      ? true : isStepComplete(i, draft, layout)),
+    [draft, steps, layout, mode, isCommercial, ilrFinalisedAt, ilrLegacyReadOnly]
   );
   /** First step before `target` that is still unfilled, or -1 if the path is clear. */
   const blockingStep = (target: number) => stepComplete.slice(0, target).findIndex((c) => !c);
-  const locked = (i: number) => gated && i > currentIndex && blockingStep(i) !== -1;
+  const locked = (i: number) => gated && i > currentIndex && blockingStep(i) !== -1
+    && !(previewIlr && canPreviewIlrStep(steps[i]?.slug));
 
   // What the rail and the progress count call complete. Next Steps has nothing
   // to answer, so validation always passes it — which ticked it off before the
@@ -157,7 +161,8 @@ export function WizardShell({
   // What the current step is still missing, recomputed live so the list shrinks
   // as the learner fills it in. Only shown once they've tried to move on.
   const [showErrors, setShowErrors] = useState(false);
-  const currentMissing = mode === 'learner' ? missingForStep(currentIndex, draft, layout) : [];
+  const currentMissing = mode === 'learner' && !(steps[currentIndex]?.slug === 'ilr-details' && (ilrFinalisedAt || ilrLegacyReadOnly))
+    ? missingForStep(currentIndex, draft, layout) : [];
   useEffect(() => setShowErrors(false), [currentIndex]);
   // Each refused Next brings the first red box into view — it may be far above
   // the footer the learner just clicked.
@@ -187,27 +192,48 @@ export function WizardShell({
    * never left behind unwritten. Staff keep an unwritten Back, since they have
    * an explicit Save progress button.
    *
-   * The save never blocks the move. Navigation is what the button promises, so
-   * it happens immediately and the write goes out behind it — a step like the
-   * Introduction holds nothing but static text, and making the learner watch a
-   * "Saving…" spinner before it would let them read the next page was the whole
-   * complaint. A failed write raises a toast rather than pulling them back.
-   *
-   * Because nothing is awaited, a learner tabbing quickly can have two writes in
-   * flight; each sends the whole draft, so the loser of that race only costs a
-   * redundant request. The last thing they do always writes the current draft.
+   * Content steps save in the background. Leaving the learner's ILR waits for
+   * persistence because that page now carries their paperwork signature.
+   * The provider serializes writes to prevent older drafts overwriting it.
    */
-  const navigateTo = useCallback((target: number) => {
+  const navigatingSignature = useRef(false);
+  const navigateTo = useCallback(async (target: number, viaNext = false) => {
     if (target < 0 || target >= steps.length) return;
+    if (navigatingSignature.current) return;
+    const leavingUnsignedIlr = mode === 'learner' && !isCommercial && !ilrFinalisedAt && !ilrLegacyReadOnly
+      && steps[currentIndex]?.slug === 'ilr-details' && target > currentIndex;
+    if (leavingUnsignedIlr && !viaNext) {
+      error('Sign your ILR to continue', 'Review the ILR and use Next to sign and submit it.');
+      return;
+    }
+    const leaveStep = async () => {
+      // A signature must reach storage before leaving ILR. The provider queues
+      // full-draft writes so an older background save cannot overwrite it.
+      if (mode === 'learner' && steps[currentIndex]?.slug === 'ilr-details') {
+        if ((ilrFinalisedAt || ilrLegacyReadOnly) && !isCommercial) { onNavigateStep(target); return; }
+        navigatingSignature.current = true;
+        try { await saveIlr({ finalizeIlr: leavingUnsignedIlr }); onNavigateStep(target); }
+        catch (reason) { error('Could not save your answers', reason instanceof Error ? reason.message : 'Unexpected error'); }
+        finally { navigatingSignature.current = false; }
+      } else {
+        saveInBackground();
+        onNavigateStep(target);
+      }
+    };
     /** Write this step behind the move; a failure is reported, never blocking. */
     const saveInBackground = () =>
-      saveIlr().catch((e: unknown) =>
+      saveIlr({ skillsRadarCheckpoint: mode === 'learner' && steps[target]?.slug === 'skills-radar' }).catch((e: unknown) =>
         error('Could not save your answers', e instanceof Error ? e.message : 'Unexpected error')
       );
 
+    if (previewIlr && canPreviewIlrStep(steps[target]?.slug)) {
+      await leaveStep();
+      return;
+    }
+
     if (target <= currentIndex) {
-      if (mode === 'learner' && hydrated) saveInBackground();
-      onNavigateStep(target);
+      if (mode === 'learner' && hydrated) await leaveStep();
+      else onNavigateStep(target);
       return;
     }
 
@@ -242,9 +268,8 @@ export function WizardShell({
       }
     }
 
-    saveInBackground();
-    onNavigateStep(target);
-  }, [steps, saveIlr, error, currentIndex, mode, hydrated, assessmentIndex, ready, assessmentMissing, modulesMissing, suitability, gated, stepComplete, onNavigateStep]);
+    await leaveStep();
+  }, [steps, saveIlr, error, currentIndex, mode, isCommercial, ilrFinalisedAt, ilrLegacyReadOnly, hydrated, assessmentIndex, ready, assessmentMissing, modulesMissing, suitability, gated, stepComplete, onNavigateStep, previewIlr]);
 
   const currentStep = steps[Math.min(currentIndex, steps.length - 1)];
   const BuiltinBody = currentStep && currentStep.builtin && !BLOCK_STEPS.has(currentStep.slug) ? BODIES_BY_SLUG[currentStep.slug] : undefined;
@@ -477,7 +502,7 @@ export function WizardShell({
               </div>
               {/* Same gate as the footer Next — this arrow is a second way
                   forward, so it cannot be allowed to skip the check. */}
-              <button onClick={() => !isLast && navigateTo(currentIndex + 1)} disabled={isLast} aria-label="Next step" className="primary-action flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary-500 text-white transition-smooth hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40">
+              <button onClick={() => !isLast && navigateTo(currentIndex + 1, true)} disabled={isLast || navigatingSignature.current} aria-label="Next step" className="primary-action flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary-500 text-white transition-smooth hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40">
                 <AppIcon className="ri-arrow-right-line" />
               </button>
             </div>
@@ -532,7 +557,7 @@ export function WizardShell({
                   {submitting ? <><AppIcon className="ri-loader-4-line animate-spin" />Submitting…</> : <><AppIcon className="ri-check-double-line" />{finishLabel}</>}
                 </button>
               ) : (
-                <button onClick={() => navigateTo(currentIndex + 1)} className={btnPrimary}>
+                <button onClick={() => navigateTo(currentIndex + 1, true)} disabled={ilrSaving} className={btnPrimary}>
                   Next<AppIcon className="ri-arrow-right-line" />
                 </button>
               )}

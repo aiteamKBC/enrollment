@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
@@ -10,6 +10,9 @@ import {
   BUILTIN_ITEMS,
   ITEM_TEXT_SLOTS,
   PAGE_TEXT_SLOTS,
+  RETIRED_PUBLIC_ITEMS,
+  REQUIRED_ADDRESS_FIELDS,
+  WORKPLACE_FIELDS,
   builtinSection,
   isBuiltinQuestion,
   textFor,
@@ -56,7 +59,6 @@ const clone = (layout: EligibilityLayout): EligibilityLayout => JSON.parse(JSON.
  * dropped: removing a question hides it and keeps its column and answers.
  */
 export default function EligibilityBuilderPage() {
-  const navigate = useNavigate();
   const { success, error } = useToast();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export default function EligibilityBuilderPage() {
     fetchEligibilityLayout()
       .then((res) => {
         if (cancelled) return;
-        const resolved = resolveLayout(res.layout);
+        const resolved = resolveLayout(res.layout, res.workplaceEnabled === true);
         setPublished(resolved);
         setLayout(clone(resolved));
         setVersion(res.version);
@@ -101,11 +103,6 @@ export default function EligibilityBuilderPage() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  const leave = () => {
-    if (dirty && !window.confirm('You have unpublished changes to the eligibility form. Leave without publishing them?')) return;
-    navigate('/users');
-  };
-
   const edit = useCallback((fn: (l: EligibilityLayout) => EligibilityLayout) => setLayout((l) => (l ? fn(l) : l)), []);
 
   const publish = async () => {
@@ -113,7 +110,7 @@ export default function EligibilityBuilderPage() {
     setPublishing(true);
     try {
       const saved = await publishEligibilityLayout(layout, version);
-      const resolved = resolveLayout(saved.layout);
+      const resolved = resolveLayout(saved.layout, saved.workplaceEnabled === true);
       setPublished(resolved);
       setLayout(clone(resolved));
       setVersion(saved.version);
@@ -142,9 +139,6 @@ export default function EligibilityBuilderPage() {
           eyebrow="Enrolment"
           actions={
             <div className="flex flex-wrap items-start gap-2">
-              <button type="button" className={btnSecondary} onClick={leave}>
-                <AppIcon className="ri-arrow-left-line" />Back to users
-              </button>
               <Link className={btnSecondary} to="/apprenticeship_application" target="_blank" rel="noopener noreferrer">
                 <AppIcon className="ri-external-link-line" />Open the form
               </Link>
@@ -316,8 +310,8 @@ function SectionEditor({
   setEditing: (v: string | 'new' | null) => void;
   edit: (fn: (l: EligibilityLayout) => EligibilityLayout) => void;
 }) {
-  const shown = section.items.filter((it) => !it.hidden);
-  const removed = section.items.filter((it) => it.hidden);
+  const shown = section.items.filter((it) => !it.hidden && !RETIRED_PUBLIC_ITEMS.has(it.key));
+  const removed = section.items.filter((it) => it.hidden && !RETIRED_PUBLIC_ITEMS.has(it.key));
   const [showRemoved, setShowRemoved] = useState(false);
   const addRef = useRef<HTMLButtonElement>(null);
   // Hiding this section would hide a question that identifies the applicant.
@@ -446,9 +440,12 @@ function ItemRow({
   const def = item.builtin ? BUILTIN_ITEMS[item.key] : undefined;
   const question = isBuiltinQuestion(def) ? def : undefined;
   const note = def?.kind === 'note';
+  const contentOnly = !item.builtin && (item.type === 'heading' || item.type === 'description');
   const label = itemLabel(layout, item);
   const locked = isLocked(item);
-  const required = locked || (item.builtin ? item.required ?? question?.required ?? false : Boolean(item.required));
+  const workplace = item.builtin && WORKPLACE_FIELDS.has(item.key);
+  const addressRequired = item.builtin && REQUIRED_ADDRESS_FIELDS.has(item.key);
+  const required = addressRequired || (workplace ? item.key === 'workplaceArrangement' : locked || (item.builtin ? item.required ?? question?.required ?? false : Boolean(item.required)));
   const deps = dependents(layout, item.key);
   const slots = item.builtin ? ITEM_TEXT_SLOTS[item.key] ?? [] : [];
   const list = builtinOptions(item);
@@ -458,7 +455,7 @@ function ItemRow({
   const hint = question ? textFor(layout.texts, `${item.key}.hint`) : item.helpText;
   // Information is all wording, so it opens with its wording showing.
   const [panel, setPanel] = useState<'wording' | 'answers' | null>(note ? 'wording' : null);
-  const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string');
+  const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string' && textFor(layout.texts, s.key) !== s.default);
 
   const remove = () => {
     if (deps.length && !window.confirm(`${deps.length} question${deps.length === 1 ? '' : 's'} only asked for an answer to this question will stop being asked.\n\nRemove it from the form?`)) return;
@@ -477,7 +474,7 @@ function ItemRow({
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {note ? 'Information' : item.builtin ? 'Standard question' : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
-            {!item.builtin && !item.column && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
+            {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
             {locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Identifies the applicant — always asked</span>}
             {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
             {trigger && shownFor.length > 0 && (
@@ -490,13 +487,13 @@ function ItemRow({
           </div>
         </div>
 
-        {!note && (
+        {!note && !contentOnly && (
           <label className={`flex shrink-0 items-center gap-1.5 text-[12px] ${locked ? 'text-foreground-400' : 'text-foreground-700'}`}>
             <input
               type="checkbox"
               className="accent-primary-500"
               checked={required}
-              disabled={locked}
+              disabled={locked || workplace || addressRequired}
               onChange={(e) => edit((l) => updateItem(l, item.key, { required: e.target.checked }))}
             />
             Mandatory
@@ -507,6 +504,7 @@ function ItemRow({
             aria-label={`Move ${label} to another section`}
             className={`${inputClass} !w-auto shrink-0 cursor-pointer !py-1.5 text-[12px]`}
             value=""
+            disabled={workplace}
             onChange={(e) => e.target.value && edit((l) => moveItemToSection(l, item.key, e.target.value))}
           >
             <option value="">Move to section…</option>
@@ -514,10 +512,10 @@ function ItemRow({
           </select>
         )}
         <div className="flex shrink-0 items-center">
-          <button type="button" className={iconBtn} disabled={first} aria-label={`Move ${label} up`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, -1))}>
+          <button type="button" className={iconBtn} disabled={first || workplace} aria-label={`Move ${label} up`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, -1))}>
             <AppIcon className="ri-arrow-up-line" />
           </button>
-          <button type="button" className={iconBtn} disabled={last} aria-label={`Move ${label} down`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, 1))}>
+          <button type="button" className={iconBtn} disabled={last || workplace} aria-label={`Move ${label} down`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, 1))}>
             <AppIcon className="ri-arrow-down-line" />
           </button>
           {slots.length > 0 && (
@@ -549,7 +547,7 @@ function ItemRow({
               <AppIcon className="ri-pencil-line" />
             </button>
           )}
-          {!locked && (
+          {!locked && !workplace && (
             <button type="button" className={`${iconBtn} hover:!text-red-600`} aria-label={`Remove ${label}`} onClick={remove}>
               <AppIcon className="ri-delete-bin-line" />
             </button>
@@ -563,7 +561,10 @@ function ItemRow({
           ))}
         </div>
       )}
-      {panel === 'answers' && list && question?.options && (
+      {panel === 'answers' && list && question?.optionLabels && (
+        <p className="text-[12px] text-foreground-600">These verification choices are fixed: {Object.values(question.optionLabels).join(' ')}</p>
+      )}
+      {panel === 'answers' && list && question?.options && !question.optionLabels && (
         <div className="mt-3 space-y-2 border-t border-foreground-100 pt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[12px] font-medium text-foreground-600">Answers applicants choose from</p>

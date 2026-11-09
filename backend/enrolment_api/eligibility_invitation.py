@@ -1,7 +1,7 @@
 """Turn an eligible apprenticeship application into a learner with an invitation.
 
 Called by the public eligibility form (eligibility_form.submit_application)
-once the postcode check finds the applicant eligible. It creates the
+once initial screening finds the applicant eligible. It creates the
 apprenticeship learner in enrolment."Created_users" from the answers, provisions
 their login account and emails the set-password invitation
 (login.services.invite_eligible_applicant).
@@ -12,9 +12,9 @@ password, which sends a learner who never set a password their invitation
 (login.services.request_password_link). That also means the form sends any one
 address at most one invitation.
 
-The chosen standard is kept in Target_programme, not Programme: Programme and
-Cohort place a learner in delivery, and staff do that once they have reviewed
-the application.
+The application programme stays on the application only. Enrolment programme
+selection and delivery placement remain independent. For linked applications,
+account and provenance commit together before invitation delivery is attempted.
 """
 import logging
 
@@ -51,6 +51,7 @@ def has_account(email):
 def learner_fields(row):
     """The Created_users columns an application fills in, from its stored row."""
     from learner_api.constants import DEFAULT_PROGRAMME_STATUS
+    from .eligibility_prefill import learner_values
 
     name = " ".join(part for part in (row.get("first_name"), row.get("surname")) if part)
     date_of_birth = row.get("date_of_birth")
@@ -65,19 +66,28 @@ def learner_fields(row):
         "current_postcode": row.get("postcode"),
         "employer": row.get("employer_name"),
         "employer_address": row.get("employer_address"),
-        "target_programme": row.get("programme"),
         "programme_status": DEFAULT_PROGRAMME_STATUS,
         "invite_to_platform": True,
         "enrolled_time_and_user": f"{stamp} by Eligibility form",
+        **learner_values(row),
     }
 
 
-def invite_applicant(row, *, ip=None, user_agent=None):
+def invite_applicant(row, *, application_id=None, ip=None, user_agent=None):
     """Create the learner for an eligible application and invite them.
 
     Returns one of the outcomes above. Never raises: the application itself is
     already saved, so a failure here is reported, not thrown.
     """
+    # Staff approval never authorises the public submission path to invite.
+    # A separately designed invitation action is required for reviewed cases.
+    if row.get("review_status") is not None:
+        return "notEligible" if row["review_status"] == "rejected" else "pendingAssessment"
+    if row.get("assessment_status") is not None and not (
+        row.get("assessment_status") == "provisional_eligible" and row.get("eligible") is True
+    ):
+        return "pendingAssessment" if row.get("assessment_status") == "pending_assessment" else "notEligible"
+
     from learner_api.learner_progression import advance_learner
     from learner_api.models import EnrolmentUser
     from login.identity import AccountError
@@ -88,10 +98,24 @@ def invite_applicant(row, *, ip=None, user_agent=None):
             return EXISTING_ACCOUNT
         with transaction.atomic(using="enrolment"):
             learner = EnrolmentUser.all_learners.create(**learner_fields(row))
+            if application_id is not None:
+                from login.identity import ensure_account
+                from . import eligibility_link
+                account, created = ensure_account('learner', learner.pk, subject=learner)
+                if not created or account.subject_type != 'learner' or account.subject_id != learner.pk:
+                    # Never claim a different existing identity on an email match.
+                    raise IntegrityError('Eligibility identity already exists')
+                eligibility_link.add_link(application_id, learner.pk)
+                result = {'outcome': INVITE_PENDING}
+                def deliver():
+                    result['outcome'] = eligibility_link.dispatch(application_id, ip=ip, user_agent=user_agent)
+                transaction.on_commit(deliver, using='enrolment')
+        if application_id is not None:
+            return result['outcome']
     except IntegrityError:
         # The unique email index: the same address was submitted twice at once.
         return EXISTING_ACCOUNT
-    except DatabaseError:
+    except (DatabaseError, AccountError, ValueError):
         logger.exception("Could not create the learner for an eligible application")
         return RETRY_LATER
 

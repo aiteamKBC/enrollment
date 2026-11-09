@@ -1,0 +1,123 @@
+.page {
+  width: min(100%, 1152px);
+  margin: 0 auto;
+  padding: 28px 28px 56px;
+  color: oklch(var(--foreground-900));
+  font-family: var(--font-body);
+}
+
+.intro { max-width: 680px; margin-bottom: 28px; }
+.intro h2, .profileSummary h2, .panel > h2 { margin: 0; font: 600 20px/1.25 var(--font-heading); }
+.intro p, .profileSummary p { margin: 8px 0 0; color: oklch(var(--foreground-400)); font-size: 14px; line-height: 1.55; }
+
+.navCards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+/* Keep the three settings rows aligned despite the global icon-link flex rule. */
+.navCards > .navCard {
+  min-height: 148px;
+  display: grid;
+  grid-template-columns: 24px 1fr 20px;
+  align-items: start;
+  gap: 14px;
+  padding: 22px;
+  color: oklch(var(--foreground-800));
+  background: oklch(var(--background-50));
+  border: 1px solid oklch(var(--foreground-100));
+  border-radius: 8px;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+.navCard:hover { border-color: oklch(var(--primary-300)); background: oklch(var(--primary-50)); transform: translateY(-2px); }
+.navCard:focus-visible, .backLink:focus-visible, .editButton:focus-visible, .primaryButton:focus-visible, .secondaryButton:focus-visible, .dangerButton:focus-visible, .photoButton:focus-within, .tabs button:focus-visible { outline: 3px solid var(--action-primary-focus); outline-offset: 2px; }
+.navCard > svg:last-child { justify-self: end; color: oklch(var(--foreground-300)); }
+.navCard strong { display: block; font-size: 16px; font-weight: 600; }
+.navCard small { display: block; margin-top: 10px; color: oklch(var(--foreground-400)); font-size: 13px; line-height: 1.5; }
+.privacyNote { display: flex; align-items: center; gap: 9px; margin: 24px 0 0; color: oklch(var(--foreground-400)); font-size: 13px; }
+
+.backLink { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin-bottom: 20px; color: oklch(var(--primary-700)); font-size: 14px; font-weight: 600; text-decoration: none; }
+.backLink:hover { text-decoration: underline; }
+
+.profileSummary { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 16px; margin-bottom: 30px; padding: 20px; background: oklch(var(--background-50)); border: 1px solid oklch(var(--foreground-100)); border-radius: 8px; }
+.largeAvatar { width: 64px; height: 64px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: oklch(var(--primary-100)); color: oklch(var(--primary-800)); font-size: 19px; font-weight: 700; }
+.largeAvatar img { width: 100%; height: 100%; object-fit: cover; }
+.photoButton, .secondaryButton, .dangerButton, .editButton, .primaryButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 0 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+.photoButton, .secondaryButton { color: oklch(var(--foreground-700)); background: #fff; border: 1px solid oklch(var(--foreground-200)); }
+.photoButton:hover, .secondaryButton:hover { background: oklch(var(--background-100)); border-color: oklch(var(--foreground-300)); }
+.photoButton input, .uploadArea input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.settingsRow { display: grid; grid-template-columns: minmax(240px, 0.66fr) minmax(0, 1fr); gap: 40px; padding: 32px 0; border-top: 1px solid oklch(var(--foreground-100)); }
+.settingsRow:first-of-type { border-top: 0; }
+.sectionIntro { align-self: start; padding-top: 6px; }
+.sectionIntro h2 { margin: 0; font: 600 16px/1.35 var(--font-heading); color: oklch(var(--foreground-900)); }
+.sectionIntro p { max-width: 360px; margin: 8px 0 0; color: oklch(var(--foreground-400)); font-size: 14px; line-height: 1.55; }
+.editButton { min-height: 34px; margin-top: 16px; padding: 0; color: oklch(var(--primary-700)); background: transparent; border: 0; }
+.editButton:hover { color: oklch(var(--primary-500)); text-decoration: underline; }
+
+.panel { min-width: 0; padding: 20px; background: oklch(var(--background-100)); border-radius: 16px; }
+.valueGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 26px; margin: 0; }
+.value dt { display: flex; align-items: center; gap: 8px; margin: 0; color: oklch(var(--foreground-400)); font-size: 12px; font-weight: 500; }
+.value dt span { color: oklch(var(--foreground-400)); background: oklch(var(--background-200)); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; }
+.value dd { margin: 6px 0 0; color: oklch(var(--foreground-800)); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+
+.formGrid { display: grid; gap: 16px; }
+.field { display: grid; gap: 8px; color: oklch(var(--foreground-700)); font-size: 14px; font-weight: 500; }
+.field input, .field select { width: 100%; height: 40px; padding: 0 12px; color: oklch(var(--foreground-900)); background: #fff; border: 1px solid oklch(var(--foreground-200)); border-radius: 8px; font: 400 14px var(--font-body); }
+.field input:focus, .field select:focus { outline: 3px solid var(--action-primary-focus); border-color: var(--action-primary); }
+.field small { color: oklch(var(--foreground-400)); font-size: 12px; font-weight: 400; line-height: 1.45; }
+.twoFields { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(200px, 1.3fr); gap: 16px; }
+.readOnlyWell { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 16px; background: oklch(var(--background-200)); border-radius: 8px; }
+.formActions, .panelFooter { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 2px; }
+.primaryButton { color: var(--action-primary-foreground); background: var(--action-primary); border: 1px solid var(--action-primary); }
+.primaryButton:hover { background: var(--action-primary-hover); }
+.primaryButton:disabled, .secondaryButton:disabled, .dangerButton:disabled { cursor: not-allowed; opacity: .55; }
+.dangerButton { color: #b42318; background: #fff; border: 1px solid #f1b7b2; }
+.dangerButton:hover { background: #fff1f0; }
+
+.success, .error { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0; padding: 11px 13px; border-radius: 6px; font-size: 13px; line-height: 1.45; }
+.success { color: #176b42; background: #eaf8f0; }
+.error { color: #9f241d; background: #fff0ef; }
+.spinner { animation: spin 800ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loadingPanel, .errorPanel { width: min(100% - 40px, 720px); min-height: 180px; margin: 40px auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: oklch(var(--background-50)); border: 1px solid oklch(var(--foreground-100)); border-radius: 8px; }
+.loadingPanel p, .errorPanel p, .muted { margin: 0; color: oklch(var(--foreground-400)); font-size: 14px; }
+
+.signatureLayout { display: grid; gap: 0; }
+.savedSignature { height: 150px; display: grid; place-items: center; padding: 12px; background: #fff; border: 1px solid oklch(var(--foreground-100)); border-radius: 8px; }
+.savedSignature img, .uploadArea img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.emptyState { margin: 0; padding: 28px 16px; color: oklch(var(--foreground-400)); text-align: center; background: #fff; border: 1px dashed oklch(var(--foreground-200)); border-radius: 8px; font-size: 14px; }
+.panelFooter { justify-content: space-between; margin-top: 14px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid oklch(var(--foreground-100)); }
+.tabs button { min-height: 38px; padding: 0 12px; color: oklch(var(--foreground-400)); background: transparent; border: 0; border-bottom: 2px solid transparent; font-size: 13px; font-weight: 600; cursor: pointer; }
+.tabs button.activeTab { color: oklch(var(--foreground-900)); border-bottom-color: oklch(var(--primary-600)); }
+.signatureCanvas { display: block; width: 100%; height: 180px; margin-bottom: 12px; touch-action: none; background: #fff; border: 1px solid oklch(var(--foreground-200)); border-radius: 8px; }
+.uploadArea { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 18px; background: #fff; border: 1px dashed oklch(var(--foreground-200)); border-radius: 8px; }
+.uploadArea img { max-height: 100px; }
+.uploadArea p { margin: 0; color: oklch(var(--foreground-400)); font-size: 13px; }
+
+@media (max-width: 900px) {
+  .navCards { grid-template-columns: 1fr; }
+  .navCards > .navCard { min-height: 94px; align-items: center; }
+  .settingsRow { grid-template-columns: 1fr; gap: 14px; }
+  .sectionIntro { padding-top: 0; }
+  .sectionIntro p { max-width: 680px; }
+}
+
+@media (max-width: 640px) {
+  .page { padding: 22px 16px 44px; }
+  .profileSummary { grid-template-columns: 56px 1fr; padding: 16px; }
+  .largeAvatar { width: 56px; height: 56px; }
+  .photoButton { grid-column: 1 / -1; width: 100%; min-height: 44px; }
+  .panel { padding: 16px; border-radius: 12px; }
+  .valueGrid, .readOnlyWell, .twoFields { grid-template-columns: 1fr; }
+  .settingsRow { padding: 26px 0; }
+  .formActions { flex-direction: column-reverse; align-items: stretch; }
+  .formActions button { min-height: 44px; }
+  .panelFooter { align-items: flex-start; flex-direction: column; }
+  .dangerButton { width: 100%; min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navCard, .photoButton, .secondaryButton, .dangerButton, .editButton, .primaryButton { transition: none; }
+  .navCard:hover { transform: none; }
+  .spinner { animation-duration: 1.6s; }
+}
