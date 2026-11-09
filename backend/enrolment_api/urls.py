@@ -1,8 +1,12 @@
 from django.urls import include, path
+from .pending_signatures import pending_signatures
 
 from . import bksb, cv_job_documents, documents, eligibility_form, eligibility_layout, extended_ilr, ilr_eligibility_evidence, ilr_employer_details, ilr_learner_record, plr_evidence, policy_documents, postcode_lookup, views, wizard_bootstrap, wizard_custom_uploads, wizard_inclusion, wizard_layout
 
 urlpatterns = [
+    path('pending-signatures/', pending_signatures, name='learner-pending-signatures'),
+    path('document-revisions/', include('enrolment_api.document_templates.revision_urls')),
+    path('document-templates/', include('enrolment_api.document_templates.urls')),
     path('skills-radar/', include('enrolment_api.skills_radar.urls')),
     path('health/', views.health, name='enrolment-health'),
     path('commercial-users/<int:pk>/board/', views.commercial_board, name='commercial-board'),

@@ -6,6 +6,7 @@ import { answerFieldTypeOptions, fieldTypeOptions, isChoiceFieldType, isContentF
 import { BUILTIN_ITEMS } from '../wizard/layout/registry';
 import { conditionSources, existingFollowUps, type FollowUpDraft } from './builderOps';
 import { fieldDraftFrom, type FieldDraft } from './fieldDraft';
+import { FieldTypeControl } from './FieldTypeControl';
 
 
 interface OptionRow {
@@ -181,19 +182,10 @@ export function FieldEditor({
             )}
           </label>
         )}
-        <label className="block text-[12px] font-medium text-foreground-600" htmlFor={`${idPrefix}-type`}>
-          Field type
-          <select
-            id={`${idPrefix}-type`}
-            className={`${inputClass} mt-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
-            value={draft.type}
-            disabled={published}
-            onChange={(e) => set({ type: e.target.value as CustomFieldType })}
-          >
-            {fieldTypeOptions(draft.type).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+        <div>
+          <FieldTypeControl id={`${idPrefix}-type`} value={draft.type} disabled={published} onChange={(type) => set({ type })} />
           {published && <span className="mt-1 block text-[11px] font-normal text-foreground-400">Published fields keep their type — remove it and add a new field to change it.</span>}
-        </label>
+        </div>
         {!isContent && <label className="flex items-center gap-2 self-end pb-2 text-[12px] font-medium text-foreground-700">
           <input type="checkbox" className="accent-primary-500" checked={draft.required} onChange={(e) => set({ required: e.target.checked })} />
           Mandatory — learners must answer before moving on
