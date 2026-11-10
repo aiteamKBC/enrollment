@@ -46,10 +46,18 @@ const choose = (group: RegExp, option: string) =>
 const next = () => fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
 const heading = (name: string) => screen.findByRole('heading', { name });
 
+it('does not ask for Title, including in an older published layout', async () => {
+  const layout = defaultLayout();
+  layout.sections[0].items.splice(2, 0, { key: 'title', builtin: true, hidden: false, required: true });
+  vi.mocked(fetchEligibilityForm).mockResolvedValue({ layout, version: 4 });
+  await open();
+  expect(screen.queryByLabelText(/^\d+\. Title\b/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/Work Email Address/)).toBeInTheDocument();
+});
+
 function fillPersonalDetails(programme = 'Marketing Manager Level 6') {
   type(/First Name/, 'Sam');
   type(/Surname/, 'Example');
-  type(/^3\. Title/, 'Mr');
   type(/Work Email Address/, 'sam@employer.example');
   type(/Date of Birth/, '1995-04-03');
   type(/Choose Your Applying Programme/, programme);
@@ -60,7 +68,7 @@ function fillEmployment(hours: 'Yes' | 'No' | null = 'Yes') {
   type(/Start Date with Employer/, '2020-09-01');
   type(/Job Title/, 'Marketing Executive');
   if (hours) choose(/50% of your working hours in England/, hours);
-  type(/^4\. Employer/, 'Example Ltd');
+  type(/^\d+\. Employer\s*\*?$/, 'Example Ltd');
   type(/Employer Address Line 1/, '2 Business Park');
   type(/Employer Address Line 3/, 'Exampletown');
   type(/Employer Postcode/, 'EX3 4MP');
@@ -107,7 +115,7 @@ it('resolves a legacy four-section publication to three sections and keeps progr
   vi.mocked(submitApprenticeshipApplication).mockResolvedValue(ELIGIBLE);
   await open();
   expect(screen.getByText('Section 1 of 3')).toBeInTheDocument();
-  expect(screen.getByLabelText(/^7\. Choose Your Applying Programme/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/^6\. Choose Your Applying Programme/)).toBeInTheDocument();
   fillPersonalDetails('Data Analyst Level 4'); next();
   await heading('Employment'); fillEmployment(); next();
   await heading('Residency');
@@ -166,7 +174,7 @@ it('shows the address placeholders with published labels and hints, preserving t
   expect(screen.queryByText(/e\.g\.|for example/i)).not.toBeInTheDocument();
   type(/Company street address/, '2 Business Park');
   type(/Start Date with Employer/, '2020-09-01'); type(/Job Title/, 'Marketing Executive');
-  choose(/50% of your working hours in England/, 'Yes'); type(/^4\. Employer/, 'Example Ltd');
+  choose(/50% of your working hours in England/, 'Yes'); type(/^\d+\. Employer\s*\*?$/, 'Example Ltd');
   type(/Employer Address Line 3/, 'Exampletown'); type(/Employer Postcode/, 'EX3 4MP');
   type(/Employer Representative Name/, 'Alex Manager'); type(/Employer Representative Email/, 'alex@employer.example');
   next(); await heading('Residency');
@@ -274,7 +282,7 @@ it('walks the three sections and submits one complete application', async () => 
   expect(screen.queryByText('All fields marked with * are required.')).not.toBeInTheDocument();
   expect(screen.queryByText('No LMS account needed to apply')).not.toBeInTheDocument();
   expect(screen.getByLabelText(/^1\. First Name/)).toBeInTheDocument();
-  expect(screen.getByLabelText(/^6\. Date of Birth/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/^5\. Date of Birth/)).toBeInTheDocument();
   expect(screen.queryByLabelText(/Residential Address Line 1/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/^\d+\. Residential Postcode /)).not.toBeInTheDocument();
   expect(screen.getByText('Section 1 of 3')).toBeInTheDocument();
@@ -299,7 +307,7 @@ it('walks the three sections and submits one complete application', async () => 
   expect(await heading('You Are Eligible to Proceed!')).toBeInTheDocument();
   expect(submitApprenticeshipApplication).toHaveBeenCalledTimes(1);
   expect(submitApprenticeshipApplication).toHaveBeenCalledWith({
-    firstName: 'Sam', surname: 'Example', title: 'Mr', workEmail: 'sam@employer.example', phoneNumber: '',
+    firstName: 'Sam', surname: 'Example', workEmail: 'sam@employer.example', phoneNumber: '',
     fullAddress: '1 Example Street, Exampletown', postcode: '', dateOfBirth: '1995-04-03',
     employmentStatus: 'In paid employment', startDateWithEmployer: '2020-09-01', jobTitle: 'Marketing Executive', majorityHoursInEngland: true,
     employerName: 'Example Ltd', employerAddress: '2 Business Park, Exampletown', employerPostcode: 'EX3 4MP',
@@ -1091,7 +1099,6 @@ it('asks the questions of the published form', async () => {
   expect(screen.getByLabelText(/Date of Birth/)).toHaveAttribute('aria-required', 'true');
   type(/Given name/, 'Sam');
   type(/Surname/, 'Example');
-  type(/Title/, 'Mr');
   type(/Work Email Address/, 'sam@employer.example');
   type(/Date of Birth/, '1995-04-03');
   expect(screen.queryByLabelText(/Residential Address Line 1/)).not.toBeInTheDocument();

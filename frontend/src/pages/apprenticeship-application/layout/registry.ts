@@ -18,7 +18,6 @@ import {
   type ApplicationField,
 } from '@/api/apprenticeshipApplication';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/lib/countries';
-import { LEARNER_TITLE_OPTIONS } from '@/lib/learnerTitles';
 import type { TextSlot } from '@/pages/users/wizard/layout/texts';
 
 export type BuiltinKind = 'text' | 'email' | 'tel' | 'date' | 'choice' | 'select' | 'yesno';
@@ -64,12 +63,19 @@ export interface BuiltinSection {
 }
 
 /** Historical answer keys retained in the API and database, never restored by layouts. */
-export const RETIRED_PUBLIC_FIELDS = new Set(['notPreviouslyCompletedProgramme', 'employerAddress', 'fullAddress', 'employerAddressLine3', 'residentialAddressLine3']);
+export const RETIRED_PUBLIC_FIELDS = new Set(['notPreviouslyCompletedProgramme', 'employerAddress', 'fullAddress', 'employerAddressLine3', 'residentialAddressLine3', 'title']);
 export const WORKPLACE_FIELDS = new Set(['workplaceArrangement', 'mainWorkplacePostcode']);
+/** Built-in inputs used for automatic screening or postcode checks. Optional
+ * answers remain optional; this only prevents removing the questions. */
+export const SCREENING_PROTECTED_FIELDS = new Set([
+  'dateOfBirth', 'employmentStatus', 'employerPostcode',
+  'majorityHoursInEngland', 'postcode', 'countryOfResidence',
+  'workplaceArrangement', 'mainWorkplacePostcode',
+]);
 /** Legacy informational content retained for old layouts but no longer shown publicly. */
 export const RETIRED_PUBLIC_ITEMS = new Set(['note.representative']);
 /** These answers are always present and never answer-dependent. */
-export const ALWAYS_VISIBLE_PUBLIC_FIELDS = new Set(['livesInUk', 'nationality', 'dateOfBirth', 'title']);
+export const ALWAYS_VISIBLE_PUBLIC_FIELDS = new Set(['livesInUk', 'nationality', 'dateOfBirth']);
 /** Questions introduced by the Residency/Employment refresh.  If a layout
  * published before that refresh is still in force, these are restored visibly
  * in their canonical section; an admin can hide them explicitly afterwards. */
@@ -112,7 +118,6 @@ export const BUILTIN_SECTIONS: BuiltinSection[] = [
     items: [
       { kind: 'text', key: 'firstName', label: 'First Name', hint: 'Please enter your legal first name', required: true, maxLength: 100, autoComplete: 'given-name', locked: true },
       { kind: 'text', key: 'surname', label: 'Surname', hint: 'Please enter your legal surname', required: true, maxLength: 100, autoComplete: 'family-name', locked: true },
-      { kind: 'select', key: 'title', label: 'Title', required: true, options: LEARNER_TITLE_OPTIONS, locked: true },
       { kind: 'email', key: 'workEmail', label: 'Work Email Address', hint: 'Please enter your email address within your organisation domain', required: true, maxLength: 254, autoComplete: 'work email', locked: true },
       { kind: 'tel', key: 'phoneNumber', label: 'Phone Number', hint: 'Enter your contact phone number.', required: false, maxLength: 40, autoComplete: 'tel' },
       { kind: 'date', key: 'dateOfBirth', label: 'Date of Birth', hint: 'Enter your date of birth.', required: true, autoComplete: 'bday', locked: true },

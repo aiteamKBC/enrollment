@@ -53,7 +53,7 @@ describe('layout edits', () => {
   it('moves a question past the next shown one, skipping removed questions', () => {
     let layout = removeItem(defaultLayout(), 'surname');
     layout = moveItem(layout, 'personal-details', 'firstName', 1);
-    expect(sectionItems(layout, 'personal-details').map((i) => i.key).slice(0, 3)).toEqual(['title', 'surname', 'firstName']);
+    expect(sectionItems(layout, 'personal-details').map((i) => i.key).slice(0, 3)).toEqual(['workEmail', 'surname', 'firstName']);
   });
 
   it('hides a built-in or published question but drops one never published', () => {
@@ -164,6 +164,24 @@ describe('builder page', () => {
     const firstName = screen.getByText('First Name').closest('div.rounded-xl') as HTMLElement;
     expect(within(firstName).getByRole('checkbox', { name: 'Mandatory' })).toBeDisabled();
     expect(within(firstName).getByRole('checkbox', { name: 'Mandatory' })).toBeChecked();
+  });
+
+  it('protects screening questions while keeping residential postcode optional', async () => {
+    renderBuilder();
+    await screen.findByRole('textbox', { name: 'Section name' });
+    const nav = screen.getByRole('navigation', { name: 'Form sections' });
+    fireEvent.click(within(nav).getByRole('button', { name: 'Employment' }));
+    for (const label of ['Your Employment Status:', 'Employer Postcode',
+      'Could you confirm whether you expect to spend at least 50% of your working hours in England?']) {
+      expect(screen.queryByRole('button', { name: `Remove ${label}` })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole('checkbox', { name: 'Show this section to applicants' })).toBeDisabled();
+    fireEvent.click(within(nav).getByRole('button', { name: 'Residency' }));
+    expect(screen.queryByRole('button', { name: 'Remove Residential Postcode / Postal Code' })).not.toBeInTheDocument();
+    const postcode = screen.getByText('Residential Postcode / Postal Code').closest('div.rounded-xl') as HTMLElement;
+    expect(within(postcode).getByRole('checkbox', { name: 'Mandatory' })).not.toBeChecked();
+    expect(within(postcode).getByRole('checkbox', { name: 'Mandatory' })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: 'Show this section to applicants' })).toBeDisabled();
   });
 
   it('opens an old published layout without restoring Programme Suitability', async () => {

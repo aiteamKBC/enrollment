@@ -17,7 +17,7 @@ import {
   isBuiltinQuestion,
   textFor,
 } from '@/pages/apprenticeship-application/layout/registry';
-import { builtinOptions, isLocked, itemLabel, resolveLayout, sectionDescription } from '@/pages/apprenticeship-application/layout/resolve';
+import { builtinOptions, isLocked, isRemovalProtected, itemLabel, resolveLayout, sectionDescription } from '@/pages/apprenticeship-application/layout/resolve';
 import { QUESTION_TYPES, type EligibilityItem, type EligibilityLayout, type EligibilitySection } from '@/pages/apprenticeship-application/layout/types';
 import { btnPrimary, btnSecondary, iconBtn, inputClass } from '../components/ui';
 import { TextEditor } from '../wizard-builder/TextEditor';
@@ -314,8 +314,8 @@ function SectionEditor({
   const removed = section.items.filter((it) => it.hidden && !RETIRED_PUBLIC_ITEMS.has(it.key));
   const [showRemoved, setShowRemoved] = useState(false);
   const addRef = useRef<HTMLButtonElement>(null);
-  // Hiding this section would hide a question that identifies the applicant.
-  const holdsLocked = shown.some(isLocked);
+  // Hiding this section would hide identity or screening questions.
+  const holdsLocked = shown.some(isRemovalProtected);
 
   const saveQuestion = (draft: QuestionDraft) => {
     if (editing) {
@@ -356,7 +356,7 @@ function SectionEditor({
             }}
           />
         </label>
-        {holdsLocked && <p className="text-[11px] text-foreground-400 sm:col-span-2"><AppIcon className="ri-lock-line mr-1 inline" />This section asks the questions that identify the applicant, so it is always shown.</p>}
+        {holdsLocked && <p className="text-[11px] text-foreground-400 sm:col-span-2"><AppIcon className="ri-lock-line mr-1 inline" />This section contains identity or screening questions, so it is always shown.</p>}
       </div>
       {section.hidden && (
         <p className="mx-5 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
@@ -443,6 +443,7 @@ function ItemRow({
   const contentOnly = !item.builtin && (item.type === 'heading' || item.type === 'description');
   const label = itemLabel(layout, item);
   const locked = isLocked(item);
+  const removalProtected = isRemovalProtected(item);
   const workplace = item.builtin && WORKPLACE_FIELDS.has(item.key);
   const addressRequired = item.builtin && REQUIRED_ADDRESS_FIELDS.has(item.key);
   const required = addressRequired || (workplace ? item.key === 'workplaceArrangement' : locked || (item.builtin ? item.required ?? question?.required ?? false : Boolean(item.required)));
@@ -476,6 +477,7 @@ function ItemRow({
             </span>
             {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
             {locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Identifies the applicant — always asked</span>}
+            {removalProtected && !locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Used in screening — always asked</span>}
             {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
             {trigger && shownFor.length > 0 && (
               <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">
@@ -508,7 +510,7 @@ function ItemRow({
             onChange={(e) => e.target.value && edit((l) => moveItemToSection(l, item.key, e.target.value))}
           >
             <option value="">Move to section…</option>
-            {otherSections.map((s) => <option key={s.slug} value={s.slug}>{s.title || 'Untitled section'}{s.hidden ? ' (hidden)' : ''}</option>)}
+            {otherSections.filter(s => !removalProtected || !s.hidden).map((s) => <option key={s.slug} value={s.slug}>{s.title || 'Untitled section'}{s.hidden ? ' (hidden)' : ''}</option>)}
           </select>
         )}
         <div className="flex shrink-0 items-center">
@@ -547,7 +549,7 @@ function ItemRow({
               <AppIcon className="ri-pencil-line" />
             </button>
           )}
-          {!locked && !workplace && (
+          {!removalProtected && !workplace && (
             <button type="button" className={`${iconBtn} hover:!text-red-600`} aria-label={`Remove ${label}`} onClick={remove}>
               <AppIcon className="ri-delete-bin-line" />
             </button>

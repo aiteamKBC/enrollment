@@ -5,6 +5,7 @@ SimpleTestCase with a recording fake cursor: no query reaches a database.
 """
 import json
 import os
+from copy import deepcopy
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -165,6 +166,15 @@ class RegistryTests(SimpleTestCase):
 
 
 class NormalizeLayoutTests(SimpleTestCase):
+    def test_legacy_title_is_removed_from_published_and_public_layouts(self):
+        raw = standard_layout()
+        raw["sections"][0]["items"].insert(2, {"key": "title", "builtin": True, "hidden": False})
+        raw["texts"] = {"title.label": "Preferred title"}
+        self.assertFalse(any(i["key"] == "title" for s in el.public_layout(raw)["sections"] for i in s["items"]))
+        saved, _ = el.normalize_layout(raw, raw)
+        self.assertFalse(any(i["key"] == "title" for s in saved["sections"] for i in s["items"]))
+        self.assertNotIn("title.label", saved.get("texts", {}))
+
     def test_the_standard_form_needs_no_columns(self):
         layout, columns = el.normalize_layout(standard_layout(), None)
         self.assertEqual(columns, {})
@@ -218,13 +228,13 @@ class NormalizeLayoutTests(SimpleTestCase):
         self.assertEqual(restored["column"], "custom_visa_expiry")
         self.assertEqual(columns, {"custom_visa_expiry": "date"})
 
-    def test_builtin_questions_and_sections_left_out_come_back_hidden(self):
+    def test_builtin_questions_left_out_are_restored_with_screening_section_visible(self):
         raw = standard_layout()
         raw["sections"] = [s for s in raw["sections"] if s["slug"] != "residency"]
         items_of(raw, "employment").remove(item(raw, "representativeEmail"))
         layout, _ = el.normalize_layout(raw, None)
         residency = next(s for s in layout["sections"] if s["slug"] == "residency")
-        self.assertTrue(residency["hidden"])
+        self.assertFalse(residency["hidden"])
         self.assertFalse(item(layout, "livesInUk")["hidden"])
         self.assertTrue(item(layout, "representativeEmail")["hidden"])
 
@@ -241,6 +251,34 @@ class NormalizeLayoutTests(SimpleTestCase):
         item(raw, "surname")["required"] = False
         layout, _ = el.normalize_layout(raw, None)
         self.assertNotIn("required", item(layout, "surname"))
+
+    def test_screening_questions_cannot_be_removed_or_hidden_with_their_section(self):
+        for key in ef.SCREENING_PROTECTED_FIELDS - {"dateOfBirth"}:
+            raw = standard_layout()
+            item(raw, key)["hidden"] = True
+            with self.subTest(key=key), self.assertRaisesMessage(LayoutError, "automatic screening"):
+                el.normalize_layout(raw, None)
+
+        raw = standard_layout()
+        next(section for section in raw["sections"] if section["slug"] == "employment")["hidden"] = True
+        with self.assertRaisesMessage(LayoutError, "automatic screening"):
+            el.normalize_layout(raw, None)
+
+    def test_missing_screening_question_is_restored_without_making_postcode_mandatory(self):
+        raw = standard_layout()
+        items_of(raw, "residency").remove(item(raw, "postcode"))
+        layout, _ = el.normalize_layout(raw, None)
+        self.assertFalse(item(layout, "postcode")["hidden"])
+        self.assertFalse(ef.asked_questions(layout)[0]["postcode"]["required"])
+
+    def test_old_public_layout_restores_screening_question_without_changing_stored_version(self):
+        raw = standard_layout()
+        item(raw, "postcode")["hidden"] = True
+        before = deepcopy(raw)
+        public = el.public_layout(raw)
+        self.assertFalse(item(public, "postcode")["hidden"])
+        self.assertFalse(ef.asked_questions(public)[0]["postcode"]["required"])
+        self.assertEqual(raw, before)
 
     def test_builtin_items_keep_only_layout_settings(self):
         raw = standard_layout()

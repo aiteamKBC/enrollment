@@ -94,9 +94,9 @@ MAX_BODY_BYTES = 64 * 1024
 # Built-in answer identifiers are stable.  In particular, livesInUk is retained
 # as the storage key for the public UK/EEA-national question so existing rows
 # and published layouts remain readable.
-RETIRED_PUBLIC_FIELDS = frozenset({"notPreviouslyCompletedProgramme", "employerAddress", "fullAddress"})
+RETIRED_PUBLIC_FIELDS = frozenset({"notPreviouslyCompletedProgramme", "employerAddress", "fullAddress", "title"})
 RETIRED_PUBLIC_ITEMS = frozenset({"note.representative"})
-ALWAYS_VISIBLE_PUBLIC_FIELDS = frozenset({"livesInUk", "nationality", "dateOfBirth", "title"})
+ALWAYS_VISIBLE_PUBLIC_FIELDS = frozenset({"livesInUk", "nationality", "dateOfBirth"})
 NEW_PUBLIC_FIELDS = frozenset({
     "startDateWithEmployer", "jobTitle", "countryOfResidence", "nationality",
     "residentPrev3Years", "yearsInUk", "fullTimeEducationPrior",
@@ -421,6 +421,19 @@ ADDRESS_COLUMNS = tuple(column for _key, column, *_rest in ADDRESS_FIELDS)
 REQUIRED_ADDRESS_FIELDS = frozenset(key for key, _column, _kind, required, _limit in ADDRESS_FIELDS if required)
 
 SCREENING_REQUIRED_FIELDS = ("employmentStatus", "employerPostcode", "majorityHoursInEngland")
+# These inputs affect the automatic result or the postcode checks. Protection
+# from removal is separate from whether an answer is mandatory (postcode is optional).
+SCREENING_PROTECTED_FIELDS = frozenset({
+    "dateOfBirth", "employmentStatus", "employerPostcode",
+    "majorityHoursInEngland", "postcode", "countryOfResidence",
+})
+SCREENING_PREVIEW_FIELDS = frozenset({"workplaceArrangement", "mainWorkplacePostcode"})
+
+
+def screening_protected_fields():
+    return SCREENING_PROTECTED_FIELDS | (SCREENING_PREVIEW_FIELDS if workplace_enabled() else frozenset())
+
+
 ASSESSMENT_CONSISTENCY = (
     "assessment_status IS NULL OR "
     "(assessment_status = 'pending_assessment' AND eligible IS NULL AND assessment_reason IS NOT NULL) OR "
@@ -459,13 +472,10 @@ PROGRAMMES = (
 )
 
 # (payload key, column, kind, required, limit-or-choices). Order is the form's.
-TITLE_OPTIONS = ('Mr', 'Mrs', 'Miss', 'Ms', 'Mx', 'Dr', 'Prof')
-
 FIELDS = (
     # Personal Details
     ("firstName", "first_name", "text", True, 100),
     ("surname", "surname", "text", True, 100),
-    ("title", "title", "choice", True, TITLE_OPTIONS),
     ("workEmail", "work_email", "email", True, 254),
     ("phoneNumber", "phone_number", "text", False, 40),
     ("fullAddress", "full_address", "text", False, 500),
@@ -556,7 +566,6 @@ LOCATION_COLUMNS = tuple(column for _postcode, *location in POSTCODES.values() f
 
 #: Columns added since the table was first created (see upgrade_table).
 ADDED_COLUMNS = tuple((column, "text") for column in LOCATION_COLUMNS + ADDRESS_COLUMNS) + (
-    ("title", "text"),
     ("start_date_with_employer", "date"),
     ("job_title", "text"),
     ("country_of_residence", "text"),
@@ -607,7 +616,6 @@ def ensure_table(cursor):
             id                                bigserial PRIMARY KEY,
             first_name                        text NOT NULL,
             surname                           text NOT NULL,
-            title                             text,
             work_email                        text NOT NULL,
             phone_number                      text,
             full_address                      text,
@@ -824,7 +832,6 @@ def asked_questions(layout):
         builtin[key] = builtin_entry(key, True)
     # Neither an old layout nor a direct client may omit the age evidence.
     builtin["dateOfBirth"] = builtin_entry("dateOfBirth", True)
-    builtin['title'] = {'required': True, 'options': TITLE_OPTIONS}
     for prefix in ("employer", "residential"):
         if f"{prefix}AddressLine1" in builtin:
             # Accept optional old-client details without ever restoring an input

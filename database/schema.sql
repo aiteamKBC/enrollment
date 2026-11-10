@@ -2790,7 +2790,6 @@ CREATE TABLE enrolment."Written_Agreements" (
 --
 
 CREATE TABLE enrolment.eligibility_form (
-    title text,
     employer_address_line1 text,
     employer_address_line2 text,
     employer_address_line3 text,

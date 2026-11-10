@@ -67,7 +67,7 @@ MAX_CUSTOM_QUESTIONS = 300
 BUILTIN_SECTIONS = {
     "personal-details": (
         "Personal Details",
-        ("firstName", "surname", "title", "workEmail", "phoneNumber", "dateOfBirth", "programme"),
+        ("firstName", "surname", "workEmail", "phoneNumber", "dateOfBirth", "programme"),
     ),
     "employment": (
         "Employment",
@@ -225,6 +225,26 @@ def public_layout(layout):
                 target.setdefault("items", []).append({"key": key, "builtin": True, "hidden": False})
                 seen.add(key)
     _move_residency_items(result.get("sections") or [])
+    # Older publications may have removed a screening input. Restore it only
+    # on the public copy so the applicant sees the evidence the server checks.
+    for key in form.SCREENING_PROTECTED_FIELDS:
+        home = by_slug.get(HOME_SECTION[key])
+        if home is None:
+            title = BUILTIN_SECTIONS[HOME_SECTION[key]][0]
+            home = {"slug": HOME_SECTION[key], "title": title, "builtin": True, "items": []}
+            sections.append(home)
+            by_slug[HOME_SECTION[key]] = home
+        found = next((item for section in sections for item in section.get("items") or []
+                      if item.get("builtin") and item.get("key") == key), None)
+        if found is None:
+            found = {"key": key, "builtin": True}
+            home.setdefault("items", []).append(found)
+        elif found not in home["items"]:
+            for section in sections:
+                section["items"] = [item for item in section.get("items") or [] if item is not found]
+            home.setdefault("items", []).append(found)
+        home["hidden"] = False
+        found["hidden"] = False
     # Keep the conditional confirmation attached to its visible parent, even
     # in older layouts. Work on the public copy; never rewrite stored layouts.
     for parent_key, child_key in (("residentPrev3Years", "residenceNotForEducation"),
@@ -333,9 +353,6 @@ def _normalize_builtin(raw_item):
         if key == "workplaceArrangement":
             item["options"] = list(form.WORKPLACE_ARRANGEMENTS)
         return item
-    if key == 'title':
-        item.update(required=True, hidden=False, options=list(form.TITLE_OPTIONS))
-        return item
     if key in form.REQUIRED_ADDRESS_FIELDS or key == "dateOfBirth":
         item["required"] = True
     elif key in form.ADDRESS_INPUT_FIELDS:
@@ -413,7 +430,7 @@ def _restore_missing(sections, prev_custom, seen_keys):
     """Put back whatever the new layout leaves out.
 
     Built-in sections and questions always exist, so a missing one comes back
-    hidden (the questions that identify the applicant come back shown). A
+    hidden (identity and screening questions come back shown). A
     published custom question owns a column of answers, so it comes back too,
     hidden, rather than orphaning that column.
     """
@@ -425,14 +442,17 @@ def _restore_missing(sections, prev_custom, seen_keys):
             by_slug[slug] = section
     for key, slug in HOME_SECTION.items():
         if key not in seen_keys and key not in form.RETIRED_PUBLIC_FIELDS:
+            protected = key in form.screening_protected_fields()
             by_slug[slug]["items"].append({
                 "key": key,
                 "builtin": True,
                 "hidden": (
-                    key not in form.LOCKED and key not in form.NEW_PUBLIC_FIELDS
+                    key not in form.LOCKED and not protected and key not in form.NEW_PUBLIC_FIELDS
                     and key not in form.ALWAYS_VISIBLE_PUBLIC_FIELDS
                 ) or (key in form.RETIRED_PUBLIC_ITEMS and key not in form.ALWAYS_VISIBLE_PUBLIC_FIELDS),
             })
+            if protected:
+                by_slug[slug]["hidden"] = False
             seen_keys.add(key)
     for key, (prior, slug) in prev_custom.items():
         if key not in seen_keys:
@@ -525,6 +545,8 @@ def _check_locked(sections):
                     raise LayoutError(f"'{LOCKED_LABELS[item['key']]}' identifies the applicant, so it must stay on the form.")
                 # Always required; an override would only mislead.
                 item.pop("required", None)
+            elif item["key"] in form.screening_protected_fields() and (item["hidden"] or section["hidden"]):
+                raise LayoutError(f"'{item['key']}' is used for automatic screening, so it must stay on the form.")
 
 
 def normalize_layout(raw, previous):
@@ -576,6 +598,10 @@ def normalize_layout(raw, previous):
         for raw_item in raw_items:
             if not isinstance(raw_item, dict):
                 raise LayoutError("Each question must be an object.")
+            # Older published layouts still contain this retired answer. Do
+            # not reintroduce it when an admin publishes a newer layout.
+            if raw_item.get("builtin") and raw_item.get("key") == "title":
+                continue
             if raw_item.get("builtin"):
                 item = _normalize_builtin(raw_item)
             else:
@@ -608,6 +634,8 @@ def normalize_layout(raw, previous):
 
     layout = {"sections": sections}
     texts = _clean_texts(raw.get("texts"))
+    texts.pop("title.label", None)
+    texts.pop("title.hint", None)
     if texts:
         layout["texts"] = texts
     return layout, {

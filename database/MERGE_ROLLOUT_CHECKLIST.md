@@ -26,8 +26,8 @@ Run each script as a separately reviewed transaction on the **verified target**,
 after a backup and successful rehearsal. These scripts are additive; existing
 answers, signatures, and application decisions are not rewritten.
 
-1. `eligibility_submission_fields.sql`, `eligibility_structured_addresses.sql`,
-   `eligibility_title.sql`. The submission script already adds
+1. `eligibility_submission_fields.sql`, `eligibility_structured_addresses.sql`.
+   The submission script already adds
    `expected_leaving_date`; `eligibility_expected_leaving_date.sql` is an
    idempotent standalone alternative, not an additional dependency.
 2. `eligibility_workplace_phase2a.sql`, then

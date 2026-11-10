@@ -125,6 +125,12 @@ def application(**overrides):
 
 
 class CleanApplicationTests(SimpleTestCase):
+    def test_legacy_title_answer_is_ignored(self):
+        row, errors = ef.clean_application(application(title="Dr"), today=TODAY)
+        self.assertEqual(errors, {})
+        self.assertNotIn("title", row)
+        self.assertNotIn("title", ef.INSERT_COLUMNS)
+
     def test_a_complete_application_maps_every_answer_to_its_column(self):
         row, errors = ef.clean_application(application(), today=TODAY)
         self.assertEqual(errors, {})
