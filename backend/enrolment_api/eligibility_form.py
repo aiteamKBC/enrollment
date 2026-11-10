@@ -60,8 +60,8 @@ happened: "invited", "invitePending" (created, but the email could not be sent;
 staff can re-send it), "existingAccount" (the address already has an account:
 sign in or use Forgot password), "notEligible", or a technical invitation retry.
 New completed screenings have boolean eligibility. Lookup failures are HTTP
-errors before saving. Historical pendingAssessment/review receipts remain
-readable without reclassification or invitation replay.
+errors before saving. Historical pendingAssessment receipts remain readable
+without reclassification or invitation replay.
 """
 import hashlib
 import json
@@ -599,7 +599,6 @@ EARLIEST_DATE = date(1900, 1, 1)
 
 def ensure_table(cursor):
     """Create enrolment.eligibility_form if it does not exist. Never alters it."""
-    from .eligibility_review import COLUMN_DEFINITIONS as REVIEW_COLUMNS, CONSISTENCY as REVIEW_CONSISTENCY
     cursor.execute("CREATE SCHEMA IF NOT EXISTS enrolment")
     # Only the answers that identify the applicant are NOT NULL: the builder
     # can remove every other question from the form.
@@ -647,8 +646,7 @@ def ensure_table(cursor):
             ineligible_reason                 text,
             submitted_at                      timestamptz NOT NULL DEFAULT now(),
             {', '.join(f'{column} text' for column in ADDRESS_COLUMNS)},
-            {', '.join(f'{column} {definition}' for column, definition in WORKPLACE_COLUMN_DEFINITIONS + SCREENING_COLUMN_DEFINITIONS + REVIEW_COLUMNS)},
-            CONSTRAINT eligibility_review_consistency CHECK ({REVIEW_CONSISTENCY}),
+            {', '.join(f'{column} {definition}' for column, definition in WORKPLACE_COLUMN_DEFINITIONS + SCREENING_COLUMN_DEFINITIONS)},
             CONSTRAINT eligibility_assessment_consistency CHECK ({ASSESSMENT_CONSISTENCY})
         )"""
     )
@@ -1126,8 +1124,6 @@ def save_screened_application(row, reasons, request):
 
     Only a new row's response receipt is updated; historical applications never
     acquire a fingerprint. Invitation failures may retry against the same row.
-    Staff decisions overlay the response without changing the original receipt
-    and always prevent invitation retries for that reviewed application.
     """
     custom = [column for column in row if CUSTOM_COLUMN_RE.match(column)]
     columns = list(INSERT_COLUMNS + (WORKPLACE_COLUMNS if workplace_enabled() else ()) + SCREENING_COLUMNS + leaving_date_columns(row)) + custom
@@ -1143,7 +1139,7 @@ def save_screened_application(row, reasons, request):
             if inserted:
                 application_id = inserted[0]
             else:
-                cursor.execute(f"SELECT id, eligible, assessment_status, submission_response, to_jsonb(a)->>'review_status', to_jsonb(a)->'review_version' FROM enrolment.{TABLE} a WHERE submission_fingerprint = %s FOR UPDATE",
+                cursor.execute(f"SELECT id, eligible, assessment_status, submission_response FROM enrolment.{TABLE} a WHERE submission_fingerprint = %s FOR UPDATE",
                                [row["submission_fingerprint"]])
                 stored = cursor.fetchone()
                 receipt = stored[3] if stored else None
@@ -1154,12 +1150,6 @@ def save_screened_application(row, reasons, request):
                         receipt = None
                 if not isinstance(receipt, dict):
                     raise DatabaseError("Submission receipt is unavailable")
-                if stored[4] is not None:
-                    from .eligibility_review import overlay_receipt
-                    review_version = stored[5]
-                    if isinstance(review_version, str):
-                        review_version = json.loads(review_version)
-                    return overlay_receipt(receipt, stored[4], review_version)
                 if receipt.get('outcome') == eligibility_invitation.INVITE_PENDING:
                     from .eligibility_link import dispatch, refresh_response
                     def retry_delivery():

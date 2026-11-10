@@ -31,8 +31,7 @@ def verified_application(learner_id):
             return None
         cursor.execute(f'''SELECT to_jsonb(a), to_jsonb(u) FROM {TABLE} l JOIN enrolment.eligibility_form a ON a.id=l.application_id
             JOIN enrolment."Created_users" u ON u.id=l.learner_id
-            WHERE l.learner_id=%s AND l.activation_verified_at IS NOT NULL AND a.eligible IS TRUE
-            AND to_jsonb(a)->>'review_status' IS NULL''', [learner_id])
+            WHERE l.learner_id=%s AND l.activation_verified_at IS NOT NULL AND a.eligible IS TRUE''', [learner_id])
         row = cursor.fetchone()
     if not row:
         return None
@@ -65,8 +64,7 @@ def delivery_authorized(application_id, learner_id):
     with connections[CONN].cursor() as cursor:
         cursor.execute(f'''SELECT 1 FROM {TABLE} l JOIN enrolment.eligibility_form a ON a.id=l.application_id
             WHERE l.application_id=%s AND l.learner_id=%s AND l.invitation_status='sending'
-            AND l.activation_verified_at IS NULL AND a.eligible IS TRUE
-            AND to_jsonb(a)->>'review_status' IS NULL''', [application_id, learner_id])
+            AND l.activation_verified_at IS NULL AND a.eligible IS TRUE''', [application_id, learner_id])
         return cursor.fetchone() is not None
 
 

@@ -584,9 +584,6 @@ class TableTests(SimpleTestCase):
             "start_date_with_employer", "job_title", "country_of_residence", "nationality",
             "resident_prev_3_years", "years_in_uk", "full_time_education_prior", "expected_leaving_date",
         }})
-        self.assertEqual(schema.count("CREATE TABLE IF NOT EXISTS enrolment.eligibility_application_reviews"), 1)
-        self.assertGreater(schema.index("CREATE TABLE IF NOT EXISTS enrolment.eligibility_application_reviews"),
-                           schema.index("ADD CONSTRAINT eligibility_form_pkey PRIMARY KEY"))
 
     def test_ddl_creates_every_column_the_insert_writes(self):
         cursor = FakeCursor()

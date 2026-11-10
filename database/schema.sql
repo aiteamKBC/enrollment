@@ -2831,9 +2831,6 @@ CREATE TABLE enrolment.eligibility_form (
     assessment_reason text CONSTRAINT eligibility_assessment_reason_length CHECK (char_length(assessment_reason) BETWEEN 1 AND 1000),
     submission_fingerprint text CONSTRAINT eligibility_submission_fingerprint_check CHECK (submission_fingerprint ~ '^[0-9a-f]{64}$') CONSTRAINT eligibility_submission_fingerprint_unique UNIQUE,
     submission_response jsonb CONSTRAINT eligibility_submission_response_check CHECK (jsonb_typeof(submission_response) = 'object'),
-    review_status text CONSTRAINT eligibility_review_status_check CHECK (review_status IN ('approved', 'rejected', 'more_evidence_required')),
-    review_version integer CONSTRAINT eligibility_review_version_check CHECK (review_version >= 1),
-    CONSTRAINT eligibility_review_consistency CHECK ((review_status IS NULL AND review_version IS NULL) OR (review_status IS NOT NULL AND review_version IS NOT NULL AND assessment_status IS NOT DISTINCT FROM 'pending_assessment' AND eligible IS NULL)),
     CONSTRAINT eligibility_assessment_consistency CHECK (assessment_status IS NULL OR (assessment_status = 'pending_assessment' AND eligible IS NULL AND assessment_reason IS NOT NULL) OR (assessment_status = 'provisional_eligible' AND eligible IS TRUE AND assessment_reason IS NULL) OR (assessment_status = 'not_eligible' AND eligible IS FALSE AND assessment_reason IS NOT NULL)),
     representative_name text,
     representative_email text,
@@ -5817,44 +5814,6 @@ ALTER TABLE ONLY login."Password_resets"
 
 
 --
--- Phase 2C.2A review history (after application primary keys).
-CREATE TABLE IF NOT EXISTS enrolment.eligibility_application_reviews (
-    id bigserial PRIMARY KEY,
-    application_id bigint NOT NULL REFERENCES enrolment.eligibility_form(id) ON DELETE RESTRICT,
-    version integer NOT NULL CHECK (version >= 1),
-    request_id uuid NOT NULL,
-    reviewer_id bigint NOT NULL CHECK (reviewer_id >= 1),
-    reviewer_name text NOT NULL CHECK (char_length(btrim(reviewer_name)) BETWEEN 1 AND 200),
-    previous_status text NOT NULL,
-    new_status text NOT NULL CHECK (new_status IN ('approved', 'rejected', 'more_evidence_required')),
-    reason text NOT NULL CHECK (char_length(btrim(reason)) BETWEEN 1 AND 2000),
-    decided_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT eligibility_review_application_version UNIQUE (application_id, version),
-    CONSTRAINT eligibility_review_application_request UNIQUE (application_id, request_id),
-    CONSTRAINT eligibility_review_transition CHECK (
-        (previous_status = 'pending_assessment' AND new_status IN ('approved', 'rejected', 'more_evidence_required')) OR
-        (previous_status = 'more_evidence_required' AND new_status IN ('approved', 'rejected'))
-    )
-);
-
--- Reviewer id is a stable authenticated account id; name is a historical
--- snapshot. No FK to a mutable/deletable login identity can erase the audit.
--- Normal application credentials cannot edit/delete/truncate history.
-CREATE OR REPLACE FUNCTION enrolment.reject_eligibility_review_mutation() RETURNS trigger
-LANGUAGE plpgsql AS $$ BEGIN
-    RAISE EXCEPTION 'Eligibility review history is append-only';
-END $$;
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'enrolment.eligibility_application_reviews'::regclass AND tgname = 'eligibility_reviews_no_edit') THEN
-        CREATE TRIGGER eligibility_reviews_no_edit BEFORE UPDATE OR DELETE ON enrolment.eligibility_application_reviews
-            FOR EACH ROW EXECUTE FUNCTION enrolment.reject_eligibility_review_mutation();
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'enrolment.eligibility_application_reviews'::regclass AND tgname = 'eligibility_reviews_no_truncate') THEN
-        CREATE TRIGGER eligibility_reviews_no_truncate BEFORE TRUNCATE ON enrolment.eligibility_application_reviews
-            FOR EACH STATEMENT EXECUTE FUNCTION enrolment.reject_eligibility_review_mutation();
-    END IF;
-END $$;
-
 -- Eligibility provenance and committed invitation recovery; no historical backfill.
 -- Both referenced primary keys have been installed above.
 CREATE TABLE IF NOT EXISTS enrolment.eligibility_learner_links (

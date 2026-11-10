@@ -40,17 +40,6 @@ def started(test, target, attribute, **kwargs):
     return p.start()
 
 
-class ManualReviewInvitationGuardTests(SimpleTestCase):
-    def test_every_manual_decision_blocks_accounts_and_mail_even_with_forged_automatic_approval(self):
-        with patch.object(ei, "has_account") as accounts, patch.object(EnrolmentUser.all_learners, "create") as create, patch.object(services, "invite_eligible_applicant") as mail:
-            for status in ("approved", "rejected", "more_evidence_required"):
-                outcome = ei.invite_applicant({**ROW, "review_status": status, "eligible": True, "assessment_status": "provisional_eligible"})
-                self.assertEqual(outcome, "notEligible" if status == "rejected" else "pendingAssessment")
-            accounts.assert_not_called()
-            create.assert_not_called()
-            mail.assert_not_called()
-
-
 class SubmitInvitesTests(SimpleTestCase):
     """Which submissions the form sends on to be invited."""
 

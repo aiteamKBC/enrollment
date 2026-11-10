@@ -12,8 +12,6 @@ import {
 } from '@/api/eligibilityApplications';
 import { WORKPLACE_LABELS } from '@/api/apprenticeshipApplication';
 import { btnPrimary, btnSecondary, FieldRow, inputClass, Pagination } from '../components/ui';
-import { ReviewPanel } from './ReviewPanel';
-import { REVIEW_LABELS } from './reviewLabels';
 
 const BASE = '/users/eligibility-applications';
 const DEFAULTS = { search: '', status: 'pending_assessment', page: 1 };
@@ -67,7 +65,6 @@ function ApplicationsList() {
           <option value="pending_assessment">Pending assessment</option><option value="all">All applications</option>
           <option value="provisional_eligible">Provisional screening pass</option><option value="not_eligible">Not eligible</option>
           <option value="legacy">Legacy / not assessed</option>
-          <option value="approved">Staff: approved — awaiting invitation</option><option value="rejected">Staff: rejected</option><option value="more_evidence_required">Staff: more evidence required</option>
         </select></div>
       <button type="submit" className={btnPrimary}>Search</button>
     </form>
@@ -75,13 +72,12 @@ function ApplicationsList() {
       {data && <><p className="mb-3 text-sm text-foreground-500" aria-live="polite">{data.total} application{data.total === 1 ? '' : 's'}</p>
         <div className="overflow-x-auto rounded-xl border border-foreground-200 bg-background-50"><table className="w-full text-left text-sm">
           <caption className="sr-only">Eligibility applications</caption>
-          <thead className="bg-background-100 text-xs text-foreground-600"><tr>{['Applicant', 'Email', 'Submitted (UK time)', 'Employer', 'Employer postcode', 'Main workplace postcode', 'Workplace arrangement', 'Assessment status', 'Assessment reason', 'Staff review'].map(label => <th scope="col" className="px-4 py-3" key={label}>{label}</th>)}</tr></thead>
+          <thead className="bg-background-100 text-xs text-foreground-600"><tr>{['Applicant', 'Email', 'Submitted (UK time)', 'Employer', 'Employer postcode', 'Main workplace postcode', 'Workplace arrangement', 'Assessment status', 'Assessment reason'].map(label => <th scope="col" className="px-4 py-3" key={label}>{label}</th>)}</tr></thead>
           <tbody>{data.applications.map(row => <tr key={row.id} className="border-t border-foreground-100 align-top">
             <td className="px-4 py-3"><Link className="font-semibold text-primary-700 hover:underline" to={`${BASE}/${row.id}${search}`}>{[row.first_name, row.surname].filter(Boolean).join(' ') || 'Unnamed applicant'}</Link></td>
             {[row.work_email, dateTime(row.submitted_at), row.employer_name, row.employer_postcode, row.main_workplace_postcode, arrangement(row.workplace_arrangement)].map((value, i) => <td key={i} className="px-4 py-3">{show(value)}</td>)}
             <td className="px-4 py-3"><AssessmentBadge status={row.assessment_status} /></td>
             <td className="min-w-64 whitespace-pre-wrap px-4 py-3">{show(row.assessment_reason)}</td>
-            <td className="px-4 py-3">{row.review_status ? REVIEW_LABELS[row.review_status] : 'Not reviewed'}</td>
           </tr>)}</tbody>
         </table></div>
         <Pagination page={data.page} totalPages={Math.max(1, Math.ceil(data.total / data.pageSize))} onChange={next => setValues({ page: next })} />
@@ -146,7 +142,6 @@ function ApplicationDetails({ id }: { id: string }) {
           <FieldRow label="Recorded submission / invitation outcome" readonly value={OUTCOME_LABELS[String(application.invitation_outcome)] || show(application.invitation_outcome)} />
           <FieldRow label="Submitted layout version" readonly value={show(application.layout_version)} />
         </section>
-        <ReviewPanel key={id} id={id} />
         {DECLARATIONS.map(([title, fields]) => <DetailPanel key={title} title={title} fields={fields} application={application} />)}
         <AddressPanel application={application} employer />
         <AddressPanel application={application} employer={false} />
@@ -168,9 +163,9 @@ export default function EligibilityApplicationsPage() {
   const { applicationId } = useParams();
   if (!auth.account || !canManageEnrolment(auth.account)) return <p role="alert" className="p-6">Your account does not have access to eligibility applications.</p>;
   const nav = roleNavMap.apprentice;
-  return <WorkspaceShell role="compliance" roleLabel={nav.label} navItems={nav.items} workspaceLabel={nav.workspaceLabel} pageTitle="Eligibility applications" pageSubtitle="Staff review">
+  return <WorkspaceShell role="compliance" roleLabel={nav.label} navItems={nav.items} workspaceLabel={nav.workspaceLabel} pageTitle="Eligibility applications" pageSubtitle="Screening results">
     <div className="admin-console-page min-w-0 space-y-4 p-3 md:p-6">
-      <p className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-800">Screening evidence does not confirm government funding eligibility. Staff decisions do not create learner accounts or send invitations. Evidence uploads are not available here.</p>
+      <p className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-800">Screening evidence does not confirm government funding eligibility. Evidence uploads are not available here.</p>
       {applicationId ? <ApplicationDetails id={applicationId} /> : <ApplicationsList />}
     </div>
   </WorkspaceShell>;
