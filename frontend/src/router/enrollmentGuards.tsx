@@ -40,7 +40,8 @@ export function LearnerStart() {
       if (kind === 'apprenticeship') {
         const board = await fetchEnrolmentBoard(id);
         const status = (board.programme.status || '').toLowerCase();
-        if (status === 'fresh user' || status === 'onboarding') return '/learner/onboarding';
+        if (status === 'fresh user') return '/learner/pending';
+        if (status === 'onboarding') return '/learner/onboarding';
       }
       const session = await fetchLearnerFirstSession(kind, id);
       if (session.access === 'open') return '/lms';
@@ -52,6 +53,27 @@ export function LearnerStart() {
   }, [kind, id, attempt]);
   if (error) return <div role="alert" className="p-6"><p>{error}</p><button onClick={() => setAttempt(value => value + 1)}>Try again</button></div>;
   return destination ? <Navigate to={destination} replace /> : <p role="status" className="p-6">Loading your enrolment…</p>;
+}
+
+/** A direct wizard URL must wait for the same live status check as LearnerStart. */
+export function LearnerOnboardingGate({ children }: { children: ReactNode }) {
+  const { auth } = useAuth();
+  const { kind, id } = useMyLearner();
+  const [state, setState] = useState<'checking' | 'allowed' | 'pending' | 'error'>('checking');
+  useEffect(() => {
+    if (auth.account?.role !== 'learner' || kind !== 'apprenticeship') {
+      setState('allowed'); return;
+    }
+    let cancelled = false;
+    setState('checking');
+    fetchEnrolmentBoard(id).then(board => {
+      if (!cancelled) setState((board.programme.status || '').toLowerCase() === 'fresh user' ? 'pending' : 'allowed');
+    }).catch(() => { if (!cancelled) setState('error'); });
+    return () => { cancelled = true; };
+  }, [auth.account?.role, kind, id]);
+  if (state === 'pending') return <Navigate to="/learner/pending" replace />;
+  if (state === 'error') return <p role="alert" className="p-6">Could not check your enrolment status. Please reload this page.</p>;
+  return state === 'allowed' ? children : <p role="status" className="p-6">Checking your enrolment…</p>;
 }
 
 /** Old Welcome bookmarks follow the same authenticated start/resume resolver. */

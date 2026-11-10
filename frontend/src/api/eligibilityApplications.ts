@@ -1,4 +1,5 @@
-/** Read-only eligibility applications API. Applicant data is never cached locally. */
+/** Eligibility applications API. Applicant data is never cached locally. */
+import { prefetchAssessmentSecurity } from '@/features/programme-suitability/api';
 export type AssessmentStatus = 'pending_assessment' | 'provisional_eligible' | 'not_eligible';
 export interface EligibilityApplication {
   id: string;
@@ -39,4 +40,29 @@ export function fetchEligibilityApplications(options: { search: string; status: 
 
 export function fetchEligibilityApplication(id: string): Promise<{ application: ApplicationDetail }> {
   return read(`${BASE}${encodeURIComponent(id)}/`);
+}
+
+export interface EligibilityExceptionPreview {
+  existingLearner: { id: string; name: string; email: string; programmeStatus: string } | null;
+  linkedLearnerId: string | null;
+  overrideReason: string | null;
+  activationVerified: boolean;
+}
+
+export function fetchEligibilityException(id: string): Promise<EligibilityExceptionPreview> {
+  return read(`${BASE}${encodeURIComponent(id)}/exception/`);
+}
+
+export async function approveEligibilityException(id: string, reason: string, confirmEmail: string): Promise<{
+  learnerId: string; invitation: 'sent' | 'notSent' | 'alreadySent' | 'alreadyActivated'; message?: string;
+}> {
+  const csrfToken = (await prefetchAssessmentSecurity()).csrfToken;
+  const response = await fetch(`${BASE}${encodeURIComponent(id)}/exception/`, {
+    method: 'POST', credentials: 'include', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify({ reason, confirmEmail }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || 'Could not approve the exception.');
+  return data;
 }

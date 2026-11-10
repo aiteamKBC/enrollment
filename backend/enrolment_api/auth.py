@@ -223,6 +223,30 @@ def enrolment_login_required(view):
                 status=404,
             )
 
+        # Fresh apprenticeship accounts may have a valid session, but their
+        # invitation/exception has not yet released them into onboarding.
+        # Check the current database status so a staff edit takes effect on the
+        # next request; a frontend redirect alone cannot secure wizard APIs.
+        account = getattr(request, "login_account", None)
+        if account is not None and account.role == "learner" and view.__name__ not in {
+            "health", "document_types", "open_policy_document",
+        }:
+            from django.db import DatabaseError
+            from learner_api.constants import DEFAULT_PROGRAMME_STATUS
+            from learner_api.models import EnrolmentUser
+
+            try:
+                learner = (EnrolmentUser.all_learners.filter(pk=account.subject_id)
+                           .values("learner_type", "programme_status").first())
+            except DatabaseError:
+                return JsonResponse({"error": "Your enrolment could not be checked."}, status=503)
+            if learner is None:
+                return JsonResponse({"error": "Not found."}, status=404)
+            if (str(learner.get("learner_type") or "apprenticeship").strip().casefold() == "apprenticeship"
+                    and str(learner.get("programme_status") or DEFAULT_PROGRAMME_STATUS).strip().casefold()
+                    == DEFAULT_PROGRAMME_STATUS.casefold()):
+                return JsonResponse({"error": "Onboarding is not available yet."}, status=403)
+
         return view(request, *args, **kwargs)
 
     return wrapped

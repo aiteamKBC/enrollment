@@ -28,3 +28,4 @@ frontend/auto-imports.d.ts
 coverage/
 test-results/
 playwright-report/
+IMPLEMENTATION_PROGRESS.md

@@ -61,7 +61,8 @@ def learner_fields(row):
         "username": name,
         "email": row["work_email"],
         "phone_number": row.get("phone_number"),
-        "date_of_birth": date_of_birth.isoformat() if date_of_birth else None,
+        "date_of_birth": (date_of_birth.isoformat() if hasattr(date_of_birth, "isoformat")
+                          else str(date_of_birth) if date_of_birth else None),
         "address": row.get("full_address"),
         "current_postcode": row.get("postcode"),
         "employer": row.get("employer_name"),

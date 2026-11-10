@@ -12,6 +12,7 @@ import {
 } from '@/api/eligibilityApplications';
 import { WORKPLACE_LABELS } from '@/api/apprenticeshipApplication';
 import { btnPrimary, btnSecondary, FieldRow, inputClass, Pagination } from '../components/ui';
+import { ExceptionPanel } from './ExceptionPanel';
 
 const BASE = '/users/eligibility-applications';
 const DEFAULTS = { search: '', status: 'pending_assessment', page: 1 };
@@ -116,6 +117,8 @@ function AddressPanel({ application, employer }: { application: ApplicationDetai
 }
 
 function ApplicationDetails({ id }: { id: string }) {
+  const { auth } = useAuth();
+  const authRole = auth.account?.role;
   const { search } = useLocation();
   const [application, setApplication] = useState<ApplicationDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -142,6 +145,7 @@ function ApplicationDetails({ id }: { id: string }) {
           <FieldRow label="Recorded submission / invitation outcome" readonly value={OUTCOME_LABELS[String(application.invitation_outcome)] || show(application.invitation_outcome)} />
           <FieldRow label="Submitted layout version" readonly value={show(application.layout_version)} />
         </section>
+        {application.eligible === false && authRole === 'admin' && <ExceptionPanel applicationId={id} email={String(application.work_email || '')} />}
         {DECLARATIONS.map(([title, fields]) => <DetailPanel key={title} title={title} fields={fields} application={application} />)}
         <AddressPanel application={application} employer />
         <AddressPanel application={application} employer={false} />

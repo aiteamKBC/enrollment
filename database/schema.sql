@@ -5824,7 +5824,15 @@ CREATE TABLE IF NOT EXISTS enrolment.eligibility_learner_links (
     invitation_status text NOT NULL DEFAULT 'pending' CHECK (invitation_status IN ('pending', 'sending', 'sent', 'failed')),
     invitation_claim uuid,
     invitation_claimed_at timestamptz,
-    invitation_error text
+    invitation_error text,
+    override_approved_at timestamptz,
+    override_approved_by_account_id bigint,
+    override_reason text,
+    CONSTRAINT eligibility_link_override_complete CHECK (
+        (override_approved_at IS NULL AND override_approved_by_account_id IS NULL AND override_reason IS NULL)
+        OR (override_approved_at IS NOT NULL AND override_approved_by_account_id IS NOT NULL
+            AND nullif(btrim(override_reason), '') IS NOT NULL)
+    )
 );
 
 -- PostgreSQL database dump complete
