@@ -378,7 +378,7 @@ function SectionEditor({
   };
 
   return (
-    <section aria-label={`${section.title || 'Untitled'} section`} className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
+    <section aria-label={`${section.title || 'Untitled'} section`} className="min-w-0 flex-1 rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
       <div className="grid gap-3 border-b border-foreground-100 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-end">
         <label className="min-w-[220px] text-[12px] font-medium text-foreground-600" htmlFor="eligibility-section-name">
           Section name

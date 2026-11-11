@@ -369,7 +369,7 @@ describe('builder page', () => {
     await user.click(within(editor).getByRole('button', { name: /Add question/ }));
 
     expect(screen.getByText('New — adds a column when published')).toBeInTheDocument();
-    expect(screen.getByText('Asked when “Please provide your residency status?” is Other')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Asked when “Please provide your residency status?” is Other' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
     expect(within(await screen.findByRole('dialog')).getByText(/Which visa do you hold\?/)).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
