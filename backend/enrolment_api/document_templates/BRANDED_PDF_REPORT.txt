@@ -1,0 +1,226 @@
+KBC / DfE BRANDED PURPLE PDF IMPLEMENTATION
+9 November 2026 — compliance-documents branch
+
+RESULT
+All eight NEW Compliance/Review document types have the shared KBC/DfE branded
+PDF design. Actual first-time Issue generates and stores the PDF on Django's
+side before returning success. Pre-issue and builder draft PDF previews also use
+the server renderer. Create retains the latest applicable published wording,
+current learner data and empty new signatures. Edit retains its exact base
+version, saved data and historical signature/provenance rules.
+
+The supplied ILR conversation image was the visual design reference. It is not
+embedded as a page background. Tables, document wording and values are native
+selectable PDF text; waves, section bars, icons and footer decoration are vector
+PDF drawings. Only the two official supplied logos and actual signature images
+are raster images.
+
+EXISTING PIPELINE / ROOT CAUSE
+The repository's real generator was jsPDF + AutoTable in TypeScript, executed
+by the browser after Issue. Django saved source/template snapshots, and the
+browser uploaded the initial PDF. Existing purple-reference-v2 presentation did
+not contain the two supplied official logos or the new section/footer design.
+
+The implementation REUSES that existing shared document renderer, its eight
+document adapters, substitutions, native table/review content and signature
+writers. It does not create a second set of Python document templates. A small
+trusted Node entry is bundled from that same renderer. Django runs it with the
+existing serialized snapshot on stdin and receives PDF bytes on stdout. No
+learner data is passed in shell arguments, no shell interpolation is used, and
+the renderer does not fetch logos/fonts or remote document URLs.
+
+ASSETS
+Actual files found and inspected:
+  frontend/public/assets/document-branding/kbc-logo.png — 438 x 201
+  frontend/public/assets/document-branding/dfe-logo.png — 400 x 380
+Original PNG bytes, alpha/transparency and proportions are preserved unchanged.
+The DfE asset's original transparent padding is retained; its placement accounts
+for that padding without changing/reconstructing the supplied logo.
+
+tools/build_document_pdf.mjs verifies both PNG signatures, records SHA256 values,
+generates brandingAssets.json from the exact bytes and embeds them in the shared
+Node/browser bundle. The backend therefore does not depend on a React asset URL,
+public web server or CDN. Logo identity is tested byte-for-byte against the files.
+
+SHARED DESIGN
+Versioned presentation identity: kbc-dfe-purple-v3.
+brandedPurpleTheme.ts centralises colours, fonts, spacing, margins and wave paths.
+brandedPurplePdf.ts paints:
+  - Exact KBC logo at upper left and exact DfE logo at upper right.
+  - Reduced logos on continuation pages, preserving room for content.
+  - Layered purple, magenta and lavender cubic-Bezier header/footer waves.
+  - Large dark-purple title and short thick rounded underline.
+  - Lavender section bars with purple blocks and white vector section icons.
+  - Dark-purple table headings with white text, white rows and light gridlines.
+  - Rounded table frames and automatic multi-page table header repetition.
+  - Thin purple footer line and rounded badge: Page N of TOTAL.
+TOTAL is obtained after all pages have been rendered, never copied from the image.
+Configured header/footer text is retained with reserved space around branding.
+Short paragraph spacing and measured signature panels avoid isolated tail lines
+and ensure complete signature areas fit inside page boundaries.
+
+The existing Training Plan five-column semantics, rows, dates, hours, calculations,
+module associations and activity ordering were retained. Its shared drawing
+helper accepts an optional palette; legacy callers retain their original styles.
+Dates/numbers remain whole in their measured columns. No learning-plan redesign,
+programme/cohort/module automation, Skills Radar or KSB changes were made.
+
+Unsigned Review PDFs now also print the actual configured native question keys
+with empty answers, alongside the existing honest Not completed indicators. Saved
+answers come from their stable keys, including when two questions have identical
+wording. Existing question content, notes and specialised PLR/Radar rows remain.
+
+VERSION / PUBLICATION SAFETY
+presentationTheme is frozen as document render metadata, separate from the
+published template content and its version/hash. The v1/v2 renderers are retained.
+No existing TemplateVersion was edited or silently published. New initial bindings
+use originalPdfVersion=2 to identify server-owned PDF storage, and keep R1.
+No R2 is created simply to apply branding to a new original.
+
+The existing classic-publication first-Issue guard remains: if an explicitly
+published applicable template still uses the older classic design, an authorised
+admin must deliberately select Purple — supplied reference design, Save, Preview
+and Publish the approved template. Wording/programme variant selection still
+comes from the published resolver. Unpublished drafts are never used for Issue.
+Built-in first-Issue defaults require no automatic publication.
+
+New Create/Edit drafts receive the new presentation metadata without replacing
+their body, source answers or selected historical template relationship. Draft
+preview and explicit finalisation store the generated revision PDF. Sign Again
+and Keep Existing Signatures continue through the established source models.
+Historical appearances retain their existing provenance and are not new approvals.
+
+STORAGE / EXACT PREVIEW AND DOWNLOAD
+Existing models used: IssuedTemplate, RenderHistory, LearnerDocumentRevision,
+and the existing four Compliance source models / EnrolmentReview.
+No migration, new table, schema alteration or historical data rewrite was needed.
+
+Immutable PDF bytes, SHA256 and the exact serialized render snapshot are appended
+to existing Document_Template_Render_History. Source signatures/Review saves
+append the newly rendered state; they never replace the original PDF. Unchanged
+retries reuse the existing fingerprint. Failure to generate a new PDF rolls back
+the associated issue/sign transaction rather than reporting false success.
+The old original-PDF endpoint remains compatible. Client replacement uploads are
+rejected for server-owned originals; browser Issue no longer generates/uploads
+their bytes.
+
+New authenticated GETs:
+  /enrolment_api/document-templates/learners/<pk>/issued/<issue-id>/pdf/
+  /enrolment_api/document-templates/learners/<pk>/revisions/<revision-id>/pdf/
+GET only reads stored bytes. A render fingerprint in Preview URLs pins the exact
+immutable artifact even if another signature/save occurs between URL creation
+and opening it. Scope checks include learner, issue/revision and existing access
+permissions. ILR remains unavailable to employers. Draft/discarded revision access
+continues through the existing revision gate. No private PDF URL is made public.
+
+Admin Preview/sign identity checking is preserved. Learner and employer views and
+downloads prefer their new server-provided stored-PDF URLs. Review downloads use
+those URLs too. Version History View/Download use the selected stored revision.
+
+Historical cached R1 PDFs remain accessible through their original endpoint when
+their content/signature snapshot matches. Their bytes/checksums are not rewritten.
+Where an exact historical binary was never stored, the new admin/history preview
+fails clearly rather than backfilling or applying the new design on GET. Existing
+legacy portal download fallbacks retain their old rendering behaviour/layout;
+they are not automatically converted to v3. Recovering absent legacy originals
+requires the actual file or a deliberately created new revision. No silent
+historical migration or pixel-identical reconstruction is claimed.
+
+TESTS ACTUALLY EXECUTED
+Full Django document suite: PASS — 167 tests.
+Final real branded-runtime suite: PASS — 23 tests, including:
+  eight real initial issuers, read-only pre-issue previews, stored-byte GETs,
+  retry/idempotency, unchanged R1/version numbering, actual signature cache updates,
+  failed-sign rollback/retry, exact old fingerprint access after signing,
+  cross-learner refusal, real legacy PDF SHA256 preservation, Create/finalise,
+  finalised-history GET without rendering, legacy R1 file access and rollout flag
+  independence for already-branded stored revisions.
+These tests use explicit isolated SQLite settings; legacy regressions keep their
+v1/v2 fixture defaults and branded integration methods enable the real Node path.
+
+Frontend document/signature regression: PASS — 237 tests across 22 files.
+Includes exact PNG identity, all eight PDF renderers, long tables, header/footer
+text, unchanged old themes, duplicate wording/stable answers, server-owned stored
+downloads, Create/Edit/History/Compare and signature notification regressions.
+TypeScript type-check: PASS. Scoped production ESLint: PASS, no warnings/errors.
+Production build including backend PDF runtime: PASS. git diff --check: PASS.
+
+REAL BROWSER VERIFICATION
+Chrome ran the actual BoardPage and Issue/Preview/Download/sign controls. API calls
+were routed to real Django handlers using isolated RequestFactory learner fixtures
+over a local process pipe; no production learner, contracts or notifications were
+used. This avoided unreliable loopback access during the test.
+  - Eight actual pre-issue previews: no issue/revision/status writes.
+  - Eight actual first-time Issue actions: server generated/stored all originals.
+  - Eight issued previews: every displayed PDF matched stored bytes exactly.
+  - Eight actual Preview Download actions: bytes matched the displayed PDF.
+  - Four actual Compliance row Download buttons: matched the stored originals.
+  - No browser upload POST to original-pdf for server-owned documents.
+  - A five-page ILR awaiting provider signature was previewed and signed using
+    the real signature pad; the signed PDF opened with both recorded signatures.
+  - Mobile 390px viewer worked without horizontal modal overflow.
+  - Zero browser page errors; zero Reviews were marked started by Preview.
+
+SAMPLES / VISUAL CHECKS
+Real original PDFs generated through the Django Issue pipeline are in
+.cache/branded-pdfs/ (synthetic learner A only, never real learner data):
+  apprenticeship-agreement.pdf — 3 pages
+  ilr.pdf — 5 pages
+  training-plan.pdf — 6 pages
+  written-agreement.pdf — 5 pages
+  review-eligibility.pdf — 3 pages
+  review-rpl.pdf — 3 pages
+  review-health-safety.pdf — 2 pages
+  review-uln.pdf — 3 pages
+PyMuPDF checks confirm readable native text, learner A/no learner B, both logos
+on every page, intact date/hour strings and correct N/TOTAL footers. First,
+middle and last pages and signature areas were rasterised and visually checked.
+Evidence: .cache/branded-pdfs/verification.json, .cache/branded-browser-results.json,
+the sample PDFs/download copies and generated page/viewer PNGs.
+
+Remaining visual differences from the supplied image are explicit: the existing
+native Helvetica bold/body faces approximate the unidentified reference font;
+section gradients are layered vector colour bands, and wave geometry is estimated
+from the reference proportions. Original logo artwork is exact. Actual content and
+explicit page breaks determine pagination; the reference's three pages are not
+forced onto different/longer contracts. Text was not shrunk to obtain a page count.
+
+FILES CHANGED FOR THIS TASK
+Backend document_templates/:
+  pdf_artifacts.py (new), pdf_views.py (new), pdf_runtime/.gitignore (new)
+  service.py, views.py, admin_preview.py, initial_issue.py, original_pdf.py
+  learner_documents.py, revisions.py, revision_views.py, urls.py, test_settings.py
+  test_z_branded_pdf.py (new), BRANDED_PDF_REPORT.txt (new)
+Frontend:
+  package.json
+  src/features/compliance-documents/brandingAssets.json (generated source)
+  src/features/compliance-documents/brandedPurpleTheme.ts (new)
+  src/features/compliance-documents/brandedPurplePdf.ts (new)
+  src/features/compliance-documents/purpleReferencePdf.ts, learningPlanLayout.ts
+  src/features/compliance-documents/render.ts, types.ts, previewPdf.ts, persistOriginalPdf.ts
+  src/features/compliance-documents/__tests__/brandedPurple.test.ts (new)
+  src/features/compliance-documents/__tests__/persistOriginalPdf.test.ts
+  src/pages/learner/onboarding/reviews/reviewDocument.ts
+  src/pages/learner/compliance/page.tsx
+  src/pages/employer/employerDocumentPreviewData.ts
+Tools: build_document_pdf.mjs (new), document_pdf_entry.ts (new).
+User-supplied logo PNGs remain byte-for-byte unchanged.
+
+DEPLOYMENT / COLLABORATION
+Run npm run build in frontend, or npm run build:document-pdf there for a backend-only
+artifact build. Both produce backend/enrolment_api/document_templates/pdf_runtime/
+renderer.cjs. Ship that generated file with the backend; it is intentionally ignored
+by Git. The runtime embeds all logo bytes and the renderer dependencies; backend
+requests do not need frontend/node_modules or a browser. Node must be installed
+on the Django worker host/container and on PATH, or configured through Django's
+DOCUMENT_PDF_NODE setting. Missing runtime returns a clear error instead of issuing
+an incomplete document. The ordinary frontend build now performs this build step.
+Deploy frontend/backend changes together and reload existing browser clients.
+No real publication, live DB migration or production document operation was run.
+
+Existing historical rows, blob paths, signatures and previously saved PDF bytes
+were not changed. Shared renderer/service/API/build/download files are integration
+points to coordinate with teammates. Unrelated wizard, Programme Suitability,
+cohort/module/PCP, Skills Radar and Training Plan business logic were not changed.
+All previous uncommitted work remains. No commit, push, merge, rebase, reset,
+branch creation or branch switch was performed.

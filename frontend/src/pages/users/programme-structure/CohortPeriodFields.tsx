@@ -1,0 +1,7 @@
+import type { AssignmentPeriod } from './cohortConfiguration';
+import { inputClass } from '@/pages/users/components/ui';
+const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+export default function CohortPeriodFields({value,onChange}:{value?:AssignmentPeriod;onChange:(period:AssignmentPeriod)=>void}) {
+  const update=(key:keyof AssignmentPeriod,number:number)=>onChange({...value,[key]:number} as AssignmentPeriod);
+  return <div className="mt-3 grid gap-3 sm:grid-cols-2">{(['start','end'] as const).map(side=><fieldset key={side} className="rounded-lg border border-primary-100 p-3"><legend className="px-1 text-xs font-semibold">Assignment Period {side==='start'?'Starts':'Ends'}</legend><div className="grid grid-cols-2 gap-2"><label className="text-xs">Month<select aria-label={`${side==='start'?'Start':'End'} Month`} className={`${inputClass} mt-1`} value={value?.[`${side}Month`] ?? ''} onChange={e=>update(`${side}Month`,Number(e.target.value))}><option value="">Select month</option>{months.map((name,i)=><option key={name} value={i+1}>{name}</option>)}</select></label><label className="text-xs">Day<input aria-label={`${side==='start'?'Start':'End'} Day`} type="number" min={1} max={31} required className={`${inputClass} mt-1`} value={value?.[`${side}Day`] ?? ''} onChange={e=>update(`${side}Day`,Number(e.target.value))}/></label></div></fieldset>)}</div>;
+}

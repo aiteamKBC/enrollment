@@ -5,7 +5,7 @@ import type { PcpRadar } from '../allocation';
 export type RadarPathway = 'operational' | 'strategic' | 'chartered';
 export interface CatalogueRecord {
   id: string; code: string; kind: 'Knowledge' | 'Skill' | 'Behaviour'; description: string;
-  moduleKey?: string; owners?: Record<RadarPathway, string>;
+  moduleKey?: string; moduleKeys?: string[]; owners?: Record<RadarPathway, string>;
 }
 export interface RadarCatalogue { programmeId: ProgrammeId; version: string; publishedAt: string | null; records: CatalogueRecord[] }
 export type RadarCatalogues = Record<ProgrammeId, RadarCatalogue>;

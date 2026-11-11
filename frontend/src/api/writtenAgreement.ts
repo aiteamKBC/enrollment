@@ -1,3 +1,5 @@
+import { persistOriginalPdf } from '@/features/compliance-documents/persistOriginalPdf';
+import { pendingSignaturesChanged } from '@/features/pending-signatures/events';
 import { readLearnerJson } from './learnerRead';
 // ============================================================================
 // Written Agreement API client
@@ -26,6 +28,7 @@ export interface WrittenAgreementPartyState {
 }
 
 export interface WrittenAgreementDocument {
+  template?: import('@/features/compliance-documents/types').IssuedTemplate;
   id: string;
   status: 'active' | 'superseded' | string;
   fullySigned: boolean;
@@ -73,9 +76,11 @@ export async function fetchWrittenAgreement(
 export async function issueWrittenAgreement(
   learnerId: string | number,
 ): Promise<WrittenAgreementDocument> {
-  const data = await readJson<{ document: WrittenAgreementDocument }>(
-    await fetch(`${BASE}/${learnerId}/issue/`, { method: 'POST', credentials: 'include' }),
+  const data = await readJson<{ document: WrittenAgreementDocument; issuedDocumentSnapshot?: WrittenAgreementDocument }>(
+    await fetch(`${BASE}/${learnerId}/issue/`, { method: 'POST', credentials: 'include', headers: { 'X-Document-Issue-Mode': 'initial' } }),
   );
+  await persistOriginalPdf(learnerId, data.issuedDocumentSnapshot || data.document);
+  pendingSignaturesChanged();
   return data.document;
 }
 
@@ -95,5 +100,6 @@ export async function signWrittenAgreement(
       body: JSON.stringify({ party, name, signature, position }),
     }),
   );
+  pendingSignaturesChanged();
   return data.document;
 }
