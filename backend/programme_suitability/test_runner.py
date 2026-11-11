@@ -64,6 +64,7 @@ class SuitabilityRunner(DiscoverRunner):
             )
             for schema in ('enrolment', 'login', 'curriculum'):
                 cursor.execute(f"ATTACH DATABASE ':memory:' AS {schema}")
+            cursor.execute('CREATE TABLE IF NOT EXISTS curriculum.programmes (programme_id TEXT PRIMARY KEY, name TEXT, level TEXT, is_archived BOOLEAN DEFAULT false, is_active BOOLEAN DEFAULT true, deleted_at TEXT, status TEXT DEFAULT \'active\')')
             cursor.execute('CREATE TABLE IF NOT EXISTS "Login_accounts" (id INTEGER PRIMARY KEY AUTOINCREMENT, "Subject_type" TEXT, "Subject_id" INTEGER, "Email" TEXT, "Display_name" TEXT, "Role" TEXT, "Password_hash" TEXT DEFAULT \'\', "Password_set_at" TEXT, "Is_active" BOOLEAN DEFAULT true, "Failed_attempts" INTEGER DEFAULT 0, "Locked_until" TEXT, "Last_login_at" TEXT, "Last_login_ip" TEXT, "Created_at" TEXT, "Updated_at" TEXT)')
             cursor.execute('CREATE TABLE IF NOT EXISTS "Login_sessions" (id INTEGER PRIMARY KEY AUTOINCREMENT, "Account_id" INTEGER, "Token_hash" TEXT UNIQUE, "Expires_at" TEXT, "Revoked_at" TEXT, "Ip_address" TEXT, "User_agent" TEXT, "Created_at" TEXT, "Last_seen_at" TEXT, "Remember" BOOLEAN DEFAULT false)')
             cursor.execute("CREATE TABLE curriculum.cohorts (cohort_id TEXT PRIMARY KEY, cohort_name TEXT, programme_id TEXT, programme_name TEXT, status TEXT DEFAULT 'active')")

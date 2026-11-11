@@ -3,6 +3,7 @@ import json
 import os
 from unittest.mock import patch
 from django.test import Client, TestCase
+from django.db import connections
 from learner_api.models import StaffUser
 from login.models import LoginAccount
 from login.sessions import issue_session, COOKIE_NAME
@@ -11,6 +12,69 @@ from enrolment_api.programme_structure_views import SHARED_DRAFT_KEY
 
 
 class SharedDraftAuthenticationTests(TestCase):
+    databases = {'default', 'enrolment'}
+
+    def _seed_verified_curriculum_rows(self):
+        programmes = (
+            ('PROG-ME-L4', 'Marketing Executive Level 4'),
+            ('PROG-MM-L6', 'Marketing Manager Level 6'),
+            ('PROG-20260907141619067932', 'Associate Project Manager Level 4'),
+            ('PROG-PCP-L6', 'Project Controls Professional Level 6'),
+        )
+        cohorts = (
+            ('COHORT-TEST-ME-FEB', 'Feb 2027', 'PROG-ME-L4'),
+            ('COHORT-TEST-ME-JUN', 'June 2027', 'PROG-ME-L4'),
+            ('COHORT-TEST-MM-FEB', 'Feb 2027', 'PROG-MM-L6'),
+            ('COHORT-TEST-APM-FEB', 'Feb 2027', 'PROG-20260907141619067932'),
+            ('COHORT-TEST-PCP-FEB', 'Feb 2027', 'PROG-PCP-L6'),
+            ('COHORT-20261111015402258877CC69FD92DAF3', 'hisham of aa7', 'PROG-ME-L4'),
+        )
+        with connections['enrolment'].cursor() as cursor:
+            for programme_id, name in programmes:
+                cursor.execute('INSERT INTO curriculum.programmes (programme_id, name) VALUES (%s, %s)', [programme_id, name])
+            for cohort_id, name, programme_id in cohorts:
+                cursor.execute('INSERT INTO curriculum.cohorts (cohort_id, cohort_name, programme_id, status) VALUES (%s, %s, %s, %s)', [cohort_id, name, programme_id, 'planned'])
+
+    @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
+    def test_reconcile_prepares_verified_curriculum_correction_without_persisting(self):
+        from copy import deepcopy
+        self._seed_verified_curriculum_rows()
+        programmes = []
+        for programme_id, curriculum_id in (
+            ('ME_L4', 'PROG-ME-L4'), ('MM_L6', 'PROG-MM-L6'),
+            ('APM_L4', 'PROG-20260907141619067932'), ('PCP_L6', 'PROG-PCP-L6'),
+        ):
+            cohort_id = {
+                'ME_L4': 'COHORT-TEST-ME-FEB', 'MM_L6': 'COHORT-TEST-MM-FEB',
+                'APM_L4': 'COHORT-TEST-APM-FEB', 'PCP_L6': 'COHORT-TEST-PCP-FEB',
+            }[programme_id]
+            programme = {'id': programme_id, 'title': programme_id, 'modules': [], 'ksbs': [], 'mappings': [], 'curriculumProgrammeId': None,
+                         'cohorts': [{'id': cohort_id, 'programmeId': programme_id, 'name': 'Feb 2027', 'modules': [], 'mappings': []}]}
+            if programme_id == 'ME_L4':
+                programme['cohorts'].extend([
+                    {'id': 'COHORT-TEST-ME-JUN', 'programmeId': programme_id, 'name': 'June 2027', 'modules': [], 'mappings': []},
+                    {'id': 'COHORT-20261111015402258877CC69FD92DAF3', 'programmeId': programme_id, 'name': 'hisham of aa7', 'modules': [], 'mappings': []},
+                ])
+            programmes.append(programme)
+        original = {'schemaVersion': 2, '_draftRevision': 1, 'programmes': programmes}
+        row = ModuleConfigurationDraft.objects.get(pk=SHARED_DRAFT_KEY)
+        row.configuration = deepcopy(original)
+        row.save(update_fields=['configuration'])
+        client = self.clients[114]
+        csrf = client.get('/learner_api/enrollment-csrf/').json()['csrfToken']
+        response = client.post('/enrolment_api/programme-structure/draft/reconcile/', data=json.dumps({'baseVersion': 16, 'revision': 1}), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertFalse(payload['persisted'])
+        self.assertEqual(payload['removedCohorts'], ['COHORT-20261111015402258877CC69FD92DAF3'])
+        self.assertEqual({p['id']: p['curriculumProgrammeId'] for p in payload['structure']['programmes']}, {
+            'ME_L4': 'PROG-ME-L4', 'MM_L6': 'PROG-MM-L6',
+            'APM_L4': 'PROG-20260907141619067932', 'PCP_L6': 'PROG-PCP-L6',
+        })
+        self.assertEqual(len(payload['structure']['programmes'][0]['cohorts']), 2)
+        persisted = ModuleConfigurationDraft.objects.get(pk=SHARED_DRAFT_KEY)
+        self.assertEqual(persisted.configuration, original)
+
     @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
     def test_generated_module_identity_and_mapping_survive_real_shared_save_and_edit(self):
         from uuid import uuid4

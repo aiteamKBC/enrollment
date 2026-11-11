@@ -12,10 +12,120 @@ from django.conf import settings
 # Programme Structure is shared system configuration, not a personal builder draft.
 SHARED_DRAFT_KEY = 'programme-structure:shared'
 
+VERIFIED_CURRICULUM_PROGRAMMES = {
+    'ME_L4': ('PROG-ME-L4', 'Marketing Executive Level 4'),
+    'MM_L6': ('PROG-MM-L6', 'Marketing Manager Level 6'),
+    'APM_L4': ('PROG-20260907141619067932', 'Associate Project Manager Level 4'),
+    'PCP_L6': ('PROG-PCP-L6', 'Project Controls Professional Level 6'),
+}
+TEST_COHORT_ID = 'COHORT-20261111015402258877CC69FD92DAF3'
+TEST_COHORT_NAME = 'hisham of aa7'
+
 def _actor(request):
     return SHARED_DRAFT_KEY
 
 def _error(message, status=400): return JsonResponse({'error': message}, status=status)
+
+
+def _normalise_identity(value):
+    return ' '.join(str(value or '').split()).casefold()
+
+
+def _curriculum_columns(cursor, schema, table):
+    # Isolated tests attach the Curriculum schema to SQLite; PostgreSQL has
+    # information_schema. Keep the same identity/reference checks on either.
+    if getattr(cursor.db, 'vendor', None) == 'sqlite':
+        try:
+            cursor.execute(f'PRAGMA "{schema}".table_info("{table}")')
+            return {row[1] for row in cursor.fetchall()}
+        except Exception:
+            return set()
+    cursor.execute(
+        'SELECT column_name FROM information_schema.columns '
+        'WHERE table_schema = %s AND table_name = %s', [schema, table]
+    )
+    return {row[0] for row in cursor.fetchall()}
+
+
+def _cohort_has_learner_reference(cursor, cohort_id, cohort_name):
+    """Fail closed when a real learner placement references the test Cohort."""
+    checks = (
+        ('Learner', 'learners', ('cohort_id', 'cohort')),
+        ('enrolment', 'Created_users', ('Cohort',)),
+        ('enrolment', 'applications', ('cohort_id',)),
+    )
+    for schema, table, candidates in checks:
+        columns = _curriculum_columns(cursor, schema, table)
+        usable = [column for column in candidates if column in columns]
+        if not usable:
+            continue
+        quoted = f'"{schema}"."{table}"'
+        clauses = []
+        params = []
+        for column in usable:
+            clauses.append(f'"{column}" IN (%s, %s)')
+            params.extend([cohort_id, cohort_name])
+        cursor.execute(f'SELECT 1 FROM {quoted} WHERE ' + ' OR '.join(clauses) + ' LIMIT 1', params)
+        if cursor.fetchone():
+            return True
+    return False
+
+
+def _verified_correction(structure, cursor):
+    """Prepare the one-time correction without persisting it."""
+    from copy import deepcopy
+
+    if not isinstance(structure, dict) or not isinstance(structure.get('programmes'), list):
+        raise ValueError('A complete shared Programme Structure is required.')
+    programmes = {item.get('id'): item for item in structure['programmes'] if isinstance(item, dict)}
+    missing = sorted(set(VERIFIED_CURRICULUM_PROGRAMMES) - set(programmes))
+    if missing:
+        raise ValueError('The shared draft is missing programmes: ' + ', '.join(missing))
+
+    expected_rows = []
+    for canonical_id, (curriculum_id, expected_name) in VERIFIED_CURRICULUM_PROGRAMMES.items():
+        cursor.execute(
+            'SELECT programme_id, name FROM curriculum.programmes WHERE programme_id = %s',
+            [curriculum_id],
+        )
+        row = cursor.fetchone()
+        if not row or row[0] != curriculum_id or _normalise_identity(row[1]) != _normalise_identity(expected_name):
+            raise ValueError(f'Curriculum identity verification failed for {canonical_id}.')
+        expected_rows.append((canonical_id, curriculum_id))
+
+    corrected = deepcopy(structure)
+    removed = []
+    for programme in corrected['programmes']:
+        canonical_id = programme.get('id')
+        curriculum_id = dict(expected_rows)[canonical_id]
+        programme['curriculumProgrammeId'] = curriculum_id
+        retained = []
+        for cohort in programme.get('cohorts', []) or []:
+            cohort_id = cohort.get('id')
+            if cohort_id == TEST_COHORT_ID and programme.get('id') == 'ME_L4':
+                cursor.execute(
+                    'SELECT cohort_id, cohort_name, programme_id FROM curriculum.cohorts WHERE cohort_id = %s',
+                    [TEST_COHORT_ID],
+                )
+                test_row = cursor.fetchone()
+                if not test_row:
+                    raise ValueError('The test Cohort could not be verified in Curriculum.')
+                if test_row[2] != curriculum_id or _normalise_identity(test_row[1]) != _normalise_identity(TEST_COHORT_NAME):
+                    raise ValueError('The test Cohort identity does not match the expected ME_L4 record.')
+                if _cohort_has_learner_reference(cursor, TEST_COHORT_ID, TEST_COHORT_NAME):
+                    raise ValueError('The test Cohort has learner references and cannot be removed from the managed draft.')
+                removed.append(TEST_COHORT_ID)
+                continue
+            if str(cohort_id or '').startswith('COHORT-'):
+                cursor.execute(
+                    'SELECT programme_id FROM curriculum.cohorts WHERE cohort_id = %s', [cohort_id]
+                )
+                row = cursor.fetchone()
+                if not row or row[0] != curriculum_id:
+                    raise ValueError(f'Cohort {cohort_id} does not belong to {canonical_id}.')
+            retained.append(cohort)
+        programme['cohorts'] = retained
+    return corrected, removed
 
 @enrolment_login_required
 @csrf_protect
@@ -121,6 +231,58 @@ def programme_structure_draft(request):
         return _error('The shared draft was created concurrently. Reload before saving.', 409)
     return JsonResponse({'structure': updated, 'baseVersion': base,
                          'revision': updated['_draftRevision'], 'scope': 'shared'})
+
+
+@enrolment_login_required
+@csrf_protect
+def programme_structure_reconcile(request):
+    """Prepare the verified Curriculum identity correction for the shared draft.
+
+    This endpoint deliberately does not save.  It returns a corrected local
+    structure; the normal Save Changes request performs the revision-checked
+    persistence.  Curriculum rows are read only and the test Cohort is never
+    deleted.
+    """
+    if not is_staff(request):
+        return _error('Admissions staff required.', 403)
+    if request.method != 'POST':
+        return _error('Method not allowed.', 405)
+    try:
+        data = json.loads(request.body or '{}')
+    except ValueError:
+        return _error('Request body must be valid JSON.')
+    if not isinstance(data, dict) or type(data.get('revision')) is not int:
+        return _error('The current shared draft revision is required.', 400)
+    database = router.db_for_write(ModuleConfigurationDraft) or 'default'
+    try:
+        with transaction.atomic(using=database):
+            row = ModuleConfigurationDraft.objects.using(database).select_for_update().filter(pk=SHARED_DRAFT_KEY).first()
+            if not row:
+                return _error('The shared draft does not exist. Reload before correcting it.', 409)
+            revision = (row.configuration or {}).get('_draftRevision', 0)
+            if data['revision'] != revision:
+                return _error('This shared draft changed since you loaded it. Reload before correcting it.', 409)
+            if data.get('baseVersion') is not None and data.get('baseVersion') != row.base_version:
+                return _error('The shared settings changed. Reload before correcting it.', 409)
+            from enrolment_api.wizard_layout import CONN, read_current
+            with connections[CONN].cursor() as curriculum_cursor:
+                current = read_current(curriculum_cursor)
+                if current and row.base_version != current[0]:
+                    return _error('Published settings changed. Reconcile the shared draft before correcting it.', 409)
+                corrected, removed = _verified_correction(row.configuration, curriculum_cursor)
+            return JsonResponse({
+                'structure': corrected,
+                'baseVersion': row.base_version,
+                'revision': revision,
+                'scope': 'shared',
+                'persisted': False,
+                'removedCohorts': removed,
+                'verifiedCurriculumProgrammeIds': {k: v[0] for k, v in VERIFIED_CURRICULUM_PROGRAMMES.items()},
+            })
+    except ValueError as exc:
+        return _error(str(exc), 409)
+    except Exception:
+        return _error('Curriculum identity verification failed. Reload and try again.', 503)
 
 
 @enrolment_login_required
