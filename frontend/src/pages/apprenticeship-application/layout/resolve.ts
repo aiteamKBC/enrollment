@@ -233,7 +233,12 @@ export function resolveLayout(raw: EligibilityLayout | null | undefined, workpla
   const birthSection = sections.find(section => section.items.some(item => item.builtin && item.key === 'dateOfBirth'))!;
   birthSection.hidden = false;
   for (const item of birthSection.items) if (item.builtin && item.key === 'dateOfBirth') Object.assign(item, { hidden: false, required: true });
-  return texts ? { sections, texts, workplaceEnabled } : { sections, workplaceEnabled };
+  return {
+    sections,
+    workplaceEnabled,
+    ...(texts ? { texts } : {}),
+    ...(typeof raw.activationEmailHtml === 'string' ? { activationEmailHtml: raw.activationEmailHtml } : {}),
+  };
 }
 
 /** Whether the item is a built-in question that must always be asked. */
@@ -244,7 +249,7 @@ export function isLocked(item: EligibilityItem): boolean {
 
 /** Whether a built-in question must stay on the form. */
 export function isRemovalProtected(item: EligibilityItem): boolean {
-  return isLocked(item) || (item.builtin && (SCREENING_PROTECTED_FIELDS.has(item.key) || FORM_PROTECTED_FIELDS.has(item.key)));
+  return isLocked(item) || Boolean(item.screeningRule) || (item.builtin && (SCREENING_PROTECTED_FIELDS.has(item.key) || FORM_PROTECTED_FIELDS.has(item.key)));
 }
 
 /** What the builder calls an item. */

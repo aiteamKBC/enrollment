@@ -209,8 +209,17 @@ def invite_eligible_applicant(learner, *, ip=None, user_agent=None, linked_appli
         linked_delivery = account.subject_type == SUBJECT_LEARNER and account.subject_id == learner.pk and delivery_authorized(linked_application_id, learner.pk)
     if (not created and not linked_delivery) or account.has_password or account.subject_type != SUBJECT_LEARNER:
         return False, "existing-account"
+    invitation_options = {}
+    if linked_delivery:
+        from enrolment_api.eligibility_layout import activation_email_for_application
+
+        try:
+            invitation_options["intro_html"] = activation_email_for_application(linked_application_id)
+        except DatabaseError as exc:
+            logger.warning("Could not read the eligibility invitation template: %s", exc)
     _invitation, sent, detail = send_invitation(
-        account, invited_by=f"eligibility application {linked_application_id}" if linked_delivery else "eligibility form", ip=ip, user_agent=user_agent
+        account, invited_by=f"eligibility application {linked_application_id}" if linked_delivery else "eligibility form", ip=ip, user_agent=user_agent,
+        **invitation_options,
     )
     return sent, detail
 

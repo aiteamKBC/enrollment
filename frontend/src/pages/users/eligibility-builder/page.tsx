@@ -45,6 +45,7 @@ const enrolmentNav = roleNavMap.apprentice;
 
 /** The left-hand entry for the page heading, ahead of the sections. */
 const PAGE = '__page';
+const EMAIL = '__activation_email';
 
 const TYPE_LABEL: Record<string, string> = Object.fromEntries(QUESTION_TYPES.map((t) => [t.value, t.label]));
 
@@ -68,6 +69,7 @@ export default function EligibilityBuilderPage() {
   const [updatedBy, setUpdatedBy] = useState('');
   const [published, setPublished] = useState<EligibilityLayout | null>(null);
   const [layout, setLayout] = useState<EligibilityLayout | null>(null);
+  const [defaultEmailHtml, setDefaultEmailHtml] = useState('');
   const [selected, setSelected] = useState<string>('');
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -84,10 +86,11 @@ export default function EligibilityBuilderPage() {
         const resolved = resolveLayout(res.layout, res.workplaceEnabled === true);
         setPublished(resolved);
         setLayout(clone(resolved));
+        setDefaultEmailHtml(res.defaultActivationEmailHtml ?? '');
         setVersion(res.version);
         setUpdatedAt(res.updatedAt ?? '');
         setUpdatedBy(res.updatedBy ?? '');
-        setSelected((cur) => (cur === PAGE || resolved.sections.some((s) => s.slug === cur) ? cur : resolved.sections[0]?.slug ?? PAGE));
+        setSelected((cur) => (cur === PAGE || cur === EMAIL || resolved.sections.some((s) => s.slug === cur) ? cur : resolved.sections[0]?.slug ?? PAGE));
       })
       .catch((e: Error) => { if (!cancelled) setLoadError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -114,13 +117,14 @@ export default function EligibilityBuilderPage() {
       const resolved = resolveLayout(saved.layout, saved.workplaceEnabled === true);
       setPublished(resolved);
       setLayout(clone(resolved));
+      setDefaultEmailHtml(saved.defaultActivationEmailHtml ?? defaultEmailHtml);
       setVersion(saved.version);
       setUpdatedAt(saved.updatedAt ?? '');
       setUpdatedBy(saved.updatedBy ?? '');
       // A new section's temporary slug is replaced by the server's.
-      setSelected((cur) => (cur === PAGE || resolved.sections.some((s) => s.slug === cur) ? cur : resolved.sections[resolved.sections.length - 1]?.slug ?? PAGE));
+      setSelected((cur) => (cur === PAGE || cur === EMAIL || resolved.sections.some((s) => s.slug === cur) ? cur : resolved.sections[resolved.sections.length - 1]?.slug ?? PAGE));
       setConfirming(false);
-      success('Eligibility form published', 'Applicants see the changes the next time they open the form.');
+      success('Eligibility form published', 'Form changes apply to new visitors; email changes apply to eligible applicants who submit this version.');
     } catch (e) {
       error('Could not publish the eligibility form', e instanceof Error ? e.message : 'Unexpected error');
     } finally {
@@ -135,7 +139,7 @@ export default function EligibilityBuilderPage() {
       <div className="admin-console-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6">
         <AdminPageHeader
           title="Apprenticeship eligibility form"
-          description="Add, remove, reorder and require the questions applicants answer on the public eligibility form, and edit their wording and answer lists. Published changes apply to everyone who opens the form afterwards."
+          description="Edit the public eligibility form and its eligible applicant activation email. Published changes apply to new form visitors and applicants who submit the new version."
           icon="ri-task-line"
           eyebrow="Enrolment"
           actions={
@@ -187,6 +191,8 @@ export default function EligibilityBuilderPage() {
               />
               {selected === PAGE ? (
                 <PageEditor layout={layout} edit={edit} />
+              ) : selected === EMAIL ? (
+                <ActivationEmailEditor layout={layout} defaultHtml={defaultEmailHtml} edit={edit} />
               ) : (
                 section && (
                   <SectionEditor
@@ -247,6 +253,22 @@ function SectionList({
           </span>
         </button>
       </div>
+      <div className="border-b border-foreground-100 p-2">
+        <button
+          type="button"
+          onClick={() => onSelect(EMAIL)}
+          aria-current={selected === EMAIL ? 'step' : undefined}
+          className={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${selected === EMAIL ? 'bg-primary-50 text-primary-700' : 'text-foreground-700 hover:bg-background-100'}`}
+        >
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] ${selected === EMAIL ? 'border-primary-300 bg-primary-100' : 'border-foreground-200'}`}>
+            <AppIcon className="ri-mail-line text-[11px]" />
+          </span>
+          <span className="min-w-0">
+            <span className={`block truncate text-[12.5px] ${selected === EMAIL ? 'font-semibold' : 'font-medium'}`}>Activation email</span>
+            <span className="block text-[10.5px] text-foreground-400">Sent to eligible applicants</span>
+          </span>
+        </button>
+      </div>
       <ol className="space-y-0.5 p-2">
         {layout.sections.map((s, i) => {
           if (!s.hidden) number += 1;
@@ -294,6 +316,46 @@ function PageEditor({ layout, edit }: { layout: EligibilityLayout; edit: (fn: (l
       {PAGE_TEXT_SLOTS.map((slot) => (
         <TextEditor key={slot.key} slot={slot} texts={layout.texts} onChange={(v) => edit((l) => setText(l, slot.key, v))} />
       ))}
+    </section>
+  );
+}
+
+function ActivationEmailEditor({ layout, defaultHtml, edit }: {
+  layout: EligibilityLayout;
+  defaultHtml: string;
+  edit: (fn: (l: EligibilityLayout) => EligibilityLayout) => void;
+}) {
+  const value = layout.activationEmailHtml ?? defaultHtml;
+  const preview = value.replaceAll('{{greeting}}', 'Hello Learner,').replaceAll('{{start_text}}', 'Getting started is simple: set your password and log in.');
+  const setEmail = (html: string) => edit((current) => {
+    const next = { ...current };
+    if (html === defaultHtml) delete next.activationEmailHtml;
+    else next.activationEmailHtml = html;
+    return next;
+  });
+  return (
+    <section aria-label="Activation email" className="min-w-0 flex-1 space-y-4 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 p-5 shadow-sm">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground-800">Eligible applicant activation email</h2>
+        <p className="mt-1 text-[12px] text-foreground-500">Edit the HTML content above the set password button. The subject, activation link, expiry information, booking step and footer remain in place.</p>
+      </div>
+      <label htmlFor="activation-email-html" className="block text-[12px] font-medium text-foreground-700">Email content (HTML)</label>
+      <textarea
+        id="activation-email-html"
+        className={`${inputClass} min-h-64 font-mono text-[12px]`}
+        value={value}
+        maxLength={40000}
+        spellCheck={false}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-foreground-500">Use {'{{greeting}}'} and {'{{start_text}}'} for the learner greeting and relevant next step.</p>
+        <button type="button" className={btnSecondary} disabled={layout.activationEmailHtml === undefined} onClick={() => setEmail(defaultHtml)}>Restore current email content</button>
+      </div>
+      <div>
+        <h3 className="mb-2 text-[12px] font-medium text-foreground-700">Preview of editable content</h3>
+        <iframe title="Activation email content preview" sandbox="" srcDoc={`<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;padding:16px;color:#241b35">${preview}</body></html>`} className="h-80 w-full rounded-xl border border-foreground-200 bg-white" />
+      </div>
     </section>
   );
 }
@@ -478,7 +540,8 @@ function ItemRow({
             </span>
             {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
             {locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Identifies the applicant — always asked</span>}
-            {removalProtected && !locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />{item.builtin && SCREENING_PROTECTED_FIELDS.has(item.key) ? 'Used in screening — always asked' : 'Protected — cannot remove'}</span>}
+            {removalProtected && !locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />{item.screeningRule || (item.builtin && SCREENING_PROTECTED_FIELDS.has(item.key)) ? 'Used in screening — always asked' : 'Protected — cannot remove'}</span>}
+            {item.screeningRule && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Eligibility rule — {item.screeningRule.eligibleAnswers.join(' / ')} pass</span>}
             {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
             {trigger && shownFor.length > 0 && (
               <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">
@@ -496,7 +559,7 @@ function ItemRow({
               type="checkbox"
               className="accent-primary-500"
               checked={required}
-              disabled={locked || workplace || addressRequired}
+              disabled={locked || workplace || addressRequired || Boolean(item.screeningRule)}
               onChange={(e) => edit((l) => updateItem(l, item.key, { required: e.target.checked }))}
             />
             Mandatory

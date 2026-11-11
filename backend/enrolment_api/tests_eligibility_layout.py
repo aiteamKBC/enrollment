@@ -54,6 +54,38 @@ def standard_layout():
     }
 
 
+class ActivationEmailLayoutTests(SimpleTestCase):
+    def test_invitation_uses_the_applicants_submitted_version(self):
+        cursor = FakeCursor(results=[("<p>Submitted version</p>",)])
+        with patch.object(el, "connections", FakeConnections(cursor)):
+            self.assertEqual(el.activation_email_for_application(42), "<p>Submitted version</p>")
+        sql, params = cursor.executed[0]
+        self.assertIn('l.id = a.layout_version', sql)
+        self.assertEqual(params, [42])
+
+    def test_html_is_versioned_but_excluded_from_public_layout(self):
+        raw = standard_layout()
+        raw["activationEmailHtml"] = "<p>{{greeting}} Please activate.</p>"
+        saved, _ = el.normalize_layout(raw, None)
+        self.assertEqual(saved["activationEmailHtml"], raw["activationEmailHtml"])
+        self.assertNotIn("activationEmailHtml", el.public_layout(saved))
+
+    def test_existing_email_content_can_be_published_unchanged(self):
+        from login.email_azure import default_invitation_intro_html
+
+        raw = standard_layout()
+        raw["activationEmailHtml"] = default_invitation_intro_html()
+        saved, _ = el.normalize_layout(raw, None)
+        self.assertEqual(saved["activationEmailHtml"], raw["activationEmailHtml"])
+
+    def test_active_html_and_unsafe_links_are_rejected(self):
+        for html in ("<script>alert(1)</script>", '<a href="javascript:alert(1)">click</a>', '<p onclick="alert(1)">Hi</p>'):
+            raw = standard_layout()
+            raw["activationEmailHtml"] = html
+            with self.subTest(html=html), self.assertRaises(LayoutError):
+                el.normalize_layout(raw, None)
+
+
 def custom(label, type_="text", **extra):
     return {"key": extra.pop("key", "new_1"), "builtin": False, "hidden": False, "label": label, "type": type_, **extra}
 
@@ -264,6 +296,38 @@ class NormalizeLayoutTests(SimpleTestCase):
         self.assertTrue(restored["hidden"])
         self.assertEqual(restored["column"], "custom_visa_expiry")
         self.assertEqual(columns, {"custom_visa_expiry": "date"})
+
+    def test_choice_screening_rule_is_saved_and_not_exposed_in_public_layout(self):
+        raw = with_items(standard_layout(), "residency", custom(
+            "Can you meet the attendance requirement?", "yesno", required=True,
+            screeningRule={"eligibleAnswers": ["Yes"]},
+        ))
+        layout, _ = el.normalize_layout(raw, None)
+        saved = item(layout, "cf_can_you_meet_the_attendance_requirement")
+        self.assertEqual(saved["screeningRule"], {"eligibleAnswers": ["Yes"]})
+        self.assertNotIn("screeningRule", item(el.public_layout(layout), saved["key"]))
+        self.assertEqual(item(el.public_layout(layout, include_screening_rules=True), saved["key"])["screeningRule"],
+                         {"eligibleAnswers": ["Yes"]})
+
+    def test_choice_screening_rule_requires_both_outcomes_and_cannot_be_hidden(self):
+        for rule in ({"eligibleAnswers": []}, {"eligibleAnswers": ["Yes", "No"]},
+                     {"eligibleAnswers": ["Maybe"]}):
+            raw = with_items(standard_layout(), "residency", custom(
+                "Can attend?", "yesno", required=True, screeningRule=rule))
+            with self.subTest(rule=rule), self.assertRaisesMessage(LayoutError, "passing answer"):
+                el.normalize_layout(raw, None)
+        for extra in ({"required": False}, {"hidden": True},
+                      {"condition": {"field": "livesInUk", "values": ["Yes"]}}):
+            raw = with_items(standard_layout(), "residency", custom(
+                "Can attend?", "yesno", **{"required": True, "screeningRule": {"eligibleAnswers": ["Yes"]}, **extra}))
+            with self.subTest(extra=extra), self.assertRaisesMessage(LayoutError, "mandatory, shown and unconditional"):
+                el.normalize_layout(raw, None)
+        raw = standard_layout()
+        raw["sections"].append({"slug": "new-screening", "title": "Additional screening", "builtin": False,
+                                "hidden": True, "items": [custom("Can attend?", "yesno", required=True,
+                                                               screeningRule={"eligibleAnswers": ["Yes"]})]})
+        with self.assertRaisesMessage(LayoutError, "affects eligibility"):
+            el.normalize_layout(raw, None)
 
     def test_builtin_questions_left_out_are_restored_with_screening_section_visible(self):
         raw = standard_layout()

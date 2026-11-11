@@ -141,6 +141,17 @@ async function publish() {
 }
 
 describe('builder page', () => {
+  it('publishes edited activation email HTML with the form layout', async () => {
+    fetchEligibilityLayout.mockResolvedValue({ layout: null, version: null, defaultActivationEmailHtml: '<p>{{greeting}} Welcome.</p>' });
+    renderBuilder();
+    fireEvent.click(await screen.findByRole('button', { name: /Activation email/ }));
+    const editor = screen.getByRole('textbox', { name: /Email content \(HTML\)/ });
+    expect(editor).toHaveValue('<p>{{greeting}} Welcome.</p>');
+    fireEvent.change(editor, { target: { value: '<h2>Hello</h2><p>{{greeting}} Please activate your account.</p>' } });
+    await publish();
+    expect(publishedLayout().activationEmailHtml).toBe('<h2>Hello</h2><p>{{greeting}} Please activate your account.</p>');
+  });
+
   it('exposes preview workplace questions with fixed verification choices and conditional requiredness', async () => {
     fetchEligibilityLayout.mockResolvedValue({ layout: null, version: null, workplaceEnabled: true });
     renderBuilder();
@@ -333,6 +344,31 @@ describe('builder page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
     expect(screen.getByRole('button', { name: 'Remove Phone Number' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
+  });
+
+  it('publishes a required choice question with an eligibility rule', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await screen.findByRole('textbox', { name: 'Section name' });
+    await user.click(screen.getByRole('button', { name: 'Residency' }));
+    await user.click(screen.getByRole('button', { name: /Add question/ }));
+    const editor = screen.getByRole('group', { name: 'New question' });
+    await user.type(within(editor).getByRole('textbox', { name: 'Question' }), 'Can you attend?');
+    await user.selectOptions(within(editor).getByRole('combobox', { name: 'Field type' }), 'yesno');
+    await user.click(within(editor).getByRole('checkbox', { name: 'Use this question to determine eligibility' }));
+    expect(within(editor).getByRole('checkbox', { name: /Mandatory/ })).toBeChecked();
+    expect(within(editor).getByRole('checkbox', { name: /Mandatory/ })).toBeDisabled();
+    await user.click(within(editor).getByRole('checkbox', { name: 'Yes passes' }));
+    await user.click(within(editor).getByRole('button', { name: /Add question/ }));
+    expect(screen.getByText('Eligibility rule — Yes pass')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove Can you attend?' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
+    await waitFor(() => expect(success).toHaveBeenCalled());
+    expect(sectionItems(publishedLayout(), 'residency').at(-1)).toMatchObject({
+      label: 'Can you attend?', type: 'yesno', required: true,
+      screeningRule: { eligibleAnswers: ['Yes'] },
+    });
   });
 
   it('warns before removing a question others depend on', async () => {

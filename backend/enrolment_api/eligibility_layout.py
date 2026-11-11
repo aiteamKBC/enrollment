@@ -18,6 +18,7 @@ A layout is a list of sections, each a list of items:
     required, and for the three choice questions their answer list;
   * custom questions added in the builder -- text, number, date, yes/no or
     dropdown -- optionally shown only for certain answers to another question;
+    required yes/no and dropdown questions can carry a versioned screening rule;
   * content-only heading and description blocks, stored in the layout without
     creating answer columns.
 
@@ -42,6 +43,7 @@ import logging
 import re
 import secrets
 from copy import deepcopy
+from html.parser import HTMLParser
 
 from django.db import DatabaseError, connections, transaction
 from django.http import JsonResponse
@@ -52,6 +54,45 @@ from .auth import enrolment_login_required
 from .wizard_layout import LayoutError, _actor, _clean_options, _clean_text, _clean_texts, _slug
 
 logger = logging.getLogger(__name__)
+
+
+class _EmailHtmlValidator(HTMLParser):
+    """Reject active content and unsafe links in an administrator's email fragment."""
+
+    ALLOWED_TAGS = {"p", "div", "span", "h1", "h2", "h3", "h4", "h5", "h6", "table", "tbody", "thead", "tfoot", "tr", "td", "th", "a", "strong", "b", "em", "i", "u", "ul", "ol", "li", "br", "blockquote", "hr"}
+    ALLOWED_ATTRS = {"style", "href", "title", "role", "cellpadding", "cellspacing", "width", "height", "bgcolor", "align", "valign", "colspan", "rowspan"}
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in self.ALLOWED_TAGS:
+            raise LayoutError(f"The activation email cannot contain <{tag}>.")
+        for name, value in attrs:
+            if name not in self.ALLOWED_ATTRS:
+                raise LayoutError("The activation email contains an unsafe HTML attribute.")
+            if name == "href" and value:
+                lowered = "".join(value.split()).lower()
+                if not lowered.startswith(("https://", "http://", "mailto:")):
+                    raise LayoutError("The activation email contains an unsafe link.")
+            if name == "style" and value and any(word in value.lower() for word in ("url(", "expression(", "@import")):
+                raise LayoutError("The activation email contains unsafe CSS.")
+
+    handle_startendtag = handle_starttag
+
+    def handle_endtag(self, tag):
+        if tag not in self.ALLOWED_TAGS:
+            raise LayoutError(f"The activation email cannot contain </{tag}>.")
+
+
+def _clean_activation_email_html(value):
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value) > 40000 or not value.strip():
+        raise LayoutError("The activation email HTML must be 1–40,000 characters.")
+    if "{{" in value.replace("{{greeting}}", "").replace("{{start_text}}", ""):
+        raise LayoutError("Only {{greeting}} and {{start_text}} are supported placeholders.")
+    validator = _EmailHtmlValidator()
+    validator.feed(value)
+    validator.close()
+    return value
 
 CONN = form.CONN
 LAYOUT_TABLE = "Eligibility_Form_Layouts"
@@ -129,9 +170,26 @@ def read_current(cursor):
     return row[0], layout, row[2], row[3]
 
 
+def activation_email_for_application(application_id):
+    """Read the email body from the version this applicant actually submitted."""
+    with connections[CONN].cursor() as cursor:
+        cursor.execute(
+            f'''SELECT l."Layout"->>'activationEmailHtml'
+                FROM enrolment.eligibility_form AS a
+                LEFT JOIN enrolment."{LAYOUT_TABLE}" AS l ON l.id = a.layout_version
+                WHERE a.id = %s''',
+            [application_id],
+        )
+        row = cursor.fetchone()
+    return row[0] if row else None
+
+
 def _payload(current):
+    from login.email_azure import default_invitation_intro_html
+
+    default_email = {"defaultActivationEmailHtml": default_invitation_intro_html()}
     if current is None:
-        return {"layout": None, "version": None, "updatedAt": "", "updatedBy": "", **_workplace_feature()}
+        return {"layout": None, "version": None, "updatedAt": "", "updatedBy": "", **_workplace_feature(), **default_email}
     version, layout, created_at, created_by = current
     return {
         "layout": layout,
@@ -139,6 +197,7 @@ def _payload(current):
         "updatedAt": created_at.isoformat() if created_at else "",
         "updatedBy": created_by or "",
         **_workplace_feature(),
+        **default_email,
     }
 
 
@@ -182,11 +241,17 @@ def structured_address_layout(layout):
     return result
 
 
-def public_layout(layout):
-    """Return a public-safe, canonical copy of a stored layout."""
+def public_layout(layout, *, include_screening_rules=False):
+    """Return a canonical copy; only server-side screening receives pass criteria."""
     if not isinstance(layout, dict):
         return layout
     result = structured_address_layout(layout)
+    result.pop("activationEmailHtml", None)
+    if not include_screening_rules:
+        for section in result.get("sections") or []:
+            for item in section.get("items") or []:
+                if isinstance(item, dict):
+                    item.pop("screeningRule", None)
     sections = result.get("sections") or []
     _retire_programme_section(sections)
     by_slug = {section.get("slug"): section for section in sections if isinstance(section, dict)}
@@ -416,6 +481,8 @@ def _normalize_custom(raw_item, section_title, prev_custom, used_keys, used_colu
     if not content_only:
         item["column"] = column
     if content_only:
+        if raw_item.get("screeningRule") is not None:
+            raise LayoutError(f"'{label}' cannot affect eligibility because it does not collect an answer.")
         return item
     help_text = _clean_text(raw_item.get("helpText"), "Help text", 500, required=False)
     if help_text:
@@ -425,6 +492,20 @@ def _normalize_custom(raw_item, section_title, prev_custom, used_keys, used_colu
     condition = _clean_condition(raw_item.get("condition"))
     if condition:
         item["condition"] = condition
+    rule = raw_item.get("screeningRule")
+    if rule is not None:
+        if question_type not in {"yesno", "dropdown"}:
+            raise LayoutError(f"'{label}' must be a yes/no or dropdown question to affect eligibility.")
+        if not isinstance(rule, dict) or not isinstance(rule.get("eligibleAnswers"), list):
+            raise LayoutError(f"'{label}' needs a list of passing answers.")
+        answers = ["Yes", "No"] if question_type == "yesno" else item["options"]
+        passing = rule["eligibleAnswers"]
+        if (not passing or len(passing) >= len(answers) or len(set(map(str, passing))) != len(passing)
+                or any(not isinstance(value, str) or value not in answers for value in passing)):
+            raise LayoutError(f"'{label}' needs at least one valid passing answer and one failing answer.")
+        if not item["required"] or item["hidden"] or condition:
+            raise LayoutError(f"'{label}' must be mandatory, shown and unconditional to affect eligibility.")
+        item["screeningRule"] = {"eligibleAnswers": passing}
     return item
 
 
@@ -551,6 +632,8 @@ def _check_locked(sections):
                 raise LayoutError(f"'{item['key']}' is used for automatic screening, so it must stay on the form.")
             elif item["key"] in form.FORM_PROTECTED_FIELDS and (item["hidden"] or section["hidden"]):
                 raise LayoutError(f"'{item['key']}' is protected and cannot be removed from the form.")
+            elif item.get("screeningRule") and (item["hidden"] or section["hidden"]):
+                raise LayoutError(f"'{item['label']}' affects eligibility, so it must stay on the form.")
 
 
 def normalize_layout(raw, previous):
@@ -642,6 +725,9 @@ def normalize_layout(raw, previous):
     texts.pop("title.hint", None)
     if texts:
         layout["texts"] = texts
+    email_html = _clean_activation_email_html(raw.get("activationEmailHtml"))
+    if email_html:
+        layout["activationEmailHtml"] = email_html
     return layout, {
         item["column"]: form.CUSTOM_SQL_TYPES[item["type"]]
         for item in custom if item.get("type") in form.CUSTOM_SQL_TYPES and item.get("column")

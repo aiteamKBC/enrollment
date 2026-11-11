@@ -425,6 +425,32 @@ class SubmitApplicationTests(SimpleTestCase):
         self.assertIsNone(stored["layout_version"])
         self.assertEqual((stored["eligible"], stored["ineligible_reason"]), (True, None))
 
+    def test_custom_choice_rule_changes_screening_outcome_on_the_server(self):
+        from enrolment_api import eligibility_layout as el
+
+        raw = layout_with(extra=[{"key": "new_attendance", "builtin": False, "hidden": False,
+                                  "required": True, "label": "Attendance requirement", "type": "dropdown",
+                                  "options": ["Yes", "No", "Unsure"],
+                                  "screeningRule": {"eligibleAnswers": ["Yes"]}}])
+        normalized, _ = el.normalize_layout(raw, None)
+        item = normalized["sections"][-1]["items"][-1]
+        self.published.return_value = (10, el.public_layout(normalized, include_screening_rules=True))
+        for answer, expected in (("Yes", True), ("No", False), ("Unsure", False)):
+            with self.subTest(answer=answer):
+                response, cursor = self.post({**application(custom={item["key"]: answer}), "layoutVersion": 10})
+                self.assertEqual(response.status_code, 201)
+                body = json.loads(response.content)
+                self.assertIs(body["eligible"], expected)
+                self.assertEqual(len(body["reasons"]), 0 if expected else 1)
+                self.assertEqual(body["outcome"], "invited" if expected else "notEligible")
+                sql, params = cursor.executed[0]
+                self.assertIn(item["column"], sql)
+                self.assertEqual(params[-1], answer)
+        response, cursor = self.post({**application(custom={item["key"]: "Forged"}), "layoutVersion": 10})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content)["fields"], {item["key"]: "Choose one of the listed options."})
+        self.assertEqual(cursor.executed, [])
+
     def submitted(self, body):
         response, cursor = self.post(body)
         self.assertEqual(response.status_code, 201)

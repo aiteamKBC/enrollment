@@ -868,6 +868,21 @@ def _answer_label(value):
     return value if isinstance(value, str) else None
 
 
+def screen_custom_rules(row, layout, reasons):
+    """Apply published choice rules to validated, server-stored answers only."""
+    _builtin, custom = asked_questions(layout)
+    passed = True
+    for item in custom:
+        rule = item.get("screeningRule")
+        if not rule:
+            continue
+        answer = _answer_label(row.get(item["column"]))
+        if answer not in rule["eligibleAnswers"]:
+            passed = False
+            reasons.append(f"Your answer to '{item['label']}' does not meet the additional eligibility requirement.")
+    return passed
+
+
 def _employment_condition_shown(key, row):
     """Whether a paid-employment answer is current for this submission."""
     if key not in EMPLOYMENT_CONDITIONAL_FIELDS:
@@ -1203,7 +1218,7 @@ def _published_layout():
     # Apply the same legacy-layout relocation as the public layout endpoint;
     # this keeps validation aligned with what the applicant actually saw.
     from .eligibility_layout import public_layout
-    return current[0], public_layout(current[1])
+    return current[0], public_layout(current[1], include_screening_rules=True)
 
 
 def _error(message, status, **extra):
@@ -1268,6 +1283,8 @@ def submit_application(request):
     elif row.get("majority_hours_in_england") is False:
         eligible = False
         reasons.append(WORKING_HOURS_SCREENING_REASON)
+    if not screen_custom_rules(row, layout, reasons):
+        eligible = False
     row["layout_version"] = version
     row["eligible"] = eligible
     row["ineligible_reason"] = " ".join(reasons) if eligible is False else None

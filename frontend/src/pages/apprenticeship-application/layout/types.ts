@@ -28,6 +28,11 @@ export interface EligibilityCondition {
   values: string[];
 }
 
+/** For a required choice question, all answers outside this list fail screening. */
+export interface EligibilityScreeningRule {
+  eligibleAnswers: string[];
+}
+
 export interface EligibilityItem {
   key: string;
   builtin: boolean;
@@ -42,6 +47,7 @@ export interface EligibilityItem {
   type?: EligibilityQuestionType;
   helpText?: string;
   condition?: EligibilityCondition | null;
+  screeningRule?: EligibilityScreeningRule | null;
   /** Server-assigned column; read-only on the client. */
   column?: string;
 }
@@ -62,6 +68,8 @@ export interface EligibilityLayout {
   sections: EligibilitySection[];
   /** Edited wording, by text slot (see registry.ts). A slot not listed here shows its standard wording. */
   texts?: Record<string, string>;
+  /** Staff-only HTML for the eligible applicant's activation email introduction. */
+  activationEmailHtml?: string;
 }
 
 /** What the layout endpoints return. `layout` is null until one is published; the public one carries no names. */
@@ -71,4 +79,6 @@ export interface EligibilityLayoutResponse {
   version: number | null;
   updatedAt?: string;
   updatedBy?: string;
+  /** The current email content, shown to staff until they publish a custom one. */
+  defaultActivationEmailHtml?: string;
 }
