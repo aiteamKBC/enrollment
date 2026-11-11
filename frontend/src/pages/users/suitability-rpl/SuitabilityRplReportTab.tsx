@@ -19,7 +19,7 @@ import {
   suitabilityRplPopulatedReportFilename,
 } from '@/lib/suitabilityRplReportPdf';
 
-type Decision = 'undecided' | 'none' | 'relevant-no-reduction' | 'relevant-with-reduction';
+type Decision = 'undecided' | 'none' | 'relevant-with-reduction' | 'legacy-relevant-no-reduction';
 type FormState = Omit<SuitabilityRplSavePayload, 'revision' | 'finalise'>;
 
 const initialForm: FormState = {
@@ -60,7 +60,7 @@ function formFromReport(report: SuitabilityRplReport | null): FormState {
 function decisionOf(form: FormState): Decision {
   if (form.relevantPriorLearning === null) return 'undecided';
   if (form.relevantPriorLearning === false) return 'none';
-  return form.reductionJustified ? 'relevant-with-reduction' : 'relevant-no-reduction';
+  return form.reductionJustified ? 'relevant-with-reduction' : 'legacy-relevant-no-reduction';
 }
 
 function radarSummary(evidence: SuitabilityRplEvidence) {
@@ -140,6 +140,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   const decision = decisionOf(form);
   const cvStatus = evidence?.evidence.cv.status || 'not_provided';
   const cvExtractionStatus = evidence?.evidence.cv.extractionStatus || (cvStatus === 'provided' ? 'pending' : 'not_provided');
+  const cvNeedsAttention = ['failed', 'unsupported', 'stale'].includes(cvExtractionStatus);
   const modules = evidence?.trainingPlan.modules || [];
   const selectedIds = useMemo(() => new Set(form.reductions.map((row) => row.moduleId)), [form.reductions]);
   const totalReduction = form.reductions.reduce((sum, row) => sum + (Number(row.reducedHours) || 0), 0);
@@ -323,26 +324,9 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       </section>
 
       {error && <ErrorMessage>{error}</ErrorMessage>}
-      {cvStatus !== 'not_provided' && <section className={`${panel} p-5`} aria-labelledby="cv-extraction-status"><p className={label}>CV evidence status</p><h3 id="cv-extraction-status" className="mt-1 font-heading text-lg font-semibold">{cvExtractionStatus === 'ready' ? 'CV available and extracted' : `CV extraction: ${cvExtractionStatus}`}</h3><p className="mt-2 text-sm text-foreground-600">Raw CV text is private and never shown here or in the PDF.</p>{cvExtractionStatus !== 'ready' && !locked && <><label className="mt-3 block"><span className={label}>Assessor acknowledgement reason</span><textarea className={`${input} min-h-20`} value={form.cvExtractionAcknowledgementReason || ''} onChange={(event) => setForm((current) => ({ ...current, cvExtractionAcknowledgementReason: event.target.value }))} /></label><label className="mt-3 flex items-start gap-3 text-sm"><input type="checkbox" className="mt-0.5" checked={!!form.cvExtractionAcknowledged} onChange={(event) => setForm((current) => ({ ...current, cvExtractionAcknowledged: event.target.checked }))} /><span>I acknowledge this CV cannot be used and approve proceeding with other evidence.</span></label></>}</section>}
+      {cvNeedsAttention && <section className={`${panel} border-amber-200 bg-amber-50 p-5`} aria-labelledby="cv-extraction-status"><p className={label}>CV evidence requires attention</p><h3 id="cv-extraction-status" className="mt-1 font-heading text-lg font-semibold text-amber-950">CV extraction: {cvExtractionStatus}</h3>{!locked && <><label className="mt-3 block"><span className={label}>Assessor acknowledgement reason</span><textarea className={`${input} min-h-20`} value={form.cvExtractionAcknowledgementReason || ''} onChange={(event) => setForm((current) => ({ ...current, cvExtractionAcknowledgementReason: event.target.value }))} /></label><label className="mt-3 flex items-start gap-3 text-sm text-amber-950"><input type="checkbox" className="mt-0.5" checked={!!form.cvExtractionAcknowledged} onChange={(event) => setForm((current) => ({ ...current, cvExtractionAcknowledged: event.target.checked }))} /><span>I acknowledge this CV cannot be used and approve proceeding with other evidence.</span></label></>}</section>}
       {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}
       {locked && <div className="flex items-start gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900"><LockKeyhole className="mt-0.5 shrink-0" size={17} /><span>This finalised report is read-only. Its evidence snapshot and approved assessment will not change when learner or programme data changes.</span></div>}
-
-      <section className={panel} aria-labelledby="evidence-heading">
-        <div className="border-b border-foreground-100 px-5 py-4">
-          <p className={label}>Frozen source snapshot · read-only learner evidence</p>
-          <h3 id="evidence-heading" className="mt-1 font-heading text-lg font-semibold text-foreground-900">Learner and programme evidence</h3>
-        </div>
-        <div className="grid gap-px bg-foreground-100 md:grid-cols-3">
-          {[
-            ['Job title', evidence.learner.jobTitle || 'Not available'],
-            ['Programme understanding', `${evidence.programmeUnderstanding.filter((item) => item.answer).length} of ${evidence.programmeUnderstanding.length} answered`],
-            ['Skills Radar', evidence.skillsRadar.items.length ? `${evidence.skillsRadar.items.length} saved scores` : 'Not available'],
-            ['CV', evidence.evidence.cv.status === 'provided' ? 'Provided' : 'Not provided'],
-            ['Qualifications', evidence.evidence.qualifications.status === 'provided' ? 'Provided' : 'Not provided'],
-            ['PLR', evidence.evidence.plr.message],
-          ].map(([heading, value]) => <div key={heading} className="bg-background-50 p-4"><p className={label}>{heading}</p><p className="mt-1.5 text-sm leading-5 text-foreground-800">{value}</p></div>)}
-        </div>
-      </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section className={`${panel} p-5`}>
@@ -350,7 +334,6 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
             <div><p className={label}>Programme decision</p><h3 className="mt-1 font-heading text-lg font-semibold">Suitability assessment</h3></div>
             <ShieldCheck className="text-primary-600" size={22} />
           </div>
-          <label className="mt-5 block"><span className={label}>Outcome</span><select className={input} disabled={locked} value={form.suitabilityOutcome} onChange={(event) => setForm((current) => ({ ...current, suitabilityOutcome: event.target.value as FormState['suitabilityOutcome'] }))}><option value="not_assessed">Not assessed</option><option value="suitable">Suitable</option><option value="further_assessment">Further assessment required</option></select></label>
           <div className="mt-4 flex items-center justify-between gap-3"><span className={label}>Editable justification · admin decision required</span><button type="button" className={secondaryButton} disabled={locked || !aiEnabled || !!working} title={aiEnabled ? '' : 'AI drafting is disabled in this environment'} onClick={() => generate('suitability')}><Sparkles size={15} />{working === 'ai-suitability' ? 'Drafting…' : 'Generate AI draft'}</button></div>
           {!aiEnabled && <p className="mt-2 text-xs text-foreground-500"><Bot className="mr-1 inline" size={13} />AI drafting is disabled by default. Manual text remains available.</p>}
           <textarea className={`${input} min-h-36 resize-y`} disabled={locked} value={form.suitabilityJustification} onChange={(event) => setForm((current) => ({ ...current, suitabilityJustification: event.target.value, suitabilityReviewed: false }))} />
@@ -363,12 +346,11 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
             <legend className={label}>Assessment outcome</legend>
             {[
               ['none', 'No relevant prior learning'],
-              ['relevant-no-reduction', 'Relevant prior learning, no reduction justified'],
-              ['relevant-with-reduction', 'Relevant prior learning, training reduction justified'],
+              ['relevant-with-reduction', 'Relevant prior learning — training reduction required'],
             ].map(([id, text]) => <label key={id} className={`flex cursor-pointer gap-3 rounded-xl border p-3 text-sm ${decision === id ? 'border-primary-300 bg-primary-50 text-primary-950' : 'border-foreground-200 text-foreground-700'}`}><input type="radio" name="rpl-decision" className="mt-0.5 accent-primary-700" checked={decision === id} onChange={() => setDecision(id as Decision)} />{text}</label>)}
           </fieldset>
-          <label className="mt-4 block"><span className={label}>Assessor evidence review</span><textarea className={`${input} min-h-24 resize-y`} disabled={locked} value={form.assessorEvidenceReview} onChange={(event) => setForm((current) => ({ ...current, assessorEvidenceReview: event.target.value }))} /></label>
-          {(decision === 'none' || decision === 'relevant-no-reduction') && <label className="mt-4 block"><span className={label}>Required explanation for keeping the full programme</span><textarea className={`${input} min-h-24 resize-y`} disabled={locked} value={form.noReductionReason} onChange={(event) => setForm((current) => ({ ...current, noReductionReason: event.target.value }))} /></label>}
+          {decision === 'legacy-relevant-no-reduction' && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">This historical report used the previous “relevant prior learning, no reduction” outcome. It is preserved unchanged; choose one of the two current outcomes to reassess this draft.</p>}
+          {decision === 'none' && <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-950"><strong>Full standard Training Plan</strong><p className="mt-1 text-xs text-primary-800">All authoritative modules remain included. Planned hours, duration and programme cost are unchanged.</p></div>}
         </section>
       </div>
 
@@ -377,16 +359,16 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
         {!evidence.trainingPlan.available && <ErrorMessage>{evidence.trainingPlan.message}</ErrorMessage>}
         <div className="mt-4 space-y-3">{form.reductions.map((row, index) => {
           const module = modules.find((item) => item.moduleId === row.moduleId);
-          return <article key={row.moduleId} className="rounded-xl border border-foreground-200 bg-background-100 p-4"><div className="flex items-start justify-between gap-3"><div><h4 className="font-semibold text-foreground-900">{module?.title || row.moduleTitle}</h4><p className="mt-1 text-xs text-foreground-500">Planned: {module?.plannedHours ?? row.plannedHours ?? 'Not available'} hours · Module ID: {row.moduleId}</p></div><button type="button" aria-label={`Remove ${module?.title || row.moduleTitle}`} disabled={locked} className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50" onClick={() => setForm((current) => ({ ...current, reductions: current.reductions.filter((_, i) => i !== index) }))}><Trash2 size={16} /></button></div><div className="mt-3 grid gap-3 md:grid-cols-[160px_1fr_1fr]"><label><span className={label}>Hours to reduce</span><input className={input} type="number" min="0.01" step="0.25" max={module?.plannedHours ?? undefined} disabled={locked} value={row.reducedHours} onChange={(event) => updateReduction(index, { reducedHours: event.target.value === '' ? '' : Number(event.target.value) })} /></label><label><span className={label}>Verified evidence</span><textarea className={`${input} min-h-20`} disabled={locked} value={row.evidence} onChange={(event) => updateReduction(index, { evidence: event.target.value })} /></label><label><span className={label}>Assessor comments</span><textarea className={`${input} min-h-20`} disabled={locked} value={row.assessorComments} onChange={(event) => updateReduction(index, { assessorComments: event.target.value })} /></label></div>{module?.ksbCodes.length ? <fieldset className="mt-3"><legend className={label}>Mapped KSBs (optional)</legend><div className="mt-2 flex flex-wrap gap-2">{module.ksbCodes.map((code) => <label key={code} className="rounded-lg border border-foreground-200 bg-white px-2.5 py-1.5 text-xs"><input type="checkbox" disabled={locked} className="mr-1.5 accent-primary-700" checked={row.ksbCodes.includes(code)} onChange={(event) => updateReduction(index, { ksbCodes: event.target.checked ? [...row.ksbCodes, code] : row.ksbCodes.filter((item) => item !== code) })} />{code}</label>)}</div></fieldset> : null}</article>;
+          return <article key={row.moduleId} className="rounded-xl border border-foreground-200 bg-background-100 p-4"><div className="flex items-start justify-between gap-3"><div><h4 className="font-semibold text-foreground-900">{module?.title || row.moduleTitle}</h4><p className="mt-1 text-xs text-foreground-500">Planned: {module?.plannedHours ?? row.plannedHours ?? 'Not available'} hours · Module ID: {row.moduleId}</p></div><button type="button" aria-label={`Remove ${module?.title || row.moduleTitle}`} disabled={locked} className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50" onClick={() => setForm((current) => ({ ...current, reductions: current.reductions.filter((_, i) => i !== index) }))}><Trash2 size={16} /></button></div><div className="mt-3"><label><span className={label}>Hours to reduce</span><input className={input} type="number" min="0.01" step="0.25" max={module?.plannedHours ?? undefined} disabled={locked} value={row.reducedHours} onChange={(event) => updateReduction(index, { reducedHours: event.target.value === '' ? '' : Number(event.target.value) })} /></label></div>{module?.ksbCodes.length ? <fieldset className="mt-3"><legend className={label}>Mapped KSBs (optional)</legend><div className="mt-2 flex flex-wrap gap-2">{module.ksbCodes.map((code) => <label key={code} className="rounded-lg border border-foreground-200 bg-white px-2.5 py-1.5 text-xs"><input type="checkbox" disabled={locked} className="mr-1.5 accent-primary-700" checked={row.ksbCodes.includes(code)} onChange={(event) => updateReduction(index, { ksbCodes: event.target.checked ? [...row.ksbCodes, code] : row.ksbCodes.filter((item) => item !== code) })} />{code}</label>)}</div></fieldset> : null}</article>;
         })}{!form.reductions.length && <div className="rounded-xl border border-dashed border-foreground-300 px-4 py-8 text-center text-sm text-foreground-500"><Plus className="mx-auto mb-2" size={19} />Select one or more modules from the saved Training Plan.</div>}</div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">{[['Original hours', evidence.trainingPlan.plannedHours ?? 'Not available'], ['Proposed reduction', totalReduction], ['Proposed adjusted hours', adjustedHours ?? 'Not available']].map(([heading, value]) => <div key={heading} className="rounded-xl bg-primary-50 p-3"><p className={label}>{heading}</p><p className="mt-1 text-lg font-semibold text-primary-900">{value}</p></div>)}</div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">{[['Original hours', evidence.trainingPlan.plannedHours ?? 'Not available'], ['Approved reduction', totalReduction], ['Remaining hours', adjustedHours ?? 'Not available']].map(([heading, value]) => <div key={heading} className="rounded-xl bg-primary-50 p-3"><p className={label}>{heading}</p><p className="mt-1 text-lg font-semibold text-primary-900">{value}</p></div>)}</div>
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"><strong>Programme cost</strong><p className="mt-1">Authorised pricing/funding rules and the original agreed price are not available in this evidence snapshot. Cost adjustment remains pending authorised assessment; no proportional reduction is calculated here.</p></div>
       </section>}
 
       <section className={`${panel} p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className={label}>Editable narrative · admin decision remains separate</p><h3 className="mt-1 font-heading text-lg font-semibold">RPL justification</h3></div><button type="button" className={secondaryButton} disabled={locked || !aiEnabled || !report || decision === 'undecided' || !!working} title={aiEnabled ? '' : 'AI drafting is disabled in this environment'} onClick={() => generate('rpl')}><Sparkles size={15} />{working === 'ai-rpl' ? 'Drafting…' : 'Generate AI draft'}</button></div>
         <textarea className={`${input} min-h-32 resize-y`} disabled={locked} value={form.rplJustification} onChange={(event) => setForm((current) => ({ ...current, rplJustification: event.target.value, rplReviewed: false }))} />
         <label className="mt-3 flex items-start gap-3 rounded-xl bg-background-100 p-3 text-sm text-foreground-800"><input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary-700" disabled={locked || !form.rplJustification.trim()} checked={form.rplReviewed} onChange={(event) => setForm((current) => ({ ...current, rplReviewed: event.target.checked }))} /><span><strong className="font-semibold">I accept this RPL justification and approve it.</strong><br /><span className="text-xs text-foreground-500">If an AI draft is not acceptable, edit or replace it first. AI never chooses the RPL outcome, modules or hours.</span></span></label>
-        <label className="mt-4 block"><span className={label}>Final assessor summary</span><textarea className={`${input} min-h-24 resize-y`} disabled={locked} value={form.finalSummary} onChange={(event) => setForm((current) => ({ ...current, finalSummary: event.target.value }))} /></label>
       </section>
 
       <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-foreground-200 bg-white/95 p-3 shadow-xl backdrop-blur">

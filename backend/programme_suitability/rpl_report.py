@@ -528,8 +528,8 @@ def _validated_reductions(data, snapshot, relevant, justified):
             raise ReportInputError(f'Reduced hours for {module.get("title") or module_id} must be positive and no more than {planned}.')
         evidence = item.get('evidence', '')
         comments = item.get('assessorComments', '')
-        if not isinstance(evidence, str) or not evidence.strip() or len(evidence) > MAX_TEXT:
-            raise ReportInputError('Verified evidence is required for every module reduction.')
+        if not isinstance(evidence, str) or len(evidence) > MAX_TEXT:
+            raise ReportInputError('Reduction evidence must be text.')
         if not isinstance(comments, str) or len(comments) > MAX_TEXT:
             raise ReportInputError('Assessor comments must be text.')
         ksb_codes = item.get('ksbCodes', [])
@@ -570,22 +570,14 @@ def _validate_finalisation(report, reductions):
         version = (report.rpl_ai_metadata or {}).get('cvEvidenceVersion') or {}
         if version.get('sha256') != report.cv_source_blob_hash or version.get('documentId') != report.cv_source_document_id:
             raise ReportInputError('RPL justification evidence is outdated. Generate and review a new justification.')
-    if report.suitability_outcome == SuitabilityRplReport.SUITABILITY_NOT_ASSESSED:
-        raise ReportInputError('Choose a programme suitability outcome before finalising.')
     if not report.suitability_justification or not report.suitability_reviewed_at:
         raise ReportInputError('Review and approve the programme suitability justification before finalising.')
     if report.relevant_prior_learning is None or report.reduction_justified is None:
         raise ReportInputError('Complete the prior learning decision before finalising.')
-    if not report.assessor_evidence_review:
-        raise ReportInputError('Record the assessor evidence review before finalising.')
     if report.reduction_justified and not reductions:
         raise ReportInputError('Add at least one validated module reduction before finalising.')
-    if not report.reduction_justified and not report.no_reduction_reason:
-        raise ReportInputError('Explain why no training reduction is justified before finalising.')
     if not report.rpl_justification or not report.rpl_reviewed_at:
         raise ReportInputError('Review and approve the RPL justification before finalising.')
-    if not report.final_summary:
-        raise ReportInputError('Add the final assessor-reviewed summary before finalising.')
 
 
 def _save_report(request, learner, kind, context, assessment, data):
@@ -627,9 +619,15 @@ def _save_report(request, learner, kind, context, assessment, data):
 
         evidence_review = _text(data, 'assessorEvidenceReview')
         no_reduction = _text(data, 'noReductionReason')
-        if justified is False and not no_reduction:
-            raise ReportInputError('A written explanation is required when no reduction is justified.')
         reductions = _validated_reductions(data, report.source_snapshot, relevant, justified)
+
+        # Changing the human RPL outcome invalidates any previously approved
+        # justification.  Keep the narrative for assessor editing, but require
+        # it to be reviewed again against the new decision and reductions.
+        decision_changed = (
+            report.relevant_prior_learning != relevant
+            or report.reduction_justified != justified
+        )
 
         suitability = _text(data, 'suitabilityJustification')
         rpl = _text(data, 'rplJustification')
@@ -663,6 +661,10 @@ def _save_report(request, learner, kind, context, assessment, data):
             report.cv_extraction_acknowledgement_reason = ''
         _review_state(report, data, 'suitability', suitability_changed, request)
         _review_state(report, data, 'rpl', rpl_changed, request)
+        if decision_changed:
+            report.rpl_reviewed_by = None
+            report.rpl_reviewed_by_name = ''
+            report.rpl_reviewed_at = None
         if data.get('rplReviewed') is True and (report.source_snapshot.get('evidence', {}).get('cv', {}).get('status') == 'provided') and not report.cv_extraction_acknowledged:
             _private_cv_text(report, report.source_snapshot['evidence']['cv'])
             version = (report.rpl_ai_metadata or {}).get('cvEvidenceVersion', {})
@@ -847,7 +849,8 @@ def _private_cv_text(report, cv):
 def generate_ai_justification(report, draft_type):
     if not getattr(settings, 'SUITABILITY_RPL_AI_ENABLED', False):
         raise ReportInputError('AI drafting is disabled for this environment.')
-    if not getattr(settings, 'OPENAI_API_KEY', ''):
+    api_key = getattr(settings, 'SUITABILITY_RPL_AI_API_KEY', '') or getattr(settings, 'OPENAI_API_KEY', '')
+    if not api_key:
         raise ReportInputError('The approved AI service is not configured.')
     if draft_type == 'rpl' and (report.relevant_prior_learning is None or report.reduction_justified is None):
         raise ReportInputError('Save the assessor prior-learning decision before generating the RPL draft.')
@@ -859,20 +862,34 @@ def generate_ai_justification(report, draft_type):
         raise ReportInputError('The approved AI client is unavailable.') from exc
     payload = _ai_input(report, draft_type)
     system = (
-        'Draft one concise, evidence-based UK apprenticeship assessment justification. '
-        'Use only the supplied JSON. Do not invent facts, infer verified learning from a job title or self-assessment, '
-        'make a final decision, change modules, change hours, or treat unavailable PLR as evidence of no prior learning. '
+        'Draft a professional, report-ready UK apprenticeship assessment narrative. '
+        'Use only the supplied JSON and write directly about the evidence and recorded decision. '
+        'Do not include internal workflow instructions, approval instructions, prompts, metadata, or technical details. '
+        'Do not invent facts, infer verified learning from a job title or self-assessment, '
+        'make a decision, change modules, change hours, calculate prices, or treat unavailable PLR as evidence of no prior learning. '
+        'If the supplied evidence is insufficient, say so clearly and identify what cannot be substantiated. '
+        'For suitability, explain the evidence-based alignment between the role, responsibilities, selected answers, and programme requirements. '
+        'For RPL without reduction, explain why the supplied evidence does not substantiate exemption or reduction against the relevant modules and KSBs. '
+        'For approved reductions, connect only the supplied CV, qualification, and work evidence to the affected modules and mapped KSBs, and explain the recorded reduction without changing it. '
         'Return JSON with one key: justification.'
     )
-    purpose = ('Explain why the selected programme is suitable, while making clear that an assessor must approve it.'
+    purpose = ('Explain why the selected programme is suitable using the supplied role, responsibilities, answers, and programme requirements.'
                if draft_type == 'suitability' else
                'Explain the assessor-entered RPL decision and training adjustment exactly as supplied.')
     model = getattr(settings, 'OPENAI_MODEL', 'gpt-4.1-mini')
-    response = OpenAI(api_key=settings.OPENAI_API_KEY).chat.completions.create(
-        model=model, messages=[{'role': 'system', 'content': system},
-                               {'role': 'user', 'content': f'{purpose}\n\nEvidence JSON:\n{json.dumps(payload, ensure_ascii=False)}'}],
-        response_format={'type': 'json_object'}, max_completion_tokens=1800,
-    )
+    base_url = getattr(settings, 'SUITABILITY_RPL_AI_BASE_URL', '') or None
+    request = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system},
+            {'role': 'user', 'content': f'{purpose}\n\nEvidence JSON:\n{json.dumps(payload, ensure_ascii=False)}'},
+        ],
+        'response_format': {'type': 'json_object'},
+        'max_completion_tokens': 4096,
+    }
+    if model.lower().startswith('gpt-5'):
+        request['reasoning_effort'] = 'minimal'
+    response = OpenAI(api_key=api_key, base_url=base_url).chat.completions.create(**request)
     content = _s(response.choices[0].message.content if response.choices else '')
     try:
         result = json.loads(content)
@@ -881,9 +898,14 @@ def generate_ai_justification(report, draft_type):
     justification = _s(result.get('justification')) if isinstance(result, dict) else ''
     if not justification or len(justification) > MAX_TEXT:
         raise ReportInputError('The AI service returned an empty or oversized draft.')
+    if '\ufffd' in justification:
+        raise ReportInputError('The AI service returned invalid replacement characters.')
     version = payload.get('cvEvidence', {}).get('evidenceVersion', {}) if draft_type == 'rpl' else {}
-    return justification, {'provider': 'openai', 'model': model, 'generatedAt': timezone.now().isoformat(),
-                           'inputHash': _json_hash(payload), 'cvEvidenceVersion': version, 'generatedText': justification}
+    usage = response.usage.model_dump() if getattr(response, 'usage', None) else None
+    finish_reason = getattr(response.choices[0], 'finish_reason', None) if response.choices else None
+    return justification, {'provider': getattr(settings, 'SUITABILITY_RPL_AI_PROVIDER', 'openai'), 'model': model, 'generatedAt': timezone.now().isoformat(),
+                           'inputHash': _json_hash(payload), 'cvEvidenceVersion': version,
+                           'usage': usage, 'finishReason': finish_reason, 'generatedText': justification}
 
 
 @require_role('admin')
