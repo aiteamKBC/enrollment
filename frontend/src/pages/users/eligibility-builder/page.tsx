@@ -69,7 +69,6 @@ export default function EligibilityBuilderPage() {
   const [updatedBy, setUpdatedBy] = useState('');
   const [published, setPublished] = useState<EligibilityLayout | null>(null);
   const [layout, setLayout] = useState<EligibilityLayout | null>(null);
-  const [defaultEmailHtml, setDefaultEmailHtml] = useState('');
   const [selected, setSelected] = useState<string>('');
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -86,7 +85,6 @@ export default function EligibilityBuilderPage() {
         const resolved = resolveLayout(res.layout, res.workplaceEnabled === true);
         setPublished(resolved);
         setLayout(clone(resolved));
-        setDefaultEmailHtml(res.defaultActivationEmailHtml ?? '');
         setVersion(res.version);
         setUpdatedAt(res.updatedAt ?? '');
         setUpdatedBy(res.updatedBy ?? '');
@@ -117,7 +115,6 @@ export default function EligibilityBuilderPage() {
       const resolved = resolveLayout(saved.layout, saved.workplaceEnabled === true);
       setPublished(resolved);
       setLayout(clone(resolved));
-      setDefaultEmailHtml(saved.defaultActivationEmailHtml ?? defaultEmailHtml);
       setVersion(saved.version);
       setUpdatedAt(saved.updatedAt ?? '');
       setUpdatedBy(saved.updatedBy ?? '');
@@ -192,7 +189,7 @@ export default function EligibilityBuilderPage() {
               {selected === PAGE ? (
                 <PageEditor layout={layout} edit={edit} />
               ) : selected === EMAIL ? (
-                <ActivationEmailEditor layout={layout} defaultHtml={defaultEmailHtml} edit={edit} />
+                <ActivationEmailEditor layout={layout} edit={edit} />
               ) : (
                 section && (
                   <SectionEditor
@@ -320,19 +317,13 @@ function PageEditor({ layout, edit }: { layout: EligibilityLayout; edit: (fn: (l
   );
 }
 
-function ActivationEmailEditor({ layout, defaultHtml, edit }: {
+function ActivationEmailEditor({ layout, edit }: {
   layout: EligibilityLayout;
-  defaultHtml: string;
   edit: (fn: (l: EligibilityLayout) => EligibilityLayout) => void;
 }) {
-  const value = layout.activationEmailHtml ?? defaultHtml;
+  const value = layout.activationEmailHtml ?? '';
   const preview = value.replaceAll('{{greeting}}', 'Hello Learner,').replaceAll('{{start_text}}', 'Getting started is simple: set your password and log in.');
-  const setEmail = (html: string) => edit((current) => {
-    const next = { ...current };
-    if (html === defaultHtml) delete next.activationEmailHtml;
-    else next.activationEmailHtml = html;
-    return next;
-  });
+  const setEmail = (html: string) => edit((current) => ({ ...current, activationEmailHtml: html }));
   return (
     <section aria-label="Activation email" className="min-w-0 flex-1 space-y-4 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 p-5 shadow-sm">
       <div>
@@ -348,10 +339,7 @@ function ActivationEmailEditor({ layout, defaultHtml, edit }: {
         spellCheck={false}
         onChange={(e) => setEmail(e.target.value)}
       />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-foreground-500">Use {'{{greeting}}'} and {'{{start_text}}'} for the learner greeting and relevant next step.</p>
-        <button type="button" className={btnSecondary} disabled={layout.activationEmailHtml === undefined} onClick={() => setEmail(defaultHtml)}>Restore current email content</button>
-      </div>
+      <p className="text-[11px] text-foreground-500">Use {'{{greeting}}'} and {'{{start_text}}'} for the learner greeting and relevant next step. A published HTML template is required before eligible applicants can be invited.</p>
       <div>
         <h3 className="mb-2 text-[12px] font-medium text-foreground-700">Preview of editable content</h3>
         <iframe title="Activation email content preview" sandbox="" srcDoc={`<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;padding:16px;color:#241b35">${preview}</body></html>`} className="h-80 w-full rounded-xl border border-foreground-200 bg-white" />
@@ -518,15 +506,14 @@ function ItemRow({
   const shownFor = item.condition?.values ?? (question?.followUpOf ? [question.followUpOf.value ? 'Yes' : 'No'] : []);
   const hint = question ? textFor(layout.texts, `${item.key}.hint`) : item.helpText;
   // Information is all wording, so it opens with its wording showing.
-  const [panel, setPanel] = useState<'wording' | 'answers' | null>(note ? 'wording' : null);
+  const [expanded, setExpanded] = useState(note);
+  const [showAnswers, setShowAnswers] = useState(false);
   const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string' && textFor(layout.texts, s.key) !== s.default);
 
   const remove = () => {
     if (deps.length && !window.confirm(`${deps.length} question${deps.length === 1 ? '' : 's'} only asked for an answer to this question will stop being asked.\n\nRemove it from the form?`)) return;
     edit((l) => removeItem(l, item.key));
   };
-
-  const toggle = (which: 'wording' | 'answers') => setPanel((p) => (p === which ? null : which));
 
   return (
     <div className="rounded-xl border border-foreground-100 bg-background-50 px-3 py-2.5">
@@ -584,32 +571,14 @@ function ItemRow({
           <button type="button" className={iconBtn} disabled={last || workplace} aria-label={`Move ${label} down`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, 1))}>
             <AppIcon className="ri-arrow-down-line" />
           </button>
-          {slots.length > 0 && (
+          {((item.builtin && (slots.length > 0 || list)) || !item.builtin) && (
             <button
               type="button"
-              className={`${iconBtn}${panel === 'wording' ? ' !bg-primary-50 !text-primary-700' : ''}`}
-              aria-label={`Edit wording of ${label}`}
-              aria-expanded={panel === 'wording'}
-              title="Edit wording"
-              onClick={() => toggle('wording')}
+              className={`${iconBtn}${item.builtin && expanded ? ' !bg-primary-50 !text-primary-700' : ''}`}
+              aria-label={`Edit ${label}`}
+              aria-expanded={item.builtin ? expanded : undefined}
+              onClick={item.builtin ? () => { setShowAnswers(false); setExpanded((open) => !open); } : onEdit}
             >
-              <AppIcon className="ri-edit-line" />
-            </button>
-          )}
-          {list && (
-            <button
-              type="button"
-              className={`${iconBtn}${panel === 'answers' ? ' !bg-primary-50 !text-primary-700' : ''}`}
-              aria-label={`Edit answers of ${label}`}
-              aria-expanded={panel === 'answers'}
-              title="Edit answers"
-              onClick={() => toggle('answers')}
-            >
-              <AppIcon className="ri-list-unordered" />
-            </button>
-          )}
-          {!item.builtin && (
-            <button type="button" className={iconBtn} aria-label={`Edit ${label}`} onClick={onEdit}>
               <AppIcon className="ri-pencil-line" />
             </button>
           )}
@@ -620,37 +589,41 @@ function ItemRow({
           )}
         </div>
       </div>
-      {panel === 'wording' && slots.length > 0 && (
-        <div className="mt-3 space-y-3 border-t border-foreground-100 pt-3">
+      {item.builtin && expanded && (
+        <div className="mt-3 space-y-4 border-t border-foreground-100 pt-3">
           {slots.map((slot) => (
             <TextEditor key={slot.key} slot={slot} texts={layout.texts} onChange={(v) => edit((l) => setText(l, slot.key, v))} />
           ))}
-        </div>
-      )}
-      {panel === 'answers' && list && question?.optionLabels && (
-        <p className="text-[12px] text-foreground-600">These verification choices are fixed: {Object.values(question.optionLabels).join(' ')}</p>
-      )}
-      {panel === 'answers' && list && question?.options && !question.optionLabels && (
-        <div className="mt-3 space-y-2 border-t border-foreground-100 pt-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[12px] font-medium text-foreground-600">Answers applicants choose from</p>
-            {item.options && (
-              <button type="button" className="cursor-pointer text-[11.5px] font-medium text-primary-600 hover:underline" onClick={() => edit((l) => updateItem(l, item.key, { options: undefined }))}>
-                Reset to standard answers
+          {list && (question?.optionLabels || question?.options) && (
+            <div className="space-y-2">
+              <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-2 text-left text-[12px] font-medium text-foreground-600" aria-expanded={showAnswers} onClick={() => setShowAnswers((open) => !open)}>
+                Answers applicants choose from
+                <AppIcon className={showAnswers ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} />
               </button>
-            )}
-          </div>
-          <OptionsEditor
-            options={list}
-            name={label}
-            showInvalid
-            onChange={(next) => {
-              const standard = question.options!;
-              const same = next.length === standard.length && next.every((o, i) => o === standard[i]);
-              edit((l) => updateItem(l, item.key, { options: same ? undefined : next }));
-            }}
-          />
-          <p className="text-[11px] text-foreground-400">Applications already submitted keep the answer they gave, even if it is no longer listed.</p>
+              {showAnswers && (question.optionLabels ? (
+                <p className="text-[12px] text-foreground-600">These verification choices are fixed: {Object.values(question.optionLabels).join(' ')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {item.options && (
+                    <button type="button" className="cursor-pointer text-[11.5px] font-medium text-primary-600 hover:underline" onClick={() => edit((l) => updateItem(l, item.key, { options: undefined }))}>
+                      Reset to standard answers
+                    </button>
+                  )}
+                  <OptionsEditor
+                    options={list}
+                    name={label}
+                    showInvalid
+                    onChange={(next) => {
+                      const standard = question.options!;
+                      const same = next.length === standard.length && next.every((o, i) => o === standard[i]);
+                      edit((l) => updateItem(l, item.key, { options: same ? undefined : next }));
+                    }}
+                  />
+                  <p className="text-[11px] text-foreground-400">Applications already submitted keep the answer they gave, even if it is no longer listed.</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

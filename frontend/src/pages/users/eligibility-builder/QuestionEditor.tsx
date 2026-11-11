@@ -30,6 +30,7 @@ export function QuestionEditor({
     return initial.type === 'dropdown' && initial.options.length === 0 ? { ...initial, options: ['', ''] } : initial;
   });
   const [tried, setTried] = useState(false);
+  const [showAnswers, setShowAnswers] = useState(false);
   const published = Boolean(item?.column || (item && /^cf_/.test(item.key)));
   const set = (patch: Partial<QuestionDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -56,6 +57,7 @@ export function QuestionEditor({
 
   const submit = () => {
     setTried(true);
+    if (isDropdown && (options.length === 0 || new Set(options).size !== options.length)) setShowAnswers(true);
     if (errors.length) return;
     onSave({
       ...draft,
@@ -126,12 +128,15 @@ export function QuestionEditor({
           Mandatory — applicants must answer before moving on
         </label>}
         {isDropdown && (
-          <fieldset className="sm:col-span-2">
-            <legend className="text-[12px] font-medium text-foreground-600">Dropdown answers</legend>
-            <div className="mt-1">
+          <div className="sm:col-span-2">
+            <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-2 text-left text-[12px] font-medium text-foreground-600" aria-expanded={showAnswers} onClick={() => setShowAnswers((open) => !open)}>
+              Answers applicants choose from
+              <AppIcon className={showAnswers ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} />
+            </button>
+            {showAnswers && <div className="mt-2">
               <OptionsEditor options={draft.options} onChange={(next) => set({ options: next })} name="Dropdown" showInvalid={tried} />
-            </div>
-          </fieldset>
+            </div>}
+          </div>
         )}
         {(draft.type === 'yesno' || isDropdown) && (
           <fieldset className="rounded-lg border border-foreground-100 bg-background-50 p-3 sm:col-span-2">

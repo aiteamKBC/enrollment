@@ -79,6 +79,4 @@ export interface EligibilityLayoutResponse {
   version: number | null;
   updatedAt?: string;
   updatedBy?: string;
-  /** The current email content, shown to staff until they publish a custom one. */
-  defaultActivationEmailHtml?: string;
 }

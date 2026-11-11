@@ -480,8 +480,8 @@ def _optional_move_box():
                     </table>"""
 
 
-def default_invitation_intro_html():
-    """Current invitation body, with safe placeholders for the recipient and next step."""
+def generic_invitation_intro_html():
+    """Content for account invitations unrelated to public eligibility."""
     paragraph = f'<p style="margin:0 0 10px;font-size:15px;line-height:1.6;color:{_LEARNER_TEXT};">'
     return (
         f'{paragraph}{{{{greeting}}}}</p>'
@@ -505,7 +505,7 @@ def invitation_message(*, display_name, link, expires_days, booking_owner=None, 
     subject = f"Your {_BRAND} account — set your password"
     booking = bool(booking_owner and booking_link)
     start = _INVITE_START_WITH_BOOKING if booking else _INVITE_START
-    intro = (intro_html or default_invitation_intro_html()).replace("{{greeting}}", escape(greeting)).replace("{{start_text}}", escape(start))
+    intro = (intro_html or generic_invitation_intro_html()).replace("{{greeting}}", escape(greeting)).replace("{{start_text}}", escape(start))
     safe_link = escape(link, quote=True)
     steps = _invitation_step(
         1 if booking else None, "Set your password",
@@ -585,19 +585,6 @@ def invitation_message(*, display_name, link, expires_days, booking_owner=None, 
     </table>
   </body>
 </html>"""
-    text = (
-        f"{greeting}\n{_INVITE_READY}\n{start}\n{_INVITE_PURPOSE}\n"
-        f"{_OPTIONAL_MOVE_TITLE}\n{_OPTIONAL_MOVE}\n"
-        f"{_PLATFORM_BENEFITS_TITLE.upper()}\n"
-        + "".join(f"✓ {title}\n{detail}\n" for title, detail in _PLATFORM_BENEFITS)
-        + f"\n{'Step 1 - ' if booking else ''}Set your password:\n{link}\n"
-        f"This link can be used once and expires in {expires_days} days.\n"
-    )
-    if booking:
-        text += (
-            f"\nStep 2 - Book a one-to-one LMS introduction with your case owner, {booking_owner}:\n"
-            f"{booking_link}\n"
-        )
     if intro_html:
         import re
         from html import unescape
@@ -609,6 +596,20 @@ def invitation_message(*, display_name, link, expires_days, booking_owner=None, 
         )
         if booking:
             text += f"\nBook your LMS introduction with {booking_owner}:\n{booking_link}\n"
+    else:
+        text = (
+            f"{greeting}\n{_INVITE_READY}\n{start}\n{_INVITE_PURPOSE}\n"
+            f"{_OPTIONAL_MOVE_TITLE}\n{_OPTIONAL_MOVE}\n"
+            f"{_PLATFORM_BENEFITS_TITLE.upper()}\n"
+            + "".join(f"✓ {title}\n{detail}\n" for title, detail in _PLATFORM_BENEFITS)
+            + f"\n{'Step 1 - ' if booking else ''}Set your password:\n{link}\n"
+            f"This link can be used once and expires in {expires_days} days.\n"
+        )
+        if booking:
+            text += (
+                f"\nStep 2 - Book a one-to-one LMS introduction with your case owner, {booking_owner}:\n"
+                f"{booking_link}\n"
+            )
     return subject, html, text
 
 

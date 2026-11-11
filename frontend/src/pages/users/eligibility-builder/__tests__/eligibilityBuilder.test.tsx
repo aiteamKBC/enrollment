@@ -142,11 +142,12 @@ async function publish() {
 
 describe('builder page', () => {
   it('publishes edited activation email HTML with the form layout', async () => {
-    fetchEligibilityLayout.mockResolvedValue({ layout: null, version: null, defaultActivationEmailHtml: '<p>{{greeting}} Welcome.</p>' });
+    fetchEligibilityLayout.mockResolvedValue({ layout: { ...defaultLayout(), activationEmailHtml: '<p>{{greeting}} Welcome.</p>' }, version: 10 });
     renderBuilder();
     fireEvent.click(await screen.findByRole('button', { name: /Activation email/ }));
     const editor = screen.getByRole('textbox', { name: /Email content \(HTML\)/ });
     expect(editor).toHaveValue('<p>{{greeting}} Welcome.</p>');
+    expect(screen.queryByRole('button', { name: /Restore current email content/ })).not.toBeInTheDocument();
     fireEvent.change(editor, { target: { value: '<h2>Hello</h2><p>{{greeting}} Please activate your account.</p>' } });
     await publish();
     expect(publishedLayout().activationEmailHtml).toBe('<h2>Hello</h2><p>{{greeting}} Please activate your account.</p>');
@@ -162,7 +163,9 @@ describe('builder page', () => {
     expect(screen.getByText('Main Workplace Postcode')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: `Remove ${label}` })).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: `Move ${label} to another section` })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: `Edit answers of ${label}` }));
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${label}` }));
+    expect(screen.queryByText(/These verification choices are fixed/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Answers applicants choose from' }));
     expect(screen.getByText(/These verification choices are fixed/)).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: `${label}: answer 1` })).not.toBeInTheDocument();
   });
@@ -249,7 +252,8 @@ describe('builder page', () => {
     expect(within(nav).queryByRole('button', { name: /Programme Suitability/ })).not.toBeInTheDocument();
     expect(screen.getByText('Choose Your Applying Programme')).toBeInTheDocument();
     expect(screen.queryByText(/not previously completed this programme/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit answers of Choose Your Applying Programme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Choose Your Applying Programme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Answers applicants choose from' }));
     expect(screen.getByRole('textbox', { name: 'Choose Your Applying Programme: answer 1' })).toHaveValue('Data Analyst Level 4');
     expect(JSON.stringify(layout)).toBe(before);
   });
@@ -258,7 +262,9 @@ describe('builder page', () => {
     renderBuilder();
     await screen.findByRole('textbox', { name: 'Section name' });
     fireEvent.click(screen.getByRole('button', { name: 'Personal Details' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit answers of Choose Your Applying Programme' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Choose Your Applying Programme' }));
+    expect(screen.queryByRole('textbox', { name: 'Choose Your Applying Programme: answer 2' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Answers applicants choose from' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Choose Your Applying Programme: answer 2' }), { target: { value: 'Data Analyst Level 4' } });
     fireEvent.click(screen.getByRole('button', { name: /Remove “Project Controls Professional Level 6”/ }));
     expect(screen.getByText('Answers edited')).toBeInTheDocument();
@@ -269,6 +275,46 @@ describe('builder page', () => {
       'Marketing Executive Level 4', 'Data Analyst Level 4', 'Associate Project Manager Level 4',
     ]);
     expect(await screen.findByText(/Published version 1/)).toBeInTheDocument();
+  });
+
+  it('opens wording and answer choices with one pencil for a built-in question', async () => {
+    renderBuilder();
+    await screen.findByRole('textbox', { name: 'Section name' });
+    fireEvent.click(screen.getByRole('button', { name: 'Residency' }));
+    const edit = screen.getByRole('button', { name: 'Edit Please state your nationality' });
+    expect(edit).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(edit);
+    expect(edit).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('textbox', { name: 'Question' })).toHaveValue('Please state your nationality');
+    const answers = screen.getByRole('button', { name: 'Answers applicants choose from' });
+    expect(answers).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('textbox', { name: 'Please state your nationality: answer 1' })).not.toBeInTheDocument();
+    fireEvent.click(answers);
+    expect(answers).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('textbox', { name: 'Please state your nationality: answer 1' })).toBeInTheDocument();
+    fireEvent.click(answers);
+    expect(screen.queryByRole('textbox', { name: 'Please state your nationality: answer 1' })).not.toBeInTheDocument();
+    fireEvent.click(answers);
+    fireEvent.click(edit);
+    fireEvent.click(edit);
+    expect(screen.getByRole('button', { name: 'Answers applicants choose from' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /Edit answers of Please state your nationality/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps custom dropdown answers collapsed until selected', async () => {
+    const layout = defaultLayout();
+    layout.sections[2].items.push({ key: 'cf_choice', builtin: false, hidden: false, label: 'Pick a choice', type: 'dropdown', options: ['A', 'B'] });
+    fetchEligibilityLayout.mockResolvedValue({ layout, version: 8 });
+    renderBuilder();
+    await screen.findByRole('textbox', { name: 'Section name' });
+    fireEvent.click(screen.getByRole('button', { name: 'Residency' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Pick a choice' }));
+    const editor = screen.getByRole('group', { name: 'Edit Pick a choice' });
+    const answers = within(editor).getByRole('button', { name: 'Answers applicants choose from' });
+    expect(answers).toHaveAttribute('aria-expanded', 'false');
+    expect(within(editor).queryByRole('textbox', { name: 'Dropdown: answer 1' })).not.toBeInTheDocument();
+    fireEvent.click(answers);
+    expect(within(editor).getByRole('textbox', { name: 'Dropdown: answer 1' })).toHaveValue('A');
   });
 
   it('expands a legacy address slot with its edited label and mandatory core parts', async () => {
@@ -289,7 +335,7 @@ describe('builder page', () => {
     expect(screen.getByText('Employer Town/City')).toBeInTheDocument();
     expect(screen.getByText('Employer Address Line 2')).toBeInTheDocument();
     expect(screen.queryByText('Employer Full Address')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit wording of Company location' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Company location' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Question' }), { target: { value: 'Company address line' } });
     await publish();
     expect(publishedLayout().texts?.['employerAddressLine1.label']).toBe('Company address line');
@@ -300,7 +346,7 @@ describe('builder page', () => {
     const user = userEvent.setup();
     renderBuilder();
     await screen.findByRole('textbox', { name: 'Section name' });
-    await user.click(screen.getByRole('button', { name: 'Edit wording of Surname' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Surname' }));
     const box = screen.getByRole('textbox', { name: 'Question' });
     await user.clear(box);
     await user.type(box, 'Family name');

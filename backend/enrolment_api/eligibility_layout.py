@@ -170,26 +170,31 @@ def read_current(cursor):
     return row[0], layout, row[2], row[3]
 
 
-def activation_email_for_application(application_id):
-    """Read the email body from the version this applicant actually submitted."""
+def activation_email_for_application(application_id=None):
+    """Use the submitted version's email, or the latest published email for legacy forms."""
     with connections[CONN].cursor() as cursor:
-        cursor.execute(
-            f'''SELECT l."Layout"->>'activationEmailHtml'
-                FROM enrolment.eligibility_form AS a
-                LEFT JOIN enrolment."{LAYOUT_TABLE}" AS l ON l.id = a.layout_version
-                WHERE a.id = %s''',
-            [application_id],
-        )
+        if application_id is None:
+            cursor.execute(
+                f'''SELECT "Layout"->>'activationEmailHtml' FROM enrolment."{LAYOUT_TABLE}"
+                    WHERE "Layout" ? 'activationEmailHtml' ORDER BY id DESC LIMIT 1'''
+            )
+        else:
+            cursor.execute(
+                f'''SELECT COALESCE(l."Layout"->>'activationEmailHtml',
+                    (SELECT "Layout"->>'activationEmailHtml' FROM enrolment."{LAYOUT_TABLE}"
+                     WHERE "Layout" ? 'activationEmailHtml' ORDER BY id DESC LIMIT 1))
+                    FROM enrolment.eligibility_form AS a
+                    LEFT JOIN enrolment."{LAYOUT_TABLE}" AS l ON l.id = a.layout_version
+                    WHERE a.id = %s''',
+                [application_id],
+            )
         row = cursor.fetchone()
     return row[0] if row else None
 
 
 def _payload(current):
-    from login.email_azure import default_invitation_intro_html
-
-    default_email = {"defaultActivationEmailHtml": default_invitation_intro_html()}
     if current is None:
-        return {"layout": None, "version": None, "updatedAt": "", "updatedBy": "", **_workplace_feature(), **default_email}
+        return {"layout": None, "version": None, "updatedAt": "", "updatedBy": "", **_workplace_feature()}
     version, layout, created_at, created_by = current
     return {
         "layout": layout,
@@ -197,7 +202,6 @@ def _payload(current):
         "updatedAt": created_at.isoformat() if created_at else "",
         "updatedBy": created_by or "",
         **_workplace_feature(),
-        **default_email,
     }
 
 
@@ -726,6 +730,8 @@ def normalize_layout(raw, previous):
     if texts:
         layout["texts"] = texts
     email_html = _clean_activation_email_html(raw.get("activationEmailHtml"))
+    if previous and previous.get("activationEmailHtml") and not email_html:
+        raise LayoutError("The activation email HTML is required once published.")
     if email_html:
         layout["activationEmailHtml"] = email_html
     return layout, {

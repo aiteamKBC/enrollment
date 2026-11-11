@@ -61,7 +61,14 @@ class ActivationEmailLayoutTests(SimpleTestCase):
             self.assertEqual(el.activation_email_for_application(42), "<p>Submitted version</p>")
         sql, params = cursor.executed[0]
         self.assertIn('l.id = a.layout_version', sql)
+        self.assertIn('COALESCE', sql)
         self.assertEqual(params, [42])
+
+    def test_unlinked_invitation_reads_latest_published_email(self):
+        cursor = FakeCursor(results=[("<p>Current content</p>",)])
+        with patch.object(el, "connections", FakeConnections(cursor)):
+            self.assertEqual(el.activation_email_for_application(), "<p>Current content</p>")
+        self.assertIn('ORDER BY id DESC LIMIT 1', cursor.executed[0][0])
 
     def test_html_is_versioned_but_excluded_from_public_layout(self):
         raw = standard_layout()
@@ -70,13 +77,11 @@ class ActivationEmailLayoutTests(SimpleTestCase):
         self.assertEqual(saved["activationEmailHtml"], raw["activationEmailHtml"])
         self.assertNotIn("activationEmailHtml", el.public_layout(saved))
 
-    def test_existing_email_content_can_be_published_unchanged(self):
-        from login.email_azure import default_invitation_intro_html
-
-        raw = standard_layout()
-        raw["activationEmailHtml"] = default_invitation_intro_html()
-        saved, _ = el.normalize_layout(raw, None)
-        self.assertEqual(saved["activationEmailHtml"], raw["activationEmailHtml"])
+    def test_publishing_cannot_remove_a_previous_email(self):
+        previous = standard_layout()
+        previous["activationEmailHtml"] = "<p>Existing content</p>"
+        with self.assertRaises(LayoutError):
+            el.normalize_layout(standard_layout(), previous)
 
     def test_active_html_and_unsafe_links_are_rejected(self):
         for html in ("<script>alert(1)</script>", '<a href="javascript:alert(1)">click</a>', '<p onclick="alert(1)">Hi</p>'):
