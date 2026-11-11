@@ -456,7 +456,7 @@ function SectionEditor({
             <ul className="mt-2 space-y-1.5">
               {removed.map((item) => (
                 <li key={item.key} className="flex items-center justify-between gap-3 rounded-lg border border-foreground-100 px-3 py-2">
-                  <span className="min-w-0 truncate text-[12px] text-foreground-500">{itemLabel(layout, item)}</span>
+                  <span className="min-w-0 break-words text-[12px] text-foreground-500">{itemLabel(layout, item)}</span>
                   <button type="button" className="shrink-0 cursor-pointer text-[12px] font-medium text-primary-600 hover:underline" onClick={() => edit((l) => updateItem(l, item.key, { hidden: false }))}>
                     Restore
                   </button>
@@ -505,11 +505,11 @@ function ItemRow({
   const otherSections = layout.sections.filter((s) => s.slug !== section.slug);
   const trigger = item.condition ? findItem(layout, item.condition.field) : question?.followUpOf ? findItem(layout, question.followUpOf.key) : undefined;
   const shownFor = item.condition?.values ?? (question?.followUpOf ? [question.followUpOf.value ? 'Yes' : 'No'] : []);
+  const conditionText = trigger && shownFor.length > 0 ? `Asked when “${itemLabel(layout, trigger)}” is ${shownFor.join(' / ')}` : '';
   const hint = question ? textFor(layout.texts, `${item.key}.hint`) : item.helpText;
   // Information is all wording, so it opens with its wording showing.
   const [expanded, setExpanded] = useState(note);
   const [showAnswers, setShowAnswers] = useState(false);
-  const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string' && textFor(layout.texts, s.key) !== s.default);
 
   const remove = () => {
     if (deps.length && !window.confirm(`${deps.length} question${deps.length === 1 ? '' : 's'} only asked for an answer to this question will stop being asked.\n\nRemove it from the form?`)) return;
@@ -519,9 +519,9 @@ function ItemRow({
   return (
     <div className="rounded-xl border border-foreground-100 bg-background-50 px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-foreground-900">{label}</p>
-          {hint && !note && <p className="mt-0.5 truncate text-[12px] text-foreground-500">{hint}</p>}
+        <div className="min-w-0 flex-[1_1_16rem]">
+          <p className="break-words text-[13px] font-medium text-foreground-900">{label}</p>
+          {hint && !note && <p className="mt-0.5 break-words text-[12px] text-foreground-500">{hint}</p>}
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px]">
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {note ? 'Information' : item.builtin ? 'Standard question' : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
@@ -540,12 +540,14 @@ function ItemRow({
             )}
             {item.screeningRule && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Eligibility rule — {item.screeningRule.eligibleAnswers.join(' / ')} pass</span>}
             {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
-            {trigger && shownFor.length > 0 && (
-              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">
-                Asked when “{itemLabel(layout, trigger)}” is {shownFor.join(' / ')}
+            {conditionText && (
+              <span className="group relative inline-flex cursor-help items-center rounded-full bg-sky-100 px-2 py-0.5 text-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500" tabIndex={0} role="img" aria-label={conditionText}>
+                <AppIcon className="ri-link" />
+                <span aria-hidden="true" className="pointer-events-none invisible absolute bottom-full left-0 z-20 mb-1 w-72 max-w-[80vw] rounded-lg bg-foreground-900 px-3 py-2 text-left text-[11px] leading-4 text-white shadow-lg group-hover:visible group-focus:visible">
+                  {conditionText}
+                </span>
               </span>
             )}
-            {wordingEdited && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">Wording edited</span>}
             {item.builtin && item.options && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">Answers edited</span>}
           </div>
         </div>
