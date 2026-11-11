@@ -76,6 +76,53 @@ class SharedDraftAuthenticationTests(TestCase):
         self.assertEqual(persisted.configuration, original)
 
     @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
+    def test_reconcile_handles_numeric_legacy_application_cohort_id(self):
+        """A legacy bigint placement column must not break identity verification.
+
+        Production ``enrolment.applications.cohort_id`` is numeric, while the
+        canonical Curriculum identity is a ``COHORT-*`` string.  The
+        correction must still verify all four authoritative programme rows,
+        including the APM identity, and remove only the unreferenced test
+        Cohort.
+        """
+        self._seed_verified_curriculum_rows()
+        with connections['enrolment'].cursor() as cursor:
+            cursor.execute('CREATE TABLE enrolment.applications (id INTEGER PRIMARY KEY, cohort_id INTEGER)')
+            cursor.execute('INSERT INTO enrolment.applications (id, cohort_id) VALUES (1, 12345)')
+        programmes = []
+        for programme_id, curriculum_id in (
+            ('ME_L4', 'PROG-ME-L4'), ('MM_L6', 'PROG-MM-L6'),
+            ('APM_L4', 'PROG-20260907141619067932'), ('PCP_L6', 'PROG-PCP-L6'),
+        ):
+            cohort_id = {
+                'ME_L4': 'COHORT-TEST-ME-FEB', 'MM_L6': 'COHORT-TEST-MM-FEB',
+                'APM_L4': 'COHORT-TEST-APM-FEB', 'PCP_L6': 'COHORT-TEST-PCP-FEB',
+            }[programme_id]
+            cohorts = [{'id': cohort_id, 'name': 'Feb 2027', 'modules': [], 'mappings': []}]
+            if programme_id == 'ME_L4':
+                cohorts.extend([
+                    {'id': 'COHORT-TEST-ME-JUN', 'name': 'June 2027', 'modules': [], 'mappings': []},
+                    {'id': 'COHORT-20261111015402258877CC69FD92DAF3', 'name': 'hisham of aa7', 'modules': [], 'mappings': []},
+                ])
+            programmes.append({'id': programme_id, 'title': programme_id, 'modules': [], 'ksbs': [],
+                               'mappings': [], 'curriculumProgrammeId': None, 'cohorts': cohorts})
+        original = {'schemaVersion': 2, '_draftRevision': 1, 'programmes': programmes}
+        row = ModuleConfigurationDraft.objects.get(pk=SHARED_DRAFT_KEY)
+        row.configuration = original
+        row.save(update_fields=['configuration'])
+        client = self.clients[114]
+        csrf = client.get('/learner_api/enrollment-csrf/').json()['csrfToken']
+        response = client.post(
+            '/enrolment_api/programme-structure/draft/reconcile/',
+            data=json.dumps({'baseVersion': 16, 'revision': 1}),
+            content_type='application/json', HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertEqual(payload['verifiedCurriculumProgrammeIds']['APM_L4'], 'PROG-20260907141619067932')
+        self.assertEqual(payload['removedCohorts'], ['COHORT-20261111015402258877CC69FD92DAF3'])
+
+    @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
     def test_generated_module_identity_and_mapping_survive_real_shared_save_and_edit(self):
         from uuid import uuid4
         from copy import deepcopy

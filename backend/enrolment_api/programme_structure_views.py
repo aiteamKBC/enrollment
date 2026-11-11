@@ -1,4 +1,5 @@
 import json
+import logging
 from django.db import connections, transaction, router, IntegrityError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_protect
@@ -8,6 +9,8 @@ from programme_suitability.models import ModuleConfigurationDraft
 from programme_suitability.programme_structure import KEY, version, validate_structure
 from programme_suitability.permissions import is_staff
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 # Programme Structure is shared system configuration, not a personal builder draft.
 SHARED_DRAFT_KEY = 'programme-structure:shared'
@@ -63,7 +66,14 @@ def _cohort_has_learner_reference(cursor, cohort_id, cohort_name):
         clauses = []
         params = []
         for column in usable:
-            clauses.append(f'"{column}" IN (%s, %s)')
+            # Curriculum cohort IDs are strings, while some legacy learner
+            # tables (notably enrolment.applications.cohort_id) store a
+            # numeric internal learner-placement key.  Comparing the raw
+            # values makes PostgreSQL attempt to cast a COHORT-* identity to
+            # bigint and raises DataError before the correction can run.  A
+            # text comparison is type-safe for both schemas and still keeps
+            # the check exact (no name matching or fallback assignment).
+            clauses.append(f'CAST("{column}" AS TEXT) IN (%s, %s)')
             params.extend([cohort_id, cohort_name])
         cursor.execute(f'SELECT 1 FROM {quoted} WHERE ' + ' OR '.join(clauses) + ' LIMIT 1', params)
         if cursor.fetchone():
@@ -282,7 +292,10 @@ def programme_structure_reconcile(request):
     except ValueError as exc:
         return _error(str(exc), 409)
     except Exception:
-        return _error('Curriculum identity verification failed. Reload and try again.', 503)
+        # Keep the response safe for Admin users while retaining the precise
+        # database exception in server logs for diagnosis and recovery.
+        logger.exception('Curriculum identity verification failed for shared Programme Structure draft.')
+        return _error('Curriculum identity verification could not read the authoritative Curriculum records. Reload the draft and try again.', 503)
 
 
 @enrolment_login_required
