@@ -129,7 +129,7 @@ export function QuestionEditor({
         </label>}
         {isDropdown && (
           <div className="sm:col-span-2">
-            <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-2 text-left text-[12px] font-medium text-foreground-600" aria-expanded={showAnswers} onClick={() => setShowAnswers((open) => !open)}>
+            <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-primary-100 bg-primary-50/40 px-3 py-2 text-left text-[12px] font-medium text-foreground-700 transition-colors hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500" aria-expanded={showAnswers} onClick={() => setShowAnswers((open) => !open)}>
               Answers applicants choose from
               <AppIcon className={showAnswers ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} />
             </button>

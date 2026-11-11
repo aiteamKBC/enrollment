@@ -495,6 +495,7 @@ function ItemRow({
   const label = itemLabel(layout, item);
   const locked = isLocked(item);
   const removalProtected = isRemovalProtected(item);
+  const usedInScreening = Boolean(item.screeningRule || (item.builtin && SCREENING_PROTECTED_FIELDS.has(item.key)));
   const workplace = item.builtin && WORKPLACE_FIELDS.has(item.key);
   const addressRequired = item.builtin && REQUIRED_ADDRESS_FIELDS.has(item.key);
   const required = addressRequired || (workplace ? item.key === 'workplaceArrangement' : locked || (item.builtin ? item.required ?? question?.required ?? false : Boolean(item.required)));
@@ -526,8 +527,17 @@ function ItemRow({
               {note ? 'Information' : item.builtin ? 'Standard question' : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
             {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
-            {locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Identifies the applicant — always asked</span>}
-            {removalProtected && !locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />{item.screeningRule || (item.builtin && SCREENING_PROTECTED_FIELDS.has(item.key)) ? 'Used in screening — always asked' : 'Protected — cannot remove'}</span>}
+            {removalProtected && (
+              <span
+                className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"
+                title={usedInScreening ? 'Used in screening — cannot remove' : locked ? 'Identifies the applicant — cannot remove' : 'Protected — cannot remove'}
+                role={usedInScreening ? undefined : 'img'}
+                aria-label={usedInScreening ? undefined : locked ? 'Identifies the applicant — cannot remove' : 'Protected — cannot remove'}
+              >
+                <AppIcon className={`ri-lock-line inline${usedInScreening ? ' mr-0.5' : ''}`} />
+                {usedInScreening && 'Used in screening'}
+              </span>
+            )}
             {item.screeningRule && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Eligibility rule — {item.screeningRule.eligibleAnswers.join(' / ')} pass</span>}
             {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
             {trigger && shownFor.length > 0 && (
@@ -555,12 +565,12 @@ function ItemRow({
         {otherSections.length > 0 && (
           <select
             aria-label={`Move ${label} to another section`}
-            className={`${inputClass} !w-auto shrink-0 cursor-pointer !py-1.5 text-[12px]`}
+            className={`${inputClass} !w-28 shrink-0 cursor-pointer !border-foreground-100 !bg-background-50/70 !px-2 !py-1 !text-[11px] !text-foreground-600`}
             value=""
             disabled={workplace}
             onChange={(e) => e.target.value && edit((l) => moveItemToSection(l, item.key, e.target.value))}
           >
-            <option value="">Move to section…</option>
+            <option value="">Move to…</option>
             {otherSections.filter(s => !removalProtected || !s.hidden).map((s) => <option key={s.slug} value={s.slug}>{s.title || 'Untitled section'}{s.hidden ? ' (hidden)' : ''}</option>)}
           </select>
         )}
@@ -596,7 +606,7 @@ function ItemRow({
           ))}
           {list && (question?.optionLabels || question?.options) && (
             <div className="space-y-2">
-              <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-2 text-left text-[12px] font-medium text-foreground-600" aria-expanded={showAnswers} onClick={() => setShowAnswers((open) => !open)}>
+              <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-primary-100 bg-primary-50/40 px-3 py-2 text-left text-[12px] font-medium text-foreground-700 transition-colors hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500" aria-expanded={showAnswers} onClick={() => setShowAnswers((open) => !open)}>
                 Answers applicants choose from
                 <AppIcon className={showAnswers ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} />
               </button>
