@@ -2,7 +2,7 @@
  * Reading a layout: the standard form as a layout, a published layout made
  * whole, and what each item is called and answers.
  */
-import { ADDRESS_GROUPS, ALWAYS_VISIBLE_PUBLIC_FIELDS, BUILTIN_ITEMS, BUILTIN_SECTIONS, NEW_PUBLIC_FIELDS, RETIRED_PUBLIC_FIELDS, RETIRED_PUBLIC_ITEMS, SCREENING_PROTECTED_FIELDS, WORKPLACE_FIELDS, TEXT_SLOTS, builtinSection, isBuiltinQuestion, textFor } from './registry';
+import { ADDRESS_GROUPS, ALWAYS_VISIBLE_PUBLIC_FIELDS, BUILTIN_ITEMS, BUILTIN_SECTIONS, FORM_PROTECTED_FIELDS, NEW_PUBLIC_FIELDS, RETIRED_PUBLIC_FIELDS, RETIRED_PUBLIC_ITEMS, SCREENING_PROTECTED_FIELDS, WORKPLACE_FIELDS, TEXT_SLOTS, builtinSection, isBuiltinQuestion, textFor } from './registry';
 import { QUESTION_TYPES, type EligibilityItem, type EligibilityLayout, type EligibilitySection } from './types';
 
 const TYPES = new Set<string>(QUESTION_TYPES.map((t) => t.value));
@@ -244,7 +244,7 @@ export function isLocked(item: EligibilityItem): boolean {
 
 /** Whether a built-in question must stay on the form. */
 export function isRemovalProtected(item: EligibilityItem): boolean {
-  return isLocked(item) || (item.builtin && SCREENING_PROTECTED_FIELDS.has(item.key));
+  return isLocked(item) || (item.builtin && (SCREENING_PROTECTED_FIELDS.has(item.key) || FORM_PROTECTED_FIELDS.has(item.key)));
 }
 
 /** What the builder calls an item. */

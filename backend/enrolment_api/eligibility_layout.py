@@ -337,6 +337,8 @@ def _normalize_builtin(raw_item):
     key = raw_item.get("key")
     if key not in HOME_SECTION:
         raise LayoutError("The form names a built-in question that does not exist.")
+    if key in form.FORM_PROTECTED_FIELDS and raw_item.get("hidden"):
+        raise LayoutError(f"'{key}' is protected and cannot be removed from the form.")
     # Retired public fields keep their identifiers and storage columns, but a
     # layout cannot make them visible again until they are deliberately
     # reintroduced in a future change.
@@ -442,7 +444,7 @@ def _restore_missing(sections, prev_custom, seen_keys):
             by_slug[slug] = section
     for key, slug in HOME_SECTION.items():
         if key not in seen_keys and key not in form.RETIRED_PUBLIC_FIELDS:
-            protected = key in form.screening_protected_fields()
+            protected = key in form.non_removable_fields()
             by_slug[slug]["items"].append({
                 "key": key,
                 "builtin": True,
@@ -547,6 +549,8 @@ def _check_locked(sections):
                 item.pop("required", None)
             elif item["key"] in form.screening_protected_fields() and (item["hidden"] or section["hidden"]):
                 raise LayoutError(f"'{item['key']}' is used for automatic screening, so it must stay on the form.")
+            elif item["key"] in form.FORM_PROTECTED_FIELDS and (item["hidden"] or section["hidden"]):
+                raise LayoutError(f"'{item['key']}' is protected and cannot be removed from the form.")
 
 
 def normalize_layout(raw, previous):

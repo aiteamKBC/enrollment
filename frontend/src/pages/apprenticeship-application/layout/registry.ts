@@ -72,6 +72,15 @@ export const SCREENING_PROTECTED_FIELDS = new Set([
   'majorityHoursInEngland', 'postcode', 'countryOfResidence',
   'workplaceArrangement', 'mainWorkplacePostcode',
 ]);
+/** Existing form questions that admins may edit but cannot remove. */
+export const FORM_PROTECTED_FIELDS = new Set([
+  'employerName', 'employerAddressLine1', 'employerAddressLine2',
+  'employerTownCity', 'employerCounty', 'startDateWithEmployer',
+  'livesInUk', 'nationality', 'residencyStatus',
+  'residentialAddressLine1', 'residentialAddressLine2',
+  'residentialTownCity', 'residentialCounty',
+  'attendedFundedTraining', 'fundedTrainingCompletedOn',
+]);
 /** Legacy informational content retained for old layouts but no longer shown publicly. */
 export const RETIRED_PUBLIC_ITEMS = new Set(['note.representative']);
 /** These answers are always present and never answer-dependent. */

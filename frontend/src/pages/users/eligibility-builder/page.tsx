@@ -12,6 +12,7 @@ import {
   PAGE_TEXT_SLOTS,
   RETIRED_PUBLIC_ITEMS,
   REQUIRED_ADDRESS_FIELDS,
+  SCREENING_PROTECTED_FIELDS,
   WORKPLACE_FIELDS,
   builtinSection,
   isBuiltinQuestion,
@@ -477,7 +478,7 @@ function ItemRow({
             </span>
             {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
             {locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Identifies the applicant — always asked</span>}
-            {removalProtected && !locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Used in screening — always asked</span>}
+            {removalProtected && !locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />{item.builtin && SCREENING_PROTECTED_FIELDS.has(item.key) ? 'Used in screening — always asked' : 'Protected — cannot remove'}</span>}
             {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
             {trigger && shownFor.length > 0 && (
               <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">

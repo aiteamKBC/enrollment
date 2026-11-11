@@ -34,6 +34,8 @@ import {
   updateItem,
 } from '../builderOps';
 import { defaultLayout } from '@/pages/apprenticeship-application/layout/resolve';
+import { isRemovalProtected } from '@/pages/apprenticeship-application/layout/resolve';
+import { FORM_PROTECTED_FIELDS } from '@/pages/apprenticeship-application/layout/registry';
 import type { EligibilityItem, EligibilityLayout } from '@/pages/apprenticeship-application/layout/types';
 
 beforeAll(() => {
@@ -50,6 +52,15 @@ const sectionItems = (layout: EligibilityLayout, slug: string) => layout.section
 const item = (layout: EligibilityLayout, key: string) => layout.sections.flatMap((s) => s.items).find((i) => i.key === key)!;
 
 describe('layout edits', () => {
+  it('protects the pictured built-in questions but leaves headings removable', () => {
+    const layout = defaultLayout();
+    for (const key of FORM_PROTECTED_FIELDS) expect(isRemovalProtected(item(layout, key))).toBe(true);
+    expect(isRemovalProtected({ key: 'cf_residential_address_line', builtin: false, hidden: false,
+      type: 'heading', label: 'Renamed residential heading' })).toBe(false);
+    expect(isRemovalProtected({ key: 'new_heading', builtin: false, hidden: false,
+      type: 'heading', label: 'Residential Address Line' })).toBe(false);
+  });
+
   it('moves a question past the next shown one, skipping removed questions', () => {
     let layout = removeItem(defaultLayout(), 'surname');
     layout = moveItem(layout, 'personal-details', 'firstName', 1);
@@ -184,6 +195,33 @@ describe('builder page', () => {
     expect(screen.getByRole('checkbox', { name: 'Show this section to applicants' })).toBeDisabled();
   });
 
+  it('shows no Remove control for the requested questions but allows removing the heading', async () => {
+    const layout = defaultLayout();
+    layout.sections.find(section => section.slug === 'residency')!.items.unshift({
+      key: 'cf_residential_address_line', builtin: false, hidden: false,
+      type: 'heading', label: 'Residential Address Line',
+    });
+    fetchEligibilityLayout.mockResolvedValue({ layout, version: 8 });
+    renderBuilder();
+    await screen.findByRole('textbox', { name: 'Section name' });
+    const nav = screen.getByRole('navigation', { name: 'Form sections' });
+    fireEvent.click(within(nav).getByRole('button', { name: 'Employment' }));
+    for (const label of ['Employer', 'Employer Street Address', 'Employer Address Line 2',
+      'Employer Town/City', 'Employer County', 'Start Date with Employer']) {
+      expect(screen.queryByRole('button', { name: `Remove ${label}` })).not.toBeInTheDocument();
+    }
+    fireEvent.click(within(nav).getByRole('button', { name: 'Residency' }));
+    for (const label of ['Are you a UK/EEA National?', 'Please state your nationality',
+      'Please provide your residency status?',
+      'Residential Street Address', 'Residential Address Line 2', 'Residential Town/City',
+      'Residential County', 'When was it completed?']) {
+      expect(screen.queryByRole('button', { name: `Remove ${label}` })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole('button', { name: /Remove Have you attended any other government-funded/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Residential Address Line' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Are you in full-time education or training prior to enrolment? (PEI1)' })).toBeInTheDocument();
+  });
+
   it('opens an old published layout without restoring Programme Suitability', async () => {
     const layout = defaultLayout();
     const personal = layout.sections[0];
@@ -237,7 +275,7 @@ describe('builder page', () => {
     const firstLine = (await screen.findByText('Company location')).closest('div.rounded-xl') as HTMLElement;
     expect(within(firstLine).getByRole('checkbox', { name: 'Mandatory' })).toBeChecked();
     expect(within(firstLine).getByRole('checkbox', { name: 'Mandatory' })).toBeDisabled();
-    expect(screen.getByText('Employer Address Line 3')).toBeInTheDocument();
+    expect(screen.getByText('Employer Town/City')).toBeInTheDocument();
     expect(screen.getByText('Employer Address Line 2')).toBeInTheDocument();
     expect(screen.queryByText('Employer Full Address')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Edit wording of Company location' }));
@@ -299,12 +337,18 @@ describe('builder page', () => {
 
   it('warns before removing a question others depend on', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const layout = defaultLayout();
+    layout.sections.find(section => section.slug === 'residency')!.items.push({
+      key: 'new_followup', builtin: false, hidden: false, label: 'What course are you taking?',
+      type: 'text', condition: { field: 'fullTimeEducationPrior', values: ['Yes'] },
+    });
+    fetchEligibilityLayout.mockResolvedValue({ layout, version: 9 });
     renderBuilder();
     await screen.findByRole('textbox', { name: 'Section name' });
     fireEvent.click(screen.getByRole('button', { name: 'Residency' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Remove Have you attended any other government-funded/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Remove Are you in full-time education or training prior to enrolment/ }));
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('1 question only asked for an answer to this question will stop being asked'));
-    expect(screen.getByRole('button', { name: /Remove Have you attended any other government-funded/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Remove Are you in full-time education or training prior to enrolment/ })).toBeInTheDocument();
   });
 
   it('will not publish a form with a problem', async () => {

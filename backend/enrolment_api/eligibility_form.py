@@ -428,10 +428,24 @@ SCREENING_PROTECTED_FIELDS = frozenset({
     "majorityHoursInEngland", "postcode", "countryOfResidence",
 })
 SCREENING_PREVIEW_FIELDS = frozenset({"workplaceArrangement", "mainWorkplacePostcode"})
+# Keep these built-in questions on the form even when their answers are
+# optional or conditional. This does not change required-answer rules.
+FORM_PROTECTED_FIELDS = frozenset({
+    "employerName", "employerAddressLine1", "employerAddressLine2",
+    "employerTownCity", "employerCounty", "startDateWithEmployer",
+    "livesInUk", "nationality", "residencyStatus",
+    "residentialAddressLine1", "residentialAddressLine2",
+    "residentialTownCity", "residentialCounty",
+    "attendedFundedTraining", "fundedTrainingCompletedOn",
+})
 
 
 def screening_protected_fields():
     return SCREENING_PROTECTED_FIELDS | (SCREENING_PREVIEW_FIELDS if workplace_enabled() else frozenset())
+
+
+def non_removable_fields():
+    return screening_protected_fields() | FORM_PROTECTED_FIELDS
 
 
 ASSESSMENT_CONSISTENCY = (

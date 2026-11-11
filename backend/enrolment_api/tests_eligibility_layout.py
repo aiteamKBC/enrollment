@@ -166,6 +166,43 @@ class RegistryTests(SimpleTestCase):
 
 
 class NormalizeLayoutTests(SimpleTestCase):
+    def test_pictured_builtin_questions_cannot_be_hidden_or_removed(self):
+        for key in ef.FORM_PROTECTED_FIELDS:
+            with self.subTest(key=key):
+                raw = standard_layout()
+                item(raw, key)["hidden"] = True
+                with self.assertRaisesRegex(LayoutError, "protected and cannot be removed"):
+                    el.normalize_layout(raw, standard_layout())
+
+                raw = standard_layout()
+                for section in raw["sections"]:
+                    section["items"] = [entry for entry in section["items"] if entry["key"] != key]
+                restored, _ = el.normalize_layout(raw, standard_layout())
+                self.assertFalse(item(restored, key)["hidden"])
+
+        raw = standard_layout()
+        item(raw, "employerAddressLine2")["required"] = False
+        normalized, _ = el.normalize_layout(raw, standard_layout())
+        self.assertFalse(item(normalized, "employerAddressLine2")["required"])
+
+    def test_published_residential_address_heading_can_be_removed_or_renamed(self):
+        previous = with_items(standard_layout(), "residency", custom(
+            "Residential Address Line", "heading", key="cf_residential_address_line"))
+        hidden = deepcopy(previous)
+        item(hidden, "cf_residential_address_line")["hidden"] = True
+        normalized, _ = el.normalize_layout(hidden, previous)
+        self.assertTrue(item(normalized, "cf_residential_address_line")["hidden"])
+
+        missing = deepcopy(previous)
+        items_of(missing, "residency").pop()
+        normalized, _ = el.normalize_layout(missing, previous)
+        self.assertTrue(item(normalized, "cf_residential_address_line")["hidden"])
+
+        renamed = deepcopy(previous)
+        item(renamed, "cf_residential_address_line")["label"] = "Current residential address"
+        normalized, _ = el.normalize_layout(renamed, previous)
+        self.assertEqual(item(normalized, "cf_residential_address_line")["label"], "Current residential address")
+
     def test_legacy_title_is_removed_from_published_and_public_layouts(self):
         raw = standard_layout()
         raw["sections"][0]["items"].insert(2, {"key": "title", "builtin": True, "hidden": False})
