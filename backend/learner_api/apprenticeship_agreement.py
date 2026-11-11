@@ -33,6 +33,8 @@ from django.db import DatabaseError, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from enrolment_api.document_templates import service as template_service
+from enrolment_api.document_templates.initial_issue import initial_issue
 
 from enrolment_api.auth import employer_signing_party_error, enrolment_login_required
 
@@ -93,14 +95,8 @@ def _employer_address(learner):
 
 def _plan_modules(learner):
     """The learner's learning-plan modules, with hours. Group preset if unsaved."""
-    catalogue = {m["moduleId"]: m for m in learner_programme_modules(learner)}
-
-    saved = _saved_modules(learner)
-    if saved:
-        module_ids = [_s(m.get("moduleId")) for m in saved]
-    else:
-        module_ids = learner_group_module_ids(learner)
-    return [catalogue[i] for i in module_ids if i in catalogue]
+    from enrolment_api.document_templates.learner_sources import plan_modules
+    return plan_modules(learner)
 
 
 def _to_date(value):
@@ -177,7 +173,8 @@ def _weeks_between(start, end):
 
 def derive_particulars(learner):
     """Everything the agreement states, derived from the learner's records."""
-    start, end, dates_from = _group_dates(learner)
+    from enrolment_api.document_templates.learner_sources import document_dates
+    start, end, dates_from = document_dates(learner)
     modules = _plan_modules(learner)
     hours = round(sum(float(m.get("hours") or 0) for m in modules), 2)
 
@@ -214,7 +211,7 @@ def _party_json(signature, name, at):
 def _agreement_json(agreement):
     if agreement is None:
         return None
-    return {
+    payload = {
         "id": str(agreement.id),
         "status": _s(agreement.status),
         "fullySigned": bool(agreement.fully_signed),
@@ -257,6 +254,9 @@ def _agreement_json(agreement):
             "stored": bool(_s(agreement.blob_name)),
         },
     }
+
+
+    return template_service.with_template('apprenticeship-agreement', agreement, payload)
 
 
 def _active_agreement(learner_kind, learner_id, lock=False):
@@ -338,6 +338,7 @@ def apprenticeship_agreement(request, pk):
 
 @enrolment_login_required
 @csrf_exempt
+@initial_issue('apprenticeship-agreement')
 def issue_agreement(request, pk):
     """Issue the agreement, snapshotting the particulars onto a new row.
 
@@ -384,6 +385,7 @@ def issue_agreement(request, pk):
                 planned_otjh=derived["plannedOtjh"],
                 plan_modules=derived["planModules"],
             )
+            template_service.bind_issue('apprenticeship-agreement', agreement, learner, _agreement_json(agreement))
     except DatabaseError as exc:
         logger.exception("issue_agreement: failed")
         return _error(f"Database error: {exc}", 502)
@@ -393,7 +395,7 @@ def issue_agreement(request, pk):
 
 @enrolment_login_required
 @csrf_exempt
-def sign_agreement(request, pk):
+def sign_agreement(request, pk, _revision_source=None):
     """Record one party's signature.
 
         POST /learner_api/apprenticeship-agreement/<pk>/sign/
@@ -441,9 +443,12 @@ def sign_agreement(request, pk):
         # save() would clobber the first party's signature columns and
         # recalculate `fully_signed` from a stale copy.
         with transaction.atomic(using="enrolment"):
-            agreement = _active_agreement(_learner_kind(learner), learner.pk, lock=True)
+            agreement = _revision_source if _revision_source is not None else _active_agreement(_learner_kind(learner), learner.pk, lock=True)
             if agreement is None:
                 return _error("No agreement has been issued for this learner yet.", 404)
+            from enrolment_api.document_templates.revisions import source_locked
+            if source_locked('apprenticeship-agreement', agreement):
+                return _error('This historical document is locked. Create a new learner revision for changes.', 409)
 
             now = timezone.now() if signature else None
             if party == "apprentice":
@@ -457,6 +462,7 @@ def sign_agreement(request, pk):
 
             agreement.recalculate_signed()
             agreement.save()
+            template_service.archive_render('apprenticeship-agreement', agreement, _agreement_json(agreement), name)
         promoted = advance_learner(learner)
     except DatabaseError as exc:
         logger.exception("sign_agreement: failed")

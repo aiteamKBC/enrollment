@@ -65,7 +65,7 @@
   "name": "enrollment-corner",
   "private": true,
   "scripts": {
-    "build": "vite build",
+    "build": "npm run build:document-pdf && vite build",
     "dev": "vite",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
@@ -79,7 +79,8 @@
     "e2e:apprentice": "playwright test --project=apprentice",
     "e2e:staff": "playwright test --project=staff",
     "e2e:employer": "playwright test --project=employer",
-    "e2e:verify": "playwright test --project=verify"
+    "e2e:verify": "playwright test --project=verify",
+    "build:document-pdf": "node ../tools/build_document_pdf.mjs"
   },
   "type": "module",
   "version": "0.0.0"

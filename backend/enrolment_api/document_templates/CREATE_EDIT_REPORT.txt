@@ -1,0 +1,90 @@
+Create latest template with current learner data / fresh signatures
+
+CURRENT BEHAVIOUR
+Create opens a new independent learner-specific document revision using the
+latest published template applicable to the learner's programme. Existing
+controlled document derivations fill the learner's current name, programme,
+learner-specific start/end dates, employer details, assigned learning plan,
+modules, activities, hours and saved document/review data where available.
+Missing information stays missing; dates do not fall back to cohort dates.
+Missing-field and learner-date warnings remain visible in PDF Preview.
+
+The complete payload, dynamic field values and actual template version are
+snapshotted at Create. Preview, Save and Finalise use that snapshot. Changes to
+the learner or global template after Create do not silently alter this copy.
+An original/signed document is never used as the new document's answer source.
+Published contractual wording and configured defaults remain as published.
+
+Create always starts unsigned. Old signature images, signer names, dates,
+provenance and fully-signed/completion status are removed from the new copy.
+Draft save or preview does not create signing obligations. After Save, review the
+PDF and Finalise: content becomes read-only, the revision appears in the learner
+Documents area and the existing fresh-signature workflow opens for the required
+learner, employer and provider parties for that document type. Actual independent
+signatures are required before Signed status is shown. Old versions/signatures
+remain unchanged and accessible.
+
+The signing envelope is newly created in the existing document/review models and
+contains this new revision's frozen data, including the learning plan. Signed PDF
+rendering therefore uses the same data that was reviewed. Pending-signature
+metadata displays this revision's actual template version, rather than the
+original issue's older version. No duplicate notification/signature tables exist.
+
+Edit still starts from the exact selected historical version. Continue editing
+resumes that draft. Keep Existing Signatures and Sign Again remain available for
+historical editing, with correct provenance. Existing View/Download/Compare/Delete
+and independent History/chevron controls remain available.
+
+COMPATIBILITY
+A pristine draft from the previous empty/unanswered Create flow may be initialised
+with current learner data on a new Create request. UUID and revision number stay
+stable; edit_version increases and the prior request, actor and time are audited.
+Only edit_version 1 drafts without saved reasons, content edits or signature
+evidence qualify. Saved work is never replaced automatically.
+
+The existing one-open-draft constraint, request UUID idempotency, source/issue
+transaction locks and MAX(number)+1 allocation (including deleted draft numbers)
+remain. No migrations, schema changes or live database updates were performed.
+All ordinary document writes occur only when the admin uses the authorised UI.
+
+FILES UPDATED FOR THIS REQUEST (relative to enrollment/)
+backend/enrolment_api/document_templates/learner_documents.py (new)
+backend/enrolment_api/document_templates/blank_documents.py
+backend/enrolment_api/document_templates/revisions.py
+backend/enrolment_api/document_templates/test_learner_documents.py (new)
+backend/enrolment_api/document_templates/CREATE_EDIT_REPORT.txt
+backend/enrolment_api/pending_signatures.py
+frontend/src/features/compliance-documents/revisionApi.ts
+frontend/src/features/compliance-documents/LearnerRevisionEditor.tsx
+frontend/src/features/compliance-documents/__tests__/createDocument.test.tsx
+frontend/src/features/compliance-documents/__tests__/profileEdit.test.tsx
+
+VALIDATION
+116 backend tests passed using isolated SQLite test databases, never the .env DB.
+The new tests use actual distinct learner A/B records, curriculum modules,
+activities, employer/personal details and saved reviews. All eight document types
+are populated, learner-scoped, unsigned and frozen through Finalise. Training Plan
+fresh learner/employer/provider signatures, actual Signed status, original-record
+immutability and correct pending notifications/template version are verified.
+Tests also verify missing student dates, current learning plans on signing rows,
+request idempotency and safe conversion of untouched older unanswered drafts.
+
+207 frontend tests passed across 20 relevant files. TypeScript, scoped ESLint and
+production frontend build passed. Real profile/editor tests show current learner
+data, preserve exact-version Edit and exercise save, preview, finalise, continue,
+deletion, history and notification behavior.
+
+Headless Chrome used actual API payloads exported from the isolated Django tests
+with real editor/PDF generators. All eight documents displayed learner A data,
+with no learner B values or historical signer data and no browser errors. The
+eight PDFs were independently parsed to verify learner scoping, current student
+dates and stable snapshot data. Temporary frontend fixtures/harness were removed.
+
+LIMITS / COORDINATION
+Only published templates are used. Existing one-open-draft rules still apply.
+PostgreSQL parallel races were not tested against a live database; the existing
+locking and unique indexes remain the allocation safeguards. Coordinate shared
+revision/editor/API/pending-signature files with teammates. No wizard, Skills
+Radar, assessment, original PDF, historical migration or unrelated feature changes.
+Existing uncommitted work preserved on compliance-documents. No commit, push,
+merge, rebase, reset or branch switch performed.

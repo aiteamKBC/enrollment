@@ -1,0 +1,179 @@
+Purple reference PDF design implementation — 5 November 2026
+
+Scope and reference
+Implemented on the existing compliance-documents branch, preserving all prior
+uncommitted work. No commit, push, merge, rebase or branch switch was performed.
+The actual supplied file was Individual_Learner_Record_Purple_Design.pdf in the
+user's Downloads directory (without the attachment prompt's '(1)' suffix).
+All five pages were rendered and inspected before implementation. Each page
+contains one raster image; there are no recoverable vector paths or font names.
+Only its visual appearance was used. No personal information, wording or
+signature image from that reference was imported into templates or assets.
+
+Actual rendering pipeline and prior mismatch
+The application uses jsPDF 4.x and jspdf-autotable 5.x, not ReportLab or an HTML
+print renderer. The four compliance generators and the shared review generator
+dispatch managed templates to renderManagedDocument. PDF preview, downloads,
+issuance and learner-specific revision generation already use these paths.
+The old lavender-v1 theme was generic: filled heading panels, boxed signatures,
+no reference waves, different spacing and automatic Learning Plan columns.
+Original published templates deliberately retained their old grey appearance.
+Changing an editable draft must not restyle an existing issued version.
+
+New versioned treatment
+purple-reference-v2 centralises the reference colours, typography, margins and
+vector decoration. Approximate measured colours: heading RGB 47/12/79; accent
+143/26/235; table header 231/215/252; border 195/155/228. Title 22pt, section
+14pt, body 10pt, table 9.5pt, horizontal margins 12mm. Curved vector waves are
+recreated at the upper-right and footer, with a clear reading area. Continuation
+content starts below the top waves; footer content remains above the lower ones.
+Main titles have the segmented purple/lavender divider; interior section
+headings have the vertical accent bar. Tables have white bodies, lavender
+headers, thin borders and rounded outer frames. Two-column tables balance
+labels against long answers rather than allocating a tiny value column.
+Signatures preserve their original images, aspect ratio, role, names, dates and
+historical provenance, with a thin lavender line and no heavy enclosing panel.
+Compact declaration/signature sequences stay together where they fit.
+Builder-added content uses the same theme and retains supported explicit styles.
+The editable HTML surface shares the tokens and decoration; PDF Preview is the
+authoritative paginated output, since one editable page can flow onto PDF pages.
+
+All eight document types use the same managed painter:
+Apprenticeship Agreement; Individual Learner Record; Training Plan; Written
+Agreement; Eligibility Review & FS Discussion; RPL and Experience; Workplace
+Health & Safety Declaration; ULN Privacy Notice & Learner Acknowledgement.
+
+Training Plan layout
+The default A4 portrait reading width is 186mm. Its five columns are explicitly
+allocated approximately 76/32/30/26/22mm: Activity, Method, Delivery Lead, Date,
+OTJ. Date and OTJ widths expand if their measured values require more room.
+Activity keeps the largest share. Text is measured and wrapped at its actual
+font size; row height follows line count. Numeric/date body cells never wrap.
+Hours use String(originalValue), without rounding, totals or recalculation;
+existing string precision such as '0.7500' and '12.50' remains intact.
+Modules and weeks have distinct lavender treatments; activities remain white.
+Headers repeat at identical widths on continuation pages. Short rows remain
+whole; individually oversized rows can continue by complete text lines. Module
+and week headings reserve room for associated rows. Explicit page breaks remain.
+A narrow configured reading area switches only the Learning Plan to related
+field/value rows instead of tiny fonts or making all documents landscape.
+Long activities remain table body content, never oversized repeating headers.
+
+Files created for this change
+frontend/src/features/compliance-documents/purpleReferenceTheme.ts
+frontend/src/features/compliance-documents/purpleReferencePdf.ts
+frontend/src/features/compliance-documents/learningPlanLayout.ts
+frontend/src/features/compliance-documents/__tests__/purpleReference.test.ts
+backend/enrolment_api/document_templates/REFERENCE_DESIGN_REPORT.txt
+
+Existing feature files modified for this change
+frontend/src/features/compliance-documents/types.ts
+frontend/src/features/compliance-documents/documentTheme.ts
+frontend/src/features/compliance-documents/documentTheme.css
+frontend/src/features/compliance-documents/lavenderPdf.ts
+frontend/src/features/compliance-documents/render.ts
+frontend/src/features/compliance-documents/pageDocument.ts
+frontend/src/features/compliance-documents/FullPageEditor.tsx
+frontend/src/features/compliance-documents/DocumentDesignControl.tsx
+frontend/src/features/compliance-documents/page.tsx
+frontend/src/features/compliance-documents/__tests__/documentTheme.test.ts
+frontend/src/features/compliance-documents/__tests__/builder.test.tsx
+backend/enrolment_api/document_templates/registry.py
+backend/enrolment_api/document_templates/test_design_theme.py
+
+Earlier dirty files outside this list belong to existing work and were preserved.
+No source document business logic, wizard/Skills Radar/KSB/assessment code,
+signing endpoints, calculation implementation or historical migration changed.
+The old lavender painter only received an optional palette argument and an
+exported bounds interface; its default v1 drawing path is retained.
+
+Validation performed
+1. Backend command:
+   .\backend\.venv\Scripts\python.exe backend/manage.py test
+   enrolment_api.document_templates
+   --settings=enrolment_api.document_templates.test_settings --noinput
+   Result: 91 passed, isolated SQLite test storage, no production database use.
+   Coverage includes all four programme variants, v2 schema acceptance,
+   draft/preview/publish versioning and unchanged existing issued assignments.
+
+2. Broad frontend command (all arguments on one line):
+   npm --prefix frontend test -- src/features/compliance-documents/__tests__
+   src/features/pending-signatures/__tests__
+   src/pages/users/wizard-builder/__tests__
+   src/pages/users/__tests__/boardPage.test.tsx
+   src/pages/learner/compliance
+   src/pages/learner/onboarding/__tests__/reviewDownload.test.tsx
+   src/pages/learner/onboarding/__tests__/ulnPrivacyReview.test.tsx --maxWorkers=2
+   Result: 22 files, 214 normal tests passed; 215 with optional artifact generation.
+   Following final pagination tuning, document tests passed: 13 files / 125 tests
+   with artifacts. Final theme/pagination focused run: 2 files / 34 tests passed.
+   Existing Node localStorage/jsdom canvas warnings remain non-failing.
+
+3. npm --prefix frontend run type-check: passed.
+   From frontend: node node_modules/eslint/bin/eslint.js
+   src/features/compliance-documents --max-warnings 0: passed.
+   npm --prefix frontend run build: passed. Existing dynamic-import/chunk and
+   plugin timing notices are non-failing. git diff --check: passed.
+
+4. Actual PDFs: 16 short/long synthetic documents, plus one realistic Training
+   Plan with 3 modules, 6 weeks, 36 activities, six methods, long lead names,
+   complete dates and OTJ 0.75/2.5/0.15/0/2/'0.7500'. All nine realistic Training
+   Plan pages were inspected visually, including all four learning-table pages,
+   the final activity, signatures and appendices. All five generated ILR pages
+   were compared with the reference; both ILR signers/declarations now share the
+   final page. First/final pages of all eight short/long types were also reviewed.
+
+5. PyMuPDF checks on generated PDFs: no missing body tokens versus v1 output
+   after excluding obsolete running titles, page counters and repeated table
+   headers; no detected glyph overlaps or text outside reading bounds; no empty
+   pages; signature aspect ratios retained. Learning table headers repeat on
+   pages 4–7 and all tested numeric/date values remain complete text words.
+   Text geometry checks supplement, rather than replace, visual inspection.
+
+6. Sixteen v1 PDFs were regenerated with identical inputs and compared with
+   pre-change outputs. All sixteen are byte-identical after normalising only
+   CreationDate and the random PDF ID. Existing classic layout regression tests
+   also pass. No old database record or stored issued PDF was rewritten.
+
+7. Local Chrome tested the real Builder, theme selection, Save Draft, actual PDF
+   iframe preview and PDF download for all eight types. Computed heading/header/
+   body colours and vector decoration matched the theme. No browser page errors.
+   The browser used intercepted synthetic API responses: eight local test draft
+   saves, zero publication requests and zero real backend writes.
+
+Local review artifacts (not production learner documents)
+.cache/purple-reference/page-1.png through page-5.png: supplied reference renders
+.cache/purple-output/ilr-short.pdf: five-page themed ILR sample
+.cache/purple-output/training-plan-realistic.pdf: nine-page Training Plan sample
+.cache/purple-output/training-all-pages.png: all nine Training Plan pages
+.cache/purple-output/inspection.json: PDF geometry/content/history checks
+.cache/purple-output/browser-results.json: all eight browser preview/downloads
+.cache/purple-output/browser-*.pdf: actual browser-download samples
+.cache/purple-output/v1-after/: regenerated historical v1 comparison files
+Other short/long samples and page PNGs are in .cache/purple-output/.
+
+Usage and version safety
+Open Compliance Documents -> Edit a template -> choose 'Purple — supplied
+reference design' -> Save Draft -> Preview saved draft. New editable copies of
+original/v1 templates prepare v2 locally; explicit Original layout remains
+selectable. Existing published-version Preview intentionally keeps that version's
+design. Global publication remains a separate explicit admin action and was NOT
+performed. New issuance uses the new style after the existing publication flow.
+Learner-specific revisions use their existing version/provenance mechanism.
+No database migration, schema alteration, production data update or PDF storage
+rewrite was needed. Historical template IDs, issued snapshots, marks, signature
+statuses and original files remain unchanged.
+
+Integration notes and limitations
+Coordinate changes to render.ts, documentTheme.ts, pageDocument.ts, types.ts,
+FullPageEditor.tsx, page.tsx and registry.py with teammates touching this feature.
+Keep both theme IDs: lavender-v1 must not be renamed to v2 or historical output
+would change. New helpers are dedicated files; unrelated shared components were
+not refactored. No dependency or migration coordination is needed.
+The source reference is raster-only, so vector curves/colours are reconstructed
+and Helvetica provides a compatible font, rather than a recovered original font.
+This is a close visual match, not a pixel-for-pixel replica. Explicit admin page
+breaks and existing content remain; page count follows real content length.
+The existing Latin-text/font support is unchanged. Production drafts/templates
+were not saved or published by this task; the admin must review and publish
+through the normal application flow before future issued documents use v2.

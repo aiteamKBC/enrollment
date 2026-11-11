@@ -16,6 +16,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from enrolment_api.document_templates import service as template_service
 
 from coach_api.models import CoachCalendarEvent, ImportedReviewInstance
 from coach_api.booking_availability import CoachAvailabilityUnavailable
@@ -237,7 +238,8 @@ def _record_enrolment_review(record, *, kind, learner_kind_id, coach_id):
         }
         if coach_id is not None:
             defaults["coach_id"] = coach_id
-        EnrolmentReview.objects.update_or_create(
+        template_service.mirror_booked_review(
+            EnrolmentReview,
             event_key=record.event_key,
             defaults=defaults,
         )

@@ -15,6 +15,8 @@
 // row for an officer to complete, rather than a guess.
 // ============================================================================
 import jsPDF from 'jspdf';
+import { renderManagedDocument } from '@/features/compliance-documents/render';
+import type { IssuedTemplate } from '@/features/compliance-documents/types';
 
 const PAGE_W = 210;
 const PAGE_H = 297;
@@ -408,6 +410,7 @@ export function ilrFilename(learnerName: string): string {
 
 /** Render an issued ILR from its record, with the marks on file. */
 export function renderIlrPdf(document: {
+  template?: IssuedTemplate;
   learnerDetails: IlrLearnerDetails;
   answers: Record<string, any>;
   signatures: {
@@ -416,6 +419,8 @@ export function renderIlrPdf(document: {
   };
   marks: { learner: string; provider: string };
 }) {
+  const managed = renderManagedDocument(document.template, document);
+  if (managed) return managed;
   const { learnerDetails, answers, signatures, marks } = document;
   return buildIlrPdf(learnerDetails, answers, {
     learner: signatures.learner.signed

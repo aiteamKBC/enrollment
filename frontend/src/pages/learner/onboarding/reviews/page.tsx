@@ -1,5 +1,8 @@
+import { DocumentSignatureTarget } from '@/features/pending-signatures/DocumentSignatureTarget';
+import { LearnerDocumentRevisions } from '@/features/compliance-documents/LearnerDocumentRevisions';
+import { REVIEW_DOCUMENT_KEYS } from '@/features/compliance-documents/revisionApi';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { roleNavMap } from '@/mocks/navigation';
 import { useMyLearner } from '@/hooks/useMyLearner';
@@ -76,6 +79,7 @@ function ReviewCard({ review, onChanged }: { review: OnboardingReviewSlot; onCha
   const learnerSigned = Boolean(review.signatures?.learner.signed);
 
   return (
+    <DocumentSignatureTarget documentKey={REVIEW_DOCUMENT_KEYS[review.type]} sourceId={eventKey || undefined}>
     <div className={`rounded-2xl border p-4 md:p-5 transition-smooth ${
       done ? 'border-emerald-200 bg-emerald-50/40' : review.issued ? 'border-primary-200 bg-background-50' : 'border-foreground-200/70 bg-background-50'
     }`}>
@@ -142,6 +146,7 @@ function ReviewCard({ review, onChanged }: { review: OnboardingReviewSlot; onCha
         </div>
       </div>
 
+      {eventKey && <LearnerDocumentRevisions learnerId={String(id)} documentKey={REVIEW_DOCUMENT_KEYS[review.type]} sourceId={eventKey} />}
       {signing && signData && eventKey && (
         <SignReviewModal
           kind={kind}
@@ -159,6 +164,7 @@ function ReviewCard({ review, onChanged }: { review: OnboardingReviewSlot; onCha
         />
       )}
     </div>
+    </DocumentSignatureTarget>
   );
 }
 
@@ -170,6 +176,7 @@ function ReviewCard({ review, onChanged }: { review: OnboardingReviewSlot; onCha
  * learner then completes and signs it here.
  */
 export default function OnboardingReviewsPage() {
+  const signatureTarget = new URLSearchParams(useLocation().search).get('signature');
   const { kind, id } = useMyLearner();
   const isCommercial = kind === 'commercial';
   const navigate = useNavigate();
@@ -194,7 +201,7 @@ export default function OnboardingReviewsPage() {
       .finally(() => setLoading(false));
   }, [kind, id, isCommercial, submitted]);
 
-  useEffect(load, [load]);
+  useEffect(load, [load, signatureTarget]);
 
   const completedCount = data?.reviews.filter((r) => r.completed).length ?? 0;
   const total = data?.reviews.length || 4;

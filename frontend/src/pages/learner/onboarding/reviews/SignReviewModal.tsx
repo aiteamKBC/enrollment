@@ -21,6 +21,7 @@ export default function SignReviewModal({
   signatures,
   onClose,
   onSigned,
+  submitSignature,
 }: {
   kind: LearnerKind;
   learnerId: string;
@@ -30,6 +31,8 @@ export default function SignReviewModal({
   signatures: ReviewSignatures;
   onClose: () => void;
   onSigned: (signatures: ReviewSignatures) => void;
+  /** Admin document-row review pins the already previewed source and checksum. */
+  submitSignature?: (body: { party: 'learner' | 'admin'; name: string; signature: string }) => Promise<{ signatures: ReviewSignatures }>;
 }) {
   const existing = signatures[party];
   // The name is not chosen here: it is whoever is signing. `defaultName` is the
@@ -45,11 +48,12 @@ export default function SignReviewModal({
     setSaving(true);
     setErr(null);
     try {
-      const res = await signReviewForm(kind, learnerId, eventKey, {
+      const body = {
         party,
         name: signature ? name : '',
         signature,
-      });
+      };
+      const res = submitSignature ? await submitSignature(body) : await signReviewForm(kind, learnerId, eventKey, body);
       onSigned(res.signatures);
       onClose();
     } catch (e) {

@@ -1,0 +1,146 @@
+ADMIN DOCUMENT PREVIEW — IMPLEMENTATION AND VERIFICATION
+Date: 9 November 2026
+Branch: compliance-documents
+
+RESULT
+The four Compliance and four Review document rows on the admin learner profile
+now have a reusable Preview action, both before first issuance and after issue.
+Opening/closing Preview never issues, signs, finalises, creates a revision, opens
+the editor, starts a review, or sends a signature notification.
+
+VIEWER
+Extended the existing DocumentPreview and existing accessible users-page Modal.
+The browser PDF viewer provides all pages, scrolling, zoom and page navigation.
+The surrounding modal retains focus trapping, Escape, Close and return focus.
+It has a wrapped mobile footer, Download preview PDF and a safe Open in new tab
+fallback. Object URLs are revoked on close; unavailable/corrupt stored PDF
+responses produce errors rather than silently substituting a different file.
+The preview download and embedded viewer use the same blob. Existing row Download
+and historical View/Download/Edit/Compare/Create/Delete Draft actions remain.
+
+EXACT SOURCE AND SIGNING SAFETY
+GET /enrolment_api/document-templates/learners/<pk>/documents/<key>/preview/
+  sourceId=<the existing row's source ID or review event key>
+This resolves only that learner's exact currently active issued source. It does
+not select a newer global template, an open draft, or the latest learner revision.
+Original R1 and its published template version are labelled in the viewer.
+Historical/updated copies retain their exact existing History actions.
+
+The response uses the existing source serializers and issued template binding.
+Compliance particulars come from the saved issued source, not current profile
+data. Signed Reviews require their existing frozen review snapshot. If that is
+unavailable, the endpoint fails closed with an explanation instead of filling a
+historical signed review from the learner's current data.
+
+Existing immutable original PDF bytes are reused only when the saved artifact
+matches the current issued content and signatures. An unsigned original is never
+substituted for a partly/fully signed version. Where no matching persisted PDF
+artifact exists, the existing download renderer produces a temporary view from
+the authoritative saved source/template/signature snapshot. No old stored PDF is
+rewritten, restyled, reissued or replaced. Byte identity is verifiable for the
+persisted-artifact path; transient legacy rendering has the existing renderer's
+normal PDF metadata and is not claimed to reproduce an absent historical file.
+
+Admin Sign as provider/Review Sign first opens this preview. Continue to signature
+appears only after the PDF loads, then opens the existing signature capture UI.
+POST .../documents/<key>/sign-reviewed/ checks a signed token binding learner,
+document key, exact source ID and hash of the complete serialized document.
+Tokens expire after one hour. Under the existing database transaction/source-row
+lock, changed content/signatures, superseded sources, foreign tokens and missing
+tokens are rejected with a request to preview again. The endpoint then delegates
+to the existing signer, preserving its validation, permissions, completion checks,
+signature dates, audit/archive and enrolment advancement. Review completion is
+still required. Signature withdrawal remains the existing signer's operation.
+No alternate signature-record system or automatic signature was introduced.
+
+PRE-ISSUE PREVIEW
+The same GET endpoint with phase=pre-issue resolves issuance_reference, using the
+actual learner and applicable published template/programme variant. Unpublished
+drafts are ignored. The existing derivation/binding/rendering functions supply
+content and warnings. The default uses the same shared purple first-Issue design.
+The viewer clearly says PRE-ISSUE PREVIEW. The preview has no signing token.
+If another admin already issued the document, the request asks to reload and use
+the issued version instead. The actual Issue operation is unchanged and resolves
+its own current approved content at issuance time.
+
+PERMISSIONS / STORAGE
+Both endpoints use the established enrolment authentication/access-grant gate,
+an additional staff requirement, and existing CSRF protection for writes.
+Learner/employer/non-enrolment staff cannot use the admin preview/sign endpoints.
+Source lookup includes learner ID, document key and exact source identifier.
+Stored PDFs remain behind the existing authenticated learner-scoped endpoint.
+No public private-document URL, runtime DDL, migration, new table or live learner
+record modification was needed. Tests use explicitly isolated in-memory SQLite.
+
+FILES CHANGED IN THIS TASK (earlier uncommitted work is retained)
+backend/enrolment_api/document_templates/admin_preview.py                 NEW
+backend/enrolment_api/document_templates/urls.py                         routes
+backend/enrolment_api/document_templates/test_issued_preview.py          NEW tests
+backend/enrolment_api/document_templates/ADMIN_PREVIEW_REPORT.txt        NEW report
+frontend/src/features/compliance-documents/useAdminDocumentPreview.tsx   NEW shared controller
+frontend/src/features/compliance-documents/DocumentPreview.tsx           extend existing viewer
+frontend/src/features/compliance-documents/types.ts                     optional persisted PDF URL
+frontend/src/features/compliance-documents/__tests__/adminPreview.test.tsx NEW tests
+frontend/src/features/compliance-documents/__tests__/profileEdit.test.tsx await async editor content
+frontend/src/pages/users/BoardPage.tsx                                  wire eight rows/sign controls
+frontend/src/pages/learner/onboarding/reviews/SignReviewModal.tsx        optional reviewed-sign callback
+
+The existing editor regression assertion now waits for its contenteditable's
+asynchronous population, rather than assuming dialog header and body arrive in
+the same render. No editor production behaviour was changed.
+
+ACTUAL VERIFICATION
+Backend full document suite:
+  backend/.venv/Scripts/python.exe backend/manage.py test
+  enrolment_api.document_templates
+  --settings=enrolment_api.document_templates.test_settings --noinput
+  PASS: 144 tests; Django system checks pass.
+Final targeted issued-preview suite: PASS, 18 tests (includes inherited regressions).
+Frontend regression:
+  npx vitest run src/features/compliance-documents
+  src/features/pending-signatures
+  src/pages/learner/onboarding/__tests__/reviewDownload.test.tsx
+  PASS: 221 tests across 21 files.
+Final focused viewer/signature-guard tests: PASS, 20 tests.
+TypeScript: npm run type-check PASS.
+Scoped ESLint on changed production frontend files: PASS, no warnings/errors.
+Production build: npm run build PASS (8.52 seconds; existing bundler timing notices).
+git diff --check: PASS.
+
+REAL BROWSER / PDF CHECKS
+Chrome + actual BoardPage, real Issue clients, real PDF generators, and real Django
+issuer/preview/sign/storage handlers backed by isolated learner A/B fixtures:
+  - Clicked all eight pre-issue Preview actions before any document existed.
+  - Confirmed no issues, revisions, artifacts or review starts were created.
+  - Clicked all eight actual Issue buttons, then all eight issued Preview actions.
+  - All eight issued previews matched the immutable stored PDF bytes exactly.
+  - Confirmed no persisted state changed from opening/closing issued previews.
+  - Previewed a five-page ILR carrying a learner signature and empty provider
+    signature, continued to the real signature pad, drew and saved the provider
+    signature through the guarded endpoint, then previewed the signed result.
+  - Six-page Training Plan preview worked on a 390px mobile viewport with no
+    horizontal modal overflow and accessible Close/Open/Download controls.
+  - Zero browser page errors; zero reviews marked started.
+  - All eight real PDFs were parsed with PyMuPDF; learner A was present and B was
+    absent. Counts: agreement 4, ILR 5, Training Plan 6, written agreement 4,
+    eligibility 2, RPL 3, health & safety 2, ULN 3 pages.
+  - Inspected document pages/signature areas and desktop/mobile viewer images.
+Evidence is local-only in .cache/admin-preview-browser-results.json,
+.cache/admin-*.pdf, .cache/admin-preview-visual/ and viewer screenshots.
+Temporary test page/server processes were cleaned up; real project servers were
+not stopped or replaced. No real learner or production database was used.
+
+SCOPE / LIMITS / TEAM INTEGRATION
+Training Plan document content, tables, layouts, renderer, bindings, issuance,
+signature writer and calculations were not changed. Its admin action now has the
+same preview/identity guard as the other provider-signable documents.
+Programme Suitability, cohort assignment, module choices, wizard navigation,
+issued snapshots and historical signatures were not changed.
+
+Native PDF viewer controls depend on browser support; Open in new tab provides
+the fallback. A legacy signed Review without a reliable frozen snapshot fails
+closed. No live PostgreSQL concurrency or Azure-storage migration was performed.
+Existing non-admin signing routes keep their established behaviour. Coordinate
+the small BoardPage and SignReviewModal changes with teammates, and deploy these
+frontend/backend routes together. The new preview service/controller are isolated
+files. No commit, push, merge, rebase, reset or branch switch was performed.

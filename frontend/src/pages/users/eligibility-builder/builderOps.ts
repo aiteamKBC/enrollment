@@ -103,13 +103,14 @@ export function saveCustomQuestion(
   key: string | null,
   draft: QuestionDraft,
 ): { layout: EligibilityLayout; key: string } {
+  const contentOnly = draft.type === 'heading' || draft.type === 'description';
   const fields: Partial<EligibilityItem> = {
     label: draft.label,
     type: draft.type,
-    options: draft.type === 'dropdown' ? draft.options : undefined,
-    helpText: draft.helpText || undefined,
-    required: draft.required,
-    condition: draft.condition,
+    options: !contentOnly && draft.type === 'dropdown' ? draft.options : undefined,
+    helpText: !contentOnly ? draft.helpText || undefined : undefined,
+    required: contentOnly ? false : draft.required,
+    condition: contentOnly ? null : draft.condition,
   };
   if (key) return { layout: updateItem(layout, key, fields), key };
   const newKey = `new_${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`;
@@ -180,7 +181,7 @@ export function conditionSources(layout: EligibilityLayout, exceptKey?: string) 
 /** What publishing would add to enrolment.eligibility_form: one column per new question. */
 export function pendingColumns(layout: EligibilityLayout): { label: string; type: EligibilityQuestionType }[] {
   return allItems(layout)
-    .filter((it) => !it.builtin && !it.column)
+    .filter((it) => !it.builtin && !it.column && it.type !== 'heading' && it.type !== 'description')
     .map((it) => ({ label: itemLabel(layout, it), type: it.type ?? 'text' }));
 }
 

@@ -1,3 +1,5 @@
+import { persistOriginalPdf } from '@/features/compliance-documents/persistOriginalPdf';
+import { pendingSignaturesChanged } from '@/features/pending-signatures/events';
 import { readLearnerJson, invalidateLearnerReads } from './learnerRead';
 // ============================================================================
 // Training Plan API client
@@ -28,6 +30,7 @@ export interface TrainingPlanPartyState {
 }
 
 export interface TrainingPlanDocument {
+  template?: import('@/features/compliance-documents/types').IssuedTemplate;
   id: string;
   status: 'active' | 'superseded' | string;
   fullySigned: boolean;
@@ -77,10 +80,12 @@ export async function fetchTrainingPlanDocument(
 export async function issueTrainingPlanDocument(
   learnerId: string | number,
 ): Promise<TrainingPlanDocument> {
-  const data = await readJson<{ document: TrainingPlanDocument }>(
-    await fetch(`${BASE}/${learnerId}/issue/`, { method: 'POST', credentials: 'include' }),
+  const data = await readJson<{ document: TrainingPlanDocument; issuedDocumentSnapshot?: TrainingPlanDocument }>(
+    await fetch(`${BASE}/${learnerId}/issue/`, { method: 'POST', credentials: 'include', headers: { 'X-Document-Issue-Mode': 'initial' } }),
   );
   invalidateLearnerReads();
+  await persistOriginalPdf(learnerId, data.issuedDocumentSnapshot || data.document);
+  pendingSignaturesChanged();
   return data.document;
 }
 
@@ -100,5 +105,6 @@ export async function signTrainingPlanDocument(
       body: JSON.stringify({ party, name, signature, position }),
     }),
   );
+  pendingSignaturesChanged();
   return data.document;
 }

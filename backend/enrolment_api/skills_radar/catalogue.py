@@ -112,13 +112,18 @@ def validate(programme, raw, modules, prior):
             for path in PCP_OWNERS:
                 if not isinstance(mapping.get(path), str) or mapping[path] not in allowed[path]:
                     problems.append(f'Invalid {path} owner key. Available: {", ".join(sorted(allowed[path]))}.')
-        elif not isinstance(record, dict) or not isinstance(record.get('moduleKey'), str) or record['moduleKey'] not in allowed['moduleKey']:
+        elif not isinstance(record, dict):
             problems.append(f'Invalid active module key. Available: {", ".join(sorted(allowed["moduleKey"]))}. Parent groups are not assessable.')
+        else:
+            keys = record.get('moduleKeys') if isinstance(record.get('moduleKeys'), list) else [record.get('moduleKey')]
+            keys = [key for key in keys if isinstance(key, str)]
+            if not keys or any(key not in allowed['moduleKey'] for key in keys) or len(set(keys)) != len(keys):
+                problems.append(f'Invalid active module keys. Available: {", ".join(sorted(allowed["moduleKey"]))}. Parent groups are not assessable.')
         if problems:
             errors.extend({'row': row, 'code': code, 'message': text} for text in problems)
             continue
         item = {'id': identities.get(code) or f'radar:{programme}:{code}', 'code': code, 'kind': kind, 'description': description}
-        item.update({'owners': {path: mapping[path] for path in PCP_OWNERS}} if programme == 'PCP_L6' else {'moduleKey': record['moduleKey']})
+        item.update({'owners': {path: mapping[path] for path in PCP_OWNERS}} if programme == 'PCP_L6' else ({'moduleKey': keys[0], **({'moduleKeys': keys} if len(keys) > 1 else {})}))
         cleaned.append(item)
     if errors:
         raise CatalogueError('CSV/catalogue validation failed. Nothing was imported.', errors)

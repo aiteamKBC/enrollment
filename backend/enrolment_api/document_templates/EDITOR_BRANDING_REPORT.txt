@@ -1,0 +1,174 @@
+KBC / DfE EDITABLE DOCUMENT CANVAS — 9 November 2026
+Branch: compliance-documents. Existing uncommitted work retained.
+
+Root cause
+----------
+The PDF uses brandedPurpleTheme / brandedPurplePdf and a frozen presentationTheme
+on issued/revision snapshots. FullPageEditor instead only used the older
+purple-reference-v2 CSS: reference waves, vertical heading accents and lavender
+table headers. It did not render the two logos or the branded footer. The same
+design selector therefore led to visibly different browser and PDF presentations.
+Site-wide dashboard table rules also imposed their own header colours/shadows.
+
+Implementation
+--------------
+FullPageEditor remains the existing editable document component. Its contentEditable
+surface, page model, safe parser, protected bindings, configuration dialogs and
+formatting/page controls were retained. No PDF iframe replaces editable content.
+The navigation's React key now includes its position: moving the synthetic first
+page previously produced duplicate first-page render keys. Stored page/block IDs
+and the existing page serialization are unchanged.
+
+BrandedEditorPage supplies non-editable page furniture OUTSIDE contentEditable:
+  - Both actual PNG assets from brandingAssets.json, the same embedded bytes used
+    by the PDF renderer; no filesystem URLs, screenshots or substituted artwork.
+  - Current deep-purple KBC variant, with original gold/white/transparency intact.
+  - Original DfE asset and original colours, without filters or recolouring.
+  - headerLogoGeometry / PDF_HEADER: same visible 18 mm height and 16 mm top on
+    every current editor page, preserving original image proportions/padding.
+  - Shared BRAND_WAVES as top/bottom SVG paths, using their exact PDF coordinates,
+    layering and colours. SVG view boxes use the same A4 millimetre coordinate space.
+  - The PDF's footer line geometry and purple Page N of T badge.
+Furniture is pointer-events:none and cannot intercept cell selection or typing.
+
+brandedEditorTheme reuses BRANDED_PURPLE and PDF_HEADER for CSS variables, fonts,
+colours, padding and content clearance. Section icons use the PDF's same section
+categories and white glyph shapes. Presentation-only data attributes/CSS SVG
+backgrounds decorate headings and signature headings without adding textual
+children or changing saved question/block structures.
+
+documentTheme.css adds a scoped branded layer:
+  - Current title colour/size and 34 x 1.7 mm purple underline.
+  - Rounded lavender section bands, purple icon blocks and white icons.
+  - Dark-purple #642783 table headers, white bold text, white body cells and thin
+    light-purple borders. Dashboard table colours, corners and shadows are neutralised
+    ONLY inside the branded editable paper. New header cells inserted by Add column
+    are styled even when the browser represents them as thead td rather than th.
+  - Existing explicit text formatting overrides remain supported.
+  - A4 paper stays 210 x 297 mm. Current header reserves at least 42 mm, with the
+    existing PDF bottom clearance. Long content scrolls within the editable body;
+    logos/footer remain fixed and content stays accessible, without being hidden
+    behind decorative overlays. Overflow is detected and explained in the UI.
+  - Configured margins remain separate from effective header clearance: rendering
+    42 mm top clearance does NOT save an invalid 42 mm configured margin. Existing
+    settings limits and stored page layouts remain unchanged.
+
+Selector, defaults and persistence
+---------------------------------
+The visible option is now "KBC & DfE — Purple Branded Design".
+Its existing stored identifier purple-reference-v2 remains unchanged; no schema
+or identifier migration is needed. Lavender-v1 and classic options remain available.
+Global Builder continues preparing an unpublished editable draft through the
+existing designDraft path and uses the shared branded canvas for the purple option.
+
+LearnerRevisionEditor passes the saved presentationTheme to both the canvas and
+selector. A current branded snapshot with no explicit content design ID displays
+the current purple selection/design without rewriting that missing ID on load.
+Save/reopen therefore uses persisted snapshot metadata, not a transient toggle.
+Snapshots without a branded presentation retain their saved legacy treatment;
+v3 branded drafts retain their original logo assets/first-versus-later geometry.
+Current v4 presentations use the agreed consistent medium header on every page.
+
+Create still loads the applicable published content and current learner data;
+manual answers/new signatures remain subject to existing logic. Edit still loads
+the selected revision's content and historical signature references. There are no
+changes to source selection, publishing, signing, notifications, history storage,
+database bindings, document/PDF generation or issued/signed snapshot retrieval.
+
+Changed production files for THIS task
+--------------------------------------
+NEW frontend/src/features/compliance-documents/BrandedEditorPage.tsx
+NEW frontend/src/features/compliance-documents/brandedEditorTheme.ts
+MOD frontend/src/features/compliance-documents/FullPageEditor.tsx
+MOD frontend/src/features/compliance-documents/documentTheme.css
+MOD frontend/src/features/compliance-documents/DocumentDesignControl.tsx
+MOD frontend/src/features/compliance-documents/LearnerRevisionEditor.tsx
+MOD frontend/src/features/compliance-documents/page.tsx (design description only)
+NEW frontend/src/features/compliance-documents/__tests__/brandedEditor.test.tsx
+NEW backend/enrolment_api/document_templates/EDITOR_BRANDING_REPORT.txt
+
+No backend implementation, schema, migration, PDF-theme/renderer, original logo,
+learner answer, programme, cohort, module, Skills Radar or wizard changes were made.
+Normal build regenerated the existing ignored backend PDF runtime from unchanged
+PDF sources. No commit/push/merge/rebase/reset/branch switch was performed.
+
+Actual browser verification
+---------------------------
+Headless Chrome opened the actual React components through an isolated Vite fixture
+on 127.0.0.1:3016. The fixture mounted the real LearnerDocumentRevisions,
+DocumentHistory, LearnerRevisionEditor, FullPageEditor and global Builder components.
+Real Django view handlers used isolated SQLite fixtures over a local IPC adapter;
+no live account, production database or existing learner record was used.
+
+Verified in the browser:
+  - Create an Apprenticeship Agreement from the latest published fixture template,
+    including a distinguishable manual table and current learner bindings.
+  - Real logos, section icon bands, table colours, title, waves and footer appear.
+  - Edit a table cell and paragraph; add/remove columns; Undo/Redo; insert a learner
+    dynamic field; save the actual revision via Django; close/reopen Continue editing.
+  - Generate and download the actual saved revision PDF; downloaded bytes equal
+    displayed preview bytes, saved wording is present and learner binding resolves.
+  - Open ILR, access long content/signatures by scrolling, verify footer stays fixed.
+  - Switch Written Agreement editor pages 1, 2 and 3: logo geometry is identical.
+  - Open the real global Builder, edit/save/reopen an ILR template draft and generate
+    its PDF preview. Nothing was published by the test.
+  - In an editable formatting fixture: add/remove rows, insert an available signature
+    block, and add/reorder/remove pages using the existing controls.
+  - Current page geometry is identical across all measured canvas pages. Paper size
+    is approximately 793.69 x 1122.52 CSS pixels at 96 dpi, body starts 158.73 px below
+    its top (42 mm). Every measured header uses the shared logo calculation.
+  - No JavaScript runtime errors or console errors in the final browser run,
+    including after page reordering. Saved content contains no decorative SVG/image
+    markup and retains the dynamic-field token and existing design identifier.
+
+Visual artifacts under .cache/ (isolated test data only):
+  editor-brand-agreement-before.png
+  editor-brand-agreement-edited.png
+  editor-brand-ilr-page-1.png / editor-brand-ilr-bottom.png
+  editor-brand-written-agreement-page-1.png / -page-2.png / -page-3.png
+  editor-brand-global-ilr.png
+  editor-brand-agreement-preview.pdf / editor-brand-agreement-download.pdf
+  editor-brand-global-preview.pdf
+  editor-brand-agreement-pdf-page-1.png / editor-brand-global-pdf-page-1.png
+  editor-brand-browser-results.json (checks, actual geometry and request paths)
+
+Compared actual edited Agreement canvas against its saved, newly generated PDF.
+Both show identical logo artwork/positions, wave paths, branded colours, title
+underline, icon bands, dark headers and footer. PDF text checks confirmed the edited
+paragraph, manual answer and learner field; no Unicode corruption or missing content.
+Global preview appropriately uses sample values; its editor shows binding chips.
+
+Tests
+-----
+Frontend regression: 263 passed across 24 files, including 14 new editor tests.
+Command:
+  npm --prefix frontend test -- src/features/compliance-documents
+    src/features/pending-signatures
+    src/pages/learner/onboarding/__tests__/reviewDownload.test.tsx --maxWorkers=2
+New coverage: all eight document types, real asset elements, saved-content safety,
+default selection from persisted presentation, legacy handling, immediate selector
+switching, page navigation/reorder, margin safety, text editing, Undo/Redo and links.
+
+Backend: 168 passed using enrolment_api.document_templates.test_settings.
+Existing tests cover Create/Edit/save/finalise, history, Issue, pre-issue previews,
+PDF retrieval/download, signatures/permissions and historical PDF immutability.
+After the navigation key correction, the 14 editor tests were rerun and passed;
+the complete browser workflow and production build passed again.
+TypeScript type-check passed. Targeted ESLint passed. Production build passed.
+git diff --check passed. Existing non-failing Vite dynamic-import/plugin-timing and
+Node localStorage warnings remain unrelated to this visual change.
+Logs: .cache/editor-brand-{backend,regression-final,types-final,lint,build-final}.log.
+
+Boundaries / limitations
+------------------------
+This is a visually faithful editable HTML canvas, not a second PDF layout engine.
+Browser font metrics, automatic table widths and wrapping can differ from jsPDF.
+Binding chips remain visibly identifiable and editable through existing controls;
+the PDF renders their actual values. Protected system-linked blocks retain their
+existing configuration dialogs rather than becoming freely rebindable HTML.
+
+Badges count EXPLICIT EDITOR pages. Automatic print overflow adds PDF pages:
+the test Agreement has 2 editor pages / 4 printed pages and ILR has 1 / 5. The UI
+explains this and keeps PDF Preview authoritative. Scroll or insert existing
+explicit page breaks to access/split long content; no contractual text was removed
+to force a visual pagination match. Existing signed/issued PDFs are not regenerated.

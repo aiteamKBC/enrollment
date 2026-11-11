@@ -658,6 +658,7 @@ export const NAV_PERMISSIONS: NavPermissionMap[] = [
   { navId: 'settings', allowedRoles: ['tenant-admin', 'super-admin'] },
   { navId: 'users', allowedRoles: ['tenant-admin', 'super-admin'] },
   { navId: 'programmes', allowedRoles: ['admin', 'curriculum', 'programme-manager', 'tenant-admin', 'super-admin'] },
+  { navId: 'admin-programme-structure', allowedRoles: ['admin', 'tenant-admin', 'super-admin'] },
   { navId: 'curriculum', allowedRoles: ['curriculum', 'programme-manager', 'tenant-admin', 'super-admin'] },
   { navId: 'cohorts', allowedRoles: ['mis', 'programme-manager', 'tenant-admin', 'super-admin'] },
   { navId: 'tenants', allowedRoles: ['super-admin'] },

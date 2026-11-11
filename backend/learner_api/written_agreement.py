@@ -28,6 +28,8 @@ from django.db import DatabaseError, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from enrolment_api.document_templates import service as template_service
+from enrolment_api.document_templates.initial_issue import initial_issue
 
 from enrolment_api.auth import employer_signing_party_error, enrolment_login_required
 
@@ -78,7 +80,8 @@ def _iso(value):
 
 def derive_content(learner):
     """Everything the Written Agreement states, from the learner's records."""
-    start, end, dates_from = _group_dates(learner)
+    from enrolment_api.document_templates.learner_sources import document_dates
+    start, end, dates_from = document_dates(learner)
     modules = _plan_modules(learner)
     breakdown = _module_breakdown([_s(m.get("moduleId")) for m in modules])
 
@@ -98,14 +101,17 @@ def derive_content(learner):
                 })
 
     total_hours = round(sum(float(m.get("hours") or 0) for m in modules), 2)
+    from enrolment_api.document_templates.learner_sources import employment_details, programme_level, employer_postcode
+    from .training_plan_document import _extended_ilr_answers
+    ilr_details = employment_details(learner)
+    employer_answers = _extended_ilr_answers(learner.pk).get('employer') or {}
 
     particulars = {
         "apprenticeName": _s(learner.username),
-        "jobTitle": "",
-        # We hold no separate standard name/level, so the programme is what we
-        # can honestly state; an officer completes the rest.
+        "jobTitle": _s(getattr(ilr_details, 'job_title', '')),
+        # Programme title and catalogue level come from the official assignment.
         "apprenticeshipTitle": _s(learner.programme),
-        "apprenticeshipLevel": "",
+        "apprenticeshipLevel": programme_level(learner),
         "fundingBandValue": "",
         "isStandard": True,
         "startDate": _iso(start),
@@ -113,8 +119,8 @@ def derive_content(learner):
         "managerName": _s(learner.line_manager),
         "managerJobTitle": "",
         "employer": _s(learner.employer),
-        "employerPostcode": "",
-        "employerAddress": _employer_address(learner),
+        "employerPostcode": employer_postcode(learner, employer_answers),
+        "employerAddress": _employer_address(learner) or _s(employer_answers.get('address')),
         "mainProvider": _s(learner.learning_provider) or MAIN_PROVIDER,
         "subcontracted": False,
     }
@@ -190,7 +196,7 @@ def _party_json(signature, name, position, at):
 def _document_json(document):
     if document is None:
         return None
-    return {
+    payload = {
         "id": str(document.id),
         "status": _s(document.status),
         "fullySigned": bool(document.fully_signed),
@@ -227,6 +233,9 @@ def _document_json(document):
             "provider": _s(document.provider_signature),
         },
     }
+
+
+    return template_service.with_template('written-agreement', document, payload)
 
 
 def _active_document(learner_kind, learner_id, lock=False):
@@ -290,6 +299,7 @@ def written_agreement(request, pk):
 
 @enrolment_login_required
 @csrf_exempt
+@initial_issue('written-agreement')
 def issue_written_agreement(request, pk):
     """Issue the agreement, snapshotting the current content onto a new row."""
     if request.method != "POST":
@@ -320,6 +330,7 @@ def issue_written_agreement(request, pk):
                 costs=derived["costs"],
                 contacts=derived["contacts"],
             )
+            template_service.bind_issue('written-agreement', document, learner, _document_json(document))
     except DatabaseError as exc:
         logger.exception("issue_written_agreement: failed")
         return _error(f"Database error: {exc}", 502)
@@ -329,7 +340,7 @@ def issue_written_agreement(request, pk):
 
 @enrolment_login_required
 @csrf_exempt
-def sign_written_agreement(request, pk):
+def sign_written_agreement(request, pk, _revision_source=None):
     """Record one party's signature. Empty signature withdraws that sign-off."""
     if request.method != "POST":
         return _error("Method not allowed.", 405)
@@ -368,9 +379,13 @@ def sign_written_agreement(request, pk):
         # Lock the row for the read-modify-write so concurrent signers (learner,
         # employer, provider) can't overwrite each other's signature. See BE-4.
         with transaction.atomic(using="enrolment"):
-            document = _active_document(_learner_kind(learner), learner.pk, lock=True)
+            document = _revision_source if _revision_source is not None else _active_document(_learner_kind(learner), learner.pk, lock=True)
             if document is None:
                 return _error("No written agreement has been issued for this learner yet.", 404)
+
+            from enrolment_api.document_templates.revisions import source_locked
+            if source_locked('written-agreement', document):
+                return _error('This historical document is locked. Create a new learner revision for changes.', 409)
 
             now = timezone.now() if signature else None
             setattr(document, f"{party}_signature", signature)
@@ -380,6 +395,7 @@ def sign_written_agreement(request, pk):
 
             document.recalculate_signed()
             document.save()
+            template_service.archive_render('written-agreement', document, _document_json(document), name)
         promoted = advance_learner(learner)
     except DatabaseError as exc:
         logger.exception("sign_written_agreement: failed")

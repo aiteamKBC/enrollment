@@ -37,16 +37,18 @@ beforeEach(() => {
   api.write.mockResolvedValue({ meta: { updatedAt: 'saved-again' } });
 });
 
-it('uses confirmed ME with a stale board, leaves saved IDs/notes/evidence intact, and switches module panels without saves', async () => {
+it('uses confirmed ME with a stale board and filters categories without changing saved answers', async () => {
   render(page());
   await screen.findByLabelText('Selected module skills assessments');
   await waitFor(() => expect(api.profile).toHaveBeenCalledWith('Marketing Executive Level 4'));
   await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(33));
   expect(latest.draft.skillsRadar.assessments[answer.ksbId]).toEqual(answer);
   const calls = api.profile.mock.calls.length;
-  const modules = within(screen.getByRole('navigation', { name: 'Selected modules' })).getAllByRole('button');
-  await userEvent.click(modules[1]);
-  await userEvent.click(modules[0]);
+  const knowledge = screen.getByRole('button', { name: /^Knowledge / });
+  await userEvent.click(knowledge);
+  expect(knowledge).toHaveAttribute('aria-pressed', 'true');
+  await userEvent.click(knowledge);
+  expect(knowledge).toHaveAttribute('aria-pressed', 'false');
   expect(api.profile).toHaveBeenCalledTimes(calls);
   expect(api.write).not.toHaveBeenCalled();
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual(['32 competencies not yet rated']);
@@ -94,8 +96,8 @@ it('requires all 33 distinct current answers, ignores historical ratings, and co
     [final.id]: { ...answer, ksbId: final.id } } }));
   expect(screen.getByText('33 of 33 answered')).toBeVisible();
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual([]);
-  for (const button of within(screen.getByRole('navigation', { name: 'Selected modules' })).getAllByRole('button')) {
-    const counts = button.textContent!.match(/(\d+) of (\d+) answered/)!;
+  for (const card of within(screen.getByRole('navigation', { name: 'Selected modules' })).getAllByText(/\d+ of \d+ answered/)) {
+    const counts = card.textContent!.match(/(\d+) of (\d+) answered/)!;
     expect(counts[1]).toBe(counts[2]);
   }
   expect(latest.draft.skillsRadar.assessments.historical).toEqual(assessments.historical);

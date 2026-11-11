@@ -1,7 +1,7 @@
 import { Fragment, useId } from 'react';
 import { useWizard } from '@/pages/users/wizard/WizardContext.helpers';
 import { btnSecondary } from '@/pages/users/components/ui';
-import { selectionConfirmed } from '../useSuitability';
+import { completion, selectionConfirmed } from '../useSuitability';
 import type { ProgrammeId } from '../types';
 import { ordered, isModuleGroup, selectableModules, selectedModuleIds, mandatoryIds, pathwaySelectionError, selectionFingerprint, moduleSelectionComplete, type ProgrammeModule, type ProgrammeModuleSelection, type ModulesConfiguration } from './configuration';
 import { useModuleSelectionSave } from './useModuleSelectionSave';
@@ -105,7 +105,7 @@ export function ProgrammeModulesView({ configuration, programmeId, selection, on
   </section>;
 }
 
-function SavedModules({ configuration, programmeId, version }: { configuration: ModulesConfiguration; programmeId: ProgrammeId; version: number | null }) {
+function SavedModules({ configuration, programmeId, version, previewOnly = false }: { configuration: ModulesConfiguration; programmeId: ProgrammeId; version: number | null; previewOnly?: boolean }) {
   const { readOnly, hydrated } = useWizard();
   const { selection, status, error, update, retry } = useModuleSelectionSave();
   const path = configuration.programmes.find((p) => p.id === programmeId)?.pathways.find((p) => p.id === selection?.pathway);
@@ -116,10 +116,10 @@ function SavedModules({ configuration, programmeId, version }: { configuration: 
     {selection && selection.configurationVersion !== version && !(version === 0 && selection.configurationVersion === undefined) &&
       <p role="status" className="mt-4 text-sm text-amber-800">Published module settings have changed. Review your choices and save them before continuing.</p>}
     <ProgrammeModulesView configuration={configuration} programmeId={programmeId} version={version} selection={selection}
-      onChange={programmeId === 'PCP_L6' ? update : undefined} readOnly={readOnly || !hydrated} />
+      onChange={previewOnly ? undefined : programmeId === 'PCP_L6' ? update : undefined} readOnly={previewOnly || readOnly || !hydrated} />
     {!readOnly && canSaveReview && <button type="button" className={`${btnSecondary} mt-3`} disabled={status === 'saving' || !hydrated}
       onClick={() => update(reviewed)}>Save reviewed module selection</button>}
-    {!readOnly && programmeId === 'PCP_L6' && <p role="status" aria-live="polite" className="mt-3 text-xs text-foreground-600">
+    {!previewOnly && !readOnly && programmeId === 'PCP_L6' && <p role="status" aria-live="polite" className="mt-3 text-xs text-foreground-600">
       {status === 'saving' ? 'Saving…' : status === 'saved' ? 'All changes saved.' : status === 'error' ? 'Unable to save changes. Retry.' : 'Choose a pathway, then choose your modules. Your choices save automatically.'}
     </p>}
     {status === 'error' && <div role="alert" className="mt-3 text-sm text-red-700"><p>{error}</p>
@@ -132,10 +132,13 @@ export function ProgrammeModulesCard() {
   const { suitability, userId, isCommercial, modules } = useWizard();
   const state = suitability?.state;
   const confirmed = selectionConfirmed(state ?? null);
-  const fallback = useModulesConfiguration(isCommercial ? 'commercial' : 'apprenticeship', userId, confirmed && !modules);
+  const resolvedProgramme = state?.selectedProgramme || modules?.data?.selectedProgramme;
+  const preview = Boolean(resolvedProgramme && completion(state) === 'SUBMITTED');
+  const fallback = useModulesConfiguration(isCommercial ? 'commercial' : 'apprenticeship', userId, (confirmed || preview) && !modules);
   const { data, error, retry } = modules ?? fallback;
-  if (!confirmed || !state?.selectedProgramme) return null;
+  if (!resolvedProgramme) return null;
+  if (!confirmed && !preview) return <p role="status" className="mt-6 text-sm text-foreground-600">Confirm your programme selection to load its modules.</p>;
   if (error) return <div role="alert" className="mt-6 text-sm text-red-700">{error}<button type="button" className={`${btnSecondary} ml-3`} onClick={retry}>Retry loading modules</button></div>;
   if (!data) return <p role="status" className="mt-6 text-sm">Loading programme modules…</p>;
-  return <SavedModules key={userId} configuration={data.configuration} programmeId={state.selectedProgramme} version={data.configurationVersion} />;
+  return <SavedModules key={userId} configuration={data.configuration} programmeId={resolvedProgramme} version={data.configurationVersion} previewOnly={!confirmed} />;
 }

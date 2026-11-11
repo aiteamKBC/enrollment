@@ -268,7 +268,7 @@ export function WizardProvider({
     steps.some(step => step.slug === 'programme-suitability'));
   const suitability = useSuitability(kindForSeed, userId, loadSuitability, publishedVersion,
     ['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) || layout.programmeSuitability?.enabled === false);
-  const modules = useModulesConfiguration(kindForSeed, userId, suitability.selectionConfirmed, publishedVersion);
+  const modules = useModulesConfiguration(kindForSeed, userId, Boolean(suitability.selectionConfirmed || suitability.state?.selectedProgramme || suitability.status === 'SUBMITTED'), publishedVersion);
   const apmStaffReview = isApmStaffReview(readOnlyLearnerSteps, board.programme.name || '', suitability.state);
   // Unconfirmed staff reviews cannot use the learner modules endpoint (which
   // requires confirmation and may pin a snapshot). Read published metadata only.

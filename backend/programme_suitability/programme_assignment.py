@@ -1,8 +1,11 @@
 """Apply a confirmed selection to the existing enrolment/profile relationship."""
 import re
+from datetime import date
 
 from django.db import connections, router
+from django.conf import settings
 from django.utils import timezone
+from .intake_calendar import resolve_intake, DEFAULT_INTAKES
 
 from learner_api.models import EnrolmentUser, LearnerProfile
 from .configuration import PROGRAMMES
@@ -18,6 +21,104 @@ CATALOGUE_NAMES = {
 
 class ProgrammeAssignmentError(ValueError):
     """Confirmation needs staff review; the enclosing transaction must roll back."""
+
+
+def automatic_cohort_window(completed_on, entries=None):
+    """Return the annual intake label for a completion date."""
+    return resolve_intake(completed_on, entries or DEFAULT_INTAKES)
+
+
+def published_intake_calendar(database):
+    """Read the effective calendar from the current immutable Wizard Layout."""
+    from enrolment_api.wizard_layout import CONN, read_current
+    with connections[CONN].cursor() as cursor:
+        current = read_current(cursor)
+    calendar = (current[1] or {}).get('intakeCalendar') if current else None
+    return calendar if isinstance(calendar, list) else DEFAULT_INTAKES
+
+
+def resolve_automatic_cohort(database, programme_id, completed_on, calendar=None):
+    """Resolve target intake or the latest eligible earlier intake."""
+    from enrolment_api.wizard_layout import CONN, read_current
+    from .intake_calendar import cohort_assignment_window
+    from .programme_structure import validate_structure
+    with connections[CONN].cursor() as cursor:
+        published = read_current(cursor)
+    layout = published[1] if published else {}
+    snapshot = layout.get('programmeStructure') or {}
+    definitions = (layout.get('programmeSuitability') or {}).get('programmes', [])
+    programme = next((p for p in snapshot.get('programmes', [])
+        if p.get('id') == programme_id or p.get('curriculumProgrammeId') == programme_id
+        or any(d.get('id') == p.get('id') and d.get('catalogueId') == programme_id for d in definitions)), None)
+    if programme and any(c.get('assignmentPeriod') for c in programme.get('cohorts', [])):
+        try:
+            validate_structure(snapshot)
+        except (ValueError, TypeError):
+            return None
+        with connections[database].cursor() as cursor:
+            cursor.execute("SELECT cohort_id,cohort_name FROM curriculum.cohorts WHERE programme_id=%s AND lower(coalesce(status,'active')) NOT IN ('archived','deleted','inactive')",[programme_id])
+            real = dict(cursor.fetchall())
+        matching, previous = [], []
+        for cohort in programme.get('cohorts', []):
+            # The published structure governs new assignments. Curriculum's
+            # status can change while an Admin is editing an unpublished draft;
+            # that must not change assignment eligibility before publication.
+            # Keep the real-row check above to reject missing/archived records.
+            if (cohort.get('id') not in real or
+                    str(cohort.get('status', 'active')).lower() not in {'planned', 'active'}):
+                continue
+            # A published empty editor configuration is not usable for learners.
+            configured = any(m.get('active',True) for m in cohort.get('modules',[]))
+            if programme.get('id') == 'PCP_L6':
+                configured = bool(cohort.get('routes')) and all(r.get('modules') for r in cohort['routes'])
+            window = cohort_assignment_window(cohort)
+            if not configured or window is None:
+                continue
+            candidate = (window[1], cohort['id'], real[cohort['id']])
+            if window[0] <= completed_on <= window[1]:
+                matching.append(candidate)
+            elif window[1] < completed_on:
+                previous.append(candidate)
+        if len(matching) > 1:
+            return None
+        candidates = matching or previous
+        if candidates:
+            _, cid, name = max(candidates)
+            return cid, name, not bool(matching)
+        return None
+    if getattr(settings, 'PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED', False):
+        # New cohort-aware assignment cannot substitute a legacy name match.
+        return None
+    intake, year = automatic_cohort_window(completed_on, calendar)
+    with connections[database].cursor() as cursor:
+        cursor.execute(
+            "SELECT cohort_id, cohort_name FROM curriculum.cohorts "
+            "WHERE programme_id = %s AND lower(coalesce(status, 'active')) IN ('planned', 'active')",
+            [programme_id],
+        )
+        rows = cursor.fetchall()
+    token = re.compile(rf"(?:^|[-_\\s]){intake}(?:[-_\\s])?{year}(?:$|[-_\\s])", re.I)
+    matches = [row for row in rows if token.search(str(row[0] or "")) or token.search(str(row[1] or ""))]
+    if len(matches) == 1:
+        return (*matches[0], False)
+    # Parse known intake identities and compare chronology rather than row order.
+    candidates = []
+    for row in rows:
+        text = f"{row[0] or ''} {row[1] or ''}"
+        found = re.search(r"(?:^|[-_\s])(Feb|Jun|Oct)[-_\s]?(\d{4})(?:$|[-_\s])", text, re.I)
+        if not found:
+            continue
+        intake_name, intake_year = found.group(1).title(), int(found.group(2))
+        month = {'Feb': 2, 'Jun': 6, 'Oct': 10}[intake_name]
+        chronology = (intake_year, month)
+        target_month = {'Feb': 2, 'Jun': 6, 'Oct': 10}[intake]
+        if chronology <= (year, target_month):
+            candidates.append((chronology, row))
+    if candidates:
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        row = candidates[0][1]
+        return (*row, True)
+    return None
 
 
 def assignment_database(row):
@@ -131,8 +232,18 @@ def sync_confirmed_programme_to_learner(row, *, actor="system", reconcile=False,
     _check_placement(database, assignment, source.cohort, source.group)
     if profile:
         _check_placement(database, assignment, profile.cohort, profile.group_name, profile.cohort_id, profile.group_id)
+    automatic_cohort = None
+    if profile and not profile.cohort_id and getattr(settings, 'PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED', False):
+        completed_on = timezone.localtime(row.selection_confirmed_at or row.confirmed_at).date()
+        automatic_cohort = resolve_automatic_cohort(database, identifier, completed_on, published_intake_calendar(database))
+        if automatic_cohort is None:
+            # Programme assignment is still valid, but cohort assignment needs
+            # an explicit admissions decision when the curriculum is missing or
+            # ambiguous. Never guess from a display name or default intake.
+            automatic_cohort = {"pending": True, "intake": automatic_cohort_window(completed_on)[0], "year": automatic_cohort_window(completed_on)[1]}
     outcome = {"status": "WOULD_APPLY" if dry_run else "APPLIED", **assignment,
                "previousProgramme": old_name, "profileId": profile.pk if profile else None,
+               "automaticCohort": automatic_cohort,
                "at": timezone.now().isoformat(), "actor": actor}
     if dry_run:
         return outcome
@@ -145,6 +256,11 @@ def sync_confirmed_programme_to_learner(row, *, actor="system", reconcile=False,
             if getattr(profile, field) != value:
                 setattr(profile, field, value)
                 changes.append(field)
+        if isinstance(automatic_cohort, tuple):
+            cohort_id, cohort_name = automatic_cohort[:2]
+            profile.cohort_id = str(cohort_id)
+            profile.cohort = str(cohort_name or cohort_id)
+            changes.extend(["cohort_id", "cohort"])
         if changes:
             profile.save(using=database, update_fields=[*changes, "updated_at"])
     row.review = {**row.review, "programmeAssignment": outcome}

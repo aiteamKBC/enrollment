@@ -173,6 +173,9 @@ export function homeRouteFor(
   if (account.role === 'employer' && account.subjectId) {
     return `/employers/${account.subjectId}/documents`;
   }
+  if (account.role === 'admin' || account.role === 'staff') {
+    return account.accessHome || '/users';
+  }
   return '/users';
 }
 

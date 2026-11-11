@@ -1,3 +1,5 @@
+import { persistOriginalPdf } from '@/features/compliance-documents/persistOriginalPdf';
+import { pendingSignaturesChanged } from '@/features/pending-signatures/events';
 import { readLearnerJson } from './learnerRead';
 // ============================================================================
 // Apprenticeship Agreement API client
@@ -44,6 +46,7 @@ export interface AgreementPartyState {
 }
 
 export interface Agreement {
+  template?: import('@/features/compliance-documents/types').IssuedTemplate;
   id: string;
   status: 'active' | 'superseded' | string;
   fullySigned: boolean;
@@ -91,9 +94,11 @@ export async function fetchAgreement(learnerId: string | number): Promise<Agreem
  * signature only ever attests to the particulars it was given against.
  */
 export async function issueAgreement(learnerId: string | number): Promise<Agreement> {
-  const data = await readJson<{ agreement: Agreement }>(
-    await fetch(`${BASE}/${learnerId}/issue/`, { method: 'POST', credentials: 'include' }),
+  const data = await readJson<{ agreement: Agreement; issuedDocumentSnapshot?: Agreement }>(
+    await fetch(`${BASE}/${learnerId}/issue/`, { method: 'POST', credentials: 'include', headers: { 'X-Document-Issue-Mode': 'initial' } }),
   );
+  await persistOriginalPdf(learnerId, data.issuedDocumentSnapshot || data.agreement);
+  pendingSignaturesChanged();
   return data.agreement;
 }
 
@@ -112,6 +117,7 @@ export async function signAgreement(
       body: JSON.stringify({ party, name, signature }),
     }),
   );
+  pendingSignaturesChanged();
   return data.agreement;
 }
 

@@ -32736,6 +32736,33 @@ def curriculum_ksb_sets(request):
 
 @require_GET
 def curriculum_cohorts(request):
+    if request.GET.get('view') == 'identity':
+        # The Programme Structure editor only needs to know whether a target
+        # already exists. The normal collection builds the entire Curriculum
+        # tree before filtering by Programme; a cold Neon rebuild can exceed
+        # the editor's request timeout even when the result is a few rows.
+        programme_id = clean_str(request.GET.get('programme_id') or request.GET.get('programmeId'))
+        cohort_id = clean_str(request.GET.get('cohort_id') or request.GET.get('cohortId'))
+        name = clean_str(request.GET.get('name'))
+        if not programme_id or not (cohort_id or name):
+            return json_error('Programme ID and Cohort ID or name are required.', status=400)
+        where, params = 'programme_id = %s', [programme_id]
+        if cohort_id:
+            where += ' and cohort_id = %s'
+            params.append(cohort_id)
+        else:
+            where += ' and lower(trim(cohort_name)) = lower(trim(%s))'
+            params.append(name)
+        rows = authoring_fetch_all(COHORT_AUTHORING_DETAILS_TABLE, where, params, ensure_tables=False)
+        results = [{
+            'id': row.get('cohort_id'),
+            'name': row.get('cohort_name') or '',
+            'programmeId': row.get('programme_id') or '',
+            'programme': row.get('programme_name') or '',
+            'startDate': format_date(row.get('start_date')),
+            'status': row.get('status') or 'planned',
+        } for row in rows if not curriculum_row_is_archived(row) and (not name or normalise(row.get('cohort_name')) == normalise(name))]
+        return curriculum_results_response(results)
     payload = get_cached_payload(request)
     programme_id = request.GET.get('programme_id') or request.GET.get('programmeId') or request.GET.get('programme')
     results = payload['cohorts']
@@ -32963,6 +32990,14 @@ def create_curriculum_cohort(payload):
     ), None)
     if duplicate:
         existing_id = clean_str(duplicate.get('cohortId')) or cohort_id
+        # Programme Structure may create/link a Cohort without delivery dates.
+        # A namesake retry must not clear/recompute an existing delivery plan.
+        delivery_dates_omitted = not any(key in payload for key in ('startDate', 'endDate', 'durationMonths'))
+        if 'startDate' not in payload:
+            payload = dict(payload, startDate=duplicate.get('startDate'))
+        if delivery_dates_omitted:
+            end_date = duplicate.get('endDate')
+            duration_months = duplicate.get('durationMonths')
         updates = {
             'cohort_name': name,
             'programme_id': programme_id or None,
@@ -32995,6 +33030,10 @@ def create_curriculum_cohort(payload):
                 updates['apprenticeship_end_override'],
             )
         ) or None
+        if delivery_dates_omitted:
+            updates['status'] = duplicate.get('status') or updates['status']
+            if not any(key in payload for key in ('epaMonths', 'epa_months', 'apprenticeshipEndOverride', 'apprenticeship_end_override')):
+                updates['apprenticeship_end_date'] = duplicate.get('apprenticeshipEndDate')
         if 'holidayIds' in payload or 'holiday_ids' in payload:
             updates['holiday_ids'] = json_db_value(holiday_ids)
         if excluded_holiday_ids_sent:
@@ -33230,11 +33269,19 @@ def curriculum_cohort_detail(request, identifier):
             updates['programme_id'] = resolved
             if clean_str(payload.get('programme')):
                 updates['programme_name'] = clean_str(payload.get('programme'))
-    updates['status'] = title_case_status(
-        clean_str(cohort_row.get('status')) == 'archived',
-        start_date,
-        end_date,
-    )
+    if 'status' in payload:
+        requested_status = clean_str(payload.get('status')).lower()
+        if requested_status not in {'planned', 'active', 'completed'}:
+            return json_error('Cohort status must be planned, active or completed.', status=400)
+        if clean_str(cohort_row.get('status')).lower() == 'archived':
+            return json_error('Restore an archived Cohort through the existing restore workflow.', status=409)
+        updates['status'] = requested_status
+    elif 'startDate' in payload or 'endDate' in payload or duration_months is not None:
+        updates['status'] = title_case_status(
+            clean_str(cohort_row.get('status')) == 'archived',
+            start_date,
+            end_date,
+        )
 
     nullable = ['apprenticeship_end_date']
     if epa_sent:

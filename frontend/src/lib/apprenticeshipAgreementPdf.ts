@@ -10,6 +10,8 @@
 // this document (note 6 on the form).
 // ============================================================================
 import jsPDF from 'jspdf';
+import { renderManagedDocument } from '@/features/compliance-documents/render';
+import type { IssuedTemplate } from '@/features/compliance-documents/types';
 import { formatHoursMinutes } from '@/lib/format';
 
 const PAGE_W = 210;
@@ -327,6 +329,7 @@ export function agreementFilename(learnerName: string): string {
  * Shared by the learner page and the admin board so both produce the same PDF.
  */
 export function renderAgreementPdf(agreement: {
+  template?: IssuedTemplate;
   particulars: AgreementParticulars;
   signatures: {
     apprentice: { signed: boolean; name: string; signedAt: string | null };
@@ -334,6 +337,8 @@ export function renderAgreementPdf(agreement: {
   };
   marks: { apprentice: string; employer: string };
 }) {
+  const managed = renderManagedDocument(agreement.template, agreement);
+  if (managed) return managed;
   const { particulars, signatures, marks } = agreement;
   return buildApprenticeshipAgreementPdf(particulars, {
     apprentice: signatures.apprentice.signed

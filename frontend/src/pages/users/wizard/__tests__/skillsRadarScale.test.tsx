@@ -48,9 +48,18 @@ describe('the Skills Radar scale', () => {
     expect(options[0]).toBe(champion);
     expect(champion.closest('label')).toHaveTextContent('I set the standard in this area');
     expect(champion.closest('label')).toHaveTextContent(/9$/);
+    expect(document.body.textContent).not.toMatch(/[\u00c2\u00c3\ufffd]/);
+    expect(screen.getByText('Select file')).toBeVisible();
 
     await user.click(champion);
     expect(screen.getByRole('status')).toHaveTextContent('may affect your eligibility for this apprenticeship');
     expect(screen.getByLabelText(/Add a note/)).toBeRequired();
+  });
+
+  it('renders clean progress text without mojibake separators', () => {
+    render(<SkillsRadar />);
+    expect(screen.getByText('0 / 1 answered')).toBeVisible();
+    expect(screen.getAllByText('0%')).toHaveLength(3);
+    expect(screen.queryByText(/answered.*[Ãâ]/)).not.toBeInTheDocument();
   });
 });

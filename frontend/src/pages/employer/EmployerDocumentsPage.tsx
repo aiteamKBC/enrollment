@@ -18,6 +18,8 @@ import { documentState as stateOf, useEmployerSigning } from './useEmployerSigni
 import { EmployerDocumentsTable, type DocumentFilter } from './EmployerDocumentsTable';
 import { useEmployerPortalChrome } from './employerPortalNav';
 import styles from './EmployerDocumentsPage.module.css';
+import { LearnerDocumentRevisions } from '@/features/compliance-documents/LearnerDocumentRevisions';
+import { REVIEW_DOCUMENT_KEYS } from '@/features/compliance-documents/revisionApi';
 
 type IconComponent = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
 
@@ -137,6 +139,11 @@ export default function EmployerDocumentsPage() {
 
               <EmployerDocumentsTable items={items} employerId={employerId} search={search} filter={filter}
                 opening={signingActions.opening} onSign={signingActions.startSigning} onShow={signingActions.openDocument} />
+              <div className="space-y-3">{items.filter((item) => item.learner.kind === 'apprenticeship' && item.kind !== 'document').map((item) => {
+                if (item.kind === 'document') return null;
+                const key = item.kind === 'review' ? REVIEW_DOCUMENT_KEYS[item.reviewType] : item.kind === 'agreement' ? 'apprenticeship-agreement' : item.kind;
+                return key ? <div key={`${item.learner.id}-${item.kind === 'review' ? item.eventKey : item.id}`}><p className="text-sm font-semibold">{item.learner.name} · {item.label}</p><LearnerDocumentRevisions learnerId={item.learner.id} documentKey={key} sourceId={item.kind === 'review' ? item.eventKey : item.id} /></div> : null;
+              })}</div>
             </>
           )}
         </div>

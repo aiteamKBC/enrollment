@@ -78,12 +78,12 @@ export function CatalogueAdmin({ layout, version, onChange }: { layout: WizardLa
         const published = index.catalogues[pid];
         return <article key={pid} aria-label={TITLES[pid]} className={`space-y-2 rounded-xl border p-3 ${selected === pid ? 'border-primary-400 bg-primary-50/40' : 'border-foreground-200'}`}>
           <h4 className="font-semibold">{TITLES[pid]}</h4>
-          <p className="text-sm">{published.records.length} published KSBs</p>
+          <p className="text-sm">{new Set(published.records.map((r) => r.id)).size} unique KSBs across {new Set(published.records.flatMap((r) => r.moduleKeys || (r.moduleKey ? [r.moduleKey] : []))).size} modules and {published.records.reduce((n, r) => n + (r.moduleKeys?.length ?? (r.moduleKey ? 1 : 0)), 0)} relationships</p>
           <p className="break-all text-xs">Mapping version: {published.version.slice(0, 12)}<br />Last published: {published.publishedAt ? new Date(published.publishedAt).toLocaleString('en-GB') : 'Initial catalogue'}</p>
-          <div className="flex flex-wrap gap-2"><a className={btnSecondary} href={csvUrl(pid)} download>Download Current Mapping CSV</a>
+          <div className="flex flex-wrap gap-2"><a className={btnSecondary} href={csvUrl(pid)} download>Export Current Mapping CSV</a>
             <label className={`${btnSecondary} ${busy ? 'opacity-50' : 'cursor-pointer'}`}>Upload CSV<input aria-label={`Upload CSV for ${TITLES[pid]}`} type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(e) => { void upload(pid, e.target.files?.[0]); e.target.value = ''; }} /></label>
             <button type="button" className={btnSecondary} disabled={busy} onClick={() => { select(pid); showCurrent((old) => old === pid ? null : pid); }}>View Current Mapping</button>
-            <a className={btnSecondary} href={csvUrl(pid, true)} download>Blank CSV template</a>
+            <a className={btnSecondary} href={csvUrl(pid, true)} download>Download Blank CSV Template</a>
             <button type="button" className={btnSecondary} disabled={busy} onClick={() => { select(pid); showPreview(true); }}>Preview mapping</button>
           </div>
         </article>;

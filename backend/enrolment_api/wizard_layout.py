@@ -226,7 +226,10 @@ def effective_layout(cursor, kind, learner_id):
     )
     assignment = cursor.fetchone()
     version = next((value for value in assignment if value is not None), None) if assignment else None
-    return read_version(cursor, version) if version is not None else read_current(cursor)
+    resolved = read_version(cursor, version) if version is not None else read_current(cursor)
+    # read_version carries scope metadata for admin/history callers, while the
+    # learner layout payload contract remains the four-field read_current shape.
+    return resolved[:4] if resolved is not None else None
 
 
 def record_layout_progress(cursor, kind, learner_id, version, *, checkpoint=False, submitted=False, actor=None):
@@ -433,6 +436,20 @@ def normalize_layout(raw, previous):
         integrate_radar(raw, previous, layout)
     except CatalogueError as exc:
         raise LayoutError(str(exc)) from exc
+    # Keep the additive canonical snapshot through the official normalizer.
+    # Older Wizard Layout clients omit these fields, so retain the previous
+    # published values rather than silently removing historical configuration.
+    from programme_suitability.programme_structure import validate_structure
+    from programme_suitability.intake_calendar import validate_calendar
+    import copy
+    for key in ('programmeStructure', 'intakeCalendar'):
+        value = raw.get(key, (previous or {}).get(key))
+        if value is not None:
+            try:
+                (validate_structure if key == 'programmeStructure' else validate_calendar)(value)
+            except (ValueError, TypeError) as exc:
+                raise LayoutError(str(exc)) from exc
+            layout[key] = copy.deepcopy(value)
     return with_suitability_step(layout), plan
 
 

@@ -53,13 +53,10 @@ it.each(['ME_L4', 'MM_L6', 'APM_L4', 'PCP_L6'] as ProgrammeId[])('renders a new 
   await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(catalogue.records.length));
   expect(screen.getByText(`0 of ${catalogue.records.length} answered`)).toBeVisible();
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual([`${catalogue.records.length} competencies not yet rated`]);
-  const buttons = within(screen.getByRole('navigation', { name: 'Selected modules' })).getAllByRole('button');
-  let total = 0;
-  for (const button of buttons) {
-    total += Number(button.textContent!.match(/0 of (\d+) answered/)![1]);
-    await userEvent.click(button);
-  }
+  const cards = within(screen.getByRole('navigation', { name: 'Selected modules' })).getAllByText(/0 of \d+ answered/);
+  const total = cards.reduce((count, card) => count + Number(card.textContent!.match(/0 of (\d+) answered/)![1]), 0);
   expect(total).toBe(catalogue.records.length);
+  expect(screen.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(catalogue.records.length);
   expect(api.profile).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });
 

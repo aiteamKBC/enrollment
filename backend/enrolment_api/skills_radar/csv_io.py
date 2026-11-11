@@ -26,8 +26,13 @@ def export_csv(catalogue, template=False):
     if not template:
         for record in catalogue['records']:
             values = [record['code'], record['kind'], record['description']]
-            values.extend(record['owners'][path] for path in ('operational', 'strategic', 'chartered')) if pid == 'PCP_L6' else values.append(record['moduleKey'])
-            writer.writerow([_safe(value) for value in values])
+            if pid == 'PCP_L6':
+                values.extend(record['owners'][path] for path in ('operational', 'strategic', 'chartered'))
+                writer.writerow([_safe(value) for value in values])
+            else:
+                keys = record.get('moduleKeys') or [record['moduleKey']]
+                for module in keys:
+                    writer.writerow([_safe(value) for value in (*values, module)])
     return '\ufeff' + output.getvalue()
 
 
@@ -52,6 +57,7 @@ def parse_csv(content, programme, modules, prior):
         if programme not in PROGRAMMES or header != expected:
             raise CatalogueError(f'Required columns in order: {",".join(expected)}.')
         records, errors = [], []
+        by_code = {}
         for values in reader:
             if not values or not any(values):
                 continue
@@ -61,16 +67,45 @@ def parse_csv(content, programme, modules, prior):
                 continue
             if escaped:
                 values = [v[1:] if len(v) > 1 and v[0] == "'" and v[1] in "'=+-@ \t\r\n" else v for v in values]
-            record = {'code': values[0].strip(), 'kind': values[1].strip(), 'description': values[2], '_row': row}
+            code, kind, description = values[0].strip(), values[1].strip(), values[2]
+            if not code:
+                errors.append({'row': row, 'message': 'ksb_code is required.'})
+            elif not re.fullmatch(r'[KSB]\d+', code, re.I):
+                errors.append({'row': row, 'code': code, 'message': 'ksb_code must use a K/S/B prefix followed by digits.'})
+            if kind not in {'Knowledge', 'Skill', 'Behaviour'}:
+                errors.append({'row': row, 'code': code, 'message': 'ksb_type must be Knowledge, Skill or Behaviour.'})
+            if not description.strip():
+                errors.append({'row': row, 'code': code, 'message': 'description is required.'})
             if programme == 'PCP_L6':
-                record['owners'] = dict(zip(('operational', 'strategic', 'chartered'), [v.strip() for v in values[3:]]))
+                record = {'code': code, 'kind': kind, 'description': description, '_row': row,
+                          'owners': dict(zip(('operational', 'strategic', 'chartered'), [v.strip() for v in values[3:]]))}
+                records.append(record)
             else:
-                record['moduleKey'] = values[3].strip()
-            records.append(record)
+                module = values[3].strip()
+                known_modules = {m.get('id') for p in modules.get('programmes', []) if p.get('id') == programme for m in p.get('modules', [])}
+                if module not in known_modules:
+                    errors.append({'row': row, 'code': code, 'message': f'Unknown module_key: {module}.'})
+                record = by_code.get(code)
+                if record is None:
+                    record = {'code': code, 'kind': kind, 'description': description, '_row': row, 'moduleKeys': []}
+                    by_code[code] = record
+                    records.append(record)
+                if record['kind'] != kind or record['description'] != description:
+                    errors.append({'row': row, 'code': code, 'message': 'Repeated KSB rows must use the same category and description.'})
+                elif module in record['moduleKeys']:
+                    errors.append({'row': row, 'code': code, 'message': 'Duplicate KSB-module relationship.'})
+                else:
+                    record['moduleKeys'].append(module)
             if len(records) > MAX_RECORDS:
                 raise CatalogueError(f'CSV must contain at most {MAX_RECORDS} KSBs.')
         if errors:
             raise CatalogueError('Invalid CSV rows. Nothing was imported.', errors)
+        for record in records:
+            if programme != 'PCP_L6':
+                keys = record.pop('moduleKeys')
+                record['moduleKey'] = keys[0]
+                if len(keys) > 1:
+                    record['moduleKeys'] = keys
     except csv.Error as exc:
         raise CatalogueError(f'Invalid CSV near line {reader.line_num}: {exc}.') from exc
     return validate(programme, {'programmeId': programme, 'records': records}, modules, prior)

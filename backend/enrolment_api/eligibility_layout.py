@@ -17,7 +17,9 @@ A layout is a list of sections, each a list of items:
     representative note -- by key, with whether each is shown, whether it is
     required, and for the three choice questions their answer list;
   * custom questions added in the builder -- text, number, date, yes/no or
-    dropdown -- optionally shown only for certain answers to another question.
+    dropdown -- optionally shown only for certain answers to another question;
+  * content-only heading and description blocks, stored in the layout without
+    creating answer columns.
 
 Built-in wording (labels, hints, the note, the page heading) is edited as text
 slots in layout["texts"]; which slots exist is the frontend registry's business
@@ -28,8 +30,9 @@ Each custom question gets a custom_* column in enrolment.eligibility_form, added
 by the publish in the same transaction as the layout row, so a layout can never
 name a column that does not exist. The server chooses every column name, and a
 question keeps its column and type once published: removing it only hides it,
-and a layout that leaves a published question out gets it back, hidden. Nothing
-here ever drops a column.
+and a layout that leaves a published question out gets it back, hidden. Heading
+and description blocks are stored in the layout JSON and do not collect answers.
+Nothing here ever drops a column.
 
 Publishing is for staff with enrolment access (auth.py). The public form reads
 the layout in force through the public endpoint, which carries no names.
@@ -93,7 +96,7 @@ HOME_SECTION.update(employerAddress="employment", fullAddress="residency")
 MOVED_TO_RESIDENCY = ("fullAddress", *form.ADDRESS_GROUPS["fullAddress"], "postcode", "attendedFundedTraining", "fundedTrainingCompletedOn")
 
 LOCKED_LABELS = {"firstName": "First Name", "surname": "Surname", "workEmail": "Work Email Address"}
-TYPE_NAMES = {"text": "text", "number": "number", "date": "date", "yesno": "yes/no", "dropdown": "dropdown"}
+TYPE_NAMES = {"text": "text", "number": "number", "date": "date", "yesno": "yes/no", "dropdown": "dropdown", "heading": "heading", "description": "description"}
 
 CUSTOM_KEY_RE = re.compile(r"^cf_[a-z0-9_]{1,50}$")
 #: Any item key a condition may name, including the temporary key the builder
@@ -266,7 +269,7 @@ def public_layout(layout):
 
 
 def custom_questions(layout):
-    """Every custom question in the layout by key, with the slug of its section."""
+    """Every custom question or content block by key and section slug."""
     out = {}
     for section in (layout or {}).get("sections") or []:
         for item in section.get("items") or []:
@@ -347,10 +350,15 @@ def _normalize_builtin(raw_item):
 def _normalize_custom(raw_item, section_title, prev_custom, used_keys, used_columns):
     key = raw_item.get("key")
     prior = prev_custom[key][0] if isinstance(key, str) and key in prev_custom else None
-    label = _clean_text(raw_item.get("label"), f"The label of a question in '{section_title}'", 300)
     question_type = raw_item.get("type")
-    if question_type not in form.CUSTOM_SQL_TYPES:
-        raise LayoutError(f"'{label}' needs a type: text, number, date, yes/no or dropdown.")
+    if question_type not in (*form.CUSTOM_SQL_TYPES, "heading", "description"):
+        raise LayoutError("A custom item needs a supported field type.")
+    content_only = question_type in {"heading", "description"}
+    label = _clean_text(
+        raw_item.get("label"),
+        "A heading" if question_type == "heading" else "A description" if question_type == "description" else f"The label of a question in '{section_title}'",
+        20_000 if question_type == "description" else 300,
+    )
 
     if prior:
         # The column's SQL type, and the answers already in it, fix the type.
@@ -366,23 +374,30 @@ def _normalize_custom(raw_item, section_title, prev_custom, used_keys, used_colu
         while key in used_keys:
             key, n = f"cf_{stem}_{n}", n + 1
         used_keys.add(key)
-        column, n = f"custom_{key[3:]}", 2
-        while column in used_columns:
-            column, n = f"custom_{key[3:]}_{n}", n + 1
-        used_columns.add(column)
+        column = None
+        if not content_only:
+            column, n = f"custom_{key[3:]}", 2
+            while column in used_columns:
+                column, n = f"custom_{key[3:]}_{n}", n + 1
+            used_columns.add(column)
 
-    if not CUSTOM_KEY_RE.match(key) or not form.CUSTOM_COLUMN_RE.match(str(column or "")):
+    if not CUSTOM_KEY_RE.match(key):
+        raise LayoutError(f"'{label}' has an invalid identifier.")
+    if not content_only and not form.CUSTOM_COLUMN_RE.match(str(column or "")):
         raise LayoutError(f"'{label}' has invalid storage.")
 
     item = {
         "key": key,
         "builtin": False,
         "hidden": bool(raw_item.get("hidden")),
-        "required": bool(raw_item.get("required")),
+        "required": False if content_only else bool(raw_item.get("required")),
         "label": label,
         "type": question_type,
-        "column": column,
     }
+    if not content_only:
+        item["column"] = column
+    if content_only:
+        return item
     help_text = _clean_text(raw_item.get("helpText"), "Help text", 500, required=False)
     if help_text:
         item["helpText"] = help_text
@@ -595,7 +610,10 @@ def normalize_layout(raw, previous):
     texts = _clean_texts(raw.get("texts"))
     if texts:
         layout["texts"] = texts
-    return layout, {item["column"]: form.CUSTOM_SQL_TYPES[item["type"]] for item in custom}
+    return layout, {
+        item["column"]: form.CUSTOM_SQL_TYPES[item["type"]]
+        for item in custom if item.get("type") in form.CUSTOM_SQL_TYPES and item.get("column")
+    }
 
 
 # ── views ────────────────────────────────────────────────────────────────────

@@ -19,6 +19,8 @@ import { MAX_COMPETENCE_SCORE, competenceMeta } from '@/mocks/enrolment-console'
 import { btnPrimary, btnSecondary, inputClass } from '@/pages/users/components/ui';
 import SignReviewModal from './SignReviewModal';
 import { downloadReviewPdf } from './reviewDocument';
+import { reviewQuestionLabel } from '@/features/compliance-documents/fields';
+import { ReviewSectionWording, ReviewTemplateWording } from '@/features/compliance-documents/ReviewTemplateWording';
 import {
   EXTENDED_ILR_QUESTIONS,
   FS_JOB_ROLE_QUESTIONS,
@@ -455,6 +457,7 @@ export default function ReviewFormPage() {
   };
 
   const info = data?.learnerInformation;
+  const wording = (section: string, key: string, fallback: string) => reviewQuestionLabel(data?.template, section, key, fallback);
   const status = data?.sectionStatus;
   const fs = answers.functionalSkills || {};
   const priorItems = answers.priorLearning?.items ?? [];
@@ -525,6 +528,7 @@ export default function ReviewFormPage() {
 
         {!loading && data && (
           <>
+            <ReviewTemplateWording data={data} />
             {error && (
               <p className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-2">
                 <i className="ri-error-warning-line mr-1" />{error}
@@ -559,7 +563,7 @@ export default function ReviewFormPage() {
             {has('ilr') && (
             <Panel title="ILR" complete={!!status?.ilr} onSave={() => save('ilr')} saving={savingSection === 'ilr'} dirty={!!dirty.ilr}>
               {ILR_QUESTIONS.map((q) => (
-                <YesNo key={q.key} name={`ilr-${q.key}`} label={q.label}
+                <YesNo key={q.key} name={`ilr-${q.key}`} label={wording('ilr', q.key, q.label)}
                   value={answers.ilr?.[q.key] ?? ''}
                   onChange={(v) => setSection('ilr', { ...answers.ilr, [q.key]: v })} />
               ))}
@@ -572,13 +576,13 @@ export default function ReviewFormPage() {
               {EXTENDED_ILR_QUESTIONS.map((q) =>
                 q.type === 'text' ? (
                   <label key={q.key} className="block py-2.5 border-b border-foreground-100 last:border-0">
-                    <span className="text-[12px] text-foreground-700 block mb-1.5">{q.label}</span>
+                    <span className="text-[12px] text-foreground-700 block mb-1.5">{wording('extendedIlr', q.key, q.label)}</span>
                     <textarea rows={3} value={answers.extendedIlr?.[q.key] ?? ''}
                       onChange={(e) => setSection('extendedIlr', { ...answers.extendedIlr, [q.key]: e.target.value })}
                       className={`${inputClass} resize-y`} />
                   </label>
                 ) : (
-                  <YesNo key={q.key} name={`extendedIlr-${q.key}`} label={q.label}
+                  <YesNo key={q.key} name={`extendedIlr-${q.key}`} label={wording('extendedIlr', q.key, q.label)}
                     value={answers.extendedIlr?.[q.key] ?? ''}
                     onChange={(v) => setSection('extendedIlr', { ...answers.extendedIlr, [q.key]: v })} />
                 ),
@@ -649,7 +653,7 @@ export default function ReviewFormPage() {
             <Panel title="Functional Skills & Job Role Discussion: Learner & Employer" complete={!!status?.fsJobRoleDiscussion}
               onSave={() => save('fsJobRoleDiscussion')} saving={savingSection === 'fsJobRoleDiscussion'} dirty={!!dirty.fsJobRoleDiscussion}>
               {FS_JOB_ROLE_QUESTIONS.map((q) => (
-                <YesNo key={q.key} name={`fsJobRoleDiscussion-${q.key}`} label={q.label}
+                <YesNo key={q.key} name={`fsJobRoleDiscussion-${q.key}`} label={wording('fsJobRoleDiscussion', q.key, q.label)}
                   value={answers.fsJobRoleDiscussion?.[q.key] ?? ''}
                   onChange={(v) => setSection('fsJobRoleDiscussion', { ...answers.fsJobRoleDiscussion, [q.key]: v })} />
               ))}
@@ -694,7 +698,7 @@ export default function ReviewFormPage() {
             <Panel title="Recognition of Prior Learning and Experience" complete={!!status?.rplExperience}
               onSave={() => save('rplExperience')} saving={savingSection === 'rplExperience'} dirty={!!dirty.rplExperience}>
               {RPL_QUESTIONS.map((q) => (
-                <YesNo key={q.key} name={`rplExperience-${q.key}`} label={q.label}
+                <YesNo key={q.key} name={`rplExperience-${q.key}`} label={wording('rplExperience', q.key, q.label)}
                   value={answers.rplExperience?.[q.key] ?? ''}
                   onChange={(v) => setSection('rplExperience', { ...answers.rplExperience, [q.key]: v })} />
               ))}
@@ -794,7 +798,7 @@ export default function ReviewFormPage() {
             <Panel title="Health & Safety Vetting" complete={!!status?.healthSafetyVetting}
               onSave={() => save('healthSafetyVetting')} saving={savingSection === 'healthSafetyVetting'} dirty={!!dirty.healthSafetyVetting}>
               {HEALTH_SAFETY_QUESTIONS.map((q) => (
-                <YesNo key={q.key} name={`healthSafetyVetting-${q.key}`} label={q.label}
+                <YesNo key={q.key} name={`healthSafetyVetting-${q.key}`} label={wording('healthSafetyVetting', q.key, q.label)}
                   value={answers.healthSafetyVetting?.[q.key] ?? ''}
                   onChange={(v) => setSection('healthSafetyVetting', { ...answers.healthSafetyVetting, [q.key]: v })} />
               ))}
@@ -806,7 +810,7 @@ export default function ReviewFormPage() {
             {has('ulnPrivacyNotice') && (
             <Panel title="Unique Learner Number (ULN) Privacy Notice" complete={!!status?.ulnPrivacyNotice} alwaysSavable
               onSave={() => save('ulnPrivacyNotice', { noticeRead: 'Yes' })} saving={savingSection === 'ulnPrivacyNotice'} dirty={false}>
-              <div className="max-w-3xl space-y-3 text-[13px] leading-relaxed text-foreground-700">
+              {data.template && !data.template.legacyEquivalent ? <ReviewSectionWording template={data.template} section="ulnPrivacyNotice" /> : <div className="max-w-3xl space-y-3 text-[13px] leading-relaxed text-foreground-700">
                 <h3 className="font-heading text-[15px] font-semibold text-foreground-900">Unique Learner Number (ULN)</h3>
                 <p className="text-foreground-500">{ULN_PRIVACY_INTRO}</p>
                 <ol className="list-decimal space-y-2 pl-5">
@@ -822,14 +826,14 @@ export default function ReviewFormPage() {
                   ))}
                 </ol>
                 <p>{ULN_PRIVACY_FURTHER_INFO}</p>
-              </div>
+              </div>}
             </Panel>
             )}
 
             {has('learnerAcknowledgement') && (
             <Panel title="Learner Acknowledgement" complete={!!status?.learnerAcknowledgement} alwaysSavable
               onSave={() => save('learnerAcknowledgement', { acknowledged: 'Yes' })} saving={savingSection === 'learnerAcknowledgement'} dirty={false}>
-              <p className="max-w-3xl text-[13px] leading-relaxed text-foreground-700">1. {LEARNER_ACKNOWLEDGEMENT}</p>
+              {data.template && !data.template.legacyEquivalent ? <ReviewSectionWording template={data.template} section="learnerAcknowledgement" /> : <p className="max-w-3xl text-[13px] leading-relaxed text-foreground-700">1. {LEARNER_ACKNOWLEDGEMENT}</p>}
             </Panel>
             )}
 

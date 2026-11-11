@@ -1,0 +1,78 @@
+.mobileMenuButton,
+.drawerCloseButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid oklch(var(--primary-200));
+  border-radius: 10px;
+  color: oklch(var(--primary-700));
+  background: oklch(var(--background-50));
+  cursor: pointer;
+}
+
+.mobileMenuButton:hover,
+.drawerCloseButton:hover {
+  background: oklch(var(--primary-50));
+}
+
+.mobileMenuButton:focus-visible,
+.drawerCloseButton:focus-visible {
+  outline: 2px solid oklch(var(--primary-500));
+  outline-offset: 2px;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgb(20 15 40 / 0.4);
+}
+
+.navigation {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 50;
+  width: min(20rem, 86vw);
+  overflow-y: auto;
+  box-shadow: 10px 0 30px rgb(20 15 40 / 0.18);
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-100%);
+  transition: transform 200ms ease, visibility 200ms ease;
+}
+
+.navigation[data-open='true'] {
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (min-width: 768px) {
+  .mobileMenuButton,
+  .drawerHeader,
+  .backdrop {
+    display: none !important;
+  }
+
+  .navigation {
+    position: static;
+    z-index: auto;
+    width: 15rem;
+    overflow-y: visible;
+    box-shadow: none;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition: none;
+  }
+}

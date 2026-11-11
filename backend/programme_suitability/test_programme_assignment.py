@@ -15,11 +15,30 @@ from learner_api.models import EnrolmentUser, LearnerProfile
 from . import views
 from .configuration import defaults
 from .models import Assessment
-from .programme_assignment import CATALOGUE_NAMES
+from .programme_assignment import CATALOGUE_NAMES, automatic_cohort_window
+from .intake_calendar import resolve_intake, validate_calendar
 from .tests import answers
 
 
 class ProgrammeAssignmentIntegrationTests(TestCase):
+    def test_automatic_cohort_boundaries(self):
+        self.assertEqual(automatic_cohort_window(date(2026, 11, 20)), ('Feb', 2027))
+        self.assertEqual(automatic_cohort_window(date(2027, 2, 15)), ('Feb', 2027))
+        self.assertEqual(automatic_cohort_window(date(2027, 2, 16)), ('Jun', 2027))
+        self.assertEqual(automatic_cohort_window(date(2027, 6, 15)), ('Jun', 2027))
+        self.assertEqual(automatic_cohort_window(date(2027, 6, 16)), ('Oct', 2027))
+        self.assertEqual(automatic_cohort_window(date(2027, 10, 14)), ('Oct', 2027))
+        self.assertEqual(automatic_cohort_window(date(2027, 10, 15)), ('Feb', 2028))
+
+    def test_configurable_calendar_supports_fourth_intake_and_rejects_invalid_dates(self):
+        calendar = [
+            {'code': 'Feb', 'name': 'February', 'startMonth': 10, 'startDay': 15, 'endMonth': 2, 'endDay': 15, 'active': False},
+            {'code': 'Jun', 'name': 'June', 'startMonth': 2, 'startDay': 16, 'endMonth': 6, 'endDay': 15, 'active': True},
+            {'code': 'Oct', 'name': 'October', 'startMonth': 6, 'startDay': 16, 'endMonth': 10, 'endDay': 14, 'active': True},
+            {'code': 'DEC', 'name': 'December', 'startMonth': 11, 'startDay': 1, 'endMonth': 11, 'endDay': 14, 'active': True},
+        ]
+        self.assertEqual(resolve_intake(date(2029, 11, 10), calendar), ('DEC', 2029))
+        with self.assertRaises(ValueError): validate_calendar([*calendar, dict(calendar[0])])
     def setUp(self):
         self.config = defaults()
         self.factory = RequestFactory()
@@ -180,7 +199,7 @@ class ProgrammeAssignmentIntegrationTests(TestCase):
 
     def test_compatible_cohort_and_group_are_preserved_without_touching_dates(self):
         with connection.cursor() as cursor:
-            cursor.execute('INSERT INTO curriculum.cohorts VALUES (%s,%s,%s,%s)', ["cohort", "Existing cohort", "CAT-MM_L6", CATALOGUE_NAMES["MM_L6"]])
+            cursor.execute('INSERT INTO curriculum.cohorts (cohort_id, cohort_name, programme_id, programme_name) VALUES (%s,%s,%s,%s)', ["cohort", "Existing cohort", "CAT-MM_L6", CATALOGUE_NAMES["MM_L6"]])
             cursor.execute('INSERT INTO curriculum.groups VALUES (%s,%s,%s,%s,%s,%s)', ["group", "Existing group", "cohort", "Existing cohort", "CAT-MM_L6", CATALOGUE_NAMES["MM_L6"]])
         EnrolmentUser.all_learners.filter(pk=self.source.pk).update(cohort="Existing cohort", group="Existing group")
         LearnerProfile.objects.filter(pk=self.profile.pk).update(cohort="Existing cohort", cohort_id="cohort", group_name="Existing group", group_id="group")

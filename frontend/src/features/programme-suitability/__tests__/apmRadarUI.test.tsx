@@ -28,36 +28,33 @@ beforeEach(() => {
 });
 afterAll(() => vi.unstubAllGlobals());
 
-it('shows the two fixed modules and all exact 42/20 descriptions in one panel, without selectors or navigation writes', async () => {
+it('shows all 62 KSBs once with two module coverage summaries and aligned table columns', () => {
   render(<Harness />);
   const nav = screen.getByRole('navigation', { name: 'Selected modules' });
-  const buttons = within(nav).getAllByRole('button');
-  expect(buttons).toHaveLength(2); expect(buttons[0]).toHaveAttribute('aria-pressed', 'true');
+  expect(within(nav).queryByRole('button')).toBeNull();
   expect(screen.queryByRole('radio')).toBeNull(); expect(screen.queryByRole('checkbox')).toBeNull();
   expect(document.querySelectorAll('details,summary')).toHaveLength(0);
+  expect(screen.getByText('SKILL DESCRIPTION')).toBeVisible();
+  expect(screen.getByText('COVERED BY MODULES')).toBeVisible();
+  expect(screen.getByText('ANSWER')).toBeVisible();
   const groups = allocateApmQuestions(apmProfile, apmModules()); const codes = new Set<string>();
-  for (const [index, group] of groups.entries()) {
-    await userEvent.click(buttons[index]);
-    expect(within(nav).getAllByRole('button', { pressed: true })).toEqual([buttons[index]]);
-    expect(within(nav).getAllByRole('button')).toEqual(buttons);
-    expect(buttons[index]).toHaveTextContent(`0 of ${group.questions.length} answered`);
-    expect(buttons[index]).toHaveTextContent(`${group.sessions} Sessions`);
-    expect(screen.getAllByRole('region', { name: /KSB questions$/ })).toHaveLength(1);
-    const panel = within(screen.getByRole('region', { name: `${group.title} KSB questions` }));
-    expect(panel.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(group.questions.length);
+  for (const group of groups) {
+    expect(within(nav).getByText(group.title)).toBeVisible();
+    expect(within(nav).getByText(`0 of ${group.questions.length} answered`)).toBeVisible();
     for (const question of group.questions) {
-      expect(panel.getByText(`${question.codes[0]} ${question.title}`)).toBeVisible();
+      expect(screen.getByText(`${question.codes[0]} ${question.title}`)).toBeVisible();
+      expect(screen.getByRole('button', { name: `Answer ${question.codes[0]}` })).toBeVisible();
       expect(within(nav).queryByText(`${question.codes[0]} ${question.title}`)).toBeNull(); codes.add(question.codes[0]);
     }
   }
+  expect(screen.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(62);
   expect(codes.size).toBe(62); expect(screen.getByText('0 of 62 answered')).toBeVisible();
   expect(mock.write).not.toHaveBeenCalled(); expect(mock.fetch).not.toHaveBeenCalled();
 });
 
-it('uses all nine original ratings, notes and evidence and selects the next module across question 42/43', async () => {
+it('uses all nine ratings, notes and evidence and advances across question 42/43', async () => {
   render(<Harness />);
   const nav = screen.getByRole('navigation', { name: 'Selected modules' });
-  const buttons = within(nav).getAllByRole('button');
   await userEvent.click(screen.getByRole('button', { name: 'Answer B3' }));
   const dialog = within(screen.getByRole('dialog'));
   expect(dialog.getByText('Question 42 of 62')).toBeVisible(); expect(dialog.getAllByRole('radio')).toHaveLength(9);
@@ -73,14 +70,14 @@ it('uses all nine original ratings, notes and evidence and selects the next modu
   expect(mock.write.mock.lastCall![0].assessments['st0310-v1-5-B3']).toMatchObject({ ksbId: 'st0310-v1-5-B3', level: 'champion', note: 'Original APM evidence workflow', evidenceFiles: ['apm-evidence.txt'] });
   expect(screen.getByText('Question 43 of 62')).toBeVisible();
   expect(within(screen.getByRole('dialog')).getByText((text) => text.includes(source.ksbs.find((item) => item.code === 'K15')!.full_description))).toBeVisible();
-  expect(buttons[1]).toHaveAttribute('aria-pressed', 'true'); expect(buttons[0]).toHaveAttribute('aria-pressed', 'false');
-  expect(buttons[0]).toHaveTextContent('1 of 42 answered'); expect(screen.getByText('1 of 62 answered')).toBeVisible();
+  expect(within(nav).getByText('1 of 42 answered')).toBeVisible();
+  expect(screen.getByText('1 of 62 answered')).toBeVisible();
 });
 
 it('restores existing flat-layout ratings/notes/evidence/action plans under Project Management Professional without changing source wording', async () => {
   const answer: KsbAssessment = { ksbId: 'st0310-v1-5-S14', level: 'expert', note: 'Previous flat-layout note', evidenceFiles: ['old-apm.pdf'], actionPlan: { text: 'Keep plan' } };
   render(<Harness saved={{ [answer.ksbId]: answer, historical: { ...answer, ksbId: 'historical' } }} />);
-  await userEvent.click(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByRole('button', { name: 'Project Management Professional' }));
+  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByText('Project Management Professional')).toBeVisible();
   expect(screen.getByText('S14 Identify and monitor project risks and issues; and plan and implement responses to them.')).toBeVisible();
   expect(screen.getByText('1 of 62 answered')).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Edit S14' }));
@@ -90,12 +87,12 @@ it('restores existing flat-layout ratings/notes/evidence/action plans under Proj
   await userEvent.click(dialog.getByRole('button', { name: 'Cancel' })); expect(mock.write).not.toHaveBeenCalled();
 });
 
-it('reflects published admin names and sessions while retaining all fixed ownership', async () => {
+it('reflects a published module name in the coverage summary and KSB cell', () => {
   const modules = apmModules(); modules.configuration.programmes.find((item) => item.id === 'APM_L4')!.modules[0].title = 'Published PMP name';
   modules.configuration.programmes.find((item) => item.id === 'APM_L4')!.modules[0].sessions = 22;
   render(<Harness modules={modules} />);
-  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByRole('button', { name: 'Published PMP name' })).toHaveTextContent('22 Sessions');
-  expect(screen.getByRole('region', { name: 'Published PMP name KSB questions' })).toHaveTextContent('42 KSBs');
+  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByText('Published PMP name')).toBeVisible();
+  expect(screen.getAllByText('Published PMP name').length).toBeGreaterThan(1);
   expect(screen.getByRole('button', { name: 'Answer K1' })).toBeVisible();
 });
 

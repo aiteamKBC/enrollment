@@ -9,6 +9,9 @@
 // chosen option marked, and signatures drawn as images above a ruled line.
 // ============================================================================
 import jsPDF from 'jspdf';
+import { storedPdfAction } from '@/features/compliance-documents/persistOriginalPdf';
+import { renderManagedDocument } from '@/features/compliance-documents/render';
+import { reviewLabels } from '@/features/compliance-documents/fields';
 import type { ReviewFormResponse, ReviewSection } from '@/api/reviewForm';
 import { LEARNER_ACKNOWLEDGEMENT, ULN_PRIVACY_FURTHER_INFO, ULN_PRIVACY_INTRO, ULN_PRIVACY_POINTS, ULN_PURPOSES } from './questions';
 
@@ -77,7 +80,7 @@ type Row =
  * `questionLabels` maps answer keys to the exact wording shown on screen, so the
  * PDF reads like the form rather than like the JSON behind it.
  */
-function buildRows(data: ReviewFormResponse, questionLabels: Record<string, string>): Row[] {
+export function buildRows(data: ReviewFormResponse, questionLabels: Record<string, string>): Row[] {
   const rows: Row[] = [];
   const info = data.learnerInformation;
 
@@ -92,10 +95,31 @@ function buildRows(data: ReviewFormResponse, questionLabels: Record<string, stri
   rows.push({ kind: 'text', label: 'Mentor', value: info.mentor });
 
   const answers = data.answers as Record<string, unknown>;
+  const verifiedBindings = (data.template?.bindingVersion ?? 1) >= 2;
 
   for (const section of data.sections) {
     const value = answers?.[section];
     rows.push({ kind: 'section', title: SECTION_TITLES[section] ?? humanise(section) });
+
+    // PLR qualification records are separate from the reviewer's answers. The
+    // existing API already returns the learner-scoped records and saved ULN.
+    // Older issued snapshots keep their original rendering verbatim.
+    if (verifiedBindings && section === 'plr') {
+      const plr = (value || {}) as {uln?:string;reportedAttainment?:string;subjectLevels?:Record<string,string>};
+      const uln = data.uln || plr.uln;
+      if(uln)rows.push({kind:'text',label:'Unique Learner Number (ULN)',value:uln});
+      if(plr.reportedAttainment)rows.push({kind:'text',label:'Highest level reported in the ILR',value:plr.reportedAttainment});
+      for(const [subject,level] of Object.entries(plr.subjectLevels||{}))rows.push({kind:'text',label:`Calculated level - ${subject}`,value:level});
+      for(const [index,record] of (data.plrRecords||[]).entries()){
+        rows.push({kind:'note',text:`Qualification ${index+1}`});
+        for(const [key,label] of Object.entries({placeOfStudy:'Place of study',qualificationType:'Qualification type',subject:'Subject',level:'Level',awardDate:'Award date',credits:'Credits',grade:'Grade',recordType:'Record type'})){
+          const entry=record[key as keyof typeof record];
+          if(entry!==null&&entry!==undefined&&entry!=='')rows.push({kind:'text',label,value:String(entry)});
+        }
+      }
+      if(!uln&&!plr.reportedAttainment&&!Object.keys(plr.subjectLevels||{}).length&&!data.plrRecords?.length)rows.push({kind:'note',text:'Not completed.'});
+      continue;
+    }
 
     // Skills Radar is handled before the "not completed" check below: the
     // assessment itself comes from the learner's own record, so it must print
@@ -118,7 +142,7 @@ function buildRows(data: ReviewFormResponse, questionLabels: Record<string, stri
           rows.push({
             kind: 'text',
             label: `${codes}${item.title || item.ksbId}`,
-            value: item.level ? `${item.level}${item.score != null ? ` (${item.score}/8)` : ''}` : 'Not answered',
+            value: item.level ? `${item.level}${item.score != null ? verifiedBindings ? ` (${item.score})` : ` (${item.score}/8)` : ''}` : 'Not answered',
           });
           if (item.note) rows.push({ kind: 'note', text: item.note });
         }
@@ -219,8 +243,8 @@ function buildRows(data: ReviewFormResponse, questionLabels: Record<string, stri
       if (answer == null || answer === '') continue;
       rows.push({
         kind: 'text',
-        label: questionLabels[key] ?? humanise(key),
-        value: String(answer),
+        label: (data.template && !data.template.legacyEquivalent ? reviewLabels(data.template, section)[key] : undefined) ?? questionLabels[key] ?? humanise(key),
+        value: verifiedBindings && typeof answer==='boolean' ? answer?'Yes':'No' : verifiedBindings && Array.isArray(answer) ? answer.map(String).join(', ') : String(answer),
       });
     }
   }
@@ -285,6 +309,10 @@ function drawSignature(doc: jsPDF, signed: string, x: number, lineY: number): vo
 }
 
 export function buildReviewPdf(data: ReviewFormResponse, questionLabels: Record<string, string>): jsPDF {
+  if (data.template && !data.template.legacyEquivalent) {
+    const managed = renderManagedDocument(data.template, data, { reviewRows: buildRows(data, questionLabels) });
+    if (managed) return managed;
+  }
   const raw = new jsPDF({ unit: 'mm', format: 'a4' });
   // Transcode on the way out so no call site has to remember to. Both text() and
   // splitTextToSize() are wrapped — splitting must measure the same string that
@@ -394,5 +422,6 @@ export function reviewDocumentFilename(data: ReviewFormResponse): string {
 }
 
 export function downloadReviewPdf(data: ReviewFormResponse, questionLabels: Record<string, string>): void {
+  if (storedPdfAction(data, reviewDocumentFilename(data))) return;
   buildReviewPdf(data, questionLabels).save(reviewDocumentFilename(data));
 }

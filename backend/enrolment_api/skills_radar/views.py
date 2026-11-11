@@ -3,6 +3,7 @@ import json
 import logging
 
 from django.db import DatabaseError, transaction
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_protect
 
@@ -142,9 +143,58 @@ def learner_catalogue(request, kind, learner_id):
         if not stored or 'skillsRadar' not in stored:
             radar = service.read_legacy_radar(kind, learner_id)
             stored = {**(stored or {}), **({'skillsRadar': radar} if radar is not None else {})}
+        radar = (stored or {}).get('skillsRadar') or {}
         _, layout = service.published()
-        return JsonResponse(service.learner_payload(kind, learner, (stored or {}).get('skillsRadar') or {}, layout))
+        profile = None
+        layout_source = None
+        if getattr(settings, 'PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED', False):
+            from learner_api.models import LearnerProfile
+            from programme_suitability.models import Assessment
+            from programme_suitability.programme_structure import learner_published_layout
+
+            profile = LearnerProfile.objects.filter(enrolment_id=learner_id).only('programme_id', 'cohort_id').first()
+            module_version = Assessment.objects.filter(learner_id=learner_id).values_list(
+                'modules_configuration_version', flat=True).first()
+            _, pinned_layout, layout_source = learner_published_layout(kind, learner_id, module_version=module_version)
+            if pinned_layout is not None:
+                layout = pinned_layout
+        payload = service.learner_payload(kind, learner, radar, layout)
+        if (getattr(settings, 'PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED', False)
+                and layout_source != 'legacy' and payload.get('programmeId')):
+            from programme_suitability.programme_structure import resolve_published, resolve_assigned_cohort
+            if profile and profile.programme_id == payload['programmeId'] and profile.cohort_id and layout:
+                resolved = resolve_published(layout, compare_legacy=False)
+                cohort = resolve_assigned_cohort(resolved['snapshot'], profile.programme_id, profile.cohort_id)
+                if resolved['source'] == 'canonical' and cohort is None:
+                    return error('The assigned Cohort is unavailable in this learner\'s saved published layout. Admissions must review the assignment.', 409)
+                programme = next((p for p in resolved['snapshot'].get('programmes', []) if p.get('id') == payload['programmeId']), None)
+                # A catalogue pinned independently of the layout may predate
+                # cohort coverage. Never graft newer mappings onto its records.
+                from .catalogue import current_catalogues
+                compatible_catalogue = (
+                    payload.get('catalogue', {}).get('version') ==
+                    current_catalogues(layout)[payload['programmeId']]['version']
+                )
+                if cohort and programme and payload.get('catalogue') and compatible_catalogue:
+                    names = {m.get('id'): m.get('title') for m in cohort.get('modules', [])}
+                    by_ksb = {}
+                    for rel in cohort.get('mappings', []):
+                        if rel.get('moduleId') in names:
+                            by_ksb.setdefault(rel.get('ksbId'), []).append(names[rel['moduleId']])
+                    for record in payload['catalogue'].get('records', []):
+                        record['moduleNames'] = sorted(set(by_ksb.get(record.get('id'), [])))
+                        module_ids = [rel.get('moduleId') for rel in cohort.get('mappings', []) if rel.get('ksbId') == record.get('id') and rel.get('moduleId') in names]
+                        record['moduleKeys'] = sorted(set(module_ids))
+                        record.pop('moduleKey', None)
+        if getattr(settings, 'PROGRAMME_STRUCTURE_SHADOW_ENABLED', False) and payload.get('programmeId'):
+            from programme_suitability.shadow_runtime import compare
+            from programme_suitability.shadow_runtime import saved_module_ids
+            selected = saved_module_ids(learner_id)
+            compare(kind, learner_id, payload['programmeId'], selected, module_version=None, catalogue_version=(radar.get('catalogueVersions') or {}).get(payload['programmeId']))
+        return JsonResponse(payload)
     except CatalogueError as exc:
+        return error(exc, 409)
+    except LookupError as exc:
         return error(exc, 409)
     except DatabaseError:
         return error('Could not load the saved Skills Radar version. Please retry.', 503)

@@ -28,11 +28,14 @@ we hold no source for are left blank rather than guessed.
 """
 import json
 import logging
+import copy
 
 from django.db import DatabaseError, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from enrolment_api.document_templates import service as template_service
+from enrolment_api.document_templates.initial_issue import initial_issue
 
 from enrolment_api.auth import enrolment_login_required
 
@@ -74,9 +77,18 @@ def _rpl_detail(learner_id):
     try:
         from .models import RplReviewDetail
 
-        return RplReviewDetail.objects.filter(learner_id=learner_id).first()
+        return RplReviewDetail.objects.filter(learner_id=learner_id, review__learner_id=learner_id).exclude(review__status='cancelled').order_by('-updated_at', '-id').first()
     except DatabaseError:
         logger.exception("_rpl_detail: lookup failed")
+        return None
+
+
+def _wizard_plr(learner_id):
+    try:
+        from enrolment_api.models import WizardPlr
+        return WizardPlr.objects.filter(learner_id=learner_id).first()
+    except DatabaseError:
+        logger.exception('_wizard_plr: lookup failed')
         return None
 
 
@@ -117,6 +129,7 @@ def derive_learner_details(learner):
     # The ILR Learner Details step: the answers the record itself has no column
     # for. The record still wins wherever it holds a value.
     details = _wizard_ilr_details(learner.pk)
+    plr = _wizard_plr(learner.pk)
 
     # The wizard's own name/DOB win: the learner entered them on their own
     # record, whereas the console row may carry a single display name.
@@ -127,7 +140,7 @@ def derive_learner_details(learner):
         first, last = (" ".join(parts[:-1]), parts[-1]) if len(parts) > 1 else (_s(learner.username), "")
 
     address_lines = [
-        _s(learner.address_line_1) or _s(learner.address),
+        _s(learner.address_line_1) or _s(learner.address) or _s(getattr(personal, 'address', '')),
         _s(learner.address_line_2),
         _s(learner.address_line_3),
         _s(learner.address_line_4),
@@ -136,7 +149,7 @@ def derive_learner_details(learner):
     return {
         # No column holds a learner reference number yet.
         "learnerReferenceNumber": "",
-        "uln": _s(getattr(rpl, "uln", "")),
+        "uln": _s(getattr(rpl, "uln", "")) or _s(getattr(plr, 'uln', '')),
         "familyName": last,
         "givenNames": first,
         "dateOfBirth": _iso(getattr(personal, "date_of_birth", None)) or _s(learner.date_of_birth),
@@ -174,7 +187,19 @@ def derive_answers(learner):
     """The Extended ILR questionnaire, as the wizard stored it."""
     row = _extended_ilr(learner.pk)
     answers = getattr(row, "answers", None)
-    return answers if isinstance(answers, dict) else {}
+    result = copy.deepcopy(answers) if isinstance(answers, dict) else {}
+    eligibility = result.get('eligibility')
+    if isinstance(eligibility, dict) and 'residentPrev3Years' in eligibility:
+        # The retained original PDF and existing template identifier use the
+        # older spelling. Resolve it in the new snapshot, never in wizard data.
+        eligibility['residentPrevious3Years'] = eligibility['residentPrev3Years']
+    kin = result.get('nextOfKin')
+    if isinstance(kin, dict) and kin.get('sameAddressAsLearner') is True:
+        personal = _wizard_personal(learner.pk)
+        kin['postcode'] = _s(learner.current_postcode)
+        kin['address'] = '\n'.join(filter(None, [_s(learner.address_line_1) or _s(learner.address) or _s(getattr(personal, 'address', '')),
+                                               _s(learner.address_line_2), _s(learner.address_line_3), _s(learner.address_line_4)]))
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +216,7 @@ def _party_json(signature, name, at):
 def _document_json(document):
     if document is None:
         return None
-    return {
+    payload = {
         "id": str(document.id),
         "status": _s(document.status),
         "fullySigned": bool(document.fully_signed),
@@ -217,6 +242,9 @@ def _document_json(document):
             "provider": _s(document.provider_signature),
         },
     }
+
+
+    return template_service.with_template('ilr', document, payload)
 
 
 def _active_document(learner_kind, learner_id, lock=False):
@@ -273,6 +301,7 @@ def ilr_document(request, pk):
 
 @enrolment_login_required
 @csrf_exempt
+@initial_issue('ilr')
 def issue_ilr(request, pk):
     """Issue the ILR, snapshotting the current details and answers onto a row."""
     if request.method != "POST":
@@ -301,6 +330,7 @@ def issue_ilr(request, pk):
                 learner_details=details,
                 answers=answers,
             )
+            template_service.bind_issue('ilr', document, learner, _document_json(document))
     except DatabaseError as exc:
         logger.exception("issue_ilr: failed")
         return _error(f"Database error: {exc}", 502)
@@ -310,7 +340,7 @@ def issue_ilr(request, pk):
 
 @enrolment_login_required
 @csrf_exempt
-def sign_ilr(request, pk):
+def sign_ilr(request, pk, _revision_source=None):
     """Record the learner's or the provider's signature on the ILR.
 
     Posting an empty signature withdraws that party's sign-off.
@@ -348,9 +378,13 @@ def sign_ilr(request, pk):
         # Lock the row for the read-modify-write so a concurrent learner/provider
         # sign can't overwrite the other's signature. See BE-4.
         with transaction.atomic(using="enrolment"):
-            document = _active_document(_learner_kind(learner), learner.pk, lock=True)
+            document = _revision_source if _revision_source is not None else _active_document(_learner_kind(learner), learner.pk, lock=True)
             if document is None:
                 return _error("No ILR has been issued for this learner yet.", 404)
+
+            from enrolment_api.document_templates.revisions import source_locked
+            if source_locked('ilr', document):
+                return _error('This historical document is locked. Create a new learner revision for changes.', 409)
 
             now = timezone.now() if signature else None
             if party == "learner":
@@ -364,6 +398,7 @@ def sign_ilr(request, pk):
 
             document.recalculate_signed()
             document.save()
+            template_service.archive_render('ilr', document, _document_json(document), name)
         promoted = advance_learner(learner)
     except DatabaseError as exc:
         logger.exception("sign_ilr: failed")
