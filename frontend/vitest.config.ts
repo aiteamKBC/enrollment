@@ -14,6 +14,7 @@ export default defineConfig({
   test: {
     // Ordinary gating tests must not inherit a developer's temporary unlock.
     env: { VITE_LOCAL_ENROLMENT_DESIGN_PREVIEW: '0' },
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     globals: true,

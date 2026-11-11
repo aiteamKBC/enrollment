@@ -15,23 +15,19 @@ import { isPcpRadar, radarProfileProgramme, resolvePcpRadar } from '@/features/p
 import { isMmRadar, mmRadarProfileProgramme, resolveMmRadar } from '@/features/programme-suitability/skills-radar/marketingManager';
 import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/programme-suitability/skills-radar/marketingExecutive';
 import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
-import { ModuleMasterDetail } from '@/features/programme-suitability/skills-radar/ModuleMasterDetail';
+import styles from './SkillsRadar.module.css';
 import { useLearnerStepPresentation } from '@/features/learner-enrolment/stepPresentation';
 
 /**
- * Skills Radar — a sequential self-assessment questionnaire.
+ * Skills Radar: a sequential self-assessment questionnaire.
  *
  * One KSB at a time ("Question N of M") on a 9-point scale, with an optional
- * note and evidence upload per question. The learner answers it; the enrolment
  * team sees the same list read-only (`readOnly` via the wizard's mode), because
- * this is the learner's own self-assessment and staff editing it would falsify
  * the record they are meant to review.
  */
 
 /**
- * A rating above this is flagged. 5 (Consistently) and up says the learner is
  * already largely competent, and an apprenticeship must involve substantial new
- * learning — so the learner is warned, must say why in a note, and the
  * enrolment team sees the flag when they review the answers.
  */
 const FLAG_ABOVE_SCORE = 4;
@@ -84,14 +80,13 @@ export default function SkillsRadar() {
   const sr = draft.skillsRadar;
 
   // The KSBs come from the profile authored against THIS learner's programme
-  // (curriculum.ksb_profiles), not a fixed standard — a learner must only ever
+  // (curriculum.ksb_profiles), not a fixed standard; a learner must only ever
   // self-assess against their own programme's competencies.
   const programmeLookup = apm ? apmRadarProfileProgramme(suitability?.state) : me ? meRadarProfileProgramme(suitability?.state) : mm ? mmRadarProfileProgramme(suitability?.state) : radarProfileProgramme(board.programme.name || '', suitability?.state);
   const programme = managed ? modules?.data?.configuration.programmes.find((p) => p.id === radarCatalogue?.data?.programmeId)?.title || board.programme.name || '' : moduleBased ? modules?.data?.configuration.programmes.find((p) => p.id === (apm ? 'APM_L4' : me ? 'ME_L4' : mm ? 'MM_L6' : 'PCP_L6'))?.title || (apm ? 'Associate Project Manager Level 4' : me ? 'Marketing Executive Level 4' : mm ? 'Marketing Manager Level 6' : 'Project Controls Professional Level 6') : board.programme.name || '';
-  // Seeded from the cache the wizard bootstrap primed, so a step the learner has
   // already visited (or one opened after the bootstrap) renders its competencies
   // on the first frame. Starting empty-and-loading meant a spinner flashed on
-  // every mount for a list that was already in memory — effects run after paint,
+  // every mount for a list that was already in memory; effects run after paint,
   // so even an instantly-resolving promise costs one visible frame.
   const cached = peekKsbProfile(programmeLookup);
   const [profileKsbs, setKsbs] = useState<Ksb[]>(() => (cached?.results as Ksb[]) ?? []);
@@ -135,10 +130,30 @@ export default function SkillsRadar() {
 
   const grouping = useMemo(() => managed ? radarCatalogue?.grouping : pcp ? resolvePcpRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : mm ? resolveMmRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : me ? resolveMeRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : apm ? resolveApmRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : null,
     [managed, radarCatalogue?.grouping, pcp, mm, me, apm, loading, loadedProgramme, programmeLookup, profileKsbs, modules?.data, modules?.error, loadError]);
-  const ksbs = useMemo(() => grouping ? grouping.questions : managed ? [] : profileKsbs, [grouping, managed, profileKsbs]);
+  const coverage = useMemo(() => {
+    const source = grouping?.modules ?? [];
+    const byId = new Map<string, { ksb: Ksb; modules: string[] }>();
+    for (const module of source) for (const ksb of module.questions) {
+      const current = byId.get(ksb.id);
+      if (current) { if (!current.modules.includes(module.title)) current.modules.push(module.title); }
+      else byId.set(ksb.id, { ksb, modules: [module.title] });
+    }
+    return [...byId.values()];
+  }, [grouping]);
+  const ksbs = useMemo(() => grouping ? coverage.map((item) => item.ksb) : managed ? [] : profileKsbs, [grouping, coverage, managed, profileKsbs]);
+  const coverageById = useMemo(() => new Map(coverage.map((item) => [item.ksb.id, item.modules])), [coverage]);
+  const coverageByCode = useMemo(() => new Map((grouping?.modules ?? []).flatMap((module) => module.questions.flatMap((question) => question.codes.map((code) => [code, module.title] as const)))), [grouping]);
+  const moduleCoverage = useMemo(() => (grouping?.modules ?? []).map((module) => {
+    const ids = new Set(module.questions.map((ksb) => ksb.id));
+    return {
+      title: module.title,
+      count: ids.size,
+      answered: [...ids].filter((id) => sr.assessments[id]?.level).length,
+    };
+  }), [grouping, sr.assessments]);
+  const coverageAvailable = coverage.some((item) => item.modules.length > 0);
   const questionIndex = useMemo(() => new Map(ksbs.map((ksb, index) => [ksb.id, index])), [ksbs]);
-  const moduleForQuestion = useMemo(() => new Map(grouping?.modules.flatMap((module) => module.questions.map((ksb) => [ksb.id, module.id] as const)) ?? []), [grouping]);
-  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'Knowledge' | 'Skill' | 'Behaviour'>('all');
 
   // An unrated row per competency is seeded by WizardProvider rather than here:
   // completeness is judged for every step at once, so a learner who never opens
@@ -150,6 +165,7 @@ export default function SkillsRadar() {
   const openIndex = position < 0 ? null : position;
   const [work, setWork] = useState<WorkingAnswer>(workingFrom());
 
+  const visibleKsbs = useMemo(() => categoryFilter === 'all' ? ksbs : ksbs.filter((k) => k.kind === categoryFilter), [ksbs, categoryFilter]);
   const answeredCount = useMemo(
     () => ksbs.filter((k) => sr.assessments[k.id]?.level).length,
     [ksbs, sr.assessments]
@@ -162,8 +178,6 @@ export default function SkillsRadar() {
   const open = (index: number) => {
     const ksb = ksbs[index];
     if (!ksb) return;
-    const owner = moduleForQuestion.get(ksb.id);
-    if (owner) setSelectedModuleId(owner);
     setWork(workingFrom(sr.assessments[ksb.id]));
     setOpenKsbId(ksb.id);
   };
@@ -187,7 +201,6 @@ export default function SkillsRadar() {
   const confirm = () => {
     if (openIndex == null) return;
     commit(openIndex);
-    // Walk straight into the next unanswered question so the learner can work
     // through all of them without reopening the list each time.
     const nextIndex = openIndex + 1;
     if (nextIndex < ksbs.length) {
@@ -205,18 +218,25 @@ export default function SkillsRadar() {
     const actionLabel = readOnly ? 'View' : level !== null ? 'Edit' : learnerPresentation ? 'Assess' : 'Answer';
     const meta = competenceMeta(level);
     const score = competenceScore(level);
+    const linkedModules = coverageById.get(ksb.id) ?? ksb.codes.flatMap((code) => coverageByCode.has(code) ? [coverageByCode.get(code)!] : []);
+    const coverageLabel = linkedModules.length ? null : grouping?.status === 'ready' ? 'No modules mapped' : 'Not available';
     // After a refused Next, every competency still to rate is marked.
     const unrated = showErrors && !readOnly && !level;
     return (
-      <div key={ksb.id} data-ksb-row={learnerPresentation ? '' : undefined} className={`flex items-center gap-3 px-3 py-2.5${moduleBased ? ' flex-wrap sm:flex-nowrap' : ''}${unrated ? ' bg-red-50 ring-1 ring-inset ring-red-500' : ''}`}>
-        <span className="text-[12px] font-semibold text-foreground-400 w-7 shrink-0 text-right">{i + 1}.</span>
-        <span className={`flex-1 min-w-0 [overflow-wrap:anywhere] ${moduleBased ? 'basis-[calc(100%-3rem)] sm:basis-auto' : ''}`}>
-          <span className="text-[13px] text-foreground-800">{learnerPresentation
-            ? <><span data-ksb-code>{ksb.codes.join(', ')}</span> {ksb.title}</>
-            : <>{ksb.codes.join(', ')} {ksb.title}</>}</span>
-          <span className="block text-[11px] text-foreground-400 mt-0.5">{ksb.theme} · {ksb.kind}</span>
+      <div key={ksb.id} role="row" className={`${styles.row}${unrated ? ` ${styles.unrated}` : ''}`}>
+        <span role="cell" className={styles.description}>
+          <span className={styles.number}>{i + 1}.</span>
+          <span><span className={styles.question}>{ksb.codes.join(', ')} {ksb.title}</span>
+            <span className={styles.meta}>{ksb.theme} &middot; {ksb.kind}</span>
+          </span>
         </span>
-        <span className="ml-auto flex shrink-0 items-center gap-3">
+        <div role="cell" className={styles.coverageCell}>
+          <span className={styles.mobileLabel}>Covered by Modules</span>
+          <div className={styles.chips}>{linkedModules.map((name) => <span key={name} className={styles.chip}>{name}</span>)}</div>
+          {coverageLabel && <span className="text-foreground-400">{coverageLabel}</span>}
+        </div>
+        <div role="cell" className={styles.answerCell}>
+          <span className={styles.mobileLabel}>Answer</span>
         {score != null && meta ? (
           <span className={`text-[11px] font-bold w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${meta.tintBg} ${meta.tintText}`} title={meta.label}>
             {score}
@@ -224,26 +244,24 @@ export default function SkillsRadar() {
         ) : unrated ? (
           <span className="text-[11px] text-red-600 shrink-0">Please answer</span>
         ) : (
-          <span className="text-[11px] text-foreground-300 shrink-0">—</span>
+          <span className="text-[11px] text-foreground-300 shrink-0">Not rated</span>
         )}
-        {/* Fixed-width slot so the scores stay in one column. */}
-        <span className="w-7 shrink-0">{isHighRating(level) && <HighRatingFlag />}</span>
+        {isHighRating(level) && <HighRatingFlag />}
         <button
           onClick={() => open(i)}
           aria-label={moduleBased ? `${actionLabel} ${ksb.codes[0]}` : undefined}
-          data-ksb-action={learnerPresentation ? '' : undefined}
           aria-invalid={unrated || undefined}
-          className={`${btnSecondary} !py-1 !px-3 !text-[11px] shrink-0`}
+          className={`${btnSecondary} ${styles.action}`}
         >
           <AppIcon className={readOnly ? 'ri-eye-line' : 'ri-edit-line'} />{actionLabel}
         </button>
-        </span>
+        </div>
       </div>
     );
   };
 
   return (
-    <div>
+    <div className={styles.radar}>
       <StepHeading
         title={t('block.skillsRadar.title')}
         subtitle={programme ? `${programme} [${ksbs.length}]` : 'No programme assigned'}
@@ -272,7 +290,7 @@ export default function SkillsRadar() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="text-[12px] text-foreground-500">
           {readOnly
-            ? 'The learner’s self-assessment. Read-only here — only the learner can change their own answers.'
+            ? "The learner's self-assessment. Read-only here; only the learner can change their own answers."
             : t('block.skillsRadar.instructions')}
         </p>
         <span className="flex items-center gap-3 shrink-0">
@@ -286,10 +304,31 @@ export default function SkillsRadar() {
       </div>
       )}
 
+      {ksbs.length > 0 && <>
+        <div className={styles.categories}>
+          {(['Knowledge', 'Skill', 'Behaviour'] as const).map((kind) => {
+            const items = ksbs.filter((k) => k.kind === kind); const answered = items.filter((k) => sr.assessments[k.id]?.level).length;
+            const pct = items.length ? Math.round(answered / items.length * 100) : 0; const tone = pct === 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-amber-500' : 'bg-red-500';
+            return <button type="button" key={kind} onClick={() => setCategoryFilter(categoryFilter === kind ? 'all' : kind)} aria-pressed={categoryFilter === kind} className={`${styles.category} ${categoryFilter === kind ? styles.selected : ''}`}>
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground-800"><span className={`h-2.5 w-2.5 rounded-full ${tone}`} />{kind === 'Skill' ? 'Skills' : kind}</div><div className="mt-1 flex items-center justify-between gap-2 text-xs text-foreground-600"><span>{answered} / {items.length} answered</span><span className="font-semibold">{pct}%</span></div><div className="mt-2 h-1.5 rounded-full bg-primary-100"><div className={styles.progressFill} style={{width: `${pct}%`}} /></div>
+            </button>;
+          })}
+        </div>
+        <div className={styles.filters}><button type="button" onClick={() => setCategoryFilter('all')} aria-pressed={categoryFilter === 'all'} className={`${styles.allFilter} ${categoryFilter === 'all' ? styles.activeFilter : ''}`}>All KSBs ({ksbs.length})</button></div>
+        {moduleCoverage.length > 0 && <nav aria-label="Selected modules" className={styles.moduleCoverage}>
+          <label className="sr-only" htmlFor="selected-module-skills">Selected module skills assessments</label><input id="selected-module-skills" className="sr-only" readOnly />
+          <h3>Coverage by selected modules</h3>
+          <div className={styles.moduleGrid}>{moduleCoverage.map((module) => <div key={module.title} className={styles.moduleCard}>
+            <span className={styles.moduleName}>{module.title}</span>
+            <span className={styles.moduleCount}>{module.answered} of {module.count} answered</span>
+          </div>)}</div>
+        </nav>}
+      </>}
+
       {/* Progress */}
       {ksbs.length > 0 && (
-      <div className="h-1.5 bg-background-200 rounded-full overflow-hidden mb-5">
-        <div className="h-full bg-primary-500 rounded-full transition-all duration-300" style={{ width: `${(answeredCount / ksbs.length) * 100}%` }} />
+      <div className={styles.overallProgress}>
+        <div className={styles.progressFill} style={{ width: `${(answeredCount / ksbs.length) * 100}%` }} />
       </div>
       )}
 
@@ -302,15 +341,14 @@ export default function SkillsRadar() {
         </button>
       )}
 
-      {/* Same answer rows and popup, grouped for confirmed PCP, MM, ME and APM programmes. */}
-      {grouping?.status === 'ready' ? <ModuleMasterDetail modules={grouping.modules} assessments={sr.assessments}
-        selectedModuleId={(openKsbId && moduleForQuestion.get(openKsbId)) || selectedModuleId} onSelect={setSelectedModuleId}
-        renderQuestion={(ksb) => renderQuestion(ksb, questionIndex.get(ksb.id)!)} /> : !moduleBased && <div className="border border-foreground-200/70 rounded-xl divide-y divide-foreground-100 overflow-hidden">
-        <div className="flex items-center gap-3 px-3 py-2 bg-background-100/60">
-          <span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider flex-1">Skill description</span>
-          <span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider">Answer</span>
+      {/* One assessment row per stable KSB ID, for both learner and staff views. */}
+      {(grouping?.status === 'ready' || !moduleBased) && <div role="table" aria-label="Skills assessments" className={styles.table}>
+        <div role="row" className={styles.tableHeader}>
+          <span role="columnheader">SKILL DESCRIPTION</span>
+          <span role="columnheader">COVERED BY MODULES</span>
+          <span role="columnheader">ANSWER</span>
         </div>
-        {ksbs.map(renderQuestion)}
+        {visibleKsbs.map((ksb) => renderQuestion(ksb, questionIndex.get(ksb.id)!))}
       </div>}
 
       {/* Question modal */}
@@ -336,7 +374,7 @@ export default function SkillsRadar() {
         >
           {/* Position within the questionnaire */}
           <div className="h-1.5 bg-background-200 rounded-full overflow-hidden mb-4">
-            <div className="h-full bg-primary-500 rounded-full transition-all duration-300" style={{ width: `${((openIndex + 1) / ksbs.length) * 100}%` }} />
+            <div className={styles.progressFill} style={{ width: `${((openIndex + 1) / ksbs.length) * 100}%` }} />
           </div>
 
           <p className="text-[14px] text-foreground-900 mb-4">
@@ -366,7 +404,7 @@ export default function SkillsRadar() {
                     />
                     <span className="flex-1 text-[12px] text-foreground-700">
                       <span className={`font-semibold ${selected ? lvl.tintText : 'text-foreground-800'}`}>{lvl.label}</span>
-                      {' – '}{lvl.help}
+                      {' '}{lvl.help}
                     </span>
                     <span className={`text-[11px] font-bold w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${lvl.tintBg} ${lvl.tintText}`}>
                       {lvl.score}
@@ -423,7 +461,7 @@ export default function SkillsRadar() {
             <label className="block text-[12px] font-medium text-foreground-700 mb-1.5">{t('block.skillsRadar.upload')}</label>
             {!readOnly && (
               <label className="inline-flex items-center gap-2 px-3 py-2 text-[12px] bg-background-100 text-foreground-600 rounded-lg border border-background-200 hover:bg-background-200 transition-smooth cursor-pointer mb-2">
-                <AppIcon className="ri-folder-open-line" />Select file…
+                <AppIcon className="ri-folder-open-line" />Select file
                 <input
                   type="file"
                   multiple
