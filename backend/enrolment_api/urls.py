@@ -1,5 +1,5 @@
 from django.urls import include, path
-from . import eligibility_applications, eligibility_review
+from . import eligibility_applications, eligibility_review, programme_structure_views
 
 from . import bksb, cv_job_documents, documents, eligibility_form, eligibility_layout, extended_ilr, ilr_eligibility_evidence, ilr_employer_details, ilr_learner_record, plr_evidence, policy_documents, postcode_lookup, views, wizard_bootstrap, wizard_custom_uploads, wizard_inclusion, wizard_layout
 
@@ -9,6 +9,10 @@ urlpatterns = [
     path('eligibility-applications/<int:application_id>/', eligibility_applications.eligibility_application_detail, name='eligibility-application-detail'),
     path('eligibility-applications/<int:application_id>/reviews/', eligibility_review.application_reviews, name='eligibility-application-reviews'),
     path('skills-radar/', include('enrolment_api.skills_radar.urls')),
+    path('programme-structure/validate/', programme_structure_views.programme_structure_validate, name='programme-structure-validate'),
+    path('programme-structure/preview/', programme_structure_views.programme_structure_preview, name='programme-structure-preview'),
+    path('programme-structure/draft/', programme_structure_views.programme_structure_draft, name='programme-structure-draft'),
+    path('programme-structure/publish/', programme_structure_views.programme_structure_publish, name='programme-structure-publish'),
     path('health/', views.health, name='enrolment-health'),
     path('commercial-users/<int:pk>/board/', views.commercial_board, name='commercial-board'),
     # Public apprenticeship eligibility form (/apprenticeship_application) — no sign-in

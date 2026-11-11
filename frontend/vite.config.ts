@@ -13,7 +13,7 @@ export default defineConfig(({ mode, command }) => {
   // Read the local backend address before configuring the dev proxy. All API
   // prefixes belong to the same Django application and must follow this target.
   const env = loadEnv(mode, __dirname, "VITE_API_");
-  const apiTarget = env.VITE_API_TARGET || env.VITE_API_PROXY || "http://127.0.0.1:8000";
+  const apiTarget = env.VITE_API_TARGET || env.VITE_API_PROXY || "http://127.0.0.1:8001";
   const localLogger = command === 'serve' && mode === 'eligibility-local' ? createLogger() : undefined;
   if (localLogger) {
     for (const method of ['info', 'warn', 'warnOnce', 'error'] as const) {
@@ -118,7 +118,7 @@ export default defineConfig(({ mode, command }) => {
     },
   },
     server: {
-    port: 3000,
+    port: 3001,
     strictPort: true,
     host: "0.0.0.0",
     // Forward API calls to the Django backend so the browser sees them as

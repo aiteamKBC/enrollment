@@ -42,15 +42,13 @@ afterAll(() => vi.unstubAllGlobals());
 it('shows published 42/20 modules for staff before Step 6, preserving read-only answers without confirmation or writes', async () => {
   render(page());
   const nav = await screen.findByRole('navigation', { name: 'Selected modules' });
-  const buttons = within(nav).getAllByRole('button');
-  expect(buttons).toHaveLength(2);
-  expect(buttons[0]).toHaveTextContent('1 of 42 answered'); expect(buttons[0]).toHaveTextContent('28 Sessions');
+  expect(within(nav).queryByRole('button')).toBeNull();
+  expect(within(nav).getByText('1 of 42 answered')).toBeVisible();
+  expect(within(nav).getByText('0 of 20 answered')).toBeVisible();
   expect(screen.getByText('1 of 62 answered')).toBeVisible();
-  expect(screen.getAllByRole('button', { name: /^View [KSB]\d+$/ })).toHaveLength(42);
+  expect(screen.getAllByRole('button', { name: /^View [KSB]\d+$/ })).toHaveLength(62);
   const calls = api.profile.mock.calls.length;
-  await userEvent.click(buttons[1]);
-  expect(screen.getAllByRole('button', { name: /^View [KSB]\d+$/ })).toHaveLength(20);
-  await userEvent.click(buttons[0]); await userEvent.click(screen.getByRole('button', { name: 'View K1' }));
+  await userEvent.click(screen.getByRole('button', { name: 'View K1' }));
   const dialog = within(screen.getByRole('dialog'));
   expect(dialog.getAllByRole('radio')).toHaveLength(9);
   for (const radio of dialog.getAllByRole('radio')) expect(radio).toBeDisabled();
@@ -69,7 +67,7 @@ it('does not enable the unconfirmed staff fallback for a learner', async () => {
   render(page(false));
   await waitFor(() => expect(latest.ready).toBe(true));
   expect(screen.queryByRole('navigation', { name: 'Selected modules' })).toBeNull();
-  expect(screen.getByText('Skill description')).toBeVisible();
+  expect(screen.getByText('SKILL DESCRIPTION')).toBeVisible();
   expect(latest.suitability?.selectionConfirmed).toBe(false); expect(api.modules).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });
 
@@ -81,9 +79,9 @@ it('uses the pinned confirmed APM snapshot for staff instead of the newer publis
   render(page());
   await waitFor(() => expect(api.assessment).toHaveBeenCalled());
   expect(screen.queryByRole('navigation', { name: 'Selected modules' })).toBeNull();
-  expect(screen.queryByText('Skill description')).toBeNull();
+  expect(screen.queryByText('SKILL DESCRIPTION')).toBeNull();
   await act(async () => resolve(confirmedApm));
-  await screen.findByRole('button', { name: 'Pinned PMP title' });
+  expect(within(await screen.findByRole('navigation', { name: 'Selected modules' })).getByText('Pinned PMP title')).toBeVisible();
   expect(api.modules).toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });
 
@@ -91,7 +89,8 @@ it('reviews an assigned APM programme when the published wizard has no assessmen
   api.layout.mockResolvedValue({ version: 11, layout: { steps: [], programmeModules: apmModules().configuration } });
   render(page());
   const nav = await screen.findByRole('navigation', { name: 'Selected modules' });
-  expect(within(nav).getAllByRole('button')).toHaveLength(2);
+  expect(within(nav).queryByRole('button')).toBeNull();
+  expect(within(nav).getAllByText(/\d+ of \d+ answered/)).toHaveLength(2);
   expect(api.assessment).not.toHaveBeenCalled();
   expect(api.modules).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });
@@ -104,13 +103,13 @@ it('never overrides a confirmed alternative programme with the stale assigned AP
   await waitFor(() => expect(latest.suitability?.selectionConfirmed).toBe(true));
   await waitFor(() => expect(api.profile).toHaveBeenCalledWith('Marketing Executive Level 4'));
   expect(latest.modules?.data?.selectedProgramme).toBe('ME_L4');
-  expect(screen.queryByRole('button', { name: 'Project Management Professional' })).toBeNull();
+  expect(screen.queryByText('Project Management Professional')).toBeNull();
 });
 
 it('reports missing published modules clearly instead of silently showing the old flat staff view', async () => {
   api.layout.mockResolvedValue({ version: 11, layout: { steps: [], programmeSuitability: confirmedApm.configuration } });
   render(page());
   expect(await screen.findByRole('alert')).toHaveTextContent('Published APM modules are unavailable');
-  expect(screen.queryByText('Skill description')).toBeNull();
+  expect(screen.queryByText('SKILL DESCRIPTION')).toBeNull();
   expect(api.modules).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });

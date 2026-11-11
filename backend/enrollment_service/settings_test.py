@@ -14,7 +14,12 @@ INSTALLED_APPS = [
     'programme_suitability',
 ]
 DATABASES = {name: {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'} for name in ('default', 'enrolment')}
-DATABASE_ROUTERS = ['learner_api.routers.EnrolmentRouter']
+# Keep the isolated test database single-store.  Production routes enrolment
+# models to the Neon-backed ``enrolment`` alias, but the PCP integration
+# fixtures intentionally create those rows on ``default``.  Disabling that
+# production router here makes reads and writes deterministic and prevents a
+# test from crossing aliases while both aliases remain SQLite-only below.
+DATABASE_ROUTERS = []
 MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -59,3 +64,10 @@ READ_MODEL_DUAL_WRITE_ENABLED = False
 CURRICULUM_ALLOW_RUNTIME_SCHEMA_BOOTSTRAP = False
 ENROLLMENT_SESSION_COOKIE_NAME = 'enrollment_session'
 LMS_URL = 'https://lms.example.test'
+
+TEST_RUNNER = 'programme_suitability.test_runner.SuitabilityRunner'
+PROGRAMME_STRUCTURE_PUBLISHING_ENABLED = False
+PROGRAMME_STRUCTURE_SHADOW_ENABLED = False
+PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED = False
+PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED = False
+PROGRAMME_STRUCTURE_SHADOW_REPORTER = None

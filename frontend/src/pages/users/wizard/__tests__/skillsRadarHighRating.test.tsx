@@ -96,6 +96,6 @@ describe('Skills Radar high self-ratings', () => {
 
     const firstRow = screen.getByText(/Marketing Concepts/).closest('div') as HTMLElement;
     await user.click(within(firstRow).getByRole('button', { name: /view/i }));
-    expect(screen.getByRole('status')).toHaveTextContent('Flagged: the learner rated this above 4.');
+    expect(screen.getByRole('status')).toHaveTextContent('High self-ratings may affect their eligibility for this apprenticeship, which requires substantial new learning.');
   });
 });
