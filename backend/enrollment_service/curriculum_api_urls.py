@@ -4,4 +4,6 @@ from curriculum_api import views
 
 urlpatterns = [
     path('curriculum/free-programmes/<str:programme_id>/modules/', views.curriculum_free_programme_modules, name='curriculum-free-programme-modules'),
+    path('curriculum/cohorts/', views.curriculum_cohort_collection, name='curriculum-cohort-collection'),
+    path('curriculum/cohorts/<str:identifier>/', views.curriculum_cohort_detail, name='curriculum-cohort-detail'),
 ]

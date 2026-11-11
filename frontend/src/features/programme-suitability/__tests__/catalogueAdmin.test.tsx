@@ -27,11 +27,11 @@ it('shows all four programmes with dynamic counts, current export and blank temp
   render(<Editor />);
   await screen.findByRole('article', { name: 'Associate Project Manager L4' });
   expect(screen.getAllByLabelText(/^Upload CSV for/)).toHaveLength(4);
-  for (const [title, pid, total] of [['Project Controls Professional L6', 'PCP_L6', 71], ['Marketing Manager L6', 'MM_L6', 42], ['Marketing Executive L4', 'ME_L4', 33], ['Associate Project Manager L4', 'APM_L4', 62]]) {
+  for (const [title, pid, total, modules, relationships] of [['Project Controls Professional L6', 'PCP_L6', 71, 0, 0], ['Marketing Manager L6', 'MM_L6', 42, 4, 42], ['Marketing Executive L4', 'ME_L4', 33, 3, 33], ['Associate Project Manager L4', 'APM_L4', 62, 2, 62]]) {
     const card = within(screen.getByRole('article', { name: String(title) }));
-    expect(card.getByText(`${total} published KSBs`)).toBeVisible();
-    expect(card.getByRole('link', { name: 'Download Current Mapping CSV' })).toHaveAttribute('href', `/enrolment_api/skills-radar/catalogues/${pid}/`);
-    expect(card.getByRole('link', { name: 'Blank CSV template' })).toHaveAttribute('href', `/enrolment_api/skills-radar/catalogues/${pid}/?template=1`);
+    expect(card.getByText(`${total} unique KSBs across ${modules} modules and ${relationships} relationships`)).toBeVisible();
+    expect(card.getByRole('link', { name: 'Export Current Mapping CSV' })).toHaveAttribute('href', `/enrolment_api/skills-radar/catalogues/${pid}/`);
+    expect(card.getByRole('link', { name: 'Download Blank CSV Template' })).toHaveAttribute('href', `/enrolment_api/skills-radar/catalogues/${pid}/?template=1`);
   }
   expect(changed).not.toHaveBeenCalled(); expect(api.save).not.toHaveBeenCalled();
 });
@@ -49,7 +49,7 @@ it('reviews a complete snapshot, saves a private draft and previews dynamic modu
   expect(api.save).toHaveBeenCalledWith(draftFor(), 11);
   expect(changed).toHaveBeenCalledWith(draftFor());
   expect(screen.getByText(/34 KSBs. Test choices/)).toBeVisible();
-  expect(screen.getByText('33 published KSBs')).toBeVisible();
+  expect(screen.getByText('33 unique KSBs across 3 modules and 33 relationships')).toBeVisible();
   expect(screen.getByRole('navigation', { name: 'Selected modules' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Publish changes' })).toBeNull();
 });

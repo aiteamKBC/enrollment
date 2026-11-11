@@ -1,0 +1,10 @@
+export type ProgrammeEntityStatus = 'active' | 'archived';
+export type CohortStatus = 'planned' | 'active' | 'completed' | 'inactive' | 'archived';
+export type ModuleSelection = 'required' | 'optional';
+export type KsbKind = 'Knowledge' | 'Skill' | 'Behaviour';
+export interface ProgrammeStructureModule { id: string; title: string; description?: string; order: number; active: boolean; selection: ModuleSelection; selectable?: boolean; credits?: number | null; sessions?: number | null; durationWeeks?: number | null; book?: string | null; progressReviews?: number | null; weeklyTopics?: Array<{ id: string; title: string; summary?: string; order: number }>; }
+export interface ProgrammeStructureKsb { id: string; code: string; kind: KsbKind; description: string; status: ProgrammeEntityStatus; }
+export interface ProgrammeKsbModuleMapping { programmeId: string; ksbId: string; moduleId: string; pathwayId?: string; status: ProgrammeEntityStatus; }
+export interface ProgrammeStructureCohort { id: string; programmeId: string; name: string; startDate?: string; assignmentPeriod?: {year?:number;startMonth:number;startDay:number;endMonth:number;endDay:number}; status: CohortStatus; modules: ProgrammeStructureModule[]; mappings: ProgrammeKsbModuleMapping[]; }
+export interface ProgrammeStructureProgramme { id: string; curriculumProgrammeId?: string; title: string; code?: string; level?: string; description?: string; durationMonths?: number | null; epao?: string | null; modules: ProgrammeStructureModule[]; cohorts?: ProgrammeStructureCohort[]; ksbs: ProgrammeStructureKsb[]; mappings: ProgrammeKsbModuleMapping[]; selectionPolicy: { type: 'required-optional' | 'pcp-pathways'; minOptional?: number; maxOptional?: number; pathways?: unknown[]; }; }
+export interface ProgrammeStructureSnapshot { intakeCalendar?: Array<{ code: string; name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; active: boolean }>; schemaVersion: 2; version: string; publishedAt?: string | null; programmes: ProgrammeStructureProgramme[]; }

@@ -20,7 +20,7 @@ interface Props {
 }
 
 export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras }: Props) {
-  const { auth, logout } = useAuth();
+  const { auth, logout, isAdmin } = useAuth();
   const signatures = usePendingSignatures(auth.account);
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -38,6 +38,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
   ] : employer ? [[`/employers/${auth.account?.subjectId}/documents`, 'Documents to sign']] : [
     ['/users', 'Learners & contacts'], ['/users/coach-directory', 'Coach directory'], ['/users/first-sessions', 'First-session bookings'],
     ['/users/eligibility-applications', 'Eligibility applications'], ['/users/eligibility-builder', 'Eligibility form builder'], ['/users/wizard-builder', 'Enrolment form builder'],
+    ...((isAdmin || auth.account?.role === 'admin') ? [['/users/programme-structure', 'Programme Structure']] : []),
     ['/users/compliance-documents', 'Compliance Documents'], ['/lms', 'Open LMS'],
     ...(auth.account && hasOwnEnrolment(auth.account) ? [['/learner/home?self=1', 'My enrolment']] : []),
   ];

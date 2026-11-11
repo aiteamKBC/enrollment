@@ -30,9 +30,10 @@ export function resolveCatalogueRadar(catalogue: RadarCatalogue | null, state: M
     if (!definition) throw new Error('Published programme modules are unavailable.');
     const modules = leaves(definition.modules).map((m) => ({ id: m.id, title: m.title, sessions: m.sessions, questions: [] as Ksb[] }));
     catalogue.records.forEach((r, index) => {
-      const module = modules.find((m) => m.id === r.moduleKey);
-      if (!module) throw new Error(`KSB ${r.code} references an unavailable module. Please contact admissions.`);
-      module.questions.push(questions[index]);
+      const keys = Array.isArray(r.moduleKeys) && r.moduleKeys.length ? r.moduleKeys : (r.moduleKey ? [r.moduleKey] : []);
+      const targets = modules.filter((m) => keys.includes(m.id));
+      if (!targets.length) throw new Error(`KSB ${r.code} references an unavailable module.`);
+      targets.forEach((module) => module.questions.push(questions[index]));
     });
     return { status: 'ready', message: '', modules, questions: modules.flatMap((m) => m.questions) };
   } catch (failure) {

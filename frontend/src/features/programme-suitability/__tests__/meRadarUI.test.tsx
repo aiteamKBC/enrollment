@@ -28,36 +28,44 @@ beforeEach(() => {
 });
 afterAll(() => vi.unstubAllGlobals());
 
-it('shows the three fixed modules and all exact 14/10/9 descriptions in one panel, without selectors or navigation writes', async () => {
+it('counts saved answers in each module coverage card without changing the saved rating', () => {
+  const first = allocateMeQuestions(meProfile, meModules())[0].questions[0];
+  const saved: Record<string, KsbAssessment> = { [first.id]: { ksbId: first.id, level: 'expert', note: 'Saved', evidenceFiles: [], actionPlan: null } };
+  render(<Harness saved={saved} />);
+  const cards = within(screen.getByRole('navigation', { name: 'Selected modules' }));
+  expect(cards.getByText('1 of 14 answered')).toBeVisible();
+  expect(cards.getByText('0 of 10 answered')).toBeVisible();
+  expect(cards.getByText('0 of 9 answered')).toBeVisible();
+  expect(mock.write).not.toHaveBeenCalled();
+});
+
+it('shows all 33 KSBs once with the three module coverage summaries and aligned table columns', () => {
   render(<Harness />);
   const nav = screen.getByRole('navigation', { name: 'Selected modules' });
-  const buttons = within(nav).getAllByRole('button');
-  expect(buttons).toHaveLength(3); expect(buttons[0]).toHaveAttribute('aria-pressed', 'true');
+  expect(within(nav).queryByRole('button')).toBeNull();
   expect(screen.queryByRole('radio')).toBeNull(); expect(screen.queryByRole('checkbox')).toBeNull();
   expect(document.querySelectorAll('details,summary')).toHaveLength(0);
+  expect(screen.getByText('SKILL DESCRIPTION')).toBeVisible();
+  expect(screen.getByText('COVERED BY MODULES')).toBeVisible();
+  expect(screen.getByText('ANSWER')).toBeVisible();
   const groups = allocateMeQuestions(meProfile, meModules()); const codes = new Set<string>();
-  for (const [index, group] of groups.entries()) {
-    await userEvent.click(buttons[index]);
-    expect(within(nav).getAllByRole('button', { pressed: true })).toEqual([buttons[index]]);
-    expect(within(nav).getAllByRole('button')).toEqual(buttons);
-    expect(buttons[index]).toHaveTextContent(`0 of ${group.questions.length} answered`);
-    expect(buttons[index]).toHaveTextContent(`${group.sessions} Sessions`);
-    expect(screen.getAllByRole('region', { name: /KSB questions$/ })).toHaveLength(1);
-    const panel = within(screen.getByRole('region', { name: `${group.title} KSB questions` }));
-    expect(panel.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(group.questions.length);
+  for (const group of groups) {
+    expect(within(nav).getByText(group.title)).toBeVisible();
+    expect(within(nav).getByText(`0 of ${group.questions.length} answered`)).toBeVisible();
     for (const question of group.questions) {
-      expect(panel.getByText(`${question.codes[0]} ${question.title}`)).toBeVisible();
+      expect(screen.getByText(`${question.codes[0]} ${question.title}`)).toBeVisible();
+      expect(screen.getByRole('button', { name: `Answer ${question.codes[0]}` })).toBeVisible();
       expect(within(nav).queryByText(`${question.codes[0]} ${question.title}`)).toBeNull(); codes.add(question.codes[0]);
     }
   }
+  expect(screen.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(33);
   expect(codes.size).toBe(33); expect(screen.getByText('0 of 33 answered')).toBeVisible();
   expect(mock.write).not.toHaveBeenCalled(); expect(mock.fetch).not.toHaveBeenCalled();
 });
 
-it('uses all nine original ratings, notes and evidence and selects the next module across question 14/15', async () => {
+it('uses all nine ratings, notes and evidence and advances across question 14/15', async () => {
   render(<Harness />);
   const nav = screen.getByRole('navigation', { name: 'Selected modules' });
-  const buttons = within(nav).getAllByRole('button');
   await userEvent.click(screen.getByRole('button', { name: 'Answer B8' }));
   const dialog = within(screen.getByRole('dialog'));
   expect(dialog.getByText('Question 14 of 33')).toBeVisible(); expect(dialog.getAllByRole('radio')).toHaveLength(9);
@@ -73,14 +81,14 @@ it('uses all nine original ratings, notes and evidence and selects the next modu
   expect(mock.write.mock.lastCall![0].assessments['st0596-v1-0-B8']).toMatchObject({ ksbId: 'st0596-v1-0-B8', level: 'champion', note: 'Original ME evidence workflow', evidenceFiles: ['me-evidence.txt'] });
   expect(screen.getByText('Question 15 of 33')).toBeVisible();
   expect(within(screen.getByRole('dialog')).getByText((text) => text.includes(source.ksbs.find((item) => item.code === 'K11')!.full_description))).toBeVisible();
-  expect(buttons[1]).toHaveAttribute('aria-pressed', 'true'); expect(buttons[0]).toHaveAttribute('aria-pressed', 'false');
-  expect(buttons[0]).toHaveTextContent('1 of 14 answered'); expect(screen.getByText('1 of 33 answered')).toBeVisible();
+  expect(within(nav).getByText('1 of 14 answered')).toBeVisible();
+  expect(screen.getByText('1 of 33 answered')).toBeVisible();
 });
 
 it('restores existing flat-layout ratings/notes/evidence/action plans under Marketing Technology (MarTech) without changing source wording', async () => {
   const answer: KsbAssessment = { ksbId: 'st0596-v1-0-S14', level: 'expert', note: 'Previous flat-layout note', evidenceFiles: ['old-me.pdf'], actionPlan: { text: 'Keep plan' } };
   render(<Harness saved={{ [answer.ksbId]: answer, historical: { ...answer, ksbId: 'historical' } }} />);
-  await userEvent.click(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByRole('button', { name: 'Marketing Technology (MarTech)' }));
+  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByText('Marketing Technology (MarTech)')).toBeVisible();
   expect(screen.getByText('S14 Use appropriate technologies to deliver marketing outcomes e.g. digital/web analytics, social media, CRM.')).toBeVisible();
   expect(screen.getByText('1 of 33 answered')).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Edit S14' }));
@@ -90,12 +98,12 @@ it('restores existing flat-layout ratings/notes/evidence/action plans under Mark
   await userEvent.click(dialog.getByRole('button', { name: 'Cancel' })); expect(mock.write).not.toHaveBeenCalled();
 });
 
-it('reflects published admin names and sessions while retaining all fixed ownership', async () => {
+it('reflects a published module name in the coverage summary and KSB cell', () => {
   const modules = meModules(); modules.configuration.programmes.find((item) => item.id === 'ME_L4')!.modules[0].title = 'Published impact name';
   modules.configuration.programmes.find((item) => item.id === 'ME_L4')!.modules[0].sessions = 22;
   render(<Harness modules={modules} />);
-  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByRole('button', { name: 'Published impact name' })).toHaveTextContent('22 Sessions');
-  expect(screen.getByRole('region', { name: 'Published impact name KSB questions' })).toHaveTextContent('14 KSBs');
+  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByText('Published impact name')).toBeVisible();
+  expect(screen.getAllByText('Published impact name').length).toBeGreaterThan(1);
   expect(screen.getByRole('button', { name: 'Answer K1' })).toBeVisible();
 });
 
