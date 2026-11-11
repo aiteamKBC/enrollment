@@ -1,0 +1,179 @@
+.theme {
+  --enrolment-ink: #290853;
+  --enrolment-purple: #700bd5;
+  --enrolment-border: #e4d1fc;
+  position: relative;
+  isolation: isolate;
+  color: var(--enrolment-ink);
+  background: radial-gradient(ellipse at 90% 0%, #e8cfff 0%, transparent 42%), radial-gradient(ellipse at 40% 35%, #fff 0%, transparent 60%), #f3ebff;
+}
+.theme .header { position: relative; z-index: 30; min-height: 64px; padding: 3px 25px; border-bottom: 1px solid #e4d1fc; background: linear-gradient(118deg, #fff 10%, #fbf6ff 60%, #efe1ff); box-shadow: 0 3px 15px #7136b51a; }
+.brand { display: flex; align-items: center; gap: 28px; color: #5809b1; font-size: 19px; font-weight: 800; letter-spacing: -.5px; white-space: nowrap; }
+.brand img { display: block; width: 140px; height: 56px; object-fit: contain; }
+.brandDivider { width: 1px; height: 28px; background: #a763f3; }
+.account { display: flex; align-items: center; gap: 12px; border-left: 1px solid #b886ec; padding-left: 25px; margin-left: 10px; }
+.accountButton { display: flex; align-items: center; gap: 12px; color: #230743; font-size: 13px; font-weight: 700; border-radius: 25px; padding: 4px; }
+.avatar { display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; border-radius: 50%; background: linear-gradient(140deg, #f5e9ff, #e4c9ff); color: #7109d3; font-size: 13px; box-shadow: inset 0 1px 3px #fff; }
+.accountName { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme .pageHeading { padding: 18px 18px 0; }
+.pageHeading h1 { color: #290853; font-size: 29px; font-weight: 800; line-height: 1.2; letter-spacing: -.8px; }
+.pageHeading p { margin-top: 4px; line-height: 1.4; color: #2d134b; font-size: 14px; }
+.content { min-width: 0; }
+.navigation ul { position: relative; z-index: 1; display: grid; gap: 9px; }
+.navigation::after { content: ''; position: absolute; pointer-events: none; z-index: 0; bottom: 0; left: 0; width: 100%; height: 220px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 250 220' preserveAspectRatio='none'%3E%3Cpath d='M0 0C110 20 140 145 250 160V220H0Z' fill='%23d8b2ff' fill-opacity='.6'/%3E%3Cpath d='M0 50C95 65 160 188 250 178V220H0Z' fill='%23b67aef' fill-opacity='.48'/%3E%3Cpath d='M0 175C115 100 137 176 250 212V220H0Z' fill='%23ecd8ff' fill-opacity='.85'/%3E%3C/svg%3E") bottom / 100% 100% no-repeat; }
+.theme .navItem { width: 100%; position: relative; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 12px 14px; border: 1px solid #eadcff; border-radius: 17px; background: linear-gradient(110deg, #fff9, #f8f0ffdd); color: #290853; font-size: 13px; font-weight: 700; line-height: 1.35; box-shadow: 0 3px 8px #6525a50a; transition: background .16s, box-shadow .16s; }
+.navItem > svg { color: #7a11e0; flex-shrink: 0; }
+.navItem > span:first-of-type { flex: 1; }
+.navItem:hover { background: #f1e1ff; box-shadow: 0 4px 12px #7331b41a; }
+.theme .navItemActive, .theme .navItemActive:hover { border-color: #ac4afa; background: radial-gradient(ellipse at 8% 10%, #b122ef, transparent 65%), linear-gradient(125deg, #9713ea, #4d0c9d); color: white; box-shadow: inset 0 2px 5px #f6cbff66, 0 5px 14px #7a1bd645; }
+.navItemActive > svg { color: white; }
+.theme .onboardingPage { padding: 14px 18px 25px; }
+.hero { position: relative; isolation: isolate; overflow: visible; min-height: 112px; margin-bottom: 17px; border: 1px solid #ddaeff; border-radius: 22px; background: linear-gradient(110deg, #6f1db3, #8950b7 62%, #b285db); box-shadow: 0 6px 13px #6924aa30, inset 0 1px 6px #f5d9ff80; }
+.heroSky { position: absolute; z-index: 1; top: 0; right: 0; bottom: 0; width: min(56%, 820px); overflow: hidden; border-radius: 0 22px 22px 0; pointer-events: none; mask-image: linear-gradient(to right, transparent 0%, #0003 12%, #000a 30%, #000 48%); }
+.heroSky > svg { display: block; width: 100%; height: 100%; }
+.heroSky::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 36% 100%, #ffcf9c88, transparent 65%); mix-blend-mode: soft-light; }
+.heroMedia { position: absolute; z-index: 2; top: -18px; right: 0; bottom: 0; width: 44%; pointer-events: none; clip-path: inset(0 0 0 0 round 0 0 22px 0); }
+/* A sky-only window extends the original sunset. Matching photo layers retain
+   the trees, while the opaque roof/facade silhouette always covers the waves. */
+.heroImage, .heroEnvironment { position: absolute; top: 0; right: 0; display: block; width: 90%; max-width: 450px; height: auto; object-fit: contain; object-position: right top; }
+.heroEnvironment { z-index: 0; clip-path: inset(18px 0 0 round 0 22px 0 0); mask-image: linear-gradient(to right, transparent 0%, #0003 10%, #0009 20%, #000 28%); }
+.heroImage { z-index: 1; clip-path: polygon(0 66%, 12.7% 42.3%, 35% 21.1%, 43% 29.6%, 79.3% 1.8%, 94.5% 25.4%, 100% 35%, 100% 100%, 0 100%); mask-image: linear-gradient(to right, transparent 0%, #000 10%); }
+/* Decorative paint stays behind the photo; text is the top content layer. */
+.heroSurface { position: absolute; z-index: 0; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.hero::before { content: ''; position: absolute; z-index: 0; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(ellipse at 12% 0, #b546ed9c, transparent 52%), linear-gradient(90deg, transparent 66%, #7b18bf10); }
+.heroWaves { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.heroContent { position: relative; z-index: 3; display: flex; align-items: center; gap: 22px; padding: 17px 34px; max-width: 62%; }
+.heroIcon { display: flex; width: 68px; height: 68px; align-items: center; justify-content: center; flex-shrink: 0; color: #8709e3; border: 2px solid #f5d6ff; border-radius: 20px; background: linear-gradient(140deg, #faf0ff, #ddb8fa); box-shadow: 0 3px 8px #28075230, inset 0 2px 4px #fff; }
+.heroContent h2 { margin: 0 0 5px; color: #fff; font-size: 26px; font-weight: 750; line-height: 1.2; letter-spacing: -.6px; }
+.heroContent p { margin: 0; color: white; font-size: 13px; line-height: 1.6; }
+/* This wrapper includes the hero and every step, within the shell's content
+   column. The application sidebar and header keep their existing geometry. */
+.wizard { width: 100%; max-width: 1140px; margin-inline: auto; container: enrolment-layout / inline-size; }
+.wizardLayout { align-items: stretch !important; gap: 18px !important; }
+.progressRail { width: 260px !important; }
+.progressPanel { height: 100%; border-color: #e4d1fc !important; border-radius: 23px !important; background: linear-gradient(140deg, #fff, #fcf8ff) !important; box-shadow: 0 4px 13px #6e22ad1a !important; }
+.progressHeading { padding: 14px 18px !important; border-color: #eee0ff !important; }
+.progressHeading > div:first-child > span:first-child { color: #290853; font-size: 14px; font-weight: 800; text-transform: none; letter-spacing: -.2px; }
+.progressHeading > div:first-child > span:last-child { color: #7a08d4; font-size: 18px; font-weight: 800; }
+.progressHeading > div:nth-child(2) { height: 11px; background: #edddff; box-shadow: inset 0 1px 3px #6c12ba0d; }
+.progressHeading > div:nth-child(2) > div { background: linear-gradient(90deg, #b626f5, #7405c8); box-shadow: inset 0 2px 3px #edbaff6b; }
+.progressHeading > p { color: #32164e; font-size: 11px; }
+.timeline { position: relative; padding: 10px 9px 24px !important; }
+.timeline::before { content: ''; position: absolute; pointer-events: none; width: 2px; top: 30px; bottom: 50px; left: 37px; background: linear-gradient(#a33bed, #d7b6f2); }
+.timelineItem { min-height: 48px; gap: 11px !important; padding: 7px 12px !important; border-radius: 15px !important; }
+.timelineItem[aria-selected='true'] { background: linear-gradient(100deg, #f1d9ff, #f5e6ff) !important; color: #30094f; }
+.timelineItem > span:first-child { height: 28px; width: 3px; background: #9b16ed; }
+.timelineIcon { position: relative; z-index: 1; display: flex; width: 33px; height: 33px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 50%; color: #5d08aa; background: #faf3ff; box-shadow: 0 2px 7px #7334a71f; }
+.timelineItem[aria-disabled='true'] .timelineIcon { color: #58367d; background: #f1e7fa; }
+.timelineLabel { display: block; white-space: normal !important; text-overflow: clip !important; font-size: 11.5px !important; font-weight: 750 !important; line-height: 1.25; overflow: visible !important; }
+.timelineStatus { color: #291044 !important; font-size: 10px !important; line-height: 1.4; }
+.timelineDone { display: inline-flex; width: 25px; height: 25px; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; color: #164e44; background: linear-gradient(140deg, #e9fff8, #a8ecd7); }
+.wizardCard { container: enrolment-wizard / inline-size; border-color: #ead8ff !important; border-radius: 23px !important; background: linear-gradient(125deg, #fff 50%, #fcf7ff) !important; box-shadow: 0 5px 17px #6e22ad1a !important; }
+.stepHeader { min-height: 70px; border-color: #eee1fb !important; padding: 13px 28px !important; background: linear-gradient(100deg, #fff8, #f7edff66); }
+.stepHeader p:first-child { color: #7800d5; font-size: 11px; font-weight: 800; letter-spacing: -.2px; }
+.stepHeader p:last-child { color: #2d0955; font-size: 22px; font-weight: 800; line-height: 1.2; }
+.wizardBody { padding: 27px 26px !important; }
+.wizardFooter { padding: 16px 22px !important; border-color: #f1e4ff !important; background: transparent !important; }
+.wizard button:focus-visible, .theme a:focus-visible, .theme button:focus-visible { outline: 3px solid #a537e9; outline-offset: 3px; }
+.wizardFooter > button, .nextArrow { border: 1px solid #a72df4 !important; color: white !important; background: radial-gradient(ellipse at 10% 0, #b928ff, transparent 75%), linear-gradient(125deg, #9e0bea, #5205a6) !important; box-shadow: inset 0 1px 3px #e4afff70, 0 4px 9px #7d1dc930 !important; border-radius: 30px !important; }
+.wizardFooter > button { min-height: 43px; padding: 11px 23px; font-weight: 700; font-size: 13px; }
+.wizardFooter > button:hover:not(:disabled), .nextArrow:hover:not(:disabled) { filter: brightness(1.08); }
+.wizardFooter > button:disabled, .nextArrow:disabled { opacity: .45; box-shadow: none !important; }
+.nextArrow { width: 40px !important; height: 40px !important; }
+.welcome { color: #23073e; }
+.welcomeLead { position: relative; isolation: isolate; margin-bottom: 25px; min-height: 190px; padding-right: clamp(0px, 12vw, 210px); }
+.welcomeGlow { position: absolute; z-index: -1; pointer-events: none; right: 0; top: 0; width: 200px; height: 200px; border-radius: 50% 50% 32% 58%; background: linear-gradient(145deg, #edd9ff90, #f8f0ff20); transform: rotate(-15deg); }
+.welcomeTitle { position: relative; display: table; margin: 0 0 30px; padding: 0 0 12px; font-size: clamp(28px, 2.5vw, 39px); font-weight: 800; color: #2c0753; line-height: 1.15; letter-spacing: -1.2px; }
+.welcomeTitle::after { content: ''; position: absolute; left: 0; bottom: 0; width: 108px; height: 5px; border-radius: 80% 80% 0 0; background: #7800ca; transform: rotate(-3deg); }
+.richText { display: grid; gap: 10px; min-width: 0; }
+.welcomeSectionHeading { margin: 0; color: #7100c5; font-size: 21px; line-height: 1.3; font-weight: 800; }
+.welcomeSubheading { margin: 0; color: #360b5d; font-size: 17px; font-weight: 750; }
+.welcomeParagraph { margin: 0; font-size: 13.5px; line-height: 1.6; }
+.welcomeParagraph strong { color: inherit; }
+.welcomeList { list-style: disc; padding-left: 18px; margin: 0; font-size: 13px; line-height: 1.65; }
+.welcomeList li + li { margin-top: 5px; }
+.welcomeCards { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 13px; }
+.welcomeCard { position: relative; display: flex; align-items: flex-start; gap: 13px; min-width: 0; padding: 17px 15px; border: 1px solid #e3cbff; border-radius: 18px; background: linear-gradient(145deg, #fff, #f4e9ff); box-shadow: 0 3px 7px #6b22a314; }
+.cardIcon { display: inline-flex; width: 45px; height: 45px; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 13px; color: #8709df; background: linear-gradient(145deg, #f1dcff, #e5c1ff); }
+.welcomeCard .welcomeSectionHeading, .welcomeCard .welcomeSubheading, .welcomeCard .richText > p:first-child:has(strong:only-child) { color: #250540; font-size: 15px; font-weight: 800; line-height: 1.35; }
+.welcomeCard .welcomeParagraph, .welcomeCard .welcomeList { font-size: 12.5px; line-height: 1.6; }
+.welcomeConclusion { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; gap: 17px; margin-top: 20px; padding: 17px 20px; border: 1px solid #e7caff; border-radius: 18px; background: linear-gradient(100deg, #f3dfff, #fff4ff 65%, #ead1ff); box-shadow: 0 3px 8px #7d2caf15; }
+.welcomeConclusion::after { content: ''; position: absolute; z-index: -1; right: -10px; bottom: -60px; width: 240px; height: 110px; border-radius: 50%; background: #cf9cf132; transform: rotate(-25deg); pointer-events: none; }
+.welcomeConclusion > svg { flex-shrink: 0; color: #8c08e1; }
+.welcomeConclusion .welcomeParagraph { color: #350c60; font-weight: 600; }
+@media (min-width: 768px) {
+  .navigation { position: sticky !important; top: 0; align-self: flex-start; width: 248px !important; min-height: calc(100dvh - 64px); padding: 27px 15px !important; border-right: 0 !important; background: linear-gradient(120deg, #fef9ff, #efe0ff); }
+}
+@media (max-width: 1279px) {
+  .brand { gap: 17px; font-size: 17px; }
+  .heroContent { max-width: 62%; padding: 22px; gap: 16px; }
+  .welcomeCards { grid-template-columns: 1fr; }
+  .welcomeLead { padding-right: 0; }
+  .welcomeGlow { opacity: .35; }
+  .welcomeCard .richText { flex: 1; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .heroMedia { top: auto; height: 110px; width: 75%; }
+  .heroImage, .heroEnvironment { top: auto; bottom: 0; max-width: 279px; }
+  .heroEnvironment { clip-path: none; }
+  .heroSky { top: auto; height: 110px; width: 85%; }
+  .heroContent { align-items: flex-start; max-width: none; padding-bottom: 110px; }
+}
+@media (max-width: 767px) {
+  .theme .header { gap: 10px; min-height: 62px; padding: 5px 12px; }
+  .brand { gap: 10px; font-size: 14px; letter-spacing: -.3px; }
+  .brand img { width: 86px; height: 44px; }
+  .brandDivider { height: 24px; }
+  .account { border: 0; padding: 0; margin: 0; }
+  .accountButton { gap: 0; }
+  .accountName, .accountButton > svg { display: none; }
+  .avatar { width: 33px; height: 33px; }
+  .header > div { gap: 4px; }
+  .navigation { background: #f9f1ff !important; }
+  .theme .pageHeading { padding: 18px 14px 0; }
+  .pageHeading h1 { font-size: 26px; }
+  .pageHeading p { font-size: 12px; }
+  .theme .onboardingPage { padding: 14px 12px 20px; }
+  .hero { min-height: 210px; border-radius: 18px; }
+  .heroMedia { top: auto; height: 95px; width: 75%; clip-path: inset(0 0 0 0 round 0 0 18px 0); }
+  .heroImage, .heroEnvironment { top: auto; bottom: 0; max-width: 239px; }
+  .heroEnvironment { clip-path: none; }
+  .heroSky { top: auto; height: 95px; width: 85%; border-radius: 0 0 18px 0; }
+  .heroContent { align-items: flex-start; max-width: none; padding: 19px 17px 95px; gap: 13px; }
+  .heroIcon { width: 48px; height: 48px; border-radius: 14px; }
+  .heroIcon > svg { width: 29px; }
+  .heroContent h2 { font-size: 23px; }
+  .heroContent p { font-size: 12px; }
+  .wizardBody { padding: 23px 18px !important; }
+  .wizardCard { border-radius: 19px !important; }
+  .welcomeLead { min-height: 0; margin-bottom: 22px; }
+  .welcomeTitle { margin-bottom: 24px; }
+  .welcomeSectionHeading { font-size: 19px; }
+  .welcomeGlow { display: none; }
+  .welcomeConclusion { gap: 12px; padding: 15px; }
+  .welcomeConclusion > svg { width: 32px; }
+  .wizardFooter { padding: 14px 17px !important; }
+}
+/* Use the existing compact step navigation when the space remaining after the
+   application sidebar cannot comfortably fit both wizard columns. */
+@container enrolment-layout (max-width: 899px) {
+  .wizardLayout { flex-direction: column !important; gap: 16px !important; }
+  .progressRail { display: none !important; }
+  .compactSteps { display: block !important; }
+}
+@container enrolment-wizard (max-width: 900px) {
+  .welcomeCards { grid-template-columns: 1fr; }
+  .welcomeLead { padding-right: 0; }
+  .welcomeGlow { opacity: .35; }
+  .welcomeCard .richText { flex: 1; }
+}
+@media (max-width: 410px) {
+  .brand { gap: 7px; font-size: 12px; }
+  .brand img { width: 67px; height: 40px; }
+  .brandDivider { display: none; }
+  .accountButton { padding: 0; }
+  .theme .header { padding-left: 9px; padding-right: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme *, .wizard * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

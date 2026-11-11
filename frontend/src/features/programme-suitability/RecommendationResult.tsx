@@ -13,13 +13,13 @@ export function RecommendationResult({ state, mode = 'summary', onSelect }: Resu
   const alternative = alternativeProgramme(state);
   const selected = state.configuration?.programmes.find((p) => p.id === state.selectedProgramme);
   const confirmedAlternative = selectionConfirmed(state) && recommended && selected && selected.id !== recommended.id ? selected : null;
-  return <section aria-label="Assessment recommendation result" className="space-y-4">
-    <p className="text-sm font-semibold text-primary-700">Assessment Completed</p>
-    {recommended ? <div className="space-y-4 rounded-2xl border border-primary-300 bg-primary-50/60 p-5 md:p-6">
+  return <section aria-label="Assessment recommendation result" className="space-y-4" data-recommendation-result>
+    <p className="text-sm font-semibold text-primary-700" data-assessment-status>Assessment Completed</p>
+    {recommended ? <div className="space-y-4 rounded-2xl border border-primary-300 bg-primary-50/60 p-5 md:p-6" data-recommended-programme>
       <h3 className="text-lg font-semibold">Your Recommended Programme</h3>
       <h4 className="text-2xl font-bold text-primary-800">{recommended.title} — Level {recommended.level}</h4>
       <p className="text-sm text-foreground-600">Based on your answers and current job responsibilities.</p>
-      {confirmedAlternative && <div className="space-y-3 border-t border-primary-200 pt-4">
+      {confirmedAlternative && <div className="space-y-3 border-t border-primary-200 pt-4" data-confirmed-programme>
         <h5 className="font-semibold">Your Confirmed Programme Selection</h5>
         <p role="status" className="text-base font-semibold text-primary-800 md:text-lg">
           You chose {confirmedAlternative.title} Level {confirmedAlternative.level} instead of {recommended.title} Level {recommended.level}.

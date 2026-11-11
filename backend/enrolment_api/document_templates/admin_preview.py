@@ -75,12 +75,14 @@ def document_preview(request, pk, key):
         if artifact is None:
             return error('This exact saved PDF is unavailable. It will not be regenerated when previewed. Please retry the operation that saved this document.', 409)
         saved_url = pdf.issued_url(pk, binding.pk, artifact.fingerprint)
-    elif pdf.enabled() and not saved_url:
+    from .legacy_snapshot import can_render_original_snapshot, SNAPSHOT_NOTICE
+    snapshot_preview = pdf.enabled() and not saved_url and can_render_original_snapshot(key, data)
+    if pdf.enabled() and not pdf.branded(data) and not saved_url and not snapshot_preview:
         return error('The stored historical PDF is unavailable. It will not be regenerated or changed to the new design.', 409)
     version = data['template']['number']
     return response({'template': data['template'], 'data': data, 'sample': False, 'missingFields': [],
         'previewToken': token, 'pdfUrl': saved_url,
-        'notice': 'Issued original R1 · ' + (f'Template V{version}' if version else 'Original application template') +
+        'notice': SNAPSHOT_NOTICE if snapshot_preview else 'Issued original R1 · ' + (f'Template V{version}' if version else 'Original application template') +
                   '. Saved issued content and recorded signatures. Other versions are available in History.'})
 
 

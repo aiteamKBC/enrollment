@@ -45,6 +45,7 @@ import { ToastProvider } from '@/hooks/useToast';
 import { fetchInclusionStatus } from '@/api/wizardInclusion';
 import { WizardProvider } from '../WizardContext';
 import { WizardShell } from '../WizardShell';
+import { WIZARD_STEPS } from '../../types';
 import type { EnrolmentBoard, IlrForm, IlrLearnerDetails, PersonalDetails } from '../../types';
 
 // Only the branches the wizard reads are populated; the board type is far wider
@@ -136,6 +137,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('learner step gating', () => {
+  it('opens only the final three tabs for local design without saving or signing earlier steps', async () => {
+    vi.stubEnv('DEV', true);
+    vi.stubEnv('VITE_LOCAL_ENROLMENT_DESIGN_PREVIEW', '1');
+    const navigate = renderShell('learner');
+    await waitForHydration();
+    for (const name of ['Policies', 'Initial Assessments', 'What Happens Now?']) {
+      await waitFor(() => expect(screen.getByRole('tab', { name })).not.toHaveAttribute('aria-disabled', 'true'));
+    }
+    expect(screen.getByRole('tab', { name: 'Inclusion' })).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(screen.getByRole('tab', { name: 'Policies' }));
+    expect(navigate).toHaveBeenCalledWith(WIZARD_STEPS.findIndex(step => step.slug === 'policies'));
+    expect(saveExtendedIlr).not.toHaveBeenCalled();
+  });
   it('temporarily allows ILR to Extended ILR navigation without answers only in local preview', async () => {
     vi.stubEnv('DEV', true);
     vi.stubEnv('MODE', 'eligibility-local');

@@ -1,0 +1,45 @@
+.page { width: 100%; min-width: 0; padding: 24px 26px 40px; color: #26095a; }
+/* Scope the existing shell heading to this page without changing the shell. */
+:global(div):has(> .page) > :global(div:first-child) :global(h1) { color: #29095d; font-size: clamp(26px, 2.1vw, 34px); font-weight: 800; letter-spacing: -.8px; }
+:global(div):has(> .page) > :global(div:first-child) :global(p) { color: #372454; font-size: 16px; }
+.hero { position: relative; isolation: isolate; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: center; gap: 24px; width: 100%; margin: 0; padding: clamp(30px, 3.5vw, 64px); border: 1px solid #fff; border-radius: 29px; background: linear-gradient(115deg, #fffdff 4%, #fbf8ff 47%, #f1e4ff 77%, #e6ccfc); box-shadow: 0 10px 23px #7932bc1c, inset 0 0 0 1px #f1e5fc; }
+.heroContent { position: relative; z-index: 1; min-width: 0; }
+.waves { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; pointer-events: none; }
+.eyebrow { display: inline-flex; align-items: center; gap: 14px; padding: 10px 20px; border-radius: 40px; color: #5408a6; background: linear-gradient(100deg, #e8d1ff, #eedcfc); font-size: 15px; font-weight: 800; }
+.lockedHeading { margin: 25px 0 0; color: #290761; font-size: clamp(26px, 2.15vw, 38px); line-height: 1.22; letter-spacing: -.9px; font-weight: 800; }
+.underline { display: block; width: 154px; height: 16px; margin: 4px 0 13px; color: #6408b5; }
+.description { margin: 0; max-width: 730px; color: #24104f; font-size: clamp(15px, 1.08vw, 18px); line-height: 1.6; }
+.requirements { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; padding: 22px 8px; margin: 26px 0 32px; border: 1px solid #e5d0fc; border-radius: 22px; background: linear-gradient(120deg, #fcf9ffb3, #f2e8fd99); box-shadow: inset 0 0 0 1px #f1e6fc; }
+.documentTile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0 12px; color: #260955; text-align: center; font-size: 15px; font-weight: 750; line-height: 1.35; }
+.documentTile + .documentTile { border-left: 1px solid #e2c9fa; }
+.documentIcon { position: relative; display: grid; place-items: center; width: 59px; height: 59px; border: 1px solid #ebd9ff; border-radius: 16px; color: #730ad2; background: linear-gradient(135deg, #fff, #f9f3ff); box-shadow: 0 3px 5px #8d3ebc12; }
+.indicator { position: absolute; top: -7px; right: -8px; display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid #faf5ff; border-radius: 50%; color: #766783; background: #e9e1f2; }
+.indicator[data-signed] { color: #fff; background: linear-gradient(140deg, #82e8ac, #24b97b); }
+.complianceButton { display: inline-flex; align-items: center; justify-content: center; gap: 14px; width: min(100%, 480px); min-height: 60px; padding: 15px 25px; border: 1px solid #c762ff; border-radius: 25px; color: #fff; background: linear-gradient(110deg, #961be1, #800bd2 55%, #6503b8); box-shadow: inset 0 2px 3px #e5a3ff66, 0 8px 18px #780ecb30; font-size: 18px; font-weight: 750; line-height: 1.4; text-align: left; transition: box-shadow .18s, background .18s; }
+.complianceButton > svg { flex-shrink: 0; }
+.complianceButton > svg:last-child { margin-left: auto; }
+.complianceButton:hover { background: linear-gradient(110deg, #8610d2, #6902bd); box-shadow: 0 10px 22px #780ecb40; }
+.complianceButton:focus-visible { outline: 3px solid #8d26db; outline-offset: 4px; }
+.artwork { position: relative; align-self: stretch; min-height: 380px; pointer-events: none; }
+.artworkGlow { position: absolute; width: 110%; aspect-ratio: 1; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle at 60% 45%, #c88cf54d, #d6b3f82e 65%, transparent 66%); }
+.calendar { position: absolute; top: 46%; left: 48%; transform: translate(-50%, -50%); width: 83%; max-width: 440px; filter: drop-shadow(8px 17px 12px #7829a824); }
+.checklist { position: absolute; right: 8%; bottom: 10%; width: 43%; padding: 23px 17px; border: 1px solid #fff; border-radius: 14px; background: linear-gradient(130deg, #fff, #f6eefb); box-shadow: 3px 7px 4px #753e9e28, 10px 12px 17px #7634b021; transform: rotate(9deg) skew(-6deg); }
+.checklist > div { display: grid; grid-template-columns: 28px 1fr; gap: 5px 12px; align-items: center; margin-block: 10px; }
+.checklist svg { grid-row: span 2; width: 28px; height: 28px; padding: 2px; border-radius: 5px; color: #fff; background: linear-gradient(140deg, #b9e9cf, #58bd92); box-shadow: 2px 2px 2px #29937230; }
+.checklist span { height: 6px; border-radius: 4px; background: #bcb1ce; }
+.checklist span:last-child { width: 68%; background: #d9d0e4; }
+.books { position: absolute; right: -2%; bottom: 17%; width: 31%; height: 91px; transform: rotate(-7deg); }
+.books span { position: absolute; inset: 0 0 auto; height: 43px; border: solid #9726d5; border-width: 8px 7px 6px 20px; border-radius: 12px 4px 4px 12px; background: repeating-linear-gradient(#f3e5fd 0 3px, #dfcbef 4px 5px); box-shadow: 3px 6px 7px #5f248d33; }
+.books span:last-child { top: 44px; left: -5px; right: -8px; border-color: #7926c3; }
+.plant { position: absolute; left: 0; bottom: 24%; width: 80px; height: 150px; }
+.plant span { position: absolute; bottom: 0; left: 12px; width: 62px; height: 72px; border-radius: 10px 10px 23px 23px; background: linear-gradient(90deg, #eee3fa, #fff 50%, #d9c6ea); box-shadow: 4px 7px 8px #68318e22; }
+.plant i { position: absolute; left: 36px; bottom: 55px; width: 26px; height: 94px; border-radius: 100% 0 100% 0; transform: rotate(-42deg); transform-origin: bottom; background: linear-gradient(90deg, #53ae67, #b3edaf); }
+.plant i:nth-child(2) { transform: rotate(22deg); height: 112px; }
+.plant i:nth-child(3) { transform: rotate(55deg); height: 82px; background: linear-gradient(90deg, #64b66c, #b8edb1); }
+.workflow { max-width: 720px; margin-inline: auto; padding: clamp(24px, 4vw, 44px); border: 1px solid #e4cff7; border-radius: 26px; color: #2b1052; background: linear-gradient(135deg, #fff, #faf4ff); box-shadow: 0 8px 24px #6c2da817; }
+.workflow :global(input), .workflow :global(select) { border-color: #d9c3ee; border-radius: 12px; }
+.feedback { max-width: 576px; }
+.signatureLabel { color: #766783; font-size: 11px; font-weight: 500; line-height: 1.4; }
+@media (max-width: 1200px) { .hero { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; padding: 32px; } .lockedHeading { font-size: 30px; } .documentTile { font-size: 13px; padding-inline: 8px; } .artwork { min-height: 330px; } .checklist { width: 48%; padding: 12px; right: 0; } .plant { left: -10px; transform: scale(.8); } }
+@media (max-width: 950px) { .hero { grid-template-columns: minmax(0, 1fr); gap: 12px; } .heroContent { max-width: 740px; } .artwork { min-height: 300px; width: min(100%, 440px); justify-self: center; } .calendar { width: 68%; } .checklist { width: 36%; bottom: 2%; right: 12%; } .plant { left: 8%; bottom: 15%; } .books { right: 4%; bottom: 8%; } .artworkGlow { width: 90%; } }
+@media (max-width: 540px) { .page { padding: 18px 14px 28px; } .hero { padding: 25px 20px; border-radius: 23px; } .eyebrow { gap: 9px; padding: 9px 12px; font-size: 11px; } .eyebrow svg { width: 20px; } .lockedHeading { margin-top: 22px; font-size: 28px; letter-spacing: -.6px; } .description { font-size: 15px; } .requirements { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 0; padding: 22px 8px; margin-block: 23px; } .documentTile { font-size: 14px; } .documentTile:nth-child(3) { border-left: 0; } .complianceButton { min-height: 58px; gap: 9px; padding: 13px; border-radius: 20px; font-size: 15px; } .complianceButton > svg { width: 20px; } .artwork { min-height: 265px; } .checklist { padding: 10px; } .checklist > div { gap: 4px 6px; grid-template-columns: 21px 1fr; margin-block: 7px; } .checklist svg { width: 21px; height: 21px; } .checklist span { height: 4px; } .books { width: 27%; transform: rotate(-7deg) scale(.85); } .plant { left: 0; transform: scale(.65); } }

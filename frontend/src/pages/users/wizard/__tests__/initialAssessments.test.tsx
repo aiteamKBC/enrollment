@@ -28,6 +28,7 @@ vi.mock('../layout/textsContext', () => ({
 }));
 
 import InitialAssessments from '../steps/InitialAssessments';
+import { LearnerEnrolmentVisualContext } from '@/features/learner-enrolment/enrolmentPresentation';
 
 function response() {
   return {
@@ -39,7 +40,20 @@ function response() {
   };
 }
 
-describe('Initial Assessments Auto-login fallback', () => {
+describe.each([false, true])('Initial Assessments Auto-login fallback (learner visuals: %s)', learner => {
+  const renderStep = () => render(<LearnerEnrolmentVisualContext.Provider value={learner}><InitialAssessments /></LearnerEnrolmentVisualContext.Provider>);
+  it('keeps the unavailable warning, both retry actions and incomplete states', async () => {
+    fetchInitialAssessments.mockResolvedValueOnce({ enabled: false, assessments: [
+      { subject: 'english', status: 'error', error: 'BKSB is unavailable.' },
+      { subject: 'maths', status: 'error', error: 'BKSB is unavailable.' },
+    ] });
+    renderStep();
+    expect(await screen.findByRole('alert')).toHaveTextContent('BKSB is currently unavailable. You can continue onboarding and try again later.');
+    expect(screen.getAllByText('Error / Unavailable')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Retry English Assessment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Retry Maths Assessment' })).toBeEnabled();
+    expect(screen.queryByText('Completed')).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     fetchInitialAssessments.mockResolvedValue(response());
@@ -52,7 +66,7 @@ describe('Initial Assessments Auto-login fallback', () => {
   });
 
   it('shows the account action and keeps ENG_NEW direct launch hidden', async () => {
-    render(<InitialAssessments />);
+    renderStep();
     expect(await screen.findByRole('button', { name: 'Start English Assessment' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open BKSB Account' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start Maths Assessment' })).toBeInTheDocument();
@@ -65,7 +79,7 @@ describe('Initial Assessments Auto-login fallback', () => {
     const tab = { closed: false, opener: null, close: vi.fn(), location: { replace: vi.fn(), href: '' } };
     vi.mocked(window.open).mockReturnValue(tab as unknown as Window);
     autoLoginBksbAccount.mockResolvedValue({ url: 'https://login.example.test/one-time', expiresAt: 'soon' });
-    render(<InitialAssessments />);
+    renderStep();
     fireEvent.click(await screen.findByRole('button', { name: 'Start English Assessment' }));
     await waitFor(() => expect(autoLoginBksbAccount).toHaveBeenCalledWith('apprenticeship', '1601', 'english'));
     expect(tab.location.replace).toHaveBeenCalledWith('https://login.example.test/one-time');
@@ -86,7 +100,7 @@ describe('Initial Assessments Auto-login fallback', () => {
     };
     vi.mocked(window.open).mockReturnValue(tab as unknown as Window);
     autoLoginBksbAccount.mockReturnValue(pendingLogin);
-    render(<InitialAssessments />);
+    renderStep();
     fireEvent.click(await screen.findByRole('button', { name: 'Start English Assessment' }));
     await waitFor(() => {
       expect(tab.document.title).toBe('Opening BKSB');
@@ -100,7 +114,7 @@ describe('Initial Assessments Auto-login fallback', () => {
     const tab = { closed: false, opener: null, close: vi.fn(), location: { replace: vi.fn(), href: '' } };
     vi.mocked(window.open).mockReturnValue(tab as unknown as Window);
     autoLoginBksbAccount.mockRejectedValue(new Error('BKSB is temporarily unavailable.'));
-    render(<InitialAssessments />);
+    renderStep();
     fireEvent.click(await screen.findByRole('button', { name: 'Start English Assessment' }));
     await waitFor(() => expect(tab.close).toHaveBeenCalled());
     expect(screen.getByRole('alert')).toHaveTextContent('BKSB is temporarily unavailable.');
@@ -114,14 +128,14 @@ describe('Initial Assessments Auto-login fallback', () => {
         { subject: 'maths', status: 'not_started', directLaunchEnabled: true },
       ],
     });
-    render(<InitialAssessments />);
+    renderStep();
     expect(await screen.findByRole('button', { name: 'Start English Assessment' })).toBeInTheDocument();
     expect(screen.queryByText('Completed')).not.toBeInTheDocument();
   });
 
   it('opens an unstarted Maths assessment through Auto-login with the Maths subject', async () => {
     autoLoginBksbAccount.mockResolvedValue({ url: 'https://login.example.test/maths', expiresAt: 'soon' });
-    render(<InitialAssessments />);
+    renderStep();
     fireEvent.click(await screen.findByRole('button', { name: 'Start Maths Assessment' }));
     await waitFor(() => expect(autoLoginBksbAccount).toHaveBeenCalledWith('apprenticeship', '1601', 'maths'));
     expect(launchInitialAssessment).not.toHaveBeenCalled();
@@ -135,7 +149,7 @@ describe('Initial Assessments Auto-login fallback', () => {
         { subject: 'maths', status: 'not_started', directLaunchEnabled: true },
       ],
     });
-    render(<InitialAssessments />);
+    renderStep();
     expect(await screen.findByRole('button', { name: 'Continue English Assessment' })).toBeInTheDocument();
   });
 
@@ -148,7 +162,7 @@ describe('Initial Assessments Auto-login fallback', () => {
       ],
     });
     autoLoginBksbAccount.mockResolvedValue({ url: 'https://login.example.test/review', expiresAt: 'soon' });
-    render(<InitialAssessments />);
+    renderStep();
     expect(await screen.findByRole('button', { name: 'Review English Assessment' })).toBeInTheDocument();
     expect(screen.getByText('Review your completed assessment results and access your English course in BKSB.')).toBeInTheDocument();
     expect(screen.getByText('Level 2')).toBeInTheDocument();
@@ -169,7 +183,7 @@ describe('Initial Assessments Auto-login fallback', () => {
       ],
     });
     autoLoginBksbAccount.mockResolvedValue({ url: 'https://login.example.test/review', expiresAt: 'soon' });
-    render(<InitialAssessments />);
+    renderStep();
     fireEvent.click(await screen.findByRole('button', { name: 'Review Maths Assessment' }));
     expect(screen.getByText('Review your completed assessment results and access your Maths course in BKSB.')).toBeInTheDocument();
     await waitFor(() => expect(autoLoginBksbAccount).toHaveBeenCalledWith('apprenticeship', '1601', 'maths'));
@@ -184,20 +198,20 @@ describe('Initial Assessments Auto-login fallback', () => {
         { subject: 'maths', status: 'not_started', directLaunchEnabled: true },
       ],
     });
-    render(<InitialAssessments />);
+    renderStep();
     expect(await screen.findByText('Level pending verification')).toBeInTheDocument();
     expect(screen.queryByText('2.6')).not.toBeInTheDocument();
   });
 
   it('does not present the legacy English deep-link 404 as an assessment failure', async () => {
-    render(<InitialAssessments />);
+    renderStep();
     expect(screen.getByText('Open BKSB to access your English course and complete your Initial Assessment.')).toBeInTheDocument();
     expect(screen.queryByText('BKSB returned HTTP 404.')).not.toBeInTheDocument();
     expect(screen.getAllByText('Not Started')).toHaveLength(2);
   });
 
   it('keeps the existing cards and hides transient errors on a return-to-tab refresh', async () => {
-    render(<InitialAssessments />);
+    renderStep();
     expect(await screen.findByRole('button', { name: 'Start Maths Assessment' })).toBeInTheDocument();
     await waitFor(() => expect(fetchInitialAssessments).toHaveBeenCalledTimes(1));
     fetchInitialAssessments.mockRejectedValueOnce(new Error('temporary refocus failure'));

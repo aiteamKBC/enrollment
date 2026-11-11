@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { ChevronDown, Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth.helpers';
 import type { SidebarNavItem } from './Sidebar';
 import { hasOwnEnrolment } from '@/lib/enrollmentAccess';
 import styles from './EnrollmentShell.module.css';
 import { usePendingSignatures } from '@/features/pending-signatures/usePendingSignatures';
 import { PendingSignatureBadge, SignatureNotifications } from '@/features/pending-signatures/SignatureNotifications';
+import { LearnerNavIcon } from '@/features/learner-enrolment/EnrolmentVisuals';
+import { enrolmentAsset } from '@/features/learner-enrolment/enrolmentPresentation';
+import learnerStyles from '@/features/learner-enrolment/learnerEnrolment.module.css';
 
 interface Props {
   children: ReactNode;
@@ -32,6 +35,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
   const learner = auth.account?.role === 'learner' || Boolean(auth.account && hasOwnEnrolment(auth.account) && pathname.startsWith('/learner'));
   const employer = auth.account?.role === 'employer';
   const commercial = (auth.account?.role === 'learner' ? auth.account.learnerType : auth.account?.learnerRecordKind) === 'commercial';
+  const brandedLearner = auth.account?.role === 'learner' && !commercial;
   const links = learner ? [
     ...(!commercial ? [['/learner/onboarding', 'My enrolment'], ['/learner/onboarding/reviews', 'Reviews'], ['/learner/compliance-documents', 'Compliance documents']] : []),
     ['/learner/first-session', 'First learning session'], ['/lms?self=1', 'Continue to LMS'],
@@ -98,12 +102,12 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
     };
   }, [accountOpen]);
   return (
-    <div className="min-h-screen bg-background-200 text-foreground-900">
-      <header className="flex items-center justify-between gap-4 border-b border-foreground-200 bg-background-50 px-5 py-4" inert={open}>
-        <Link to="/enrollment" className="font-heading text-lg font-semibold text-primary-700">Enrolment Corner</Link>
+    <div className={`min-h-screen bg-background-200 text-foreground-900 ${brandedLearner ? learnerStyles.theme : ''}`}>
+      <header className={`flex items-center justify-between gap-4 border-b border-foreground-200 bg-background-50 px-5 py-4 ${brandedLearner ? learnerStyles.header : ''}`} inert={open}>
+        <Link to="/enrollment" aria-label="Enrolment Corner" className={brandedLearner ? learnerStyles.brand : 'font-heading text-lg font-semibold text-primary-700'}>{brandedLearner && <><img src={enrolmentAsset('assets/document-branding/kbc-logo.png')} alt="Kent Business College" /><span className={learnerStyles.brandDivider} aria-hidden="true" /></>}Enrolment Corner</Link>
         <div className="flex items-center gap-3">
           {auth.account?.role === 'learner' && <SignatureNotifications {...signatures} />}
-          <div ref={accountRef} className="relative">
+          <div ref={accountRef} className={`relative ${brandedLearner ? learnerStyles.account : ''}`}>
             <button
               type="button"
               aria-label={`Open account menu for ${displayName}`}
@@ -111,9 +115,9 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
               aria-expanded={accountOpen}
               title="Account menu"
               onClick={() => setAccountOpen(value => !value)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-800 ring-1 ring-primary-200 hover:bg-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              className={brandedLearner ? learnerStyles.accountButton : 'flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-800 ring-1 ring-primary-200 hover:bg-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500'}
             >
-              {initials}
+              {brandedLearner ? <><span className={learnerStyles.avatar}>{initials}</span><span className={learnerStyles.accountName}>{displayName}</span><ChevronDown size={18} aria-hidden="true" /></> : initials}
             </button>
             {accountOpen && (
               <div role="menu" className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl bg-background-50 p-1.5 ring-1 ring-foreground-100 shadow-xl">
@@ -128,7 +132,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
               </div>
             )}
           </div>
-          <span className="hidden text-sm sm:inline">{auth.account?.displayName}</span>
+          {!brandedLearner && <span className="hidden text-sm sm:inline">{auth.account?.displayName}</span>}
           <button
             type="button"
             ref={menuButtonRef}
@@ -144,7 +148,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
       </header>
       {open && <div className={styles.backdrop} aria-hidden="true" onClick={() => closeNavigation()} />}
       <div className="md:flex">
-        <nav id="enrolment-navigation" aria-label="Enrolment navigation" data-open={open} className={`${styles.navigation} shrink-0 border-r border-foreground-200 bg-background-50 p-4`}>
+        <nav id="enrolment-navigation" aria-label="Enrolment navigation" data-open={open} className={`${styles.navigation} shrink-0 border-r border-foreground-200 bg-background-50 p-4 ${brandedLearner ? learnerStyles.navigation : ''}`}>
           <div className={styles.drawerHeader}>
             <span className="font-heading text-lg font-semibold text-primary-700">Enrolment Corner</span>
             <button type="button" ref={drawerCloseRef} className={styles.drawerCloseButton} aria-label="Close navigation" onClick={() => closeNavigation()}><X size={20} aria-hidden="true" /></button>
@@ -154,19 +158,19 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
               <li key={to}>
                 <NavLink
                   to={to}
-                  end
+                  end={!brandedLearner || to === '/learner/onboarding' && pathname.startsWith('/learner/onboarding/reviews')}
                   onClick={() => closeNavigation(false)}
-                  className={({ isActive }) => `flex items-center justify-between gap-2 rounded-lg px-4 py-3 text-sm ${isActive ? 'bg-primary-100 font-semibold text-primary-800' : 'hover:bg-background-200'}`}
+                  className={({ isActive }) => brandedLearner ? `${learnerStyles.navItem} ${isActive ? learnerStyles.navItemActive : ''}` : `flex items-center justify-between gap-2 rounded-lg px-4 py-3 text-sm ${isActive ? 'bg-primary-100 font-semibold text-primary-800' : 'hover:bg-background-200'}`}
                 >
-                  <span>{label}</span>
+                  {brandedLearner && <LearnerNavIcon path={to} />}<span>{label}</span>
                   {auth.account?.role === 'learner' && to === '/learner/compliance-documents' && <PendingSignatureBadge count={signatures.data.count} label="documents requiring your signature" />}
                 </NavLink>
               </li>
             ))}
           </ul>
         </nav>
-        <div className="min-w-0 flex-1" inert={open}>
-          <div className="flex flex-wrap items-center justify-between gap-4 px-6 pt-6">
+        <div className={`min-w-0 flex-1 ${brandedLearner ? learnerStyles.content : ''}`} inert={open}>
+          <div className={`flex flex-wrap items-center justify-between gap-4 px-6 pt-6 ${brandedLearner ? learnerStyles.pageHeading : ''}`}>
             <div>
               <h1 className="font-heading text-2xl font-semibold">{pageTitle}</h1>
               {pageSubtitle && <p className="mt-1 text-sm text-foreground-500">{pageSubtitle}</p>}

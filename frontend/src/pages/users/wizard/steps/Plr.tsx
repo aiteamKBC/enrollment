@@ -335,7 +335,7 @@ export default function Plr() {
         <Table headers={['Place of Study', 'Qualification Type', 'Subject', 'Level', 'Award Date', 'Credits', 'Grade', 'Record Type', 'Certificate / Evidence', 'Actions']}>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={10} className="py-4 px-3 text-center text-[12px] text-foreground-400">{t('block.plr.empty')}</td>
+              <td colSpan={10} className="py-4 px-3 text-center text-[12px] text-foreground-400"><span>{t('block.plr.empty')}</span></td>
             </tr>
           ) : (
             rows.map((r) => (

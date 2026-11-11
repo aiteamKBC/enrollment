@@ -16,6 +16,7 @@ import { isMmRadar, mmRadarProfileProgramme, resolveMmRadar } from '@/features/p
 import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/programme-suitability/skills-radar/marketingExecutive';
 import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
 import { ModuleMasterDetail } from '@/features/programme-suitability/skills-radar/ModuleMasterDetail';
+import { useLearnerStepPresentation } from '@/features/learner-enrolment/stepPresentation';
 
 /**
  * Skills Radar — a sequential self-assessment questionnaire.
@@ -70,6 +71,7 @@ function workingFrom(existing?: KsbAssessment): WorkingAnswer {
 }
 
 export default function SkillsRadar() {
+  const learnerPresentation = useLearnerStepPresentation();
   const { draft, setSection, readOnly, board, suitability, modules, radarCatalogue } = useWizard();
   const managed = Boolean(radarCatalogue?.enabled && !(radarCatalogue.data && !radarCatalogue.data.catalogue));
   const pcp = isPcpRadar(suitability?.state);
@@ -200,15 +202,18 @@ export default function SkillsRadar() {
 
   const renderQuestion = (ksb: Ksb, i: number) => {
     const level = sr.assessments[ksb.id]?.level ?? null;
+    const actionLabel = readOnly ? 'View' : level !== null ? 'Edit' : learnerPresentation ? 'Assess' : 'Answer';
     const meta = competenceMeta(level);
     const score = competenceScore(level);
     // After a refused Next, every competency still to rate is marked.
     const unrated = showErrors && !readOnly && !level;
     return (
-      <div key={ksb.id} className={`flex items-center gap-3 px-3 py-2.5${moduleBased ? ' flex-wrap sm:flex-nowrap' : ''}${unrated ? ' bg-red-50 ring-1 ring-inset ring-red-500' : ''}`}>
+      <div key={ksb.id} data-ksb-row={learnerPresentation ? '' : undefined} className={`flex items-center gap-3 px-3 py-2.5${moduleBased ? ' flex-wrap sm:flex-nowrap' : ''}${unrated ? ' bg-red-50 ring-1 ring-inset ring-red-500' : ''}`}>
         <span className="text-[12px] font-semibold text-foreground-400 w-7 shrink-0 text-right">{i + 1}.</span>
         <span className={`flex-1 min-w-0 [overflow-wrap:anywhere] ${moduleBased ? 'basis-[calc(100%-3rem)] sm:basis-auto' : ''}`}>
-          <span className="text-[13px] text-foreground-800">{ksb.codes.join(', ')} {ksb.title}</span>
+          <span className="text-[13px] text-foreground-800">{learnerPresentation
+            ? <><span data-ksb-code>{ksb.codes.join(', ')}</span> {ksb.title}</>
+            : <>{ksb.codes.join(', ')} {ksb.title}</>}</span>
           <span className="block text-[11px] text-foreground-400 mt-0.5">{ksb.theme} · {ksb.kind}</span>
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-3">
@@ -225,11 +230,12 @@ export default function SkillsRadar() {
         <span className="w-7 shrink-0">{isHighRating(level) && <HighRatingFlag />}</span>
         <button
           onClick={() => open(i)}
-          aria-label={moduleBased ? `${readOnly ? 'View' : level ? 'Edit' : 'Answer'} ${ksb.codes[0]}` : undefined}
+          aria-label={moduleBased ? `${actionLabel} ${ksb.codes[0]}` : undefined}
+          data-ksb-action={learnerPresentation ? '' : undefined}
           aria-invalid={unrated || undefined}
           className={`${btnSecondary} !py-1 !px-3 !text-[11px] shrink-0`}
         >
-          <AppIcon className={readOnly ? 'ri-eye-line' : 'ri-edit-line'} />{readOnly ? 'View' : level ? 'Edit' : 'Answer'}
+          <AppIcon className={readOnly ? 'ri-eye-line' : 'ri-edit-line'} />{actionLabel}
         </button>
         </span>
       </div>

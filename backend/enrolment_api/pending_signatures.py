@@ -90,8 +90,10 @@ def pending_for(learner_id, include_reviews=True):
         for row in rows:
             key = row['issue__document_key']; source = sources.get(key)
             if not source or str(source['id']) != row['issue__source_id']: continue
-            if row['number'] == 1: locked.add(key)
-            if row['state'] == 'finalized': current.setdefault(row['issue_id'], row)
+            if row['number'] == 1 and key.startswith('review-'): locked.add(key)
+            if row['state'] == 'finalized':
+                locked.add(key)
+                current.setdefault(row['issue_id'], row)
     if service.ready():
         for row in IssuedTemplate.objects.filter(learner_id=learner_id, source_id__in=[str(s['id']) for s in sources.values()]).values('document_key', 'source_id', 'template_snapshot__number'):
             source = sources.get(row['document_key'])

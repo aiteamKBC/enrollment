@@ -172,6 +172,7 @@ export function WizardProvider({
   isCommercial = false,
   board,
   readOnlyLearnerSteps = false,
+  recoverSavedAssessment = false,
   layout: layoutOverride,
   children,
 }: {
@@ -180,6 +181,8 @@ export function WizardProvider({
   board: EnrolmentBoard;
   /** Set on the staff wizard: learner-owned steps render read-only. */
   readOnlyLearnerSteps?: boolean;
+  /** Learner portal: recover the assessment snapshot if its layout is unavailable. */
+  recoverSavedAssessment?: boolean;
   /** Render this layout instead of the published one (the builder's preview). */
   layout?: WizardLayout;
   children: ReactNode;
@@ -261,10 +264,11 @@ export function WizardProvider({
   );
   const steps = useMemo(() => visibleSteps(layout), [layout]);
   const completed = useMemo(() => steps.map(step => Boolean(completedBySlug[step.slug])), [steps, completedBySlug]);
-  // Older version-pinned layouts predate suitability. The assessment endpoint
-  // owns its saved configuration snapshot, so read it for those apprentices
-  // without replacing their assigned wizard steps or Skills Radar catalogue.
-  const loadSuitability = Boolean(layout.programmeSuitability) || (!isCommercial && !readOnlyLearnerSteps && publishedLayout !== null && layoutSettled &&
+  // The assessment endpoint owns its saved configuration snapshot. A missing
+  // or failed layout read must not hide a learner's existing result/modules.
+  // Builder overrides remain local; staff/commercial fallback is unchanged.
+  const loadSuitability = Boolean(layout.programmeSuitability) || (!isCommercial && !readOnlyLearnerSteps && !layoutOverride &&
+    (publishedLayout !== null || recoverSavedAssessment) && layoutSettled &&
     steps.some(step => step.slug === 'programme-suitability'));
   const suitability = useSuitability(kindForSeed, userId, loadSuitability, publishedVersion,
     ['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) || layout.programmeSuitability?.enabled === false);

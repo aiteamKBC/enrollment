@@ -1,0 +1,135 @@
+.content { --step-purple: #7008cc; --step-ink: #2e0958; --step-line: #e4d1fa; min-width: 0; color: #2b1244; }
+.content [class~='max-w-3xl'], .content [class~='max-w-7xl'] { max-width: none; }
+.stepIntro { position: relative; isolation: isolate; display: flex; align-items: center; gap: 26px; min-width: 0; margin-bottom: 22px; padding: 22px 26px; border: 1px solid #eee1fc; border-radius: 20px; background: linear-gradient(115deg, #f4eaff, #fff 60%, #f2e4ff); overflow: hidden; }
+.stepIntro::after { content: ''; position: absolute; z-index: -1; pointer-events: none; width: 42%; height: 145%; right: -8%; bottom: -75%; transform: rotate(-17deg); border-radius: 50%; background: linear-gradient(125deg, #eee0fb33, #d7b5f77a); box-shadow: -25px -25px 0 #ead5fa44; }
+.stepIntro > div { min-width: 0; flex: 1; }
+.stepIntro h2 { margin: 0; color: var(--step-ink); font-size: clamp(22px, 2.1vw, 31px); line-height: 1.2; font-weight: 800; letter-spacing: -.7px; }
+.stepIntro h2 + p { margin-top: 9px; color: #6f13bc; font-size: 14px; font-weight: 600; }
+.artwork { position: relative; display: flex; width: 125px; height: 108px; flex-shrink: 0; align-items: center; justify-content: center; border-right: 1px solid #d6b7f5; padding-right: 20px; color: #8a21cf; }
+.artwork::before { content: ''; position: absolute; inset: 10px 28px 3px -2px; z-index: -1; border-radius: 48% 55% 32% 45%; transform: rotate(-12deg); background: linear-gradient(125deg, #e4ccff, #f3e8ff); }
+.artwork > svg { width: 82px; height: 88px; filter: drop-shadow(0 3px 2px #9243b619); }
+.rich { display: grid; gap: 10px; min-width: 0; }
+.informationHeading { margin: 0; color: var(--step-ink); font-size: 18px; font-weight: 800; line-height: 1.35; }
+.stepIntro .informationHeading { color: var(--step-purple); margin-top: 12px; font-size: 17px; }
+.paragraph, .list { font-size: 13px; line-height: 1.7; margin: 0; }
+.list { list-style: disc; padding-left: 19px; }
+.list li::marker { color: #8a19d7; }
+.list li + li { margin-top: 5px; }
+.informationGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 17px; }
+.informationCard { min-width: 0; display: flex; align-items: flex-start; gap: 17px; border: 1px solid var(--step-line); border-radius: 18px; padding: 22px; background: linear-gradient(135deg, #fff, #fcf8ff); box-shadow: 0 3px 9px #6921aa0a; }
+.informationCard:has(ul), .informationCard:has(ol) { grid-column: 1 / -1; }
+.informationCard:first-child { grid-column: 1 / -1; }
+.informationCard:has(ul) .rich, .informationCard:has(ol) .rich { width: 100%; }
+.sectionIcon { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 13px; color: #7707cf; background: linear-gradient(135deg, #f8f0ff, #e8d1ff); }
+.content :is(section, fieldset):not([role='dialog']) { min-width: 0; }
+.content section:has(> h3):not([aria-label]) { border: 1px solid var(--step-line); border-radius: 17px; padding: 18px 20px; background: linear-gradient(135deg, #fff, #fcf9ff); }
+.content section > h3 { color: var(--step-ink); font-weight: 800; font-size: 18px; line-height: 1.35; }
+.content section:not([aria-label]) > h3 { padding: 10px 13px; margin: -3px -4px 14px; border: 0; border-radius: 11px; background: linear-gradient(100deg, #f1e3ff, #f7effd); }
+.content section > h3 > span { border: 0; }
+.content fieldset:has(> legend:not([class~='sr-only'])) { padding: 18px; border: 1px solid var(--step-line); border-radius: 17px; background: linear-gradient(135deg, #fff, #fcf9ff); }
+.content legend:not([class~='sr-only']) { padding: 6px 12px; border-radius: 9px; color: var(--step-ink); background: #f2e5ff; font-size: 16px; font-weight: 750; }
+.content [data-enrolment-row] { gap: 9px 20px; padding-top: 13px; padding-bottom: 13px; border-color: #eee3fa; }
+.content [data-enrolment-row] > div:first-child { color: #301345; font-weight: 600; font-size: 12.5px; }
+.content :is(input:not([type='radio']):not([type='checkbox']):not([type='file']), select, textarea):not([aria-invalid='true']) { border-color: #d7c6ed; border-radius: 10px; background-color: #fff; min-height: 39px; box-shadow: inset 0 1px 2px #34105405; }
+.content :is(input, select, textarea):focus-visible { outline: 2px solid #a348df; outline-offset: 2px; }
+.content :is(input[readonly], input:disabled, select:disabled, textarea:disabled):not([aria-invalid='true']) { background-color: #eee7f6; color: #63536f; border-color: #d7cee0; }
+.content :is(input[type='radio'], input[type='checkbox']) { accent-color: #850cdb; width: 15px; height: 15px; flex-shrink: 0; }
+.content label:has(> input[type='file']) { display: flex; width: 100%; min-height: 65px; padding: 16px; justify-content: center; border: 1px dashed #ceacef; border-radius: 13px; background: linear-gradient(120deg, #fcf8ff, #f5edff); color: #700ac5; font-weight: 650; }
+.content label:has(> input[type='file']):focus-within { outline: 2px solid #a348df; outline-offset: 2px; }
+.content :is(button, a)[class~='bg-primary-500'] { background: linear-gradient(135deg, #a21dea, #6405b7); border-radius: 16px; color: white; box-shadow: inset 0 1px 2px #eac8ff66, 0 4px 10px #6e14b126; }
+.content button[class~='border-foreground-200'] { border-color: #dcc3f5; border-radius: 13px; }
+.content :is(button, a):focus-visible { outline: 3px solid #a348df; outline-offset: 3px; }
+.content button:disabled { cursor: not-allowed; }
+.content :is(button, a):not(:disabled):hover { filter: brightness(1.025); }
+.content table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.content th { background: linear-gradient(100deg, #e8d5fb, #ddc4f3); color: #310959; padding: 13px 15px; font-weight: 750; }
+/* The legacy global table chrome uses !important; keep this override scoped. */
+.content table > thead > tr > th { background: linear-gradient(100deg, #e8d5fb, #ddc4f3) !important; color: #310959 !important; border-bottom-color: #d9bdef !important; }
+.content th:first-child { border-top-left-radius: 11px; }
+.content th:last-child { border-top-right-radius: 11px; }
+.content td { border-color: #ece1f7; padding-top: 13px; padding-bottom: 13px; overflow-wrap: anywhere; }
+.content tbody > tr:nth-child(even) { background-color: #faf5ff; }
+.content td[colspan='10'] { padding: 65px 24px; color: #64347f; background: radial-gradient(ellipse at center, #f6edff, white 75%); font-size: 16px; }
+.content td[colspan='10'] { background: radial-gradient(ellipse at center, #f6edff, white 75%) !important; }
+.content [class~='overflow-x-auto'] { max-width: 100%; overscroll-behavior-x: contain; }
+.content [aria-label='Programme suitability assessment'] { padding: 0; border: 0; background: none; max-width: none; }
+.content [aria-label='Programme suitability assessment'] > h3 { margin-top: 25px; }
+.content [data-assessment-status] { padding: 13px 18px; border: 1px solid #bfe8dc; border-radius: 14px; background: linear-gradient(100deg, #e5f8ee, #effaf7); color: #165c49; font-size: 18px; font-weight: 750; }
+.content [data-recommended-programme] { position: relative; border-color: #b97ce9; border-radius: 19px; background: linear-gradient(135deg, #fff, #eddbff); box-shadow: 0 4px 12px #6c13a512; }
+.content [data-recommended-programme] > h4 { color: #3a0a67; font-size: clamp(23px, 2vw, 30px); font-weight: 800; }
+.content [data-confirmed-programme] { border: 1px solid #debbf7; border-radius: 14px; padding: 18px; background: linear-gradient(135deg, #fff, #f7edff); }
+.content [aria-label='Programme Modules'] { border-radius: 19px; border-color: #d9baf5; overflow: hidden; }
+.content [aria-label='Programme Modules'] > h3 { margin: -20px -20px 12px; padding: 19px 22px; background: linear-gradient(105deg, #f4e9ff, #e6d2fc); font-size: 23px; }
+.content [aria-label='Programme Modules'] > section { border-color: #ddc5f2; }
+.content [aria-label='Programme Modules'] section:has(> label > input:checked) { border: 2px solid #9c39dc; background: #f9f0ff; box-shadow: 0 3px 10px #7a1aa410; }
+.content [aria-label='Selected modules'] > button { border-radius: 16px; padding: 18px; border-color: #ddc8f2; background: linear-gradient(125deg, #fff, #fcf8ff); }
+.content [aria-label='Selected modules'] > button[aria-pressed='true'] { border-color: #9f42df; background: linear-gradient(125deg, #f2ddff, #faf3ff); color: #3c086a; box-shadow: inset 3px 0 #8c16d2, 0 3px 8px #6b13b014; }
+.content [aria-label='Selected module skills assessments'] > section { border-radius: 17px; border-color: #ddc8f2; }
+.content [aria-label='Selected module skills assessments'] header { background: linear-gradient(100deg, #f1e4fc, #faf4ff); border-color: #e4d2f5; }
+.content [data-ksb-row] { padding: 16px; border-bottom: 1px solid #eee3f7; }
+.content [data-ksb-row]:nth-child(even) { background: #fbf7ff; }
+.content [data-ksb-action] { color: #7208bf; border: 1px solid #dcc0f4; border-radius: 20px; background: #faf4ff; min-height: 31px; }
+.content [data-ksb-code] { display: inline-block; padding: 2px 7px; margin-right: 5px; border-radius: 6px; background: #efe0ff; color: #6b0cb4; font-weight: 700; font-size: 11px; }
+.content[data-enrolment-step='ilr-details'] section:has(> h3) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 24px; }
+.content[data-enrolment-step='ilr-details'] section > :is(h3, p, fieldset) { grid-column: 1 / -1; }
+.content[data-enrolment-step='ilr-details'] [data-enrolment-row] { display: flex; flex-direction: column; border-bottom: 0; padding: 9px 0; }
+.content[data-enrolment-step='cv-job'] .stepIntro { padding: 17px 23px; }
+.content[data-enrolment-step='cv-job'] .artwork { width: 60px; height: 55px; padding-right: 10px; }
+.content[data-enrolment-step='cv-job'] .artwork > svg { width: 38px; height: 40px; }
+.content[data-enrolment-step='inclusion'] > div > p { padding: 20px 23px; border: 1px solid #e7d5f8; border-radius: 15px; background: #fcf8ff; font-size: 14px; line-height: 1.7; }
+.content[data-enrolment-step='inclusion'] [role='status'] { font-size: 14px; line-height: 1.7; }
+.content[data-enrolment-step='inclusion'] > div > div:has(> [role='status']):not([class*='border-red']):not([class*='border-emerald']) { padding: 23px; border-color: #ddc6f3; border-radius: 18px; background: linear-gradient(125deg, #fcf9ff, #f5eaff); }
+.content[data-enrolment-step='inclusion'] > div > div:has(> [role='status'] > [class*='text-red']) { border-color: #f1bfd1; background: #fff5f8; }
+.content[data-enrolment-step='plr'] > div > button:first-of-type { color: white; border-color: #9222d8; border-radius: 24px; background: linear-gradient(130deg, #a620eb, #6506b6); padding: 11px 21px; }
+.content[data-enrolment-step='plr'] { container-type: inline-size; }
+.content[data-enrolment-step='plr'] td[colspan='10'] > span { display: block; max-width: calc(100cqw - 48px); margin-inline: auto; }
+@container enrolment-wizard (min-width: 1000px) {
+  .informationCard .list { columns: 2; column-gap: 35px; }
+  .informationCard .list li { break-inside: avoid; }
+  .content [aria-label='Programme suitability assessment'] > [data-recommendation-result] > [data-recommended-programme]:has([data-confirmed-programme]) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 20px; isolation: isolate; border: 0; background: none; box-shadow: none; padding: 0; }
+  .content [aria-label='Programme suitability assessment'] > [data-recommendation-result] > [data-recommended-programme]:has([data-confirmed-programme])::before { content: ''; position: absolute; z-index: -1; left: 0; top: 0; bottom: 0; width: calc(50% - 10px); border: 1px solid #b97ce9; border-radius: 19px; background: linear-gradient(125deg, #fff, #ead6fc); }
+  .content [aria-label='Programme suitability assessment'] > [data-recommendation-result] > [data-recommended-programme]:has([data-confirmed-programme]) > :is(h3, h4, p) { grid-column: 1; margin: 0; padding: 12px 22px; }
+  .content [aria-label='Programme suitability assessment'] > [data-recommendation-result] > [data-recommended-programme] > [data-confirmed-programme] { grid-column: 2; grid-row: 1 / span 3; margin: 0; padding: 22px; }
+}
+@media (max-width: 900px) {
+  .informationGrid { grid-template-columns: 1fr; }
+  .informationCard { grid-column: auto; }
+  .stepIntro { gap: 17px; padding: 20px; }
+  .artwork { width: 85px; height: 85px; padding-right: 12px; }
+  .artwork > svg { width: 60px; height: 65px; }
+  .content[data-enrolment-step='ilr-details'] section:has(> h3) { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .content[data-enrolment-step='plr'] td[colspan='10'] > span { margin-inline: 0; }
+  .content[data-enrolment-step='plr'] [class~='border-t'] > div { flex-wrap: wrap; }
+  .stepIntro { gap: 13px; padding: 18px; align-items: flex-start; }
+  .artwork { width: 48px; height: 54px; padding-right: 7px; }
+  .artwork > svg { width: 39px; height: 45px; }
+  .stepIntro h2 { font-size: 23px; }
+  .informationCard { padding: 18px; gap: 12px; }
+  .sectionIcon { width: 35px; height: 35px; }
+  .content section:has(> h3):not([aria-label]), .content fieldset:has(> legend:not([class~='sr-only'])) { padding: 14px; }
+  .content [aria-label='Programme Modules'] > h3 { margin: -16px -16px 12px; }
+  .content [data-ksb-row] { padding: 13px 10px; gap: 8px; }
+  .content [data-enrolment-row] { grid-template-columns: minmax(0, 1fr); }
+}
+/* These shared components keep their original viewport breakpoints elsewhere.
+   Inside the learner wizard, size their columns to the actual content card. */
+@container enrolment-wizard (max-width: 950px) {
+  .content [aria-label='Project Controls Professional pathway'] { grid-template-columns: minmax(0, 1fr); }
+}
+@container enrolment-wizard (min-width: 760px) {
+  .content [aria-label='Selected module skills assessments'] { grid-template-columns: 220px minmax(0, 1fr); }
+}
+@container enrolment-wizard (max-width: 759px) {
+  .content [aria-label='Selected module skills assessments'] { grid-template-columns: minmax(0, 1fr); }
+  .content [aria-label='Selected module skills assessments'] > section { grid-column: 1; grid-row: 2; }
+}
+@container enrolment-wizard (max-width: 680px) {
+  .informationGrid { grid-template-columns: minmax(0, 1fr); }
+  .informationCard { grid-column: auto; }
+  .content[data-enrolment-step='ilr-details'] section:has(> h3) { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .content * { transition: none !important; animation: none !important; }
+}
