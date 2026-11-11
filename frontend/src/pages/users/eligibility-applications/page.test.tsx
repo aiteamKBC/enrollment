@@ -7,12 +7,10 @@ import type { ApplicationDetail, EligibilityApplication } from '@/api/eligibilit
 vi.mock('@/components/feature/WorkspaceShell', () => ({ WorkspaceShell: ({ children }: { children: ReactNode }) => children }));
 let account: { role: 'admin' | 'staff' | 'learner' | 'employer'; access: string } | null;
 vi.mock('@/hooks/useAuth.helpers', () => ({ useAuth: () => ({ auth: { account } }) }));
-const list = vi.fn(), detail = vi.fn(), fetchReview = vi.fn();
+const list = vi.fn(), detail = vi.fn();
 vi.mock('@/api/eligibilityApplications', () => ({
   fetchEligibilityApplications: (...args: unknown[]) => list(...args),
   fetchEligibilityApplication: (...args: unknown[]) => detail(...args),
-  fetchApplicationReview: (...args: unknown[]) => fetchReview(...args),
-  recordApplicationReview: vi.fn(),
 }));
 import EligibilityApplicationsPage from './page';
 
@@ -33,7 +31,6 @@ beforeEach(() => {
   account = { role: 'staff', access: 'enrolment' };
   list.mockReset().mockImplementation(async options => ({ applications: [row], total: 51, page: options.page, pageSize: 25 }));
   detail.mockReset().mockResolvedValue({ application });
-  fetchReview.mockReset().mockResolvedValue({ status: null, version: 0, enabled: false, available: false, allowedActions: [], history: [] });
 });
 afterEach(cleanup);
 
@@ -52,9 +49,10 @@ it('defaults to pending assessment and displays the required queue columns', asy
   for (const label of ['Applicant', 'Email', 'Submitted (UK time)', 'Employer', 'Employer postcode', 'Main workplace postcode', 'Workplace arrangement', 'Assessment status', 'Assessment reason']) {
     expect(within(table).getByRole('columnheader', { name: label })).toBeInTheDocument();
   }
+  expect(within(table).queryByRole('columnheader', { name: 'Staff review' })).not.toBeInTheDocument();
   expect(within(table).getByText(row.assessment_reason!)).toBeInTheDocument();
   expect(within(table).getByText('I work remotely, hybrid, or across multiple locations.')).toBeInTheDocument();
-  expect(screen.getByText(/Staff decisions do not create learner accounts/)).toBeInTheDocument();
+  expect(screen.getByText(/Screening evidence does not confirm government funding eligibility/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /approve|reject|invitation|upload/i })).not.toBeInTheDocument();
 });
 
@@ -112,6 +110,7 @@ it('separates declarations, recorded geography, assessment reasons and outcomes 
   const employment = screen.getByRole('heading', { name: 'Employment and workplace — declared' }).closest('section')!;
   expect(within(employment).getByText('Expects at least 50% of working hours in England').parentElement).toHaveTextContent('No');
   expect(screen.getByText('Server-generated assessment reason').parentElement).toHaveTextContent(row.assessment_reason!);
+  expect(screen.queryByRole('heading', { name: 'Staff review decision' })).not.toBeInTheDocument();
   expect(screen.getByText('Stored screening result').parentElement).toHaveTextContent('Not determined');
   expect(screen.getByText('Pending assessment — no invitation')).toBeInTheDocument();
   expect(screen.getByText('Pre-settled Status')).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { updateEnrolmentUser } from '@/api/enrolmentUsers';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 
 export function LearnerHeaderDates({ learnerId, startDate = '', endDate = '' }: {
   learnerId: string;
@@ -23,7 +24,6 @@ export function LearnerHeaderDates({ learnerId, startDate = '', endDate = '' }: 
 
   const invalidRange = Boolean(start && end && end < start);
   const dirty = start !== saved.start || end !== saved.end;
-  const inputClass = 'min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-800 outline-none hover:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:opacity-60';
 
   return (
     <form className="min-w-0 max-w-full" onSubmit={async (event) => {
@@ -46,14 +46,14 @@ export function LearnerHeaderDates({ learnerId, startDate = '', endDate = '' }: 
       }
     }}>
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Start date</span>
-          <input type="date" value={start} max={end || '9999-12-31'} disabled={saving} className={inputClass} onChange={(event) => { setStart(event.target.value); setMessage(''); setError(''); }} />
-        </label>
-        <label className="flex min-w-0 flex-col gap-1.5">
+          <DatePickerField label="Start date" hideLabel value={start} max={end || '9999-12-31'} disabled={saving} onChange={value => { setStart(value); setMessage(''); setError(''); }} />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">End date</span>
-          <input type="date" value={end} min={start || undefined} max="9999-12-31" disabled={saving} aria-invalid={invalidRange} className={inputClass} onChange={(event) => { setEnd(event.target.value); setMessage(''); setError(''); }} />
-        </label>
+          <DatePickerField label="End date" hideLabel value={end} min={start || undefined} max="9999-12-31" disabled={saving} error={invalidRange ? 'End date must be on or after start date.' : undefined} onChange={value => { setEnd(value); setMessage(''); setError(''); }} />
+        </div>
         {dirty && <button type="submit" disabled={saving || invalidRange} className="inline-flex items-center gap-1.5 rounded-lg bg-violet-100 px-3 py-2 text-[12px] font-semibold text-violet-800 hover:bg-violet-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:opacity-60">
           <i className={saving ? 'ri-loader-4-line animate-spin' : 'ri-save-line'} aria-hidden="true" />
           {saving ? 'Saving…' : 'Save dates'}

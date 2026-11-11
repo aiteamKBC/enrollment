@@ -665,6 +665,7 @@ export const WIZARD_STEPS: WizardStepDef[] = [
   // labels follow the onboarding flow.
   { slug: 'introduction', label: 'Welcome' },
   { slug: 'before-you-begin', label: 'Before You Begin' },
+  { slug: 'personal-details', label: 'Personal Details' },
   { slug: 'ilr-details', label: 'ILR' },
   { slug: 'ilr', label: 'Extended ILR' },
   { slug: 'programme-suitability', label: 'Programme Suitability & Modules' },

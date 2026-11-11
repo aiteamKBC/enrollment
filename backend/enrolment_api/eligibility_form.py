@@ -60,8 +60,8 @@ happened: "invited", "invitePending" (created, but the email could not be sent;
 staff can re-send it), "existingAccount" (the address already has an account:
 sign in or use Forgot password), "notEligible", or a technical invitation retry.
 New completed screenings have boolean eligibility. Lookup failures are HTTP
-errors before saving. Historical pendingAssessment/review receipts remain
-readable without reclassification or invitation replay.
+errors before saving. Historical pendingAssessment receipts remain readable
+without reclassification or invitation replay.
 """
 import hashlib
 import json
@@ -94,9 +94,9 @@ MAX_BODY_BYTES = 64 * 1024
 # Built-in answer identifiers are stable.  In particular, livesInUk is retained
 # as the storage key for the public UK/EEA-national question so existing rows
 # and published layouts remain readable.
-RETIRED_PUBLIC_FIELDS = frozenset({"notPreviouslyCompletedProgramme", "employerAddress", "fullAddress"})
+RETIRED_PUBLIC_FIELDS = frozenset({"notPreviouslyCompletedProgramme", "employerAddress", "fullAddress", "title"})
 RETIRED_PUBLIC_ITEMS = frozenset({"note.representative"})
-ALWAYS_VISIBLE_PUBLIC_FIELDS = frozenset({"livesInUk", "nationality", "dateOfBirth", "title"})
+ALWAYS_VISIBLE_PUBLIC_FIELDS = frozenset({"livesInUk", "nationality", "dateOfBirth"})
 NEW_PUBLIC_FIELDS = frozenset({
     "startDateWithEmployer", "jobTitle", "countryOfResidence", "nationality",
     "residentPrev3Years", "yearsInUk", "fullTimeEducationPrior",
@@ -421,6 +421,33 @@ ADDRESS_COLUMNS = tuple(column for _key, column, *_rest in ADDRESS_FIELDS)
 REQUIRED_ADDRESS_FIELDS = frozenset(key for key, _column, _kind, required, _limit in ADDRESS_FIELDS if required)
 
 SCREENING_REQUIRED_FIELDS = ("employmentStatus", "employerPostcode", "majorityHoursInEngland")
+# These inputs affect the automatic result or the postcode checks. Protection
+# from removal is separate from whether an answer is mandatory (postcode is optional).
+SCREENING_PROTECTED_FIELDS = frozenset({
+    "dateOfBirth", "employmentStatus", "employerPostcode",
+    "majorityHoursInEngland", "postcode", "countryOfResidence",
+})
+SCREENING_PREVIEW_FIELDS = frozenset({"workplaceArrangement", "mainWorkplacePostcode"})
+# Keep these built-in questions on the form even when their answers are
+# optional or conditional. This does not change required-answer rules.
+FORM_PROTECTED_FIELDS = frozenset({
+    "employerName", "employerAddressLine1", "employerAddressLine2",
+    "employerTownCity", "employerCounty", "startDateWithEmployer",
+    "livesInUk", "nationality", "residencyStatus",
+    "residentialAddressLine1", "residentialAddressLine2",
+    "residentialTownCity", "residentialCounty",
+    "attendedFundedTraining", "fundedTrainingCompletedOn",
+})
+
+
+def screening_protected_fields():
+    return SCREENING_PROTECTED_FIELDS | (SCREENING_PREVIEW_FIELDS if workplace_enabled() else frozenset())
+
+
+def non_removable_fields():
+    return screening_protected_fields() | FORM_PROTECTED_FIELDS
+
+
 ASSESSMENT_CONSISTENCY = (
     "assessment_status IS NULL OR "
     "(assessment_status = 'pending_assessment' AND eligible IS NULL AND assessment_reason IS NOT NULL) OR "
@@ -459,13 +486,10 @@ PROGRAMMES = (
 )
 
 # (payload key, column, kind, required, limit-or-choices). Order is the form's.
-TITLE_OPTIONS = ('Mr', 'Mrs', 'Miss', 'Ms', 'Mx', 'Dr', 'Prof')
-
 FIELDS = (
     # Personal Details
     ("firstName", "first_name", "text", True, 100),
     ("surname", "surname", "text", True, 100),
-    ("title", "title", "choice", True, TITLE_OPTIONS),
     ("workEmail", "work_email", "email", True, 254),
     ("phoneNumber", "phone_number", "text", False, 40),
     ("fullAddress", "full_address", "text", False, 500),
@@ -556,7 +580,6 @@ LOCATION_COLUMNS = tuple(column for _postcode, *location in POSTCODES.values() f
 
 #: Columns added since the table was first created (see upgrade_table).
 ADDED_COLUMNS = tuple((column, "text") for column in LOCATION_COLUMNS + ADDRESS_COLUMNS) + (
-    ("title", "text"),
     ("start_date_with_employer", "date"),
     ("job_title", "text"),
     ("country_of_residence", "text"),
@@ -599,7 +622,6 @@ EARLIEST_DATE = date(1900, 1, 1)
 
 def ensure_table(cursor):
     """Create enrolment.eligibility_form if it does not exist. Never alters it."""
-    from .eligibility_review import COLUMN_DEFINITIONS as REVIEW_COLUMNS, CONSISTENCY as REVIEW_CONSISTENCY
     cursor.execute("CREATE SCHEMA IF NOT EXISTS enrolment")
     # Only the answers that identify the applicant are NOT NULL: the builder
     # can remove every other question from the form.
@@ -608,7 +630,6 @@ def ensure_table(cursor):
             id                                bigserial PRIMARY KEY,
             first_name                        text NOT NULL,
             surname                           text NOT NULL,
-            title                             text,
             work_email                        text NOT NULL,
             phone_number                      text,
             full_address                      text,
@@ -647,8 +668,7 @@ def ensure_table(cursor):
             ineligible_reason                 text,
             submitted_at                      timestamptz NOT NULL DEFAULT now(),
             {', '.join(f'{column} text' for column in ADDRESS_COLUMNS)},
-            {', '.join(f'{column} {definition}' for column, definition in WORKPLACE_COLUMN_DEFINITIONS + SCREENING_COLUMN_DEFINITIONS + REVIEW_COLUMNS)},
-            CONSTRAINT eligibility_review_consistency CHECK ({REVIEW_CONSISTENCY}),
+            {', '.join(f'{column} {definition}' for column, definition in WORKPLACE_COLUMN_DEFINITIONS + SCREENING_COLUMN_DEFINITIONS)},
             CONSTRAINT eligibility_assessment_consistency CHECK ({ASSESSMENT_CONSISTENCY})
         )"""
     )
@@ -826,7 +846,6 @@ def asked_questions(layout):
         builtin[key] = builtin_entry(key, True)
     # Neither an old layout nor a direct client may omit the age evidence.
     builtin["dateOfBirth"] = builtin_entry("dateOfBirth", True)
-    builtin['title'] = {'required': True, 'options': TITLE_OPTIONS}
     for prefix in ("employer", "residential"):
         if f"{prefix}AddressLine1" in builtin:
             # Accept optional old-client details without ever restoring an input
@@ -847,6 +866,21 @@ def _answer_label(value):
     if isinstance(value, bool):
         return "Yes" if value else "No"
     return value if isinstance(value, str) else None
+
+
+def screen_custom_rules(row, layout, reasons):
+    """Apply published choice rules to validated, server-stored answers only."""
+    _builtin, custom = asked_questions(layout)
+    passed = True
+    for item in custom:
+        rule = item.get("screeningRule")
+        if not rule:
+            continue
+        answer = _answer_label(row.get(item["column"]))
+        if answer not in rule["eligibleAnswers"]:
+            passed = False
+            reasons.append(f"Your answer to '{item['label']}' does not meet the additional eligibility requirement.")
+    return passed
 
 
 def _employment_condition_shown(key, row):
@@ -1126,8 +1160,6 @@ def save_screened_application(row, reasons, request):
 
     Only a new row's response receipt is updated; historical applications never
     acquire a fingerprint. Invitation failures may retry against the same row.
-    Staff decisions overlay the response without changing the original receipt
-    and always prevent invitation retries for that reviewed application.
     """
     custom = [column for column in row if CUSTOM_COLUMN_RE.match(column)]
     columns = list(INSERT_COLUMNS + (WORKPLACE_COLUMNS if workplace_enabled() else ()) + SCREENING_COLUMNS + leaving_date_columns(row)) + custom
@@ -1143,7 +1175,7 @@ def save_screened_application(row, reasons, request):
             if inserted:
                 application_id = inserted[0]
             else:
-                cursor.execute(f"SELECT id, eligible, assessment_status, submission_response, to_jsonb(a)->>'review_status', to_jsonb(a)->'review_version' FROM enrolment.{TABLE} a WHERE submission_fingerprint = %s FOR UPDATE",
+                cursor.execute(f"SELECT id, eligible, assessment_status, submission_response FROM enrolment.{TABLE} a WHERE submission_fingerprint = %s FOR UPDATE",
                                [row["submission_fingerprint"]])
                 stored = cursor.fetchone()
                 receipt = stored[3] if stored else None
@@ -1154,12 +1186,6 @@ def save_screened_application(row, reasons, request):
                         receipt = None
                 if not isinstance(receipt, dict):
                     raise DatabaseError("Submission receipt is unavailable")
-                if stored[4] is not None:
-                    from .eligibility_review import overlay_receipt
-                    review_version = stored[5]
-                    if isinstance(review_version, str):
-                        review_version = json.loads(review_version)
-                    return overlay_receipt(receipt, stored[4], review_version)
                 if receipt.get('outcome') == eligibility_invitation.INVITE_PENDING:
                     from .eligibility_link import dispatch, refresh_response
                     def retry_delivery():
@@ -1192,7 +1218,7 @@ def _published_layout():
     # Apply the same legacy-layout relocation as the public layout endpoint;
     # this keeps validation aligned with what the applicant actually saw.
     from .eligibility_layout import public_layout
-    return current[0], public_layout(current[1])
+    return current[0], public_layout(current[1], include_screening_rules=True)
 
 
 def _error(message, status, **extra):
@@ -1257,6 +1283,8 @@ def submit_application(request):
     elif row.get("majority_hours_in_england") is False:
         eligible = False
         reasons.append(WORKING_HOURS_SCREENING_REASON)
+    if not screen_custom_rules(row, layout, reasons):
+        eligible = False
     row["layout_version"] = version
     row["eligible"] = eligible
     row["ineligible_reason"] = " ".join(reasons) if eligible is False else None

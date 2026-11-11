@@ -75,7 +75,6 @@ class EntryTests(SimpleTestCase):
              patch.object(bootstrap.EnrolmentUser.all_learners, 'filter') as query, \
              patch('learner_api.learning_plan.promote_learner_if_ready', return_value=False), \
              patch.object(bootstrap, 'advance_learner'), \
-             patch.object(bootstrap, 'programme_status', side_effect=lambda row: row.programme_status), \
              patch.object(bootstrap, 'to_board', return_value=board), \
              patch.object(bootstrap, 'read_extended_ilr', return_value={'draft': saved or {}}):
             query.return_value.first.return_value = learner
@@ -83,11 +82,11 @@ class EntryTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200, response.content)
         return learner, json.loads(response.content)
 
-    def test_starting_apprenticeship_changes_only_programme_status_not_signing_or_completion(self):
+    def test_opening_apprenticeship_does_not_change_programme_status(self):
         for status in ('Fresh user', ''):
             learner, data = self.open(status=status)
-            self.assertEqual(learner.programme_status, 'Onboarding')
-            learner.save.assert_called_once_with(update_fields=['programme_status'])
+            self.assertEqual(learner.programme_status, status)
+            learner.save.assert_not_called()
             self.assertTrue(data['board']['contact']['titleRequired'])
             self.assertEqual(data['ilr']['draft'], {})
 

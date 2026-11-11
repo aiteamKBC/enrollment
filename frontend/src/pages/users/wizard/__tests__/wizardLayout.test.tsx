@@ -175,6 +175,27 @@ describe('the wizard with a published layout', () => {
     return onNavigateStep;
   }
 
+  it('never displays a removed step while the learner layout is loading', async () => {
+    let resolveLayoutRequest!: (value: { layout: WizardLayout; version: number }) => void;
+    fetchWizardLayout.mockReturnValue(new Promise((resolve) => { resolveLayoutRequest = resolve; }));
+    const layout = defaultLayout();
+    layout.steps.find((step) => step.slug === 'personal-details')!.hidden = true;
+
+    render(
+      <ToastProvider>
+        <WizardProvider userId="20" board={BOARD}>
+          <WizardShell currentIndex={0} mode="learner" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
+        </WizardProvider>
+      </ToastProvider>
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading enrolment layout');
+    expect(screen.queryByRole('tab', { name: 'Personal Details' })).not.toBeInTheDocument();
+    resolveLayoutRequest({ layout, version: 13 });
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(WIZARD_STEPS.length - 1));
+    expect(screen.queryByRole('tab', { name: 'Personal Details' })).not.toBeInTheDocument();
+  });
+
   it('lists the steps in the published order, without hidden ones, under their new names', async () => {
     const layout = defaultLayout();
     const [intro, before, pd, ...rest] = layout.steps;
@@ -229,8 +250,8 @@ describe('the wizard with a published layout', () => {
         </WizardProvider>
       </ToastProvider>
     );
-    await waitFor(() => expect(fetchWizardLayout).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(WIZARD_STEPS.length));
     expect(screen.getAllByRole('tab')).toHaveLength(WIZARD_STEPS.length);
-    expect(screen.getByRole('heading', { name: 'ILR' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Personal Details' })).toBeInTheDocument();
   });
 });

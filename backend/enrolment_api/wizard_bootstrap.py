@@ -26,8 +26,6 @@ from learner_api.curriculum import ksb_profile_for_programme
 from learner_api.learner_progression import advance_learner
 from learner_api.mappers import to_board
 from learner_api.models import CommercialUser, EnrolmentUser
-from learner_api.aptem_status import programme_status
-from learner_api.constants import DEFAULT_PROGRAMME_STATUS
 
 from .auth import enrolment_login_required
 from .extended_ilr import read_extended_ilr
@@ -71,14 +69,6 @@ def wizard_bootstrap(request, kind, learner_id):
         account = getattr(request, 'login_account', None)
         own_learner = (getattr(account, 'role', None) == 'learner'
                        and str(getattr(account, 'subject_id', '')) == str(learner.pk))
-        if own_learner and kind == 'apprenticeship' and learner_type == 'apprenticeship' and (
-            programme_status(learner) or DEFAULT_PROGRAMME_STATUS
-        ).strip().casefold() == DEFAULT_PROGRAMME_STATUS.casefold():
-            # Opening the wizard starts onboarding; it does not sign anything
-            # or complete the retired first-login screens.
-            learner.programme_status = 'Onboarding'
-            learner.save(update_fields=['programme_status'])
-
         board = to_board(learner)
         ilr = read_extended_ilr(kind, int(learner_id), str(learner.username or "").strip(), own_learner, learner)
         if kind == 'apprenticeship':

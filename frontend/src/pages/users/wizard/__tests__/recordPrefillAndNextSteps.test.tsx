@@ -157,7 +157,7 @@ describe('Next Steps in the step rail', () => {
     // programme), plus unconfigured suitability, count so far — Next Steps
     // would make it 6. The Inclusion
     // assessment is not answered.
-    expect(screen.getByText('6 of 12 steps complete')).toBeInTheDocument();
+    expect(screen.getByText('6 of 13 steps complete')).toBeInTheDocument();
   });
 
   it('shows its number rather than a tick for staff, who are not gated', async () => {
@@ -165,12 +165,12 @@ describe('Next Steps in the step rail', () => {
     const tab = await screen.findByRole('tab', { name: 'What Happens Now?' });
 
     await waitFor(() => expect(within(tab).getByText('Not started')).toBeInTheDocument());
-    expect(within(tab).getByText('12')).toBeInTheDocument();
+    expect(within(tab).getByText('13')).toBeInTheDocument();
     expect(tab.querySelector('.ri-check-line')).toBeNull();
   });
 
   it('does not count as complete just by being opened while earlier steps are unfinished', async () => {
-    renderWizard(board(), { mode: 'staff', currentIndex: 11 });
+    renderWizard(board(), { mode: 'staff', currentIndex: 12 });
     const tab = await screen.findByRole('tab', { name: 'What Happens Now?' });
 
     await waitFor(() => expect(within(tab).getByText('In progress')).toBeInTheDocument());

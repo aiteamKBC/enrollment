@@ -1256,7 +1256,9 @@ ONBOARDING_REVIEW_TYPES = ("eligibility-review", "workspace", "training-plan", "
 # Statuses a learner can be promoted *out of*. Anything else (Active, Completed,
 # Withdrawn, On break) is a deliberate later state, so a late signature must not
 # drag the learner backwards into Delivery.
-PRE_DELIVERY_STATUSES = {"Fresh user", "Onboarding", "Ready to enrol", ""}
+# A Fresh learner has not been released to onboarding. Old review records must
+# not let a read or late signature bypass invitation acceptance or staff release.
+PRE_DELIVERY_STATUSES = {"Onboarding", "Ready to enrol"}
 
 
 def _fully_signed(review):

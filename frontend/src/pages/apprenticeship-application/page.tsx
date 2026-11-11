@@ -44,6 +44,7 @@ import type { EligibilityLayout } from './layout/types';
 // and the dark-theme version of that frame.
 import frame from '../coach-booking/booking.module.css';
 import styles from './application.module.css';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 
 /** A postcode check as the page tracks it, by compact postcode. */
 type Check = PostcodeCheck | { status: 'checking' };
@@ -621,6 +622,19 @@ function QuestionRow({ question, number, value, error, today, minimumDate, onCha
             <option value="">Please select</option>
             {question.options.map(option => <option key={option} value={option}>{question.optionLabels?.[option] ?? option}</option>)}
           </select>
+        ) : question.kind === 'date' ? (
+          <DatePickerField
+            label={question.label}
+            hideLabel
+            inputId={id}
+            value={String(value ?? '')}
+            onChange={onChange}
+            required={question.required}
+            error={error}
+            min={minimumDate}
+            max={!question.allowFuture ? today : undefined}
+            autoComplete={'autoComplete' in question ? question.autoComplete : undefined}
+          />
         ) : (
           <input
             {...shared}
@@ -631,14 +645,12 @@ function QuestionRow({ question, number, value, error, today, minimumDate, onCha
             onBlur={onBlur}
             placeholder={question.placeholder}
             maxLength={'maxLength' in question ? question.maxLength : undefined}
-            max={question.kind === 'date' && !question.allowFuture ? today : undefined}
-            min={question.kind === 'date' ? minimumDate : undefined}
             step={question.kind === 'number' ? 'any' : undefined}
             inputMode={question.kind === 'number' ? 'decimal' : undefined}
             autoComplete={'autoComplete' in question ? question.autoComplete : undefined}
           />
         )}
-        {message}
+        {question.kind !== 'date' && message}
         {onRetry && <button type="button" className={styles.secondary} onClick={onRetry}>Retry postcode verification</button>}
         {locationId && (
           <div id={locationId} aria-live="polite">

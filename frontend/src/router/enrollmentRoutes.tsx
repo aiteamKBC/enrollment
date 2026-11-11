@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 import { type RouteObject } from 'react-router-dom';
-import { AccessGate, Home, LearnerStart, WelcomeEntry } from './enrollmentGuards';
+import { AccessGate, Home, LearnerOnboardingGate, LearnerStart, WelcomeEntry } from './enrollmentGuards';
 
 const Login = lazy(() => import('@/pages/login/page'));
 const ForgotPassword = lazy(() => import('@/pages/forgot-password/page'));
@@ -20,6 +20,7 @@ const CoachBooking = lazy(() => import('@/pages/coach-booking/page'));
 const Introduction = lazy(() => import('@/pages/lms-introduction/page'));
 const Welcome = lazy(() => import('@/pages/learner/welcome/page'));
 const Onboarding = lazy(() => import('@/pages/learner/onboarding/page'));
+const PendingOnboarding = lazy(() => import('@/pages/learner/pending/page'));
 const Reviews = lazy(() => import('@/pages/learner/onboarding/reviews/page'));
 const ReviewForm = lazy(() => import('@/pages/learner/onboarding/reviews/form'));
 const Documents = lazy(() => import('@/pages/learner/compliance/page'));
@@ -48,13 +49,14 @@ export const enrollmentRoutes: RouteObject[] = [
     { path: '/users/first-sessions', element: <FirstSessions /> },
     { path: '/users/coach-directory', element: <CoachDirectory workspaceRole="compliance" /> },
     { path: '/users/:userId', element: <Board /> },
-    { path: '/users/:userId/wizard', element: <Wizard /> },
-    { path: '/users/:userId/wizard/:stepSlug', element: <Wizard /> },
+    { path: '/users/:userId/wizard', element: <LearnerOnboardingGate><Wizard /></LearnerOnboardingGate> },
+    { path: '/users/:userId/wizard/:stepSlug', element: <LearnerOnboardingGate><Wizard /></LearnerOnboardingGate> },
     { path: '/learner/welcome', element: <WelcomeEntry><Welcome /></WelcomeEntry> },
-    { path: '/learner/onboarding', element: <Onboarding /> },
-    { path: '/learner/onboarding/reviews', element: <Reviews /> },
-    { path: '/learner/onboarding/reviews/:eventKey', element: <ReviewForm /> },
-    { path: '/learner/onboarding/:stepSlug', element: <Onboarding /> },
+    { path: '/learner/pending', element: <PendingOnboarding /> },
+    { path: '/learner/onboarding', element: <LearnerOnboardingGate><Onboarding /></LearnerOnboardingGate> },
+    { path: '/learner/onboarding/reviews', element: <LearnerOnboardingGate><Reviews /></LearnerOnboardingGate> },
+    { path: '/learner/onboarding/reviews/:eventKey', element: <LearnerOnboardingGate><ReviewForm /></LearnerOnboardingGate> },
+    { path: '/learner/onboarding/:stepSlug', element: <LearnerOnboardingGate><Onboarding /></LearnerOnboardingGate> },
     { path: '/learner/compliance-documents', element: <Documents /> },
     { path: '/learner/first-session', element: <FirstSession /> },
     ...['/learner', '/learner/home', '/workspace/learner', '/workspace/learner/dashboard'].map(path => ({ path, element: <LearnerStart /> })),

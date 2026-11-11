@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { roleNavMap } from '@/mocks/navigation';
 import { useMyLearner } from '@/hooks/useMyLearner';
 import { ONBOARDING_NAV_ITEMS } from '@/hooks/useOnboardingRedirect';
@@ -169,10 +170,10 @@ function AssessmentList({
               <span className="text-[10px] font-semibold text-foreground-500 block mb-1">Level</span>
               <input value={row.level} onChange={(e) => update(index, { level: e.target.value })} className={inputClass} placeholder="e.g. Level 2" />
             </label>
-            <label className="block">
+            <div className="block">
               <span className="text-[10px] font-semibold text-foreground-500 block mb-1">Assessment date</span>
-              <input type="date" value={row.date} onChange={(e) => update(index, { date: e.target.value })} className={inputClass} />
-            </label>
+              <DatePickerField label="Assessment date" hideLabel value={row.date} onChange={value => update(index, { date: value })} />
+            </div>
             <label className="block">
               <span className="text-[10px] font-semibold text-foreground-500 block mb-1">Outcome</span>
               <input value={row.outcome} onChange={(e) => update(index, { outcome: e.target.value })} className={inputClass} placeholder="e.g. Pass" />
@@ -631,15 +632,15 @@ export default function ReviewFormPage() {
                             })}
                             className={inputClass} />
                         </label>
-                        <label className="block">
+                        <div className="block">
                           <span className="text-[10px] text-foreground-500 block mb-1">Assessment Date</span>
-                          <input type="date" value={fs.results?.[item]?.assessmentDate ?? ''}
-                            onChange={(e) => setSection('functionalSkills', {
+                          <DatePickerField label="Assessment Date" hideLabel value={fs.results?.[item]?.assessmentDate ?? ''}
+                            onChange={(value) => setSection('functionalSkills', {
                               ...fs,
-                              results: { ...fs.results, [item]: { ...(fs.results?.[item] ?? { score: '', assessmentDate: '' }), assessmentDate: e.target.value } },
+                              results: { ...fs.results, [item]: { ...(fs.results?.[item] ?? { score: '', assessmentDate: '' }), assessmentDate: value } },
                             })}
-                            className={inputClass} />
-                        </label>
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

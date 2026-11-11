@@ -8,7 +8,7 @@ from .eligibility_link import verified_application
 DRAFT_FIELDS = {
     'personalDetails.firstName': 'first_name', 'personalDetails.lastName': 'surname',
     'personalDetails.email': 'work_email', 'personalDetails.phone': 'phone_number',
-    'personalDetails.title': 'title', 'personalDetails.country': 'country_of_residence',
+    'personalDetails.country': 'country_of_residence',
     'personalDetails.currentPostcode': 'postcode',
     'personalDetails.addressLine1': 'residential_address_line1', 'personalDetails.addressLine2': 'residential_address_line2',
     'personalDetails.addressLine3': 'residential_town_city', 'personalDetails.addressLine4': 'residential_county',
@@ -25,7 +25,6 @@ ANSWER_FIELDS = {
     'otherTraining.attended12m': 'attended_funded_training', 'otherTraining.completedWhen': 'funded_training_completed_on',
 }
 LEARNER_FIELDS = {
-    'title': 'title',
     'country': 'country_of_residence', 'address_line_1': 'residential_address_line1',
     'address_line_2': 'residential_address_line2', 'address_line_3': 'residential_town_city',
     'address_line_4': 'residential_county',
@@ -80,7 +79,7 @@ def defaults(learner_id):
     current = row.get('_learner') or {}
     # First-login/staff identity corrections are newer than the application.
     for source, column in {'phone_number':'Phone_number', 'date_of_birth':'Date_of_birth',
-                           'work_email':'Email', 'country_of_residence':'Country', 'postcode':'Current_postcode', 'title':'Title',
+                           'work_email':'Email', 'country_of_residence':'Country', 'postcode':'Current_postcode',
                            'residential_address_line1':'Current_address_line_1', 'residential_address_line2':'Current_address_line_2',
                            'residential_town_city':'Current_address_line_3', 'residential_county':'Current_address_line_4'}.items():
         if column in current:
@@ -97,7 +96,12 @@ def defaults(learner_id):
     years = row.get('years_in_uk')
     if isinstance(years, str) and years.isdecimal():
         answers.setdefault('eligibility', {})['yearsInUk'] = int(years)
-    return {'applicationId': str(row['id']), 'draft': mapped(row, DRAFT_FIELDS), 'answers': answers,
+    draft = mapped(row, DRAFT_FIELDS)
+    # A profile title may be collected later in the wizard. It is no longer
+    # collected or copied from the public eligibility application.
+    if current.get('Title'):
+        draft.setdefault('personalDetails', {})['title'] = current['Title']
+    return {'applicationId': str(row['id']), 'draft': draft, 'answers': answers,
             'employerRepresentative': {'name': row.get('representative_name') or '', 'email': row.get('representative_email') or ''}}
 
 

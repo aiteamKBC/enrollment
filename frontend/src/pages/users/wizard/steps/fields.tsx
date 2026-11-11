@@ -4,6 +4,7 @@ import { FieldRow, inputClass } from '../../components/ui';
 import { SignaturePad } from './SignaturePad';
 import { FieldError, invalidClass } from '../stepErrors';
 import { missingMessage, useMissing } from "../stepErrors.helpers";
+import { DatePickerField } from '@/components/feature/DatePickerField';
 
 export function LabeledInput({
   label,
@@ -41,7 +42,9 @@ export function LabeledInput({
 
   return (
     <FieldRow label={label} required={required}>
-      <input
+      {type === 'date' ? (
+        <DatePickerField label={label} hideLabel value={value} onChange={onChange} required={required} disabled={readOnly} error={error} />
+      ) : <input
         type={type}
         value={value}
         readOnly={readOnly}
@@ -60,8 +63,8 @@ export function LabeledInput({
         // waiting to be typed into. No focus highlight either, since there is
         // nothing to type; the text can still be selected and copied.
         className={`${inputClass}${error ? invalidClass : ''}${readOnly ? ' !bg-background-200 !border-foreground-200 !text-foreground-600 cursor-default focus:!border-foreground-200 focus:!ring-0' : ''}`}
-      />
-      {error && <FieldError message={error} />}
+      />}
+      {error && type !== 'date' && <FieldError message={error} />}
       {helper && !error && <p className="text-[11px] text-foreground-400 mt-1">{helper}</p>}
     </FieldRow>
   );

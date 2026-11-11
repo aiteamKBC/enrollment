@@ -41,6 +41,16 @@ class PrefillTests(SimpleTestCase):
         self.assertEqual(result['answers']['eligibility']['countryOfResidence'],'France')
         self.assertEqual(result['draft']['ilrDetails']['postcodePriorToEnrolment'],'75001')
 
+    def test_eligibility_title_is_not_prefilled_but_profile_title_is_preserved(self):
+        row = {**ROW, 'id': 41, 'title': 'Dr', '_learner': {'Title': 'Ms'}}
+        with patch.object(prefill, 'verified_application', return_value=row):
+            result = prefill.defaults(812)
+        self.assertEqual(result['draft']['personalDetails']['title'], 'Ms')
+        row['_learner'] = {}
+        with patch.object(prefill, 'verified_application', return_value=row):
+            result = prefill.defaults(812)
+        self.assertNotIn('title', result['draft'].get('personalDetails', {}))
+
     def test_commercial_reads_do_not_query_eligibility(self):
         with patch.object(prefill,'defaults') as source:
             self.assertEqual(prefill.add_defaults({'answers':None},'commercial',812),{'answers':None})
@@ -52,6 +62,7 @@ class PrefillTests(SimpleTestCase):
         result=invite.learner_fields(row)
         self.assertEqual([result[f'address_line_{n}'] for n in range(1,5)],['Street','Flat','Paris','France'])
         self.assertNotIn('target_programme',result)
+        self.assertNotIn('title',result)
 
     def test_company_address_uses_active_lines_one_two_four_and_separate_city(self):
         row={**ROW, 'id':41, 'workplace_arrangement':'same', 'employer_postcode':'ME14 1XQ',

@@ -1,6 +1,7 @@
 """Server-owned Eligibility provenance and committed invitation delivery.
 
-Only newly created learners acquire a link. No email lookup/backfill. No token
+Public submissions link only newly created eligible learners. Administrators can
+record a separately approved exception for an ineligible application. No token
 is stored here or returned to public submission callers.
 """
 import logging
@@ -31,8 +32,8 @@ def verified_application(learner_id):
             return None
         cursor.execute(f'''SELECT to_jsonb(a), to_jsonb(u) FROM {TABLE} l JOIN enrolment.eligibility_form a ON a.id=l.application_id
             JOIN enrolment."Created_users" u ON u.id=l.learner_id
-            WHERE l.learner_id=%s AND l.activation_verified_at IS NOT NULL AND a.eligible IS TRUE
-            AND to_jsonb(a)->>'review_status' IS NULL''', [learner_id])
+            WHERE l.learner_id=%s AND l.activation_verified_at IS NOT NULL
+            AND (a.eligible IS TRUE OR to_jsonb(l)->>'override_approved_at' IS NOT NULL)''', [learner_id])
         row = cursor.fetchone()
     if not row:
         return None
@@ -55,18 +56,27 @@ def add_link(application_id, learner_id):
 def mark_activated(account):
     if account.subject_type != 'learner':
         return
-    with connections[CONN].cursor() as cursor:
+    with transaction.atomic(using=CONN), connections[CONN].cursor() as cursor:
         if available(cursor):
-            cursor.execute(f'''UPDATE {TABLE} SET activation_verified_at=COALESCE(activation_verified_at, now())
-                WHERE learner_id=%s''', [account.subject_id])
+            cursor.execute(f'''UPDATE {TABLE} l SET activation_verified_at=COALESCE(l.activation_verified_at, now())
+                FROM enrolment.eligibility_form a WHERE l.learner_id=%s AND a.id=l.application_id
+                AND (a.eligible IS TRUE OR to_jsonb(l)->>'override_approved_at' IS NOT NULL)
+                RETURNING l.learner_id''', [account.subject_id])
+            if cursor.fetchone():
+                from django.db.models import Q
+                from learner_api.constants import DEFAULT_PROGRAMME_STATUS
+                from learner_api.models import EnrolmentUser
+                EnrolmentUser.all_learners.filter(pk=account.subject_id).filter(
+                    Q(programme_status=DEFAULT_PROGRAMME_STATUS)
+                    | Q(programme_status__isnull=True) | Q(programme_status='')
+                ).update(programme_status='Onboarding')
 
 
 def delivery_authorized(application_id, learner_id):
     with connections[CONN].cursor() as cursor:
         cursor.execute(f'''SELECT 1 FROM {TABLE} l JOIN enrolment.eligibility_form a ON a.id=l.application_id
             WHERE l.application_id=%s AND l.learner_id=%s AND l.invitation_status='sending'
-            AND l.activation_verified_at IS NULL AND a.eligible IS TRUE
-            AND to_jsonb(a)->>'review_status' IS NULL''', [application_id, learner_id])
+            AND l.activation_verified_at IS NULL AND a.eligible IS TRUE''', [application_id, learner_id])
         return cursor.fetchone() is not None
 
 

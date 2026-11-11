@@ -103,7 +103,7 @@ export function WizardShell({
   header?: ReactNode;
   sidebar?: ReactNode;
 }) {
-  const { draft, hydrated, ready, saveIlr, ilrSaving, ilrFinalisedAt, ilrLegacyReadOnly, layout, steps, suitability, isCommercial } = useWizard();
+  const { draft, hydrated, ready, layoutReady, saveIlr, ilrSaving, ilrFinalisedAt, ilrLegacyReadOnly, layout, steps, suitability, isCommercial } = useWizard();
   const previewIlr = mode === 'learner' && !isCommercial && canPreviewIlrStep(steps[currentIndex]?.slug);
   const continuedAssessment = useRef(0);
   const assessmentIndex = steps.findIndex((step) => step.slug === SUITABILITY_STEP.slug);
@@ -329,6 +329,14 @@ export function WizardShell({
     if (isLast) { void finish(); return; }
     navigateTo(currentIndex + 1);
   }, [suitability?.continueToken, suitability?.status, suitability?.selectionConfirmed, suitability?.state?.selectedProgramme, draft.programmeModulesCompletion?.required, mode, currentStep?.slug, isLast, currentIndex, navigateTo, finish, ready]);
+
+  // The default registry includes every built-in step. Rendering it while the
+  // learner's published layout loads briefly exposes steps removed by admins.
+  if (layoutReady === false) return (
+    <div role="status" className="rounded-2xl border border-foreground-200/60 bg-background-50 p-5 text-sm text-foreground-500">
+      Loading enrolment layout…
+    </div>
+  );
 
   if (mode === 'learner' && assessmentIndex >= 0 && currentIndex > assessmentIndex && (assessmentMissing || modulesMissing)) return (
     <div role="alert" className="rounded-xl border border-primary-200 bg-primary-50 p-4">
