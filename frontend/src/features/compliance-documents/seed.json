@@ -1,0 +1,4039 @@
+{
+  "templates": {
+    "apprenticeship-agreement": {
+      "schemaVersion": 1,
+      "templateId": "apprenticeship-agreement",
+      "documentKey": "apprenticeship-agreement",
+      "title": "Apprenticeship Agreement",
+      "category": "Compliance",
+      "programmes": [],
+      "blocks": [
+        {
+          "id": "aa-title",
+          "type": "heading",
+          "text": "APPRENTICESHIP AGREEMENT",
+          "level": 1
+        },
+        {
+          "id": "aa-intro",
+          "type": "paragraph",
+          "text": "An apprenticeship agreement must be in place from the start of the apprenticeship. The agreement must be extended if the programme is extended."
+        },
+        {
+          "id": "aa-purpose",
+          "type": "paragraph",
+          "text": "The purpose of the apprenticeship agreement is to identify:"
+        },
+        {
+          "id": "aa-purpose-0",
+          "type": "paragraph",
+          "text": "• the apprenticeship standard connected to the apprenticeship;"
+        },
+        {
+          "id": "aa-purpose-1",
+          "type": "paragraph",
+          "text": "• the dates during which the apprenticeship is expected to take place; and"
+        },
+        {
+          "id": "aa-purpose-2",
+          "type": "paragraph",
+          "text": "• the amount of off the job training that the apprentice is to receive."
+        },
+        {
+          "id": "aa-particulars",
+          "type": "heading",
+          "text": "Apprenticeship Particulars:",
+          "level": 2
+        },
+        {
+          "id": "aa-fields",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Apprentice name:",
+              "{{document.particulars.apprenticeName}}"
+            ],
+            [
+              "Place of work (employer name and location):",
+              "{{document.particulars.employerName}}\n{{document.particulars.employerAddress}}"
+            ],
+            [
+              "Apprenticeship standard, level and version:",
+              "{{document.particulars.standard}}"
+            ],
+            [
+              "Start date of apprenticeship (see note 2):",
+              "{{document.particulars.startDate}}"
+            ],
+            [
+              "End date of apprenticeship (see note 2):",
+              "{{document.particulars.endDate}}"
+            ],
+            [
+              "Start date of practical period (see note 2):",
+              "{{document.particulars.practicalStartDate}}"
+            ],
+            [
+              "Estimated end date of practical period (see note 2):",
+              "{{document.particulars.practicalEndDate}}"
+            ],
+            [
+              "Duration of practical period (see note 2):",
+              "{{document.particulars.durationWeeks}}"
+            ],
+            [
+              "Planned amount of off-the-job training (hours) (see note 5):",
+              "{{document.particulars.plannedOtjHours}}"
+            ]
+          ]
+        },
+        {
+          "id": "aa-signatories",
+          "type": "heading",
+          "text": "Signatories:",
+          "level": 2
+        },
+        {
+          "id": "signature-apprentice",
+          "type": "signature",
+          "role": "apprentice",
+          "label": "Apprentice:"
+        },
+        {
+          "id": "signature-employer",
+          "type": "signature",
+          "role": "employer",
+          "label": "Employer:"
+        },
+        {
+          "id": "aa-notes-page",
+          "type": "page-break"
+        },
+        {
+          "id": "aa-notes-title",
+          "type": "heading",
+          "text": "APPRENTICESHIP AGREEMENT - NOTES",
+          "level": 1
+        },
+        {
+          "id": "aa-note-heading-0",
+          "type": "heading",
+          "text": "1. Why is an apprenticeship agreement required?",
+          "level": 2
+        },
+        {
+          "id": "aa-note-body-0",
+          "type": "paragraph",
+          "text": "The Apprenticeships, Skills, Children and Learning Act (ASCLA) 2009 and the Apprenticeships (Miscellaneous Provisions) Regulations 2017 (SI No. 2017/1310) require an apprenticeship agreement to be in place, for nearly all apprentices. This forms part of the employment arrangements between an apprentice and their employer; it is a contract of service (i.e. a contract of employment) and not a contract of apprenticeship. An apprenticeship agreement must be put in place when an individual starts an apprenticeship and should remain in place throughout (the agreement must be extended if the duration of the apprenticeship is extended)."
+        },
+        {
+          "id": "aa-note-heading-1",
+          "type": "heading",
+          "text": "2. What is a 'practical period'? How does this differ to 'the apprenticeship'?",
+          "level": 2
+        },
+        {
+          "id": "aa-note-body-1",
+          "type": "paragraph",
+          "text": "A practical period is the period in which an apprentice is expected to work and receive training under an approved English apprenticeship agreement; it must have a minimum duration of 8 months. The practical period covers the training; the full apprenticeship covers the training and final assessment (currently called end-point assessment)."
+        },
+        {
+          "id": "aa-note-heading-2",
+          "type": "heading",
+          "text": "3. Can an apprenticeship be completed without an apprenticeship agreement?",
+          "level": 2
+        },
+        {
+          "id": "aa-note-body-2",
+          "type": "paragraph",
+          "text": "Yes, there are some circumstances where an apprentice can complete a statutory apprenticeship without an apprenticeship agreement. Please refer to the 'alternative English apprenticeship' section of the latest apprenticeship funding rules."
+        },
+        {
+          "id": "aa-note-heading-3",
+          "type": "heading",
+          "text": "4. What information is needed in an apprenticeship agreement?",
+          "level": 2
+        },
+        {
+          "id": "aa-note-body-3",
+          "type": "paragraph",
+          "text": "The apprenticeship agreement must comply with the requirements in ASCLA and the 2017 Regulations. It must: a) provide for the apprentice to work for the employer for reward, in an occupation for which an apprenticeship standard has been published by Skills England; b) provide for the apprentice to receive training in order to assist the apprentice to achieve the standard in the work done under the agreement; c) specify the apprenticeship’s practical period; and d) specify the amount of off-the-job training the apprentice is to receive. If the template overleaf is not used, the required information should be attached to / incorporated in an existing employment contract."
+        },
+        {
+          "id": "aa-note-heading-4",
+          "type": "heading",
+          "text": "5. What is the definition of off-the-job training and how much needs to be included?",
+          "level": 2
+        },
+        {
+          "id": "aa-note-body-4",
+          "type": "paragraph",
+          "text": "Off-the-job training delivers new skills that are directly relevant to the apprenticeship standard referenced in the agreement. The volume of off-the-job training should be agreed with the training provider and must take into account any relevant prior learning. Further information can be found in the apprenticeship funding rules."
+        },
+        {
+          "id": "aa-note-heading-5",
+          "type": "heading",
+          "text": "6. Who must sign the apprenticeship agreement?",
+          "level": 2
+        },
+        {
+          "id": "aa-note-body-5",
+          "type": "paragraph",
+          "text": "The employer and apprentice must sign and keep a copy of the apprenticeship agreement. The employer must give a copy to the training provider. The training provider, employer and apprentice must also sign a separate training plan; this builds upon the apprenticeship agreement and outlines the planned content and schedule of training to be delivered."
+        },
+        {
+          "id": "aa-note-heading-6",
+          "type": "heading",
+          "text": "7. What is a break in learning?",
+          "level": 2
+        },
+        {
+          "id": "aa-note-body-6",
+          "type": "paragraph",
+          "text": "A break in learning is where an individual takes a break from their apprenticeship but plans to return to it in the future; this can be with or without a break from work. When the apprentice restarts the programme all documentation, including the apprenticeship agreement and training plan, must be reviewed and updated to account for the duration of the break."
+        }
+      ],
+      "signatureRoles": [
+        "apprentice",
+        "employer"
+      ]
+    },
+    "training-plan": {
+      "schemaVersion": 1,
+      "templateId": "training-plan",
+      "documentKey": "training-plan",
+      "title": "Training Plan",
+      "category": "Compliance",
+      "programmes": [],
+      "blocks": [
+        {
+          "id": "tp-title",
+          "type": "heading",
+          "text": "Training Plan",
+          "level": 1
+        },
+        {
+          "id": "tp-intro",
+          "type": "paragraph",
+          "text": "This document outlines how all three parties (the apprentice, employer, and training provider) will support the achievement of the apprenticeship. It sets out the key milestones of the apprenticeship and the learning plan designed to achieve this, together with the information, policies, procedures and guidance that support it."
+        },
+        {
+          "id": "tp-apprentice",
+          "type": "paragraph",
+          "text": "Apprentice: {{document.programme.apprenticeName}}"
+        },
+        {
+          "id": "tp-programme",
+          "type": "heading",
+          "text": "Apprenticeship Programme Details",
+          "level": 2
+        },
+        {
+          "id": "tp-programme-fields",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Programme:",
+              "{{document.programme.programme}}"
+            ],
+            [
+              "Apprenticeship Standard/Framework Name:",
+              "{{document.programme.standard}}"
+            ],
+            [
+              "Apprenticeship Reference:",
+              "{{document.programme.reference}}"
+            ],
+            [
+              "Apprenticeship Level:",
+              "{{document.programme.level}}"
+            ],
+            [
+              "Start date of apprenticeship:",
+              "{{document.programme.startDate}}"
+            ],
+            [
+              "End date of apprenticeship:",
+              "{{document.programme.endDate}}"
+            ],
+            [
+              "Start date of practical period:",
+              "{{document.programme.practicalStartDate}}"
+            ],
+            [
+              "Estimated end date of practical period:",
+              "{{document.programme.practicalEndDate}}"
+            ],
+            [
+              "Duration of practical period:",
+              "{{document.programme.durationWeeks}}"
+            ],
+            [
+              "ILR Planned Hours:",
+              "{{document.programme.ilrPlannedHours}}"
+            ]
+          ]
+        },
+        {
+          "id": "tp-employment",
+          "type": "heading",
+          "text": "Employment Details",
+          "level": 2
+        },
+        {
+          "id": "tp-employment-fields",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Employer:",
+              "{{document.employment.employerName}}"
+            ],
+            [
+              "Delivery Address:",
+              "{{document.employment.deliveryAddress}}"
+            ],
+            [
+              "Apprentice Job Title:",
+              "{{document.employment.jobTitle}}"
+            ],
+            [
+              "Working hours (per week):",
+              "{{document.employment.workingHoursPerWeek}}"
+            ],
+            [
+              "Line Manager:",
+              "{{document.employment.lineManager}}"
+            ],
+            [
+              "Line Manager Title:",
+              "{{document.employment.lineManagerTitle}}"
+            ],
+            [
+              "Start Date With Employer:",
+              "{{document.employment.startDateWithEmployer}}"
+            ]
+          ]
+        },
+        {
+          "id": "tp-commitments-page",
+          "type": "page-break"
+        },
+        {
+          "id": "tp-commitments",
+          "type": "heading",
+          "text": "Commitment to the Programme",
+          "level": 2
+        },
+        {
+          "id": "tp-commitment-0",
+          "type": "heading",
+          "text": "The main provider will:",
+          "level": 2
+        },
+        {
+          "id": "tp-commitment-intro-0",
+          "type": "paragraph",
+          "text": "In signing this Training Plan, the provider agrees and commits to:"
+        },
+        {
+          "id": "tp-commitment-0-0",
+          "type": "paragraph",
+          "text": "1. Check the eligibility of the learner, including their right to work in England, that they spend at least 50% of their working time in England, that they are not undertaking another apprenticeship or benefiting from other DfE funding, and that they have not been asked to contribute financially."
+        },
+        {
+          "id": "tp-commitment-0-1",
+          "type": "paragraph",
+          "text": "2. Conduct the required checks with the employer, including that an apprenticeship agreement has been signed, a lawful wage is paid, the apprenticeship is the most appropriate programme, and that the employer acknowledges the apprentice needs at least an average of 6 hours per week of off-the-job training during working hours."
+        },
+        {
+          "id": "tp-commitment-0-2",
+          "type": "paragraph",
+          "text": "3. Devise and deliver the agreed off-the-job training and arrange the assessments required, taking account of the learner’s prior knowledge, skills and behaviours, to achieve the milestones in this Training Plan."
+        },
+        {
+          "id": "tp-commitment-0-3",
+          "type": "paragraph",
+          "text": "4. Negotiate a price with the employer, accounting for additional payments, relevant prior learning and any co-investment obligations."
+        },
+        {
+          "id": "tp-commitment-0-4",
+          "type": "paragraph",
+          "text": "5. Ensure the provision of appropriate additional learning support where required."
+        },
+        {
+          "id": "tp-commitment-0-5",
+          "type": "paragraph",
+          "text": "6. Ensure a safe and fair learning and working environment."
+        },
+        {
+          "id": "tp-commitment-0-6",
+          "type": "paragraph",
+          "text": "7. Brief the apprentice on the provider’s policies: Code of Conduct, Health & Safety, Equality and Diversity, Harassment and Bullying, and the Complaints Procedure."
+        },
+        {
+          "id": "tp-commitment-0-7",
+          "type": "paragraph",
+          "text": "8. Undertake legal and contractual obligations in relation to Safeguarding and Prevent."
+        },
+        {
+          "id": "tp-commitment-1",
+          "type": "heading",
+          "text": "The employer will:",
+          "level": 2
+        },
+        {
+          "id": "tp-commitment-intro-1",
+          "type": "paragraph",
+          "text": "In signing this Training Plan, the employer agrees and commits to:"
+        },
+        {
+          "id": "tp-commitment-1-0",
+          "type": "paragraph",
+          "text": "1. Work with the main provider to identify the most suitable apprenticeship standard."
+        },
+        {
+          "id": "tp-commitment-1-1",
+          "type": "paragraph",
+          "text": "2. Directly employ (PAYE) the apprentice and issue a contract of employment."
+        },
+        {
+          "id": "tp-commitment-1-2",
+          "type": "paragraph",
+          "text": "3. Employ the apprentice for at least the duration required to complete the apprenticeship."
+        },
+        {
+          "id": "tp-commitment-1-3",
+          "type": "paragraph",
+          "text": "4. Arrange contracted hours to allow for sufficient, regular training."
+        },
+        {
+          "id": "tp-commitment-1-4",
+          "type": "paragraph",
+          "text": "5. Pay the apprentice at least the National Minimum Wage and issue payslips."
+        },
+        {
+          "id": "tp-commitment-1-5",
+          "type": "paragraph",
+          "text": "6. Provide an appropriate workplace induction."
+        },
+        {
+          "id": "tp-commitment-1-6",
+          "type": "paragraph",
+          "text": "7. Provide the on-the-job training, mentoring and support required to achieve the milestones in this Training Plan."
+        },
+        {
+          "id": "tp-commitment-1-7",
+          "type": "paragraph",
+          "text": "8. Promptly inform the provider if any matters arise that may affect the learner’s learning, development or progression."
+        },
+        {
+          "id": "tp-commitment-1-8",
+          "type": "paragraph",
+          "text": "9. Ensure conformity with the provider’s Equality and Diversity policies and procedures."
+        },
+        {
+          "id": "tp-commitment-1-9",
+          "type": "paragraph",
+          "text": "10. Undertake legal and contractual obligations in relation to Safeguarding and Prevent."
+        },
+        {
+          "id": "tp-commitment-1-10",
+          "type": "paragraph",
+          "text": "11. Allow the apprentice to complete the apprenticeship within their working hours, including any English and maths required."
+        },
+        {
+          "id": "tp-commitment-2",
+          "type": "heading",
+          "text": "The apprentice will:",
+          "level": 2
+        },
+        {
+          "id": "tp-commitment-intro-2",
+          "type": "paragraph",
+          "text": "In signing this Training Plan, the learner agrees and commits to:"
+        },
+        {
+          "id": "tp-commitment-2-0",
+          "type": "paragraph",
+          "text": "1. Give the provider relevant information to assist in learner or programme eligibility checks."
+        },
+        {
+          "id": "tp-commitment-2-1",
+          "type": "paragraph",
+          "text": "2. Take appropriate responsibility for their own learning, development and progression, including attending all required training sessions."
+        },
+        {
+          "id": "tp-commitment-2-2",
+          "type": "paragraph",
+          "text": "3. Diligently undertake the on- and off-the-job learning required to achieve the milestones in this document."
+        },
+        {
+          "id": "tp-commitment-2-3",
+          "type": "paragraph",
+          "text": "4. Maintain an off-the-job training log evidencing the hours set out in this training plan, presenting it at every appointment with their Tutor."
+        },
+        {
+          "id": "tp-commitment-2-4",
+          "type": "paragraph",
+          "text": "5. Maintain appointments with their Tutor and Functional Skills Tutors."
+        },
+        {
+          "id": "tp-commitment-2-5",
+          "type": "paragraph",
+          "text": "6. Prepare for, participate in and contribute to reviews of their progress and achievement."
+        },
+        {
+          "id": "tp-commitment-2-6",
+          "type": "paragraph",
+          "text": "7. Work collaboratively with the employer and the provider, including submitting coursework for formative assessment where required."
+        },
+        {
+          "id": "tp-commitment-2-7",
+          "type": "paragraph",
+          "text": "8. Promptly inform the employer and/or the provider if any matters arise that may affect their learning, development or progression."
+        },
+        {
+          "id": "tp-commitment-2-8",
+          "type": "paragraph",
+          "text": "9. Behave at all times in a safe and responsible manner, in accordance with Health and Safety legislation."
+        },
+        {
+          "id": "tp-commitment-2-9",
+          "type": "paragraph",
+          "text": "10. Report any incidents of harassment, bullying, violence or suspected extremism or radicalisation."
+        },
+        {
+          "id": "tp-commitment-2-10",
+          "type": "paragraph",
+          "text": "11. Comply with the policies and procedures of the employer."
+        },
+        {
+          "id": "tp-commitment-2-11",
+          "type": "paragraph",
+          "text": "12. Provide the End-Point Assessment Organisation with the information necessary to register for End-Point Assessment."
+        },
+        {
+          "id": "tp-plan-page",
+          "type": "page-break"
+        },
+        {
+          "id": "tp-plan",
+          "type": "heading",
+          "text": "Learning Plan",
+          "level": 2
+        },
+        {
+          "id": "tp-learning-plan",
+          "type": "native",
+          "source": "learning-plan",
+          "label": "Learning plan activities",
+          "columns": [
+            "Activity/Unit",
+            "Method",
+            "Delivery Lead",
+            "Planned Date",
+            "OTJ (hr)"
+          ]
+        },
+        {
+          "id": "tp-otj",
+          "type": "heading",
+          "text": "Off-The-Job Training Hours",
+          "level": 2
+        },
+        {
+          "id": "tp-otj-note",
+          "type": "paragraph",
+          "text": "Off-the-job training is training received by the apprentice for the purpose of achieving the knowledge, skills and behaviours of the approved apprenticeship referenced in the apprenticeship agreement. The published figure can only be reduced where there is evidence of relevant prior learning from the apprentice’s initial assessment."
+        },
+        {
+          "id": "tp-otj-fields",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Planned off-the-job training:",
+              "{{document.otjh.plannedTotal}}"
+            ],
+            [
+              "Published minimum off-the-job training:",
+              "{{document.otjh.publishedMinimum}}"
+            ],
+            [
+              "Volume of RPL:",
+              "{{document.otjh.rplVolume}}"
+            ]
+          ]
+        },
+        {
+          "id": "tp-epa",
+          "type": "heading",
+          "text": "End Point Assessment",
+          "level": 2
+        },
+        {
+          "id": "tp-epa-note",
+          "type": "paragraph",
+          "text": "End Point Assessment (EPA) is the final assessment of an apprentice at the completion of their apprenticeship, carried out by an independent End Point Assessment Organisation. A Gateway Review determines whether the apprentice is ready to undertake it."
+        },
+        {
+          "id": "tp-epa-fields",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "End Point Assessment Organisation (EPAO):",
+              "{{document.epa.epao}}"
+            ],
+            [
+              "Estimated Gateway Meeting Review Date:",
+              "{{document.epa.gatewayReviewDate}}"
+            ],
+            [
+              "EPA Period:",
+              "{{document.epa.period}}"
+            ]
+          ]
+        },
+        {
+          "id": "tp-signatures-page",
+          "type": "page-break"
+        },
+        {
+          "id": "tp-signatures",
+          "type": "heading",
+          "text": "Signatures & Declarations",
+          "level": 2
+        },
+        {
+          "id": "tp-declaration",
+          "type": "paragraph",
+          "text": "By signing this agreement you confirm that you have read, understood and commit to the details, aims and learning plan outlined in this document."
+        },
+        {
+          "id": "signature-apprentice",
+          "type": "signature",
+          "role": "apprentice",
+          "label": "Apprentice"
+        },
+        {
+          "id": "signature-employer",
+          "type": "signature",
+          "role": "employer",
+          "label": "Employer"
+        },
+        {
+          "id": "signature-provider",
+          "type": "signature",
+          "role": "provider",
+          "label": "Training Provider"
+        },
+        {
+          "id": "tp-appendices",
+          "type": "heading",
+          "text": "Appendices",
+          "level": 2
+        },
+        {
+          "id": "tp-apprentice-contact",
+          "type": "heading",
+          "text": "1.1 Apprentice Contact Details",
+          "level": 2
+        },
+        {
+          "id": "tp-apprentice-contacts",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Name:",
+              "{{document.contacts.apprentice.name}}"
+            ],
+            [
+              "Email:",
+              "{{document.contacts.apprentice.email}}"
+            ],
+            [
+              "Telephone:",
+              "{{document.contacts.apprentice.telephone}}"
+            ],
+            [
+              "Address:",
+              "{{document.contacts.apprentice.address}}"
+            ]
+          ]
+        },
+        {
+          "id": "tp-employer-contact",
+          "type": "heading",
+          "text": "1.2 Employer Contact Details",
+          "level": 2
+        },
+        {
+          "id": "tp-employer-contacts",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Line Manager:",
+              "{{document.contacts.employer.lineManager}}"
+            ],
+            [
+              "Email:",
+              "{{document.contacts.employer.email}}"
+            ],
+            [
+              "Telephone:",
+              "{{document.contacts.employer.telephone}}"
+            ],
+            [
+              "Company:",
+              "{{document.contacts.employer.company}}"
+            ],
+            [
+              "Address:",
+              "{{document.contacts.employer.address}}"
+            ]
+          ]
+        }
+      ],
+      "signatureRoles": [
+        "apprentice",
+        "employer",
+        "provider"
+      ]
+    },
+    "written-agreement": {
+      "schemaVersion": 1,
+      "templateId": "written-agreement",
+      "documentKey": "written-agreement",
+      "title": "Written Agreement",
+      "category": "Compliance",
+      "programmes": [],
+      "blocks": [
+        {
+          "id": "wa-title",
+          "type": "heading",
+          "text": "Written Agreement",
+          "level": 1
+        },
+        {
+          "id": "wa-intro",
+          "type": "paragraph",
+          "text": "This is a written agreement between the Employer and {{document.particulars.mainProviderIntro}} (Main Provider). It contains the details of the End Point Assessment Organisation and any subcontractors that may be required to complement the delivery of the apprenticeship for the apprentice detailed below. This document lays out the planned delivery requirements of the apprenticeship and the areas of responsibility for each party with the relevant costs."
+        },
+        {
+          "id": "wa-particulars",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Job Title",
+              "{{document.particulars.jobTitle}}"
+            ],
+            [
+              "Apprenticeship Title",
+              "{{document.particulars.apprenticeshipTitle}}"
+            ],
+            [
+              "Apprenticeship Level",
+              "{{document.particulars.apprenticeshipLevel}}"
+            ],
+            [
+              "Apprenticeship maximum funding band value",
+              "{{document.particulars.fundingBandValue}}"
+            ],
+            [
+              "Apprenticeship Start Date",
+              "{{document.particulars.startDate}}"
+            ],
+            [
+              "Apprenticeship Planned End Date",
+              "{{document.particulars.plannedEndDate}}"
+            ],
+            [
+              "Manager Name",
+              "{{document.particulars.managerName}}"
+            ],
+            [
+              "Manager Job Title",
+              "{{document.particulars.managerJobTitle}}"
+            ],
+            [
+              "Employer",
+              "{{document.particulars.employer}}"
+            ],
+            [
+              "Employer Postcode",
+              "{{document.particulars.employerPostcode}}"
+            ],
+            [
+              "Employer Address",
+              "{{document.particulars.employerAddress}}"
+            ],
+            [
+              "Main Provider",
+              "{{document.particulars.mainProvider}}"
+            ],
+            [
+              "Is any part of the Apprenticeship to be Subcontracted?",
+              "{{document.particulars.subcontracted}}"
+            ]
+          ]
+        },
+        {
+          "id": "wa-delivery",
+          "type": "heading",
+          "text": "Delivery",
+          "level": 2
+        },
+        {
+          "id": "wa-off-the-job-note",
+          "type": "paragraph",
+          "text": "Training that the provider will deliver to the Apprentice off the job. This must be a minimum of 20% of the apprentice's total paid working time, not including any English and maths delivery."
+        },
+        {
+          "id": "wa-delivery-data",
+          "type": "native",
+          "source": "delivery",
+          "label": "Delivery activities and off-the-job training",
+          "columns": [
+            "Activity",
+            "Method",
+            "Hours"
+          ]
+        },
+        {
+          "id": "wa-english-maths",
+          "type": "heading",
+          "text": "English and maths training delivered off the job",
+          "level": 2
+        },
+        {
+          "id": "wa-english-maths-note",
+          "type": "paragraph",
+          "text": "English and maths requirements up to and including Level 2 are paid directly to the provider by the DfE. Level 3 or above will have associated costs to the employer."
+        },
+        {
+          "id": "wa-epa-page",
+          "type": "page-break"
+        },
+        {
+          "id": "wa-epa",
+          "type": "heading",
+          "text": "End Point Assessment Organisation",
+          "level": 2
+        },
+        {
+          "id": "wa-epa-note",
+          "type": "paragraph",
+          "text": "In accordance with data protection law and with the apprentice’s agreement, the provider will give the End Point Assessment Organisation the apprentice details required to allow the End Point Assessment, any possible retakes and certification to take place."
+        },
+        {
+          "id": "wa-epa-fields",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Assessment Organisation",
+              "{{document.epa.organisation}}"
+            ],
+            [
+              "Postcode",
+              "{{document.epa.postcode}}"
+            ],
+            [
+              "Arrangements for end-point assessment (including retakes)",
+              "{{document.epa.arrangements}}"
+            ],
+            [
+              "Agreed transaction for payments to the EPA Organisation",
+              "{{document.epa.paymentArrangements}}"
+            ],
+            [
+              "Name of External Quality Assurance Organisation",
+              "{{document.epa.externalQualityAssurance}}"
+            ]
+          ]
+        },
+        {
+          "id": "wa-costs",
+          "type": "heading",
+          "text": "Costs",
+          "level": 2
+        },
+        {
+          "id": "wa-costs-note",
+          "type": "paragraph",
+          "text": "Any prior knowledge the apprentice may have should be accounted for and costs reduced accordingly — see the Learning Plan for details."
+        },
+        {
+          "id": "wa-cost-items",
+          "type": "native",
+          "source": "costs",
+          "label": "Costs",
+          "columns": [
+            "Item",
+            "Associated price"
+          ],
+          "labels": {
+            "cost-0": "Training that the provider will deliver to the Apprentice Off the Job",
+            "cost-1": "Distance, online or blended learning relating to the off-the-job training",
+            "cost-2": "English & maths training that the provider will deliver Off the Job (L3+ only)",
+            "cost-3": "Assessment that the provider will deliver (including Progress Reviews)",
+            "cost-4": "Registration, examination and certification",
+            "cost-5": "Materials (non-capital items) used in the delivery of the apprenticeship",
+            "cost-6": "Administration costs directly linked to training and assessment, including EPA",
+            "cost-7": "Training delivered by the Subcontractor",
+            "cost-8": "Assessment undertaken by the Subcontractor",
+            "cost-9": "Support that the provider will provide to the Subcontractor",
+            "cost-10": "Monitoring that the provider will undertake",
+            "cost-11": "End Point Assessment",
+            "cost-12": "Apprenticeship Certification",
+            "cost-13": "External Quality Assurance",
+            "cost-14": "Any other costs not fundable by Levy funds or DfE contribution",
+            "total": "Total price of Apprenticeship",
+            "maximum": "Funding Band Maximum value",
+            "balance": "Balance due"
+          }
+        },
+        {
+          "id": "wa-queries",
+          "type": "heading",
+          "text": "Queries and complaints",
+          "level": 2
+        },
+        {
+          "id": "wa-complaints",
+          "type": "paragraph",
+          "text": "Please refer to the provider’s complaints procedure for the correct process for registering a complaint. First point of contact details are shown below."
+        },
+        {
+          "id": "wa-contacts",
+          "type": "native",
+          "source": "contacts",
+          "label": "Queries and complaints contacts",
+          "columns": [
+            "Field",
+            "Value"
+          ]
+        },
+        {
+          "id": "wa-signatures-page",
+          "type": "page-break"
+        },
+        {
+          "id": "wa-signatures",
+          "type": "heading",
+          "text": "Declaration & Signatures",
+          "level": 2
+        },
+        {
+          "id": "wa-declaration-learner",
+          "type": "heading",
+          "text": "Apprentice:",
+          "level": 2
+        },
+        {
+          "id": "wa-declaration-text-learner",
+          "type": "paragraph",
+          "text": "I confirm my full agreement and commitment to the content contained in this document. The information contained within the document is true and correct to the best of my knowledge."
+        },
+        {
+          "id": "signature-learner",
+          "type": "signature",
+          "role": "learner",
+          "label": "Apprentice:"
+        },
+        {
+          "id": "wa-declaration-employer",
+          "type": "heading",
+          "text": "Employer:",
+          "level": 2
+        },
+        {
+          "id": "wa-declaration-text-employer",
+          "type": "paragraph",
+          "text": "I confirm my full agreement and commitment to the content and costings contained in this document, and any additional costs due (detailed above) we will pay in full to the provider. The information contained within the document is true and correct to the best of my knowledge."
+        },
+        {
+          "id": "signature-employer",
+          "type": "signature",
+          "role": "employer",
+          "label": "Employer:"
+        },
+        {
+          "id": "wa-declaration-provider",
+          "type": "heading",
+          "text": "{{document.particulars.mainProviderSignatureLabel}} (Main Provider):",
+          "level": 2
+        },
+        {
+          "id": "wa-declaration-text-provider",
+          "type": "paragraph",
+          "text": "I confirm my full agreement and commitment to the content and costings contained in this document. The information contained within the document is true and correct to the best of my knowledge."
+        },
+        {
+          "id": "signature-provider",
+          "type": "signature",
+          "role": "provider",
+          "label": "{{document.particulars.mainProviderSignatureLabel}} (Main Provider):"
+        }
+      ],
+      "signatureRoles": [
+        "learner",
+        "employer",
+        "provider"
+      ]
+    },
+    "ilr": {
+      "schemaVersion": 1,
+      "templateId": "ilr",
+      "documentKey": "ilr",
+      "title": "Individual Learner Record",
+      "category": "Compliance",
+      "programmes": [],
+      "blocks": [
+        {
+          "id": "ilr-row-0",
+          "type": "heading",
+          "text": "Individual Learner Record",
+          "level": 1
+        },
+        {
+          "id": "ilr-row-1",
+          "type": "heading",
+          "text": "Learner details",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-2",
+          "type": "field",
+          "label": "Learner reference number",
+          "value": "{{document.learnerDetails.learnerReferenceNumber}}"
+        },
+        {
+          "id": "ilr-row-3",
+          "type": "field",
+          "label": "ULN",
+          "value": "{{document.learnerDetails.uln}}"
+        },
+        {
+          "id": "ilr-row-4",
+          "type": "field",
+          "label": "Family name",
+          "value": "{{document.learnerDetails.familyName}}"
+        },
+        {
+          "id": "ilr-row-5",
+          "type": "field",
+          "label": "Given names",
+          "value": "{{document.learnerDetails.givenNames}}"
+        },
+        {
+          "id": "ilr-row-6",
+          "type": "field",
+          "label": "Date of birth",
+          "value": "{{document.learnerDetails.dateOfBirth}}"
+        },
+        {
+          "id": "ilr-row-7",
+          "type": "field",
+          "label": "Address 1",
+          "value": "{{document.learnerDetails.address1}}"
+        },
+        {
+          "id": "ilr-row-8",
+          "type": "field",
+          "label": "Address 2",
+          "value": "{{document.learnerDetails.address2}}"
+        },
+        {
+          "id": "ilr-row-9",
+          "type": "field",
+          "label": "Address 3",
+          "value": "{{document.learnerDetails.address3}}"
+        },
+        {
+          "id": "ilr-row-10",
+          "type": "field",
+          "label": "Address 4",
+          "value": "{{document.learnerDetails.address4}}"
+        },
+        {
+          "id": "ilr-row-11",
+          "type": "field",
+          "label": "How long have you been at this address (years)?",
+          "value": "{{document.learnerDetails.yearsAtAddress}}"
+        },
+        {
+          "id": "ilr-row-12",
+          "type": "field",
+          "label": "Telephone number",
+          "value": "{{document.learnerDetails.telephone}}"
+        },
+        {
+          "id": "ilr-row-13",
+          "type": "field",
+          "label": "Current post code",
+          "value": "{{document.learnerDetails.currentPostcode}}"
+        },
+        {
+          "id": "ilr-row-14",
+          "type": "field",
+          "label": "Postcode prior to enrolment",
+          "value": "{{document.learnerDetails.postcodePriorToEnrolment}}"
+        },
+        {
+          "id": "ilr-row-15",
+          "type": "field",
+          "label": "National insurance number",
+          "value": "{{document.learnerDetails.nationalInsuranceNumber}}"
+        },
+        {
+          "id": "ilr-row-16",
+          "type": "field",
+          "label": "Sex",
+          "value": "{{document.learnerDetails.sex}}"
+        },
+        {
+          "id": "ilr-row-17",
+          "type": "field",
+          "label": "Ethnicity",
+          "value": "{{document.learnerDetails.ethnicity}}"
+        },
+        {
+          "id": "ilr-row-18",
+          "type": "heading",
+          "text": "Health",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-19",
+          "type": "field",
+          "label": "Do you consider yourself to have a long term disability, health problem or any learning difficulties?",
+          "value": "{{document.learnerDetails.longTermDisability}}"
+        },
+        {
+          "id": "ilr-row-20",
+          "type": "heading",
+          "text": "Education and training",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-21",
+          "type": "field",
+          "label": "Prior attainment",
+          "value": "{{document.learnerDetails.priorAttainment}}"
+        },
+        {
+          "id": "ilr-row-22",
+          "type": "heading",
+          "text": "Latest employment status details",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-23",
+          "type": "field",
+          "label": "Status",
+          "value": "{{document.learnerDetails.employmentStatus}}"
+        },
+        {
+          "id": "ilr-row-24",
+          "type": "field",
+          "label": "Employment start date",
+          "value": "{{document.learnerDetails.employmentStartDate}}"
+        },
+        {
+          "id": "ilr-row-25",
+          "type": "field",
+          "label": "Date status applies",
+          "value": "{{document.learnerDetails.dateStatusApplies}}"
+        },
+        {
+          "id": "ilr-row-26",
+          "type": "field",
+          "label": "Job title",
+          "value": "{{document.learnerDetails.jobTitle}}"
+        },
+        {
+          "id": "ilr-row-27",
+          "type": "field",
+          "label": "EDRS/ERN number",
+          "value": "{{document.learnerDetails.edrsErn}}"
+        },
+        {
+          "id": "ilr-row-28",
+          "type": "field",
+          "label": "Self employed",
+          "value": "{{document.learnerDetails.selfEmployed}}"
+        },
+        {
+          "id": "ilr-row-29",
+          "type": "field",
+          "label": "Full time education or training prior to enrolment",
+          "value": "{{document.learnerDetails.fullTimeEducationPrior}}"
+        },
+        {
+          "id": "ilr-row-30",
+          "type": "field",
+          "label": "Contracted hours per week",
+          "value": "{{document.learnerDetails.contractedHoursPerWeek}}"
+        },
+        {
+          "id": "ilr-row-31",
+          "type": "field",
+          "label": "Is small employer",
+          "value": "{{document.learnerDetails.isSmallEmployer}}"
+        },
+        {
+          "id": "ilr-row-32",
+          "type": "heading",
+          "text": "Extended ILR",
+          "level": 1
+        },
+        {
+          "id": "ilr-row-33",
+          "type": "heading",
+          "text": "Contact Preferences",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-34",
+          "type": "field",
+          "label": "By post",
+          "value": "{{document.answers.contact.byPost}}"
+        },
+        {
+          "id": "ilr-row-35",
+          "type": "field",
+          "label": "By phone",
+          "value": "{{document.answers.contact.byPhone}}"
+        },
+        {
+          "id": "ilr-row-36",
+          "type": "field",
+          "label": "By e-mail",
+          "value": "{{document.answers.contact.byEmail}}"
+        },
+        {
+          "id": "ilr-row-37",
+          "type": "heading",
+          "text": "Emergency contact details/Next of kin",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-38",
+          "type": "field",
+          "label": "Full name",
+          "value": "{{document.answers.nextOfKin.fullName}}"
+        },
+        {
+          "id": "ilr-row-39",
+          "type": "field",
+          "label": "Relationship to",
+          "value": "{{document.answers.nextOfKin.relationship}}"
+        },
+        {
+          "id": "ilr-row-40",
+          "type": "field",
+          "label": "Email address",
+          "value": "{{document.answers.nextOfKin.email}}"
+        },
+        {
+          "id": "ilr-row-41",
+          "type": "field",
+          "label": "Phone number",
+          "value": "{{document.answers.nextOfKin.phone}}"
+        },
+        {
+          "id": "ilr-row-42",
+          "type": "field",
+          "label": "Contact post code",
+          "value": "{{document.answers.nextOfKin.postcode}}"
+        },
+        {
+          "id": "ilr-row-43",
+          "type": "field",
+          "label": "Contact address",
+          "value": "{{document.answers.nextOfKin.address}}"
+        },
+        {
+          "id": "ilr-row-44",
+          "type": "heading",
+          "text": "Eligibility",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-45",
+          "type": "field",
+          "label": "Are you primarily employed in England?",
+          "value": "{{document.answers.eligibility.employedInEngland}}"
+        },
+        {
+          "id": "ilr-row-46",
+          "type": "field",
+          "label": "Are you a UK/EEA National?",
+          "value": "{{document.answers.eligibility.ukEeaNational}}"
+        },
+        {
+          "id": "ilr-row-47",
+          "type": "field",
+          "label": "Nationality",
+          "value": "{{document.answers.eligibility.nationality}}"
+        },
+        {
+          "id": "ilr-row-48",
+          "type": "field",
+          "label": "Have you been resident in the UK/EEA for the previous 3 years?",
+          "value": "{{document.answers.eligibility.residentPrevious3Years}}"
+        },
+        {
+          "id": "ilr-row-49",
+          "type": "field",
+          "label": "How many full years have you lived in the UK?",
+          "value": "{{document.answers.eligibility.yearsInUk}}"
+        },
+        {
+          "id": "ilr-row-50",
+          "type": "field",
+          "label": "Do you require a Work Permit?",
+          "value": "{{document.answers.eligibility.requiresWorkPermit}}"
+        },
+        {
+          "id": "ilr-row-51",
+          "type": "field",
+          "label": "Country of residence",
+          "value": "{{document.answers.eligibility.countryOfResidence}}"
+        },
+        {
+          "id": "ilr-row-52",
+          "type": "heading",
+          "text": "Employer Details",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-53",
+          "type": "field",
+          "label": "Organisation name",
+          "value": "{{document.answers.employer.organisationName}}"
+        },
+        {
+          "id": "ilr-row-54",
+          "type": "field",
+          "label": "Organisation post code",
+          "value": "{{document.answers.employer.postcode}}"
+        },
+        {
+          "id": "ilr-row-55",
+          "type": "field",
+          "label": "Organisation address",
+          "value": "{{document.answers.employer.address}}"
+        },
+        {
+          "id": "ilr-row-56",
+          "type": "field",
+          "label": "Organisation city",
+          "value": "{{document.answers.employer.city}}"
+        },
+        {
+          "id": "ilr-row-57",
+          "type": "field",
+          "label": "Line Manager name",
+          "value": "{{document.answers.employer.lineManagerName}}"
+        },
+        {
+          "id": "ilr-row-58",
+          "type": "field",
+          "label": "Line Manager email",
+          "value": "{{document.answers.employer.lineManagerEmail}}"
+        },
+        {
+          "id": "ilr-row-59",
+          "type": "field",
+          "label": "Line Manager phone",
+          "value": "{{document.answers.employer.lineManagerPhone}}"
+        },
+        {
+          "id": "ilr-row-60",
+          "type": "heading",
+          "text": "Other training",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-61",
+          "type": "field",
+          "label": "Have you attended any other government funded training programmes in the last 12 months?",
+          "value": "{{document.answers.otherTraining.attended12m}}"
+        },
+        {
+          "id": "ilr-row-62",
+          "type": "field",
+          "label": "When was it completed?",
+          "value": "{{document.answers.otherTraining.completedWhen}}"
+        },
+        {
+          "id": "ilr-row-63",
+          "type": "heading",
+          "text": "Personal Circumstances",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-64",
+          "type": "field",
+          "label": "Do you have any caring responsibilities?",
+          "value": "{{document.answers.circumstances.caringResponsibilities}}"
+        },
+        {
+          "id": "ilr-row-65",
+          "type": "field",
+          "label": "Are there any other personal circumstances you want to tell us about?",
+          "value": "{{document.answers.circumstances.other}}"
+        },
+        {
+          "id": "ilr-row-66",
+          "type": "field",
+          "label": "Care leaver",
+          "value": "{{document.answers.circumstances.careLeaver}}"
+        },
+        {
+          "id": "ilr-row-67",
+          "type": "heading",
+          "text": "Programme understanding",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-68",
+          "type": "field",
+          "label": "What is your understanding of the programme you are applying for?",
+          "value": "{{document.answers.understanding.programmeUnderstanding}}"
+        },
+        {
+          "id": "ilr-row-69",
+          "type": "field",
+          "label": "How will this programme help you in your career development/aspirations and/or with your progression?",
+          "value": "{{document.answers.understanding.careerProgression}}"
+        },
+        {
+          "id": "ilr-row-70",
+          "type": "heading",
+          "text": "Additional information",
+          "level": 2
+        },
+        {
+          "id": "ilr-row-71",
+          "type": "field",
+          "label": "Are you aged between 16 and 18?",
+          "value": "{{document.answers.additional.aged16to18}}"
+        },
+        {
+          "id": "ilr-row-72",
+          "type": "field",
+          "label": "Are you aged between 19 and 24?",
+          "value": "{{document.answers.additional.aged19to24}}"
+        },
+        {
+          "id": "ilr-row-73",
+          "type": "field",
+          "label": "Media Consent",
+          "value": ""
+        },
+        {
+          "id": "ilr-row-74",
+          "type": "field",
+          "label": "Do you give Kent Business College consent for the above?",
+          "value": "{{document.answers.media.consent}}"
+        },
+        {
+          "id": "ilr-row-75",
+          "type": "field",
+          "label": "I understand that my Personal Learning Record (PLR) information will be shared with Kent Business College and other relevant organisations",
+          "value": "{{document.answers.declarations.plrShared}}"
+        },
+        {
+          "id": "ilr-row-76",
+          "type": "field",
+          "label": "I understand that I am on programme that is part funded by the DfE. I understand that members of the qualification and funding authorities may contact me in connection to my apprenticeship",
+          "value": "{{document.answers.declarations.dfeContact}}"
+        },
+        {
+          "id": "ilr-row-77",
+          "type": "field",
+          "label": "I understand that relevant personal details will be provided to the End Point and Awarding Organisation so that Registration and Certification can take place",
+          "value": "{{document.answers.declarations.epaoDetails}}"
+        },
+        {
+          "id": "ilr-row-78",
+          "type": "field",
+          "label": "I understand that Kentbusinesscollege will hold any relevant copies of my certificates for audit purposes",
+          "value": "{{document.answers.declarations.kbcHoldsCerts}}"
+        },
+        {
+          "id": "ilr-row-79",
+          "type": "field",
+          "label": "I confirm that all the information contained in this application is accurate and true",
+          "value": "{{document.answers.declarations.infoAccurate}}"
+        },
+        {
+          "id": "ilr-row-80",
+          "type": "field",
+          "label": "Could you confirm whether you expect to spend more than 50% of your working hours in England?",
+          "value": "{{document.answers.declarations.over50PercentEngland}}"
+        },
+        {
+          "id": "ilr-row-81",
+          "type": "field",
+          "label": "Please confirm your \"current wage rate per hour\" is equal to or higher than:",
+          "value": "{{document.answers.declarations.wageRateBand}}"
+        },
+        {
+          "id": "ilr-row-82",
+          "type": "field",
+          "label": "Have you ever been known by any other name?",
+          "value": "{{document.answers.declarations.knownByOtherName}}"
+        },
+        {
+          "id": "ilr-row-83",
+          "type": "field",
+          "label": "Please confirm that you are aware your training provider will need to access your PLR:",
+          "value": "{{document.answers.declarations.plrAccessAware}}"
+        },
+        {
+          "id": "ilr-learning-declaration",
+          "type": "heading",
+          "text": "Learning declaration",
+          "level": 2
+        },
+        {
+          "id": "ilr-learning-declaration-0",
+          "type": "paragraph",
+          "text": "I confirm my agreement to share my Personal Learning Record (PLR) information with Kent Business College and other relevant bodies."
+        },
+        {
+          "id": "ilr-learning-declaration-1",
+          "type": "paragraph",
+          "text": "I understand that my programme is supported and funded by the Department of Education (DfE) on behalf of the Secretary of State. I am happy to be contacted by the relevant funding authorities in connection with this programme."
+        },
+        {
+          "id": "ilr-learning-declaration-2",
+          "type": "paragraph",
+          "text": "I confirm all the information completed in this Application for learning document is accurate."
+        },
+        {
+          "id": "signature-learner",
+          "type": "signature",
+          "role": "learner",
+          "label": "Learner"
+        },
+        {
+          "id": "ilr-provider-declaration",
+          "type": "heading",
+          "text": "Provider/Sub-contractor Declaration",
+          "level": 2
+        },
+        {
+          "id": "ilr-provider-note",
+          "type": "paragraph",
+          "text": "I confirm I have seen evidence to verify the learners identity, immigration permission (if applicable) and relevant eligibility for this qualification/funding"
+        },
+        {
+          "id": "signature-provider",
+          "type": "signature",
+          "role": "provider",
+          "label": "Provider"
+        }
+      ],
+      "signatureRoles": [
+        "learner",
+        "provider"
+      ]
+    },
+    "review-eligibility": {
+      "schemaVersion": 1,
+      "templateId": "review-eligibility",
+      "documentKey": "review-eligibility",
+      "title": "Eligibility Review & FS Discussion",
+      "category": "Review",
+      "programmes": [],
+      "blocks": [
+        {
+          "id": "review-title",
+          "type": "heading",
+          "text": "Eligibility Review & FS Discussion",
+          "level": 1
+        },
+        {
+          "id": "review-learner-information",
+          "type": "heading",
+          "text": "Learner Information",
+          "level": 2
+        },
+        {
+          "id": "review-information",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Name",
+              "{{document.learnerInformation.name}}"
+            ],
+            [
+              "Programme Name",
+              "{{document.learnerInformation.programmeName}}"
+            ],
+            [
+              "Programme Start Date",
+              "{{document.learnerInformation.programmeStartDate}}"
+            ],
+            [
+              "Planned End Date",
+              "{{document.learnerInformation.plannedEndDate}}"
+            ],
+            [
+              "Programme Status",
+              "{{document.learnerInformation.programmeStatus}}"
+            ],
+            [
+              "Employer",
+              "{{document.learnerInformation.employer}}"
+            ],
+            [
+              "Manager",
+              "{{document.learnerInformation.manager}}"
+            ],
+            [
+              "Mentor",
+              "{{document.learnerInformation.mentor}}"
+            ]
+          ]
+        },
+        {
+          "id": "review-section-ilr",
+          "type": "heading",
+          "text": "ILR",
+          "level": 2
+        },
+        {
+          "id": "review-answers-ilr",
+          "type": "native",
+          "source": "review:ilr",
+          "label": "ILR",
+          "labels": {
+            "over16": "Is the apprentice over 16 years old at the start of the programme?",
+            "withinContractTime": "Can the apprentice complete their apprenticeship within the time they have available within their contract of employment?",
+            "payeScheme": "Is apprentice employed and on the PAYE scheme either directly by you, a connected company, or charity as defined by HMRC?"
+          }
+        },
+        {
+          "id": "review-section-extendedIlr",
+          "type": "heading",
+          "text": "Extended ILR",
+          "level": 2
+        },
+        {
+          "id": "review-answers-extendedIlr",
+          "type": "native",
+          "source": "review:extendedIlr",
+          "label": "Extended ILR",
+          "labels": {
+            "eligibleResidency": "Does the apprentice have an eligible residency status?",
+            "identityDocumentsSeen": "Have you seen suitable identity documents and/or immigration permission",
+            "eligibilityEvidence": "What evidence has been seen to confirm eligibility?",
+            "rightToWorkEngland": "Does the apprentice have the right to work in England?",
+            "fiftyPercentEngland": "Does the apprentice spend at least 50% of their working hours in England over the duration of the apprenticeship?",
+            "minimumWage": "Is the apprentice paid at least the minimum wage appropriate to their age and apprenticeship?"
+          }
+        },
+        {
+          "id": "review-section-functionalSkills",
+          "type": "heading",
+          "text": "Functional Skills",
+          "level": 2
+        },
+        {
+          "id": "review-answers-functionalSkills",
+          "type": "native",
+          "source": "review:functionalSkills",
+          "label": "Functional Skills",
+          "labels": {}
+        },
+        {
+          "id": "review-section-fsJobRoleDiscussion",
+          "type": "heading",
+          "text": "Functional Skills & Job Role Discussion: Learner & Employer",
+          "level": 2
+        },
+        {
+          "id": "review-answers-fsJobRoleDiscussion",
+          "type": "native",
+          "source": "review:fsJobRoleDiscussion",
+          "label": "Functional Skills & Job Role Discussion: Learner & Employer",
+          "labels": {
+            "holdsLevel2": "Does the apprentice hold an approved qualification for both Level 2 English & maths Functional Skills or equivalent?",
+            "levelMatchesRole": "Please confirm that the apprenticeship selected matches the level of the role(s) underpinned by this apprenticeship and outlined in their role description",
+            "productivePurpose": "Please confirm that the apprentice's job role has a productive purpose and that there is a direct link between this job role and the chosen apprenticeship standard",
+            "ksbExposure": "Please confirm that you will provide the individual with the exposure to the Knowledge, Skills & Behaviours - KSBs, and appropriate support & supervision to carry out both their job role and their apprenticeship, particularly where the apprentice is working flexibly, including working from home",
+            "releaseForOtj": "Please confirm that you will release the apprentice for off-the-job training as required by the training plan including English and maths training if required.",
+            "embedOtj": "Please confirm that you will provide the apprentice with the opportunity to embed and consolidate the knowledge, skills, and behaviours gained through off-the-job training into the workplace.",
+            "warningAreas": "Are there any warning areas in the statements above that require further justification or evidence?"
+          }
+        },
+        {
+          "id": "review-section-comments",
+          "type": "heading",
+          "text": "Comments",
+          "level": 2
+        },
+        {
+          "id": "review-answers-comments",
+          "type": "native",
+          "source": "review:comments",
+          "label": "Comments",
+          "labels": {}
+        },
+        {
+          "id": "review-declaration",
+          "type": "heading",
+          "text": "Declaration",
+          "level": 2
+        },
+        {
+          "id": "review-declaration-note",
+          "type": "paragraph",
+          "text": "The parties below confirm the answers recorded in this review are accurate."
+        },
+        {
+          "id": "signature-learner",
+          "type": "signature",
+          "role": "learner",
+          "label": "Learner signature"
+        },
+        {
+          "id": "signature-admin",
+          "type": "signature",
+          "role": "admin",
+          "label": "Provider signature"
+        },
+        {
+          "id": "signature-employer",
+          "type": "signature",
+          "role": "employer",
+          "label": "Employer signature",
+          "condition": "employer-required"
+        }
+      ],
+      "signatureRoles": [
+        "learner",
+        "admin",
+        "employer"
+      ],
+      "reviewType": "eligibility-review"
+    },
+    "review-rpl": {
+      "schemaVersion": 1,
+      "templateId": "review-rpl",
+      "documentKey": "review-rpl",
+      "title": "RPL And Experience",
+      "category": "Review",
+      "programmes": [],
+      "blocks": [
+        {
+          "id": "review-title",
+          "type": "heading",
+          "text": "RPL And Experience",
+          "level": 1
+        },
+        {
+          "id": "review-learner-information",
+          "type": "heading",
+          "text": "Learner Information",
+          "level": 2
+        },
+        {
+          "id": "review-information",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Name",
+              "{{document.learnerInformation.name}}"
+            ],
+            [
+              "Programme Name",
+              "{{document.learnerInformation.programmeName}}"
+            ],
+            [
+              "Programme Start Date",
+              "{{document.learnerInformation.programmeStartDate}}"
+            ],
+            [
+              "Planned End Date",
+              "{{document.learnerInformation.plannedEndDate}}"
+            ],
+            [
+              "Programme Status",
+              "{{document.learnerInformation.programmeStatus}}"
+            ],
+            [
+              "Employer",
+              "{{document.learnerInformation.employer}}"
+            ],
+            [
+              "Manager",
+              "{{document.learnerInformation.manager}}"
+            ],
+            [
+              "Mentor",
+              "{{document.learnerInformation.mentor}}"
+            ]
+          ]
+        },
+        {
+          "id": "review-section-priorLearning",
+          "type": "heading",
+          "text": "Prior Learning",
+          "level": 2
+        },
+        {
+          "id": "review-answers-priorLearning",
+          "type": "native",
+          "source": "review:priorLearning",
+          "label": "Prior Learning",
+          "labels": {}
+        },
+        {
+          "id": "review-section-rplExperience",
+          "type": "heading",
+          "text": "Recognition of Prior Learning and Experience",
+          "level": 2
+        },
+        {
+          "id": "review-answers-rplExperience",
+          "type": "native",
+          "source": "review:rplExperience",
+          "label": "Recognition of Prior Learning and Experience",
+          "labels": {
+            "apprenticeshipAppropriate": "Have all parties agreed that an apprenticeship is the most appropriate training programme for the individual",
+            "planAlignsStandard": "Have all parties agreed that the learning plan aligns with the chosen standard and level",
+            "priorEducation": "Is there any prior education, training or associated qualifications in a related subject area, including previous apprenticeships undertaken that need to be taken into consideration for this apprenticeship?",
+            "priorWorkExperience": "Is there any learning or competence gained from prior work experience, particularly where the apprentice is an existing employee, or is beginning their apprenticeship after completing another programme with a relevant work placement that need to be taken into consideration for this apprenticeship?",
+            "planNeedsAdjusting": "As a result of the above, does the training plan need to be adjusted to take into account prior learning and experience"
+          }
+        },
+        {
+          "id": "review-section-plr",
+          "type": "heading",
+          "text": "Personal Learner Record (PLR)",
+          "level": 2
+        },
+        {
+          "id": "review-answers-plr",
+          "type": "native",
+          "source": "review:plr",
+          "label": "Personal Learner Record (PLR)",
+          "labels": {}
+        },
+        {
+          "id": "review-section-skillsRadar",
+          "type": "heading",
+          "text": "Skills Radar",
+          "level": 2
+        },
+        {
+          "id": "review-answers-skillsRadar",
+          "type": "native",
+          "source": "review:skillsRadar",
+          "label": "Skills Radar",
+          "labels": {}
+        },
+        {
+          "id": "review-section-comments",
+          "type": "heading",
+          "text": "Comments",
+          "level": 2
+        },
+        {
+          "id": "review-answers-comments",
+          "type": "native",
+          "source": "review:comments",
+          "label": "Comments",
+          "labels": {}
+        },
+        {
+          "id": "review-declaration",
+          "type": "heading",
+          "text": "Declaration",
+          "level": 2
+        },
+        {
+          "id": "review-declaration-note",
+          "type": "paragraph",
+          "text": "The parties below confirm the answers recorded in this review are accurate."
+        },
+        {
+          "id": "signature-learner",
+          "type": "signature",
+          "role": "learner",
+          "label": "Learner signature"
+        },
+        {
+          "id": "signature-admin",
+          "type": "signature",
+          "role": "admin",
+          "label": "Provider signature"
+        },
+        {
+          "id": "signature-employer",
+          "type": "signature",
+          "role": "employer",
+          "label": "Employer signature",
+          "condition": "employer-required"
+        }
+      ],
+      "signatureRoles": [
+        "learner",
+        "admin",
+        "employer"
+      ],
+      "reviewType": "workspace"
+    },
+    "review-health-safety": {
+      "schemaVersion": 1,
+      "templateId": "review-health-safety",
+      "documentKey": "review-health-safety",
+      "title": "Workplace Health & Safety Declaration",
+      "category": "Review",
+      "programmes": [],
+      "blocks": [
+        {
+          "id": "review-title",
+          "type": "heading",
+          "text": "Workplace Health & Safety Declaration",
+          "level": 1
+        },
+        {
+          "id": "review-learner-information",
+          "type": "heading",
+          "text": "Learner Information",
+          "level": 2
+        },
+        {
+          "id": "review-information",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Name",
+              "{{document.learnerInformation.name}}"
+            ],
+            [
+              "Programme Name",
+              "{{document.learnerInformation.programmeName}}"
+            ],
+            [
+              "Programme Start Date",
+              "{{document.learnerInformation.programmeStartDate}}"
+            ],
+            [
+              "Planned End Date",
+              "{{document.learnerInformation.plannedEndDate}}"
+            ],
+            [
+              "Programme Status",
+              "{{document.learnerInformation.programmeStatus}}"
+            ],
+            [
+              "Employer",
+              "{{document.learnerInformation.employer}}"
+            ],
+            [
+              "Manager",
+              "{{document.learnerInformation.manager}}"
+            ],
+            [
+              "Mentor",
+              "{{document.learnerInformation.mentor}}"
+            ]
+          ]
+        },
+        {
+          "id": "review-section-healthSafetyVetting",
+          "type": "heading",
+          "text": "Health & Safety Vetting",
+          "level": 2
+        },
+        {
+          "id": "review-answers-healthSafetyVetting",
+          "type": "native",
+          "source": "review:healthSafetyVetting",
+          "label": "Health & Safety Vetting",
+          "labels": {
+            "basicArrangements": "We have basic health and safety arrangements in place and we manage workplace risks.",
+            "dayOneInduction": "The apprentice will receive a day-one induction (including emergency arrangements and how to report concerns).",
+            "fireSafety": "We have fire safety/emergency arrangements and staff know what to do.",
+            "firstAid": "We have first aid arrangements (trained first aider(s) and a first aid kit available).",
+            "supervision": "The apprentice will have appropriate supervision and a named line manager/supervisor.",
+            "ppe": "We will provide any necessary PPE and training for the apprentice role (where applicable).",
+            "accidentRecording": "We record and investigate accidents/incidents/near misses and will inform KBC of any serious incident.",
+            "informChanges": "We will inform KBC if anything important changes (e.g., new site address, change of role, new hazards).",
+            "hsPolicy": "Do you have a short H&S policy/statement (or similar)?",
+            "liabilityInsurance": "Do you have an Employer's Liability Insurance certificate (and Public Liability if applicable)?"
+          }
+        },
+        {
+          "id": "review-declaration",
+          "type": "heading",
+          "text": "Declaration",
+          "level": 2
+        },
+        {
+          "id": "review-declaration-note",
+          "type": "paragraph",
+          "text": "The parties below confirm the answers recorded in this review are accurate."
+        },
+        {
+          "id": "signature-learner",
+          "type": "signature",
+          "role": "learner",
+          "label": "Learner signature"
+        },
+        {
+          "id": "signature-admin",
+          "type": "signature",
+          "role": "admin",
+          "label": "Provider signature"
+        },
+        {
+          "id": "signature-employer",
+          "type": "signature",
+          "role": "employer",
+          "label": "Employer signature",
+          "condition": "employer-required"
+        }
+      ],
+      "signatureRoles": [
+        "learner",
+        "admin",
+        "employer"
+      ],
+      "reviewType": "training-plan"
+    },
+    "review-uln": {
+      "schemaVersion": 1,
+      "templateId": "review-uln",
+      "documentKey": "review-uln",
+      "title": "ULN Privacy Notice & Learner Acknowledgement",
+      "category": "Review",
+      "programmes": [],
+      "blocks": [
+        {
+          "id": "review-title",
+          "type": "heading",
+          "text": "ULN Privacy Notice & Learner Acknowledgement",
+          "level": 1
+        },
+        {
+          "id": "review-learner-information",
+          "type": "heading",
+          "text": "Learner Information",
+          "level": 2
+        },
+        {
+          "id": "review-information",
+          "type": "table",
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Name",
+              "{{document.learnerInformation.name}}"
+            ],
+            [
+              "Programme Name",
+              "{{document.learnerInformation.programmeName}}"
+            ],
+            [
+              "Programme Start Date",
+              "{{document.learnerInformation.programmeStartDate}}"
+            ],
+            [
+              "Planned End Date",
+              "{{document.learnerInformation.plannedEndDate}}"
+            ],
+            [
+              "Programme Status",
+              "{{document.learnerInformation.programmeStatus}}"
+            ],
+            [
+              "Employer",
+              "{{document.learnerInformation.employer}}"
+            ],
+            [
+              "Manager",
+              "{{document.learnerInformation.manager}}"
+            ],
+            [
+              "Mentor",
+              "{{document.learnerInformation.mentor}}"
+            ]
+          ]
+        },
+        {
+          "id": "review-section-ulnPrivacyNotice",
+          "type": "heading",
+          "text": "Unique Learner Number (ULN) Privacy Notice",
+          "level": 2
+        },
+        {
+          "id": "uln-intro",
+          "type": "paragraph",
+          "text": "A Unique Learner Number (ULN) is a 10-digit number used to identify an individual learner and link them to their education, training and qualification records. It is managed through the Department for Education (DfE) Learning Records Service (LRS) and is connected to the learner's Personal Learning Record (PLR)."
+        },
+        {
+          "id": "uln-point-0",
+          "type": "paragraph",
+          "text": "1. Kent Business College (KBC) will use the personal information you provide during enrolment to locate and verify your existing ULN. Where you do not already have a ULN, the information may be used to create one for you through the Learning Records Service."
+        },
+        {
+          "id": "uln-point-1",
+          "type": "paragraph",
+          "text": "2. KBC will use your ULN for legitimate apprenticeship and education purposes, including:"
+        },
+        {
+          "id": "uln-purpose-0",
+          "type": "paragraph",
+          "text": "   a) confirming your identity and learner record"
+        },
+        {
+          "id": "uln-purpose-1",
+          "type": "paragraph",
+          "text": "   b) checking relevant qualifications and prior learning"
+        },
+        {
+          "id": "uln-purpose-2",
+          "type": "paragraph",
+          "text": "   c) registering and administering your apprenticeship"
+        },
+        {
+          "id": "uln-purpose-3",
+          "type": "paragraph",
+          "text": "   d) submitting and maintaining your Individualised Learner Record (ILR)"
+        },
+        {
+          "id": "uln-purpose-4",
+          "type": "paragraph",
+          "text": "   e) supporting apprenticeship funding and eligibility checks"
+        },
+        {
+          "id": "uln-purpose-5",
+          "type": "paragraph",
+          "text": "   f) recording learning, qualifications and achievements"
+        },
+        {
+          "id": "uln-purpose-6",
+          "type": "paragraph",
+          "text": "   g) meeting Department for Education audit, assurance and regulatory requirements"
+        },
+        {
+          "id": "uln-point-2",
+          "type": "paragraph",
+          "text": "3. Your ULN is linked to your Personal Learning Record, which may contain details of qualifications and achievements recorded by recognised education and training organisations."
+        },
+        {
+          "id": "uln-point-3",
+          "type": "paragraph",
+          "text": "4. Your personal information and ULN may be shared with the Department for Education and other authorised organisations where required for the administration, funding, delivery or assurance of your apprenticeship. Your information will be handled in accordance with applicable UK data protection legislation."
+        },
+        {
+          "id": "uln-further-info",
+          "type": "paragraph",
+          "text": "Further information about how your information is used is available in the current Department for Education Learning Records Service Privacy Notice and the applicable ILR Privacy Notice."
+        },
+        {
+          "id": "review-answers-ulnPrivacyNotice",
+          "type": "native",
+          "source": "review:ulnPrivacyNotice",
+          "label": "Unique Learner Number (ULN) Privacy Notice",
+          "labels": {
+            "noticeRead": "The learner has read the ULN privacy notice"
+          }
+        },
+        {
+          "id": "review-section-learnerAcknowledgement",
+          "type": "heading",
+          "text": "Learner Acknowledgement",
+          "level": 2
+        },
+        {
+          "id": "uln-acknowledgement",
+          "type": "paragraph",
+          "text": "I confirm that I have been provided with, or given access to, the relevant Department for Education privacy information. I understand what a ULN is and that Kent Business College may use my personal information and ULN to verify my learner record, administer my apprenticeship, maintain my ILR and meet relevant funding and regulatory requirements."
+        },
+        {
+          "id": "review-answers-learnerAcknowledgement",
+          "type": "native",
+          "source": "review:learnerAcknowledgement",
+          "label": "Learner Acknowledgement",
+          "labels": {
+            "acknowledged": "The learner confirms the acknowledgement above"
+          }
+        },
+        {
+          "id": "review-declaration",
+          "type": "heading",
+          "text": "Declaration",
+          "level": 2
+        },
+        {
+          "id": "review-declaration-note",
+          "type": "paragraph",
+          "text": "The parties below confirm the answers recorded in this review are accurate."
+        },
+        {
+          "id": "signature-learner",
+          "type": "signature",
+          "role": "learner",
+          "label": "Learner signature"
+        },
+        {
+          "id": "signature-admin",
+          "type": "signature",
+          "role": "admin",
+          "label": "Provider signature"
+        },
+        {
+          "id": "signature-employer",
+          "type": "signature",
+          "role": "employer",
+          "label": "Employer signature",
+          "condition": "employer-required"
+        }
+      ],
+      "signatureRoles": [
+        "learner",
+        "admin",
+        "employer"
+      ],
+      "reviewType": "uln-privacy"
+    }
+  },
+  "fields": {
+    "apprenticeship-agreement": {
+      "document.particulars.apprenticeName": {
+        "key": "document.particulars.apprenticeName",
+        "label": "Apprentice name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.employerName": {
+        "key": "document.particulars.employerName",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.employerAddress": {
+        "key": "document.particulars.employerAddress",
+        "label": "Employer address",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.standard": {
+        "key": "document.particulars.standard",
+        "label": "Apprenticeship standard, level and version",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.startDate": {
+        "key": "document.particulars.startDate",
+        "label": "Start date of apprenticeship (see note 2):",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.particulars.endDate": {
+        "key": "document.particulars.endDate",
+        "label": "End date of apprenticeship (see note 2):",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.particulars.practicalStartDate": {
+        "key": "document.particulars.practicalStartDate",
+        "label": "Start date of practical period (see note 2):",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.particulars.practicalEndDate": {
+        "key": "document.particulars.practicalEndDate",
+        "label": "Estimated end date of practical period (see note 2):",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.particulars.durationWeeks": {
+        "key": "document.particulars.durationWeeks",
+        "label": "Duration of practical period (see note 2):",
+        "group": "Document",
+        "format": "number"
+      },
+      "document.particulars.plannedOtjHours": {
+        "key": "document.particulars.plannedOtjHours",
+        "label": "Planned amount of off-the-job training (hours) (see note 5):",
+        "group": "Document",
+        "format": "hours"
+      },
+      "learner.fullName": {
+        "key": "learner.fullName",
+        "label": "Learner full name",
+        "group": "Learner",
+        "format": "text"
+      },
+      "learner.id": {
+        "key": "learner.id",
+        "label": "System learner identifier",
+        "group": "Learner",
+        "format": "text"
+      },
+      "programme.name": {
+        "key": "programme.name",
+        "label": "Confirmed programme / current programme",
+        "group": "Programme",
+        "format": "text"
+      },
+      "programme.cohort": {
+        "key": "programme.cohort",
+        "label": "Cohort",
+        "group": "Programme",
+        "format": "text"
+      },
+      "enrolment.startDate": {
+        "key": "enrolment.startDate",
+        "label": "Enrolment start date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "enrolment.endDate": {
+        "key": "enrolment.endDate",
+        "label": "Planned end date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "employer.name": {
+        "key": "employer.name",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "employer.manager": {
+        "key": "employer.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.apprentice.name": {
+        "key": "signature.apprentice.name",
+        "label": "apprentice signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.apprentice.date": {
+        "key": "signature.apprentice.date",
+        "label": "apprentice signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.employer.name": {
+        "key": "signature.employer.name",
+        "label": "employer signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.employer.date": {
+        "key": "signature.employer.date",
+        "label": "employer signature date",
+        "group": "Document",
+        "format": "date"
+      }
+    },
+    "training-plan": {
+      "document.programme.programme": {
+        "key": "document.programme.programme",
+        "label": "Programme:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.programme.standard": {
+        "key": "document.programme.standard",
+        "label": "Apprenticeship Standard/Framework Name:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.programme.reference": {
+        "key": "document.programme.reference",
+        "label": "Apprenticeship Reference:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.programme.level": {
+        "key": "document.programme.level",
+        "label": "Apprenticeship Level:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.programme.startDate": {
+        "key": "document.programme.startDate",
+        "label": "Start date of apprenticeship:",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.programme.endDate": {
+        "key": "document.programme.endDate",
+        "label": "End date of apprenticeship:",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.programme.practicalStartDate": {
+        "key": "document.programme.practicalStartDate",
+        "label": "Start date of practical period:",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.programme.practicalEndDate": {
+        "key": "document.programme.practicalEndDate",
+        "label": "Estimated end date of practical period:",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.programme.durationWeeks": {
+        "key": "document.programme.durationWeeks",
+        "label": "Duration of practical period:",
+        "group": "Document",
+        "format": "weeks"
+      },
+      "document.programme.ilrPlannedHours": {
+        "key": "document.programme.ilrPlannedHours",
+        "label": "ILR Planned Hours:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.employment.employerName": {
+        "key": "document.employment.employerName",
+        "label": "Employer:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.employment.deliveryAddress": {
+        "key": "document.employment.deliveryAddress",
+        "label": "Delivery Address:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.employment.jobTitle": {
+        "key": "document.employment.jobTitle",
+        "label": "Apprentice Job Title:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.employment.workingHoursPerWeek": {
+        "key": "document.employment.workingHoursPerWeek",
+        "label": "Working hours (per week):",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.employment.lineManager": {
+        "key": "document.employment.lineManager",
+        "label": "Line Manager:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.employment.lineManagerTitle": {
+        "key": "document.employment.lineManagerTitle",
+        "label": "Line Manager Title:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.employment.startDateWithEmployer": {
+        "key": "document.employment.startDateWithEmployer",
+        "label": "Start Date With Employer:",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.otjh.plannedTotal": {
+        "key": "document.otjh.plannedTotal",
+        "label": "Planned off-the-job training:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.otjh.publishedMinimum": {
+        "key": "document.otjh.publishedMinimum",
+        "label": "Published minimum off-the-job training:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.otjh.rplVolume": {
+        "key": "document.otjh.rplVolume",
+        "label": "Volume of RPL:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.epa.epao": {
+        "key": "document.epa.epao",
+        "label": "End Point Assessment Organisation (EPAO):",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.epa.gatewayReviewDate": {
+        "key": "document.epa.gatewayReviewDate",
+        "label": "Estimated Gateway Meeting Review Date:",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.epa.period": {
+        "key": "document.epa.period",
+        "label": "EPA Period:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.apprentice.name": {
+        "key": "document.contacts.apprentice.name",
+        "label": "Name:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.apprentice.email": {
+        "key": "document.contacts.apprentice.email",
+        "label": "Email:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.apprentice.telephone": {
+        "key": "document.contacts.apprentice.telephone",
+        "label": "Telephone:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.apprentice.address": {
+        "key": "document.contacts.apprentice.address",
+        "label": "Address:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.employer.lineManager": {
+        "key": "document.contacts.employer.lineManager",
+        "label": "Line Manager:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.employer.email": {
+        "key": "document.contacts.employer.email",
+        "label": "Email:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.employer.telephone": {
+        "key": "document.contacts.employer.telephone",
+        "label": "Telephone:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.employer.company": {
+        "key": "document.contacts.employer.company",
+        "label": "Company:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.employer.address": {
+        "key": "document.contacts.employer.address",
+        "label": "Address:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.programme.apprenticeName": {
+        "key": "document.programme.apprenticeName",
+        "label": "Apprentice name",
+        "group": "Document",
+        "format": "text"
+      },
+      "learner.fullName": {
+        "key": "learner.fullName",
+        "label": "Learner full name",
+        "group": "Learner",
+        "format": "text"
+      },
+      "learner.id": {
+        "key": "learner.id",
+        "label": "System learner identifier",
+        "group": "Learner",
+        "format": "text"
+      },
+      "programme.name": {
+        "key": "programme.name",
+        "label": "Confirmed programme / current programme",
+        "group": "Programme",
+        "format": "text"
+      },
+      "programme.cohort": {
+        "key": "programme.cohort",
+        "label": "Cohort",
+        "group": "Programme",
+        "format": "text"
+      },
+      "enrolment.startDate": {
+        "key": "enrolment.startDate",
+        "label": "Enrolment start date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "enrolment.endDate": {
+        "key": "enrolment.endDate",
+        "label": "Planned end date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "employer.name": {
+        "key": "employer.name",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "employer.manager": {
+        "key": "employer.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.apprentice.name": {
+        "key": "signature.apprentice.name",
+        "label": "apprentice signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.apprentice.date": {
+        "key": "signature.apprentice.date",
+        "label": "apprentice signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.employer.name": {
+        "key": "signature.employer.name",
+        "label": "employer signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.employer.date": {
+        "key": "signature.employer.date",
+        "label": "employer signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.provider.name": {
+        "key": "signature.provider.name",
+        "label": "provider signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.provider.date": {
+        "key": "signature.provider.date",
+        "label": "provider signature date",
+        "group": "Document",
+        "format": "date"
+      }
+    },
+    "written-agreement": {
+      "document.particulars.mainProviderIntro": {
+        "key": "document.particulars.mainProviderIntro",
+        "label": "Main Provider (introduction)",
+        "group": "Document",
+        "format": "text",
+        "fallback": "the Main Provider",
+        "source": "document.particulars.mainProvider"
+      },
+      "document.particulars.apprenticeName": {
+        "key": "document.particulars.apprenticeName",
+        "label": "Apprentice Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.jobTitle": {
+        "key": "document.particulars.jobTitle",
+        "label": "Job Title",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.apprenticeshipTitle": {
+        "key": "document.particulars.apprenticeshipTitle",
+        "label": "Apprenticeship Title",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.apprenticeshipLevel": {
+        "key": "document.particulars.apprenticeshipLevel",
+        "label": "Apprenticeship Level",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.fundingBandValue": {
+        "key": "document.particulars.fundingBandValue",
+        "label": "Apprenticeship maximum funding band value",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.startDate": {
+        "key": "document.particulars.startDate",
+        "label": "Apprenticeship Start Date",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.particulars.plannedEndDate": {
+        "key": "document.particulars.plannedEndDate",
+        "label": "Apprenticeship Planned End Date",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.particulars.managerName": {
+        "key": "document.particulars.managerName",
+        "label": "Manager Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.managerJobTitle": {
+        "key": "document.particulars.managerJobTitle",
+        "label": "Manager Job Title",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.employer": {
+        "key": "document.particulars.employer",
+        "label": "Employer",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.employerPostcode": {
+        "key": "document.particulars.employerPostcode",
+        "label": "Employer Postcode",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.employerAddress": {
+        "key": "document.particulars.employerAddress",
+        "label": "Employer Address",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.mainProvider": {
+        "key": "document.particulars.mainProvider",
+        "label": "Main Provider",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.subcontracted": {
+        "key": "document.particulars.subcontracted",
+        "label": "Is any part of the Apprenticeship to be Subcontracted?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.epa.organisation": {
+        "key": "document.epa.organisation",
+        "label": "Assessment Organisation",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.epa.postcode": {
+        "key": "document.epa.postcode",
+        "label": "Postcode",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.epa.arrangements": {
+        "key": "document.epa.arrangements",
+        "label": "Arrangements for end-point assessment (including retakes)",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.epa.paymentArrangements": {
+        "key": "document.epa.paymentArrangements",
+        "label": "Agreed transaction for payments to the EPA Organisation",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.epa.externalQualityAssurance": {
+        "key": "document.epa.externalQualityAssurance",
+        "label": "Name of External Quality Assurance Organisation",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.particulars.mainProviderSignatureLabel": {
+        "key": "document.particulars.mainProviderSignatureLabel",
+        "label": "Main Provider (signature label)",
+        "group": "Document",
+        "format": "text",
+        "fallback": "Main Provider",
+        "source": "document.particulars.mainProvider"
+      },
+      "document.contacts.provider.organisation": {
+        "key": "document.contacts.provider.organisation",
+        "label": "PROVIDER organisation",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.provider.name": {
+        "key": "document.contacts.provider.name",
+        "label": "PROVIDER name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.provider.website": {
+        "key": "document.contacts.provider.website",
+        "label": "PROVIDER website",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.provider.email": {
+        "key": "document.contacts.provider.email",
+        "label": "PROVIDER email",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.provider.phone": {
+        "key": "document.contacts.provider.phone",
+        "label": "PROVIDER phone",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.epao.organisation": {
+        "key": "document.contacts.epao.organisation",
+        "label": "EPAO organisation",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.epao.name": {
+        "key": "document.contacts.epao.name",
+        "label": "EPAO name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.epao.website": {
+        "key": "document.contacts.epao.website",
+        "label": "EPAO website",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.epao.email": {
+        "key": "document.contacts.epao.email",
+        "label": "EPAO email",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.epao.phone": {
+        "key": "document.contacts.epao.phone",
+        "label": "EPAO phone",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.dfe.organisation": {
+        "key": "document.contacts.dfe.organisation",
+        "label": "DFE organisation",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.dfe.name": {
+        "key": "document.contacts.dfe.name",
+        "label": "DFE name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.dfe.website": {
+        "key": "document.contacts.dfe.website",
+        "label": "DFE website",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.dfe.email": {
+        "key": "document.contacts.dfe.email",
+        "label": "DFE email",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.contacts.dfe.phone": {
+        "key": "document.contacts.dfe.phone",
+        "label": "DFE phone",
+        "group": "Document",
+        "format": "text"
+      },
+      "learner.fullName": {
+        "key": "learner.fullName",
+        "label": "Learner full name",
+        "group": "Learner",
+        "format": "text"
+      },
+      "learner.id": {
+        "key": "learner.id",
+        "label": "System learner identifier",
+        "group": "Learner",
+        "format": "text"
+      },
+      "programme.name": {
+        "key": "programme.name",
+        "label": "Confirmed programme / current programme",
+        "group": "Programme",
+        "format": "text"
+      },
+      "programme.cohort": {
+        "key": "programme.cohort",
+        "label": "Cohort",
+        "group": "Programme",
+        "format": "text"
+      },
+      "enrolment.startDate": {
+        "key": "enrolment.startDate",
+        "label": "Enrolment start date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "enrolment.endDate": {
+        "key": "enrolment.endDate",
+        "label": "Planned end date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "employer.name": {
+        "key": "employer.name",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "employer.manager": {
+        "key": "employer.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.name": {
+        "key": "signature.learner.name",
+        "label": "learner signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.date": {
+        "key": "signature.learner.date",
+        "label": "learner signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.employer.name": {
+        "key": "signature.employer.name",
+        "label": "employer signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.employer.date": {
+        "key": "signature.employer.date",
+        "label": "employer signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.provider.name": {
+        "key": "signature.provider.name",
+        "label": "provider signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.provider.date": {
+        "key": "signature.provider.date",
+        "label": "provider signature date",
+        "group": "Document",
+        "format": "date"
+      }
+    },
+    "ilr": {
+      "document.learnerDetails.learnerReferenceNumber": {
+        "key": "document.learnerDetails.learnerReferenceNumber",
+        "label": "Learner reference number",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.uln": {
+        "key": "document.learnerDetails.uln",
+        "label": "ULN",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.familyName": {
+        "key": "document.learnerDetails.familyName",
+        "label": "Family name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.givenNames": {
+        "key": "document.learnerDetails.givenNames",
+        "label": "Given names",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.dateOfBirth": {
+        "key": "document.learnerDetails.dateOfBirth",
+        "label": "Date of birth",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.learnerDetails.address1": {
+        "key": "document.learnerDetails.address1",
+        "label": "Address 1",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.address2": {
+        "key": "document.learnerDetails.address2",
+        "label": "Address 2",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.address3": {
+        "key": "document.learnerDetails.address3",
+        "label": "Address 3",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.address4": {
+        "key": "document.learnerDetails.address4",
+        "label": "Address 4",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.yearsAtAddress": {
+        "key": "document.learnerDetails.yearsAtAddress",
+        "label": "How long have you been at this address (years)?",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.telephone": {
+        "key": "document.learnerDetails.telephone",
+        "label": "Telephone number",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.currentPostcode": {
+        "key": "document.learnerDetails.currentPostcode",
+        "label": "Current post code",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.postcodePriorToEnrolment": {
+        "key": "document.learnerDetails.postcodePriorToEnrolment",
+        "label": "Postcode prior to enrolment",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.nationalInsuranceNumber": {
+        "key": "document.learnerDetails.nationalInsuranceNumber",
+        "label": "National insurance number",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.sex": {
+        "key": "document.learnerDetails.sex",
+        "label": "Sex",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.ethnicity": {
+        "key": "document.learnerDetails.ethnicity",
+        "label": "Ethnicity",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.longTermDisability": {
+        "key": "document.learnerDetails.longTermDisability",
+        "label": "Do you consider yourself to have a long term disability, health problem or any learning difficulties?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.learnerDetails.priorAttainment": {
+        "key": "document.learnerDetails.priorAttainment",
+        "label": "Prior attainment",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.employmentStatus": {
+        "key": "document.learnerDetails.employmentStatus",
+        "label": "Status",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.employmentStartDate": {
+        "key": "document.learnerDetails.employmentStartDate",
+        "label": "Employment start date",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.learnerDetails.dateStatusApplies": {
+        "key": "document.learnerDetails.dateStatusApplies",
+        "label": "Date status applies",
+        "group": "Document",
+        "format": "date"
+      },
+      "document.learnerDetails.jobTitle": {
+        "key": "document.learnerDetails.jobTitle",
+        "label": "Job title",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.edrsErn": {
+        "key": "document.learnerDetails.edrsErn",
+        "label": "EDRS/ERN number",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.selfEmployed": {
+        "key": "document.learnerDetails.selfEmployed",
+        "label": "Self employed",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.learnerDetails.fullTimeEducationPrior": {
+        "key": "document.learnerDetails.fullTimeEducationPrior",
+        "label": "Full time education or training prior to enrolment",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.learnerDetails.contractedHoursPerWeek": {
+        "key": "document.learnerDetails.contractedHoursPerWeek",
+        "label": "Contracted hours per week",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerDetails.isSmallEmployer": {
+        "key": "document.learnerDetails.isSmallEmployer",
+        "label": "Is small employer",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.contact.byPost": {
+        "key": "document.answers.contact.byPost",
+        "label": "By post",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.contact.byPhone": {
+        "key": "document.answers.contact.byPhone",
+        "label": "By phone",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.contact.byEmail": {
+        "key": "document.answers.contact.byEmail",
+        "label": "By e-mail",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.nextOfKin.fullName": {
+        "key": "document.answers.nextOfKin.fullName",
+        "label": "Full name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.nextOfKin.relationship": {
+        "key": "document.answers.nextOfKin.relationship",
+        "label": "Relationship to",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.nextOfKin.email": {
+        "key": "document.answers.nextOfKin.email",
+        "label": "Email address",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.nextOfKin.phone": {
+        "key": "document.answers.nextOfKin.phone",
+        "label": "Phone number",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.nextOfKin.postcode": {
+        "key": "document.answers.nextOfKin.postcode",
+        "label": "Contact post code",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.nextOfKin.address": {
+        "key": "document.answers.nextOfKin.address",
+        "label": "Contact address",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.eligibility.employedInEngland": {
+        "key": "document.answers.eligibility.employedInEngland",
+        "label": "Are you primarily employed in England?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.eligibility.ukEeaNational": {
+        "key": "document.answers.eligibility.ukEeaNational",
+        "label": "Are you a UK/EEA National?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.eligibility.nationality": {
+        "key": "document.answers.eligibility.nationality",
+        "label": "Nationality",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.eligibility.residentPrevious3Years": {
+        "key": "document.answers.eligibility.residentPrevious3Years",
+        "label": "Have you been resident in the UK/EEA for the previous 3 years?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.eligibility.yearsInUk": {
+        "key": "document.answers.eligibility.yearsInUk",
+        "label": "How many full years have you lived in the UK?",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.eligibility.requiresWorkPermit": {
+        "key": "document.answers.eligibility.requiresWorkPermit",
+        "label": "Do you require a Work Permit?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.eligibility.countryOfResidence": {
+        "key": "document.answers.eligibility.countryOfResidence",
+        "label": "Country of residence",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.employer.organisationName": {
+        "key": "document.answers.employer.organisationName",
+        "label": "Organisation name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.employer.postcode": {
+        "key": "document.answers.employer.postcode",
+        "label": "Organisation post code",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.employer.address": {
+        "key": "document.answers.employer.address",
+        "label": "Organisation address",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.employer.city": {
+        "key": "document.answers.employer.city",
+        "label": "Organisation city",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.employer.lineManagerName": {
+        "key": "document.answers.employer.lineManagerName",
+        "label": "Line Manager name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.employer.lineManagerEmail": {
+        "key": "document.answers.employer.lineManagerEmail",
+        "label": "Line Manager email",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.employer.lineManagerPhone": {
+        "key": "document.answers.employer.lineManagerPhone",
+        "label": "Line Manager phone",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.otherTraining.attended12m": {
+        "key": "document.answers.otherTraining.attended12m",
+        "label": "Have you attended any other government funded training programmes in the last 12 months?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.otherTraining.completedWhen": {
+        "key": "document.answers.otherTraining.completedWhen",
+        "label": "When was it completed?",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.circumstances.caringResponsibilities": {
+        "key": "document.answers.circumstances.caringResponsibilities",
+        "label": "Do you have any caring responsibilities?",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.circumstances.other": {
+        "key": "document.answers.circumstances.other",
+        "label": "Are there any other personal circumstances you want to tell us about?",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.circumstances.careLeaver": {
+        "key": "document.answers.circumstances.careLeaver",
+        "label": "Care leaver",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.understanding.programmeUnderstanding": {
+        "key": "document.answers.understanding.programmeUnderstanding",
+        "label": "What is your understanding of the programme you are applying for?",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.understanding.careerProgression": {
+        "key": "document.answers.understanding.careerProgression",
+        "label": "How will this programme help you in your career development/aspirations and/or with your progression?",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.additional.aged16to18": {
+        "key": "document.answers.additional.aged16to18",
+        "label": "Are you aged between 16 and 18?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.additional.aged19to24": {
+        "key": "document.answers.additional.aged19to24",
+        "label": "Are you aged between 19 and 24?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.media.consent": {
+        "key": "document.answers.media.consent",
+        "label": "Do you give Kent Business College consent for the above?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.declarations.plrShared": {
+        "key": "document.answers.declarations.plrShared",
+        "label": "I understand that my Personal Learning Record (PLR) information will be shared with Kent Business College and other relevant organisations",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.declarations.dfeContact": {
+        "key": "document.answers.declarations.dfeContact",
+        "label": "I understand that I am on programme that is part funded by the DfE. I understand that members of the qualification and funding authorities may contact me in connection to my apprenticeship",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.declarations.epaoDetails": {
+        "key": "document.answers.declarations.epaoDetails",
+        "label": "I understand that relevant personal details will be provided to the End Point and Awarding Organisation so that Registration and Certification can take place",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.declarations.kbcHoldsCerts": {
+        "key": "document.answers.declarations.kbcHoldsCerts",
+        "label": "I understand that Kentbusinesscollege will hold any relevant copies of my certificates for audit purposes",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.declarations.infoAccurate": {
+        "key": "document.answers.declarations.infoAccurate",
+        "label": "I confirm that all the information contained in this application is accurate and true",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.declarations.over50PercentEngland": {
+        "key": "document.answers.declarations.over50PercentEngland",
+        "label": "Could you confirm whether you expect to spend more than 50% of your working hours in England?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.declarations.wageRateBand": {
+        "key": "document.answers.declarations.wageRateBand",
+        "label": "Please confirm your \"current wage rate per hour\" is equal to or higher than:",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.declarations.knownByOtherName": {
+        "key": "document.answers.declarations.knownByOtherName",
+        "label": "Have you ever been known by any other name?",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "document.answers.declarations.plrAccessAware": {
+        "key": "document.answers.declarations.plrAccessAware",
+        "label": "Please confirm that you are aware your training provider will need to access your PLR:",
+        "group": "Document",
+        "format": "yesno"
+      },
+      "learner.fullName": {
+        "key": "learner.fullName",
+        "label": "Learner full name",
+        "group": "Learner",
+        "format": "text"
+      },
+      "learner.id": {
+        "key": "learner.id",
+        "label": "System learner identifier",
+        "group": "Learner",
+        "format": "text"
+      },
+      "programme.name": {
+        "key": "programme.name",
+        "label": "Confirmed programme / current programme",
+        "group": "Programme",
+        "format": "text"
+      },
+      "programme.cohort": {
+        "key": "programme.cohort",
+        "label": "Cohort",
+        "group": "Programme",
+        "format": "text"
+      },
+      "enrolment.startDate": {
+        "key": "enrolment.startDate",
+        "label": "Enrolment start date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "enrolment.endDate": {
+        "key": "enrolment.endDate",
+        "label": "Planned end date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "employer.name": {
+        "key": "employer.name",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "employer.manager": {
+        "key": "employer.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.name": {
+        "key": "signature.learner.name",
+        "label": "learner signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.date": {
+        "key": "signature.learner.date",
+        "label": "learner signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.provider.name": {
+        "key": "signature.provider.name",
+        "label": "provider signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.provider.date": {
+        "key": "signature.provider.date",
+        "label": "provider signature date",
+        "group": "Document",
+        "format": "date"
+      }
+    },
+    "review-eligibility": {
+      "document.learnerInformation.name": {
+        "key": "document.learnerInformation.name",
+        "label": "Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeName": {
+        "key": "document.learnerInformation.programmeName",
+        "label": "Programme Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeStartDate": {
+        "key": "document.learnerInformation.programmeStartDate",
+        "label": "Programme Start Date",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.plannedEndDate": {
+        "key": "document.learnerInformation.plannedEndDate",
+        "label": "Planned End Date",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeStatus": {
+        "key": "document.learnerInformation.programmeStatus",
+        "label": "Programme Status",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.employer": {
+        "key": "document.learnerInformation.employer",
+        "label": "Employer",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.manager": {
+        "key": "document.learnerInformation.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.mentor": {
+        "key": "document.learnerInformation.mentor",
+        "label": "Mentor",
+        "group": "Document",
+        "format": "text"
+      },
+      "learner.fullName": {
+        "key": "learner.fullName",
+        "label": "Learner full name",
+        "group": "Learner",
+        "format": "text"
+      },
+      "learner.id": {
+        "key": "learner.id",
+        "label": "System learner identifier",
+        "group": "Learner",
+        "format": "text"
+      },
+      "programme.name": {
+        "key": "programme.name",
+        "label": "Confirmed programme / current programme",
+        "group": "Programme",
+        "format": "text"
+      },
+      "programme.cohort": {
+        "key": "programme.cohort",
+        "label": "Cohort",
+        "group": "Programme",
+        "format": "text"
+      },
+      "enrolment.startDate": {
+        "key": "enrolment.startDate",
+        "label": "Enrolment start date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "enrolment.endDate": {
+        "key": "enrolment.endDate",
+        "label": "Planned end date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "employer.name": {
+        "key": "employer.name",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "employer.manager": {
+        "key": "employer.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.name": {
+        "key": "signature.learner.name",
+        "label": "learner signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.date": {
+        "key": "signature.learner.date",
+        "label": "learner signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.admin.name": {
+        "key": "signature.admin.name",
+        "label": "admin signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.admin.date": {
+        "key": "signature.admin.date",
+        "label": "admin signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.employer.name": {
+        "key": "signature.employer.name",
+        "label": "employer signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.employer.date": {
+        "key": "signature.employer.date",
+        "label": "employer signature date",
+        "group": "Document",
+        "format": "date"
+      }
+    },
+    "review-rpl": {
+      "document.learnerInformation.name": {
+        "key": "document.learnerInformation.name",
+        "label": "Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeName": {
+        "key": "document.learnerInformation.programmeName",
+        "label": "Programme Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeStartDate": {
+        "key": "document.learnerInformation.programmeStartDate",
+        "label": "Programme Start Date",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.plannedEndDate": {
+        "key": "document.learnerInformation.plannedEndDate",
+        "label": "Planned End Date",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeStatus": {
+        "key": "document.learnerInformation.programmeStatus",
+        "label": "Programme Status",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.employer": {
+        "key": "document.learnerInformation.employer",
+        "label": "Employer",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.manager": {
+        "key": "document.learnerInformation.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.mentor": {
+        "key": "document.learnerInformation.mentor",
+        "label": "Mentor",
+        "group": "Document",
+        "format": "text"
+      },
+      "learner.fullName": {
+        "key": "learner.fullName",
+        "label": "Learner full name",
+        "group": "Learner",
+        "format": "text"
+      },
+      "learner.id": {
+        "key": "learner.id",
+        "label": "System learner identifier",
+        "group": "Learner",
+        "format": "text"
+      },
+      "programme.name": {
+        "key": "programme.name",
+        "label": "Confirmed programme / current programme",
+        "group": "Programme",
+        "format": "text"
+      },
+      "programme.cohort": {
+        "key": "programme.cohort",
+        "label": "Cohort",
+        "group": "Programme",
+        "format": "text"
+      },
+      "enrolment.startDate": {
+        "key": "enrolment.startDate",
+        "label": "Enrolment start date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "enrolment.endDate": {
+        "key": "enrolment.endDate",
+        "label": "Planned end date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "employer.name": {
+        "key": "employer.name",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "employer.manager": {
+        "key": "employer.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.name": {
+        "key": "signature.learner.name",
+        "label": "learner signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.date": {
+        "key": "signature.learner.date",
+        "label": "learner signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.admin.name": {
+        "key": "signature.admin.name",
+        "label": "admin signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.admin.date": {
+        "key": "signature.admin.date",
+        "label": "admin signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.employer.name": {
+        "key": "signature.employer.name",
+        "label": "employer signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.employer.date": {
+        "key": "signature.employer.date",
+        "label": "employer signature date",
+        "group": "Document",
+        "format": "date"
+      }
+    },
+    "review-health-safety": {
+      "document.learnerInformation.name": {
+        "key": "document.learnerInformation.name",
+        "label": "Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeName": {
+        "key": "document.learnerInformation.programmeName",
+        "label": "Programme Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeStartDate": {
+        "key": "document.learnerInformation.programmeStartDate",
+        "label": "Programme Start Date",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.plannedEndDate": {
+        "key": "document.learnerInformation.plannedEndDate",
+        "label": "Planned End Date",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeStatus": {
+        "key": "document.learnerInformation.programmeStatus",
+        "label": "Programme Status",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.employer": {
+        "key": "document.learnerInformation.employer",
+        "label": "Employer",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.manager": {
+        "key": "document.learnerInformation.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.mentor": {
+        "key": "document.learnerInformation.mentor",
+        "label": "Mentor",
+        "group": "Document",
+        "format": "text"
+      },
+      "learner.fullName": {
+        "key": "learner.fullName",
+        "label": "Learner full name",
+        "group": "Learner",
+        "format": "text"
+      },
+      "learner.id": {
+        "key": "learner.id",
+        "label": "System learner identifier",
+        "group": "Learner",
+        "format": "text"
+      },
+      "programme.name": {
+        "key": "programme.name",
+        "label": "Confirmed programme / current programme",
+        "group": "Programme",
+        "format": "text"
+      },
+      "programme.cohort": {
+        "key": "programme.cohort",
+        "label": "Cohort",
+        "group": "Programme",
+        "format": "text"
+      },
+      "enrolment.startDate": {
+        "key": "enrolment.startDate",
+        "label": "Enrolment start date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "enrolment.endDate": {
+        "key": "enrolment.endDate",
+        "label": "Planned end date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "employer.name": {
+        "key": "employer.name",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "employer.manager": {
+        "key": "employer.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.name": {
+        "key": "signature.learner.name",
+        "label": "learner signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.date": {
+        "key": "signature.learner.date",
+        "label": "learner signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.admin.name": {
+        "key": "signature.admin.name",
+        "label": "admin signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.admin.date": {
+        "key": "signature.admin.date",
+        "label": "admin signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.employer.name": {
+        "key": "signature.employer.name",
+        "label": "employer signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.employer.date": {
+        "key": "signature.employer.date",
+        "label": "employer signature date",
+        "group": "Document",
+        "format": "date"
+      }
+    },
+    "review-uln": {
+      "document.learnerInformation.name": {
+        "key": "document.learnerInformation.name",
+        "label": "Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeName": {
+        "key": "document.learnerInformation.programmeName",
+        "label": "Programme Name",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeStartDate": {
+        "key": "document.learnerInformation.programmeStartDate",
+        "label": "Programme Start Date",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.plannedEndDate": {
+        "key": "document.learnerInformation.plannedEndDate",
+        "label": "Planned End Date",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.programmeStatus": {
+        "key": "document.learnerInformation.programmeStatus",
+        "label": "Programme Status",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.employer": {
+        "key": "document.learnerInformation.employer",
+        "label": "Employer",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.manager": {
+        "key": "document.learnerInformation.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.learnerInformation.mentor": {
+        "key": "document.learnerInformation.mentor",
+        "label": "Mentor",
+        "group": "Document",
+        "format": "text"
+      },
+      "learner.fullName": {
+        "key": "learner.fullName",
+        "label": "Learner full name",
+        "group": "Learner",
+        "format": "text"
+      },
+      "learner.id": {
+        "key": "learner.id",
+        "label": "System learner identifier",
+        "group": "Learner",
+        "format": "text"
+      },
+      "programme.name": {
+        "key": "programme.name",
+        "label": "Confirmed programme / current programme",
+        "group": "Programme",
+        "format": "text"
+      },
+      "programme.cohort": {
+        "key": "programme.cohort",
+        "label": "Cohort",
+        "group": "Programme",
+        "format": "text"
+      },
+      "enrolment.startDate": {
+        "key": "enrolment.startDate",
+        "label": "Enrolment start date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "enrolment.endDate": {
+        "key": "enrolment.endDate",
+        "label": "Planned end date",
+        "group": "Enrolment",
+        "format": "date"
+      },
+      "employer.name": {
+        "key": "employer.name",
+        "label": "Employer name",
+        "group": "Document",
+        "format": "text"
+      },
+      "employer.manager": {
+        "key": "employer.manager",
+        "label": "Manager",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.name": {
+        "key": "signature.learner.name",
+        "label": "learner signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.learner.date": {
+        "key": "signature.learner.date",
+        "label": "learner signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.admin.name": {
+        "key": "signature.admin.name",
+        "label": "admin signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.admin.date": {
+        "key": "signature.admin.date",
+        "label": "admin signature date",
+        "group": "Document",
+        "format": "date"
+      },
+      "signature.employer.name": {
+        "key": "signature.employer.name",
+        "label": "employer signatory name",
+        "group": "Document",
+        "format": "text"
+      },
+      "signature.employer.date": {
+        "key": "signature.employer.date",
+        "label": "employer signature date",
+        "group": "Document",
+        "format": "date"
+      }
+    }
+  },
+  "provenance": {
+    "sources": [
+      {
+        "file": "frontend/src/lib/apprenticeshipAgreementPdf.ts",
+        "sha256": "7583b507e1f1888cfcd890a3ecee9064428cb79697d48436cd7ab98b0587ae5c"
+      },
+      {
+        "file": "frontend/src/lib/trainingPlanPdf.ts",
+        "sha256": "32cce653e89eac2afb29426b02c8fdf689b6808917afc1ffbff8add2a4ec644c"
+      },
+      {
+        "file": "frontend/src/lib/writtenAgreementPdf.ts",
+        "sha256": "ccfc849f8a4455df8a29bddc05bff220c37d66aa0628a2a0dd3fb8a19d2b1961"
+      },
+      {
+        "file": "frontend/src/lib/ilrDocumentPdf.ts",
+        "sha256": "938d13f81e29061c8f4278cd13ec7caf0354c0a1d2bd2a9843a30480649ffeb2"
+      },
+      {
+        "file": "frontend/src/pages/learner/onboarding/reviews/reviewDocument.ts",
+        "sha256": "1ece7ccf0b5cda209d60b191d9d8654ad0df082e248f000a45b513382a9f475b"
+      },
+      {
+        "file": "frontend/src/pages/learner/onboarding/reviews/questions.ts",
+        "sha256": "3dda5055acbc6f4c1d38e0bb3dcd757561ec6035df5e2b048d7c4b06960fab21"
+      }
+    ]
+  }
+}

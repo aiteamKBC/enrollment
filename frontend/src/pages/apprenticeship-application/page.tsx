@@ -410,6 +410,7 @@ export default function ApprenticeshipApplicationPage() {
                 return <div key={item.key} className="whitespace-pre-line py-2.5 text-[13px] leading-relaxed text-foreground-600">{item.text}</div>;
               }
               if (!isQuestion(item)) {
+                if (item.kind !== 'note') return null;
                 if (!isNoteShown(item, answers)) return null;
                 const [title, ...paragraphs] = item.text.split('\n\n');
                 if (item.key === EMPLOYMENT_REQUIREMENTS_NOTICE_KEY) {

@@ -1,0 +1,292 @@
+Document data-binding audit — 5 November 2026
+
+Result and scope
+Audited the eight repository document templates, all 288 registered placeholders,
+native/repeating answer fields, signatory images/status/positions and conditional
+signature requirements: 445 logical bindings in total. Repeating items count by
+binding path, not by the number of learner records or PDF rows. Of these, 325
+were verified, 68 affected paths were corrected and verified, 45 have no canonical
+producer in the current document derivations, and 7 source-backed paths were
+deliberately empty in the isolated A/B fixtures. These are NOT population counts
+for real learners. '68 corrected paths' does not mean 68 independent defects.
+
+Current published template and draft configuration was read under a PostgreSQL
+SET TRANSACTION READ ONLY transaction: zero published versions and zero drafts.
+The currently connected database therefore adds no configured field bindings to
+the eight built-in templates. No production learner rows were read or modified.
+
+Coverage summary (exclusive path statuses)
+Document                         Total Verified Corrected No source Fixture empty
+Apprenticeship Agreement             26      19         7         0             0
+Training Plan                       65      39        18         7             1
+Written Agreement                   81      37        10        33             1
+Individual Learner Record            85      72         7         5             1
+Eligibility Review & FS Discussion   57      52         4         0             1
+RPL and Experience                   61      46        14         0             1
+Workplace Health & Safety            39      34         4         0             1
+ULN Privacy & Acknowledgement        31      26         4         0             1
+TOTAL                              445     325        68        45             7
+
+Complete field mapping deliverables
+.cache/binding-audit/field-bindings.csv — one row per logical binding, including
+document, section, label, stable key, actual model/table, exact producer
+expression/calculation, learner relationship, formatting, missing-value handling,
+PDF location, default-template applicability, status and A/B fixture values.
+.cache/binding-audit/field-bindings.json — same inventory, counts and unresolved
+business rules in machine-readable form.
+Source expressions are extracted from the actual Python derivations rather than
+guessed model names. The generator found zero unlocated producer expressions.
+Signature images are represented by hashes in the inventory, not long base64.
+Values configured by future admins can use only the registry's controlled keys;
+existing validation and system-linked field protection remain unchanged.
+
+Confirmed defects corrected
+1. Extended ILR residency: the wizard saves eligibility.residentPrev3Years,
+   whereas the retained ILR PDF and template identifier use
+   eligibility.residentPrevious3Years. Resolve the alias into new document
+   snapshots and field_values, preserving the existing template identifier and
+   original ExtendedIlr.answers. Explicit False remains False.
+2. Decimal duration: _weeks_between returns Decimal, but scalar discarded Decimal
+   values, so real-data template preview could show a blank duration. Decimal
+   now serialises as its exact string; no duration calculation was changed.
+3. Learning Plan selection: the previous document selectors treated [] like an
+   unsaved plan and reinstated the group preset. They also dropped saved modules
+   outside the learner's programme catalogue. The new read-only helper reuses
+   effective_training_plan, live module-by-id resolution and existing orphan
+   fallback. Explicit empty/explicit module scopes remain explicit; inherited
+   group assignments and permitted cross-programme modules remain supported.
+   Aptem subject fallback retains the existing learning-plan contract. No plan
+   or programme assignment is written while a document is derived.
+4. Missing programme level: Training/Written Agreement emitted an empty level
+   despite curriculum.programmes.level existing. Resolve the officially assigned
+   programme by existing placement id, else unique name. Never read an unconfirmed
+   recommendation. All four supported assigned programmes are tested.
+5. Missing employment fields: Training/Written job title and Training employment
+   start date now use WizardIlrLearnerDetails.job_title/employment_start_date for
+   this learner. Other employment facts with no proven source remain blank.
+6. Written Agreement employer postcode: resolve Employer.post_code through
+   EnrolmentUser.employer_id when the linked employer supplies the printed
+   address. Extended ILR postcode/address remain fallbacks without that address.
+   A deliberately different wizard postcode in the tests proves that the printed
+   employer address and postcode do not get mixed.
+7. ILR ULN/address fallback and assessed attainment: retain the existing assessed
+   RPL priority, selecting the newest detail tied to this learner and a
+   non-cancelled review. ULN falls back to this learner's WizardPlr.uln. Personal
+   address falls back to WizardPersonalDetails.address only if the learner record
+   has no address. No personal data is inferred from another learner or employer.
+8. Next-of-kin inherited address: when sameAddressAsLearner=True, derive the
+   current learner address/postcode into the new document snapshot instead of
+   printing an empty or stale independent kin address. Stored wizard answers are
+   deep-copied and never rewritten.
+9. RPL PDF lost qualification records: _plr_context already returned WizardPlr
+   and WizardPlrRecord data, but buildRows inspected only reviewer answers.
+   New binding snapshots print the actual ULN and qualification records, including
+   zero credits, even without a reviewer note. Existing reviewed attainment and
+   subject-level answers remain present.
+10. New review PDFs format saved booleans and multiple choices readably. Unknown
+    yes/no strings no longer silently become No in new binding snapshots. Null,
+    explicit No/False and numerical zero remain distinct. Literal learner text
+    resembling a placeholder is not recursively evaluated.
+11. Review score presentation assumed /8 although the current saved scale can
+    contain 9. New review documents print the actual saved numeric score without
+    inventing a denominator. Skills Radar storage, questions, scoring and UI were
+    not changed; historical render envelopes retain the old presentation.
+12. Real learner preview excludes cancelled review rows when finding the latest
+    applicable review, rather than selecting a cancelled answer set.
+
+Current user-confirmed date rule (supersedes the earlier cohort fallback)
+For NEW learner-specific documents, learner_start_date and learner_end_date are
+the ONLY apprenticeship/training period dates. A missing date stays blank and
+produces a warning; programme Start_date/End_date and cohort dates are not used
+as substitutes. These rules are shared by new AA/Training/Written derivation,
+common date placeholders and newly pinned review header fields. Read-only
+review headers outside this new-document path keep their earlier behaviour.
+
+No date column is updated. A non-empty invalid learner date stays unresolved;
+it is not quietly replaced by a cohort date. Missing dates and reversed periods
+produce bindingWarnings; the Admin PDF Preview displays these warnings. The
+existing duration calculation returns no duration for reversed periods. No
+guessed date or duration is introduced. These warnings do not create a new
+signing/admissions approval workflow. Review appointment dates and sign dates
+are not changed. Missing dates despite populated cohort dates, one-sided missing dates, invalid date and conflict
+cases are covered by isolated tests.
+
+Suspicious 02/02/1900 date
+No document derivation uses that date as a fallback. A test saves 1900-02-02 in
+WizardIlrLearnerDetails.employment_start_date and proves the document preserves
+that exact source value. An actual occurrence must be checked against that
+learner's saved column or issued snapshot; it must not be 'corrected' based on
+appearance alone. This audit did not inspect or edit a real learner's date.
+
+Programme and PCP conclusions
+Programme titles come from the officially assigned EnrolmentUser.programme, not
+Assessment.result. programme_assignment.py synchronises a confirmed alternative
+selection into that record and its profile; an authorised later placement change
+remains authoritative. Catalogue level lookup follows the existing placement id.
+No programme/cohort/assessment selection logic was changed.
+
+All three PCP paths (operational, strategic, chartered) are tested to ensure that
+reading a Training Plan does not silently replace the actual assigned learning
+plan. However, Assessment.modules_selection stores suitability-module identifiers
+which have no declared relationship to curriculum.modules.module_catalogue_id.
+The operational Learning Plan is the existing document source. Automatically
+turning a PCP pathway choice into taught curriculum modules requires a defined
+ID mapping; matching module titles or treating credits as OTJ hours would be
+invented business logic. This integration remains unresolved and was not changed.
+
+OTJ calculations and presentation
+AA planned hours, Training programme/OTJ total and Written total keep the existing
+sum of selected module total_otjh rounded to two decimal places. Component hours
+come from curriculum.components.expected_otjh. No weights, hour sources or
+rounding formula were changed. The repaired selector changes which actually
+assigned modules reach the existing calculation, fixing dropped/reinstated rows.
+Module planned dates now use authored module start_date when present, with the
+existing learner-start fallback. Methods use the actual component type mapping.
+
+Training Plan keeps decimals such as 0.75, 2.5, 0.15 and 0 as intact values in
+the existing repaired purple table. Written Agreement intentionally keeps its
+established formatHoursMinutes presentation: 0.75 -> 45m, 2.5 -> 2h 30m,
+0.15 -> 9m, 0 -> 0h, 3.4 -> 3h 24m. The underlying hours are unchanged.
+
+The Learning Plan modal additionally counts eligible review-meeting hours in its
+combined total. The user clarification answered the date question in both reply
+slots, so no decision to change this document calculation was received. Existing
+module-only totals remain; whether contracts should include the meeting subtotal
+is still a business-rule question, not a value to infer during a binding fix.
+
+Fields with no established producer — 45 paths
+Training Plan (7): workingHoursPerWeek, lineManagerTitle, publishedMinimum,
+rplVolume, EPA organisation, gatewayReviewDate and EPA period.
+Written Agreement (33): funding band, manager job title, five EPA fields,
+optional provider website/email/phone, optional EPAO contact details, DfE contact
+person name, and the 15 cost prices plus total/maximum/balance. Most are explicit
+empty/None values in derive_content, not a failed lookup. Static DfE contact
+details remain configured institutional wording and are not learner data.
+ILR (5): learnerReferenceNumber, dateStatusApplies, edrsErn,
+contractedHoursPerWeek and isSmallEmployer.
+
+No duplicate learner storage or speculative calculation was added for these.
+EnrolmentUser.reference_number is already used for the apprenticeship reference;
+the repository does not establish that it is also the ILR learner reference.
+Do not silently equate those meanings. Manager contact email/phone currently
+come from the learner's Extended ILR employer answers; there is no independent
+manager FK from which to infer a different contact when staff/profile values
+disagree. Existing same-learner source precedence is retained.
+
+Genuinely empty source-backed fixture values — 7 paths
+Training apprenticeship reference -> EnrolmentUser.reference_number.
+Written provider contact name -> EnrolmentUser.case_owner.
+ILR email-contact preference -> ExtendedIlr.answers.contact.byEmail (null).
+Four review mentor fields -> EnrolmentUser.mentor.
+These are intentionally missing in the isolated data; the reports identify the
+exact field to complete. They do not assert that real learners lack these values.
+
+Document lifecycle and history protection
+New render envelopes carry bindingVersion=2, stored inside the existing issued
+template JSON. There is no model field or migration. with_template uses the
+original stored envelope for an issued document. Old envelopes without the flag
+retain version-1 rendering behaviour; pre-builder records are explicitly version
+1. New review first-signature snapshots preserve the existing header/answer
+freeze rules. A learner-specific draft starts from the source's frozen data,
+template version and original signature provenance, not current live derivation.
+Finalised copies remain immutable under the existing workflow. No stored PDF,
+template version, signature, evidence file or production learner record changed.
+
+Regression tests exercise future preview, the four real compliance issuers,
+review binding, frozen reads after current learner data changes, revision draft
+creation and cross-learner revision lookups. Old byte rendering is compared with
+16 pre-audit v1 PDFs, normalising only CreationDate and random PDF ID: all 16
+remain identical. Source permission tests reject learner A reading learner B's
+four compliance endpoints. Existing employer, draft, publish, signature, history
+and finalisation regressions also pass. No real signing event was created; only
+isolated test rows contain synthetic marks. Test A and B use different images.
+
+PDF verification
+Generated 16 normal source-derived A/B PDFs (eight documents per learner), plus
+16 registry-probe PDFs exercising every registered placeholder. The 16 normal
+PDFs contain 60 pages and 44 signature appearances. PyMuPDF checks found:
+  0 missing registered nonempty values in the probes;
+  0 missing native/review values after their documented display transforms;
+  0 other-learner markers in normal documents;
+  0 unresolved tokens, text outside reading bounds or detected glyph overlaps;
+  all 44 signature appearances preserve source aspect ratios;
+  embedded signature pixels match the corresponding learner's source images.
+All normal pages were rasterised. First pages of all 16 were visually checked;
+both Learning Plan tables and the RPL qualification/signature pages were checked
+at larger size. The existing long multi-module/multi-page layout regression
+continues to pass. This combines actual extracted PDF data with visual checks,
+not merely serializer assertions.
+
+Actual tests and commands
+Backend (run from repository root):
+  backend\.venv\Scripts\python.exe backend/manage.py test
+  enrolment_api.document_templates enrolment_api.tests_employer_document_signing
+  enrolment_api.tests_document_schema
+  --settings=enrolment_api.document_templates.test_settings --noinput
+Result: 113 passed after the student-only date update, isolated in-memory SQLite,
+no dotenv/network access in tests. The added regression covers all eight new
+document paths with empty learner dates and populated cohort dates.
+The source queries run against real isolated model rows. SQLite-only adaptations
+translate PostgreSQL ANY arrays and the unused live-fixture archive interval;
+group/Aptem/profile catalogue boundaries are controlled test fixtures. This is
+not a claim of live PostgreSQL end-to-end learner testing.
+
+Frontend broad regression (arguments on one line):
+  npm --prefix frontend test -- src/features/compliance-documents/__tests__
+  src/features/pending-signatures/__tests__
+  src/pages/users/wizard-builder/__tests__
+  src/pages/users/__tests__/boardPage.test.tsx src/pages/learner/compliance
+  src/pages/learner/onboarding/__tests__/reviewDownload.test.tsx
+  src/pages/learner/onboarding/__tests__/ulnPrivacyReview.test.tsx --maxWorkers=2
+Result: 23 files / 226 tests passed with optional binding artifacts enabled.
+Final focused PDF/history regeneration: bindingAudit.test.ts, 12 passed.
+TypeScript type-check, scoped ESLint, frontend build and git diff --check passed.
+Existing localStorage/jsdom canvas and build chunk notices remain non-failing.
+
+Reproduce source-derived artifacts without any production writes:
+  Set BINDING_AUDIT_ARTIFACTS to an absolute .cache/binding-audit/payloads.json
+  path for the isolated Django test run above.
+  Set BINDING_AUDIT_ARTIFACTS to the absolute .cache/binding-audit directory for:
+  npm --prefix frontend test --
+  src/features/compliance-documents/__tests__/bindingAudit.test.ts --maxWorkers=2
+  Then backend\.venv\Scripts\python.exe tools/audit_document_bindings.py
+The optional local historical comparison needs the retained prior task's
+.cache/document-design-samples.json and .cache/document-design/*.pdf artifacts.
+Normal CI tests do not require those files. The audit command fails on a PDF
+value/isolation/layout/signature discrepancy and writes detailed JSON evidence.
+
+Files created in this task
+backend/enrolment_api/document_templates/learner_sources.py
+backend/enrolment_api/document_templates/test_binding_audit.py
+backend/enrolment_api/document_templates/DATA_BINDING_AUDIT_REPORT.txt
+frontend/src/features/compliance-documents/__tests__/bindingAudit.test.ts
+tools/audit_document_bindings.py
+
+Existing files changed in this task (earlier uncommitted work preserved)
+backend/enrolment_api/document_templates/service.py
+backend/enrolment_api/document_templates/preview.py
+backend/learner_api/apprenticeship_agreement.py
+backend/learner_api/ilr_document.py
+backend/learner_api/training_plan_document.py
+backend/learner_api/written_agreement.py
+backend/learner_api/review_form.py
+frontend/src/features/compliance-documents/types.ts
+frontend/src/features/compliance-documents/fields.ts
+frontend/src/features/compliance-documents/questionFields.ts
+frontend/src/features/compliance-documents/render.ts
+frontend/src/features/compliance-documents/DocumentPreview.tsx
+frontend/src/pages/learner/onboarding/reviews/reviewDocument.ts
+
+Artifacts and remaining decisions
+.cache/binding-audit/field-bindings.csv and field-bindings.json: complete mapping.
+.cache/binding-audit/pdf-verification.json: PDF/source/image/geometry checks.
+.cache/binding-audit/historical-render-verification.json: 16 unchanged old renders.
+.cache/binding-audit/configured-templates.json: read-only configuration inventory.
+.cache/binding-audit/A-*.pdf and B-*.pdf: synthetic examples, never real learners.
+
+Unresolved intended-source/business decisions are limited to: whether document
+OTJ totals include eligible review meetings; the explicit PCP suitability-ID to
+curriculum-ID mapping; the ILR learner-reference meaning; and canonical inputs
+for the no-producer contractual fields listed above. Nothing was guessed.
+No commit, push, merge, rebase, branch change, production publication or schema
+change was performed. Current branch remains compliance-documents.

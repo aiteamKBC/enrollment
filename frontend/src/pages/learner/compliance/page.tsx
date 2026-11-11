@@ -1,5 +1,8 @@
+import { storedPdfAction } from '@/features/compliance-documents/persistOriginalPdf';
+import { DocumentSignatureTarget } from '@/features/pending-signatures/DocumentSignatureTarget';
+import { LearnerDocumentRevisions } from '@/features/compliance-documents/LearnerDocumentRevisions';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { roleNavMap } from '@/mocks/navigation';
 import { useMyLearner } from '@/hooks/useMyLearner';
@@ -66,6 +69,7 @@ import { RowsSkeleton } from '@/components/feature/Skeletons';
 const learnerNav = roleNavMap.learner;
 
 export default function LearnerCompliancePage() {
+  const signatureTarget = new URLSearchParams(useLocation().search).get('signature');
   const { kind, id } = useMyLearner();
   const isCommercial = kind === 'commercial';
   const toast = useToast();
@@ -108,7 +112,7 @@ export default function LearnerCompliancePage() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, signatureTarget]);
 
   // ---- Apprenticeship Agreement ----
   const agreement = agreementData?.agreement ?? null;
@@ -250,6 +254,7 @@ export default function LearnerCompliancePage() {
           </div>
         ) : (
           <>
+            <DocumentSignatureTarget documentKey="apprenticeship-agreement" sourceId={agreement?.id}>
             <DocumentCard
               title="Apprenticeship Agreement"
               blurb="The agreement between you and your employer. It sets out your apprenticeship standard, the dates it runs, and your planned off-the-job training hours."
@@ -262,8 +267,8 @@ export default function LearnerCompliancePage() {
               signatoryName={agreementName}
               busy={busy}
               fmtDate={fmtAgreementDate}
-              onPreview={() => openPdf(agreementPdf())}
-              onDownload={() => agreementPdf()?.save(agreementFilename(agreementName))}
+              onPreview={() => { if (!storedPdfAction(agreement)) openPdf(agreementPdf()); }}
+              onDownload={() => { if (!storedPdfAction(agreement, agreementFilename(agreementName))) agreementPdf()?.save(agreementFilename(agreementName)); }}
               onSign={(mark) => void sign('agreement', mark, agreementName, 'employer')}
               fields={
                 agreementShown && (
@@ -290,7 +295,10 @@ export default function LearnerCompliancePage() {
                 )
               }
             />
+            </DocumentSignatureTarget>
+            {agreement && <LearnerDocumentRevisions learnerId={String(id)} documentKey="apprenticeship-agreement" sourceId={agreement.id} />}
 
+            <DocumentSignatureTarget documentKey="ilr" sourceId={ilr?.id}>
             <DocumentCard
               title="Individual Learner Record"
               blurb="Your enrolment record: your details, eligibility and the information you gave during onboarding. Your training provider confirms they have seen your identity and eligibility evidence."
@@ -303,8 +311,8 @@ export default function LearnerCompliancePage() {
               signatoryName={ilrData?.learner.name}
               busy={busy}
               fmtDate={fmtAgreementDate}
-              onPreview={() => openPdf(ilrPdf())}
-              onDownload={() => ilrPdf()?.save(ilrFilename(ilrData?.learner.name || ''))}
+              onPreview={() => { if (!storedPdfAction(ilr)) openPdf(ilrPdf()); }}
+              onDownload={() => { if (!storedPdfAction(ilr, ilrFilename(ilrData?.learner.name || ''))) ilrPdf()?.save(ilrFilename(ilrData?.learner.name || '')); }}
               onSign={(mark) => void sign('ilr', mark, ilrData?.learner.name || '', 'training provider')}
               fields={
                 ilrShown && (
@@ -322,7 +330,10 @@ export default function LearnerCompliancePage() {
                 )
               }
             />
+            </DocumentSignatureTarget>
+            {ilr && <LearnerDocumentRevisions learnerId={String(id)} documentKey="ilr" sourceId={ilr.id} />}
 
+            <DocumentSignatureTarget documentKey="training-plan" sourceId={plan?.id}>
             <DocumentCard
               title="Training Plan"
               blurb="How you, your employer and your training provider will each support your apprenticeship, together with the learning plan and off-the-job hours that deliver it."
@@ -337,8 +348,8 @@ export default function LearnerCompliancePage() {
               signatoryName={planData?.learner.name}
               busy={busy}
               fmtDate={fmtAgreementDate}
-              onPreview={() => openPdf(planPdf())}
-              onDownload={() => planPdf()?.save(trainingPlanFilename(planData?.learner.name || ''))}
+              onPreview={() => { if (!storedPdfAction(plan)) openPdf(planPdf()); }}
+              onDownload={() => { if (!storedPdfAction(plan, trainingPlanFilename(planData?.learner.name || ''))) planPdf()?.save(trainingPlanFilename(planData?.learner.name || '')); }}
               onSign={(mark) => void sign('plan', mark, planData?.learner.name || '', 'employer and provider')}
               fields={
                 planShown && (
@@ -362,7 +373,10 @@ export default function LearnerCompliancePage() {
                 )
               }
             />
+            </DocumentSignatureTarget>
+            {plan && <LearnerDocumentRevisions learnerId={String(id)} documentKey="training-plan" sourceId={plan.id} />}
 
+            <DocumentSignatureTarget documentKey="written-agreement" sourceId={written?.id}>
             <DocumentCard
               title="Written Agreement"
               blurb="The agreement between your employer and your training provider: what will be delivered, the end-point assessment arrangements, and the costs against the funding band."
@@ -377,8 +391,8 @@ export default function LearnerCompliancePage() {
               signatoryName={writtenData?.learner.name}
               busy={busy}
               fmtDate={fmtAgreementDate}
-              onPreview={() => openPdf(writtenPdf())}
-              onDownload={() => writtenPdf()?.save(writtenAgreementFilename(writtenData?.learner.name || ''))}
+              onPreview={() => { if (!storedPdfAction(written)) openPdf(writtenPdf()); }}
+              onDownload={() => { if (!storedPdfAction(written, writtenAgreementFilename(writtenData?.learner.name || ''))) writtenPdf()?.save(writtenAgreementFilename(writtenData?.learner.name || '')); }}
               onSign={(mark) => void sign('written', mark, writtenData?.learner.name || '', 'employer and provider')}
               fields={
                 writtenShown && (
@@ -405,6 +419,8 @@ export default function LearnerCompliancePage() {
                 )
               }
             />
+            </DocumentSignatureTarget>
+            {written && <LearnerDocumentRevisions learnerId={String(id)} documentKey="written-agreement" sourceId={written.id} />}
           </>
         )}
       </div>

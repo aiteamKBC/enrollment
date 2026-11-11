@@ -62,6 +62,7 @@ export async function loadEmployerDocumentPreview(employerId: string, target: Si
       };
     }
     const review = await fetchEmployerEnrolmentReview(employerId, kind, learnerId, item.eventKey);
+    if ((review as unknown as {pdfUrl?:string}).pdfUrl) return readPdf((review as unknown as {pdfUrl:string}).pdfUrl,filename,signal);
     const [{ buildReviewPdf, reviewDocumentFilename }, { REVIEW_QUESTION_LABELS }] = await Promise.all([
       import('@/pages/learner/onboarding/reviews/reviewDocument'),
       import('@/pages/learner/onboarding/reviews/questions'),
@@ -72,6 +73,7 @@ export async function loadEmployerDocumentPreview(employerId: string, target: Si
   const stored = await response.json() as StoredDocument;
   if (stored.kind !== item.kind) throw new Error('The document type did not match. Please reload the list.');
   if (stored.kind === 'document') return readPdf(stored.url, filename, signal, 'omit');
+  if ((stored.document as unknown as {pdfUrl?:string}).pdfUrl) return readPdf((stored.document as unknown as {pdfUrl:string}).pdfUrl,filename,signal);
   if (stored.kind === 'agreement') {
     const { renderAgreementPdf } = await import('@/lib/apprenticeshipAgreementPdf');
     return { kind: 'pdf', blob: renderAgreementPdf(stored.document).output('blob'), filename };

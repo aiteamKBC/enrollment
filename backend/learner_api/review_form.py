@@ -17,11 +17,15 @@ record, so a stale copy would be a compliance problem.
 """
 import json
 import logging
+from contextlib import nullcontext
 
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from enrolment_api.document_templates import service as template_service
+from enrolment_api.document_templates.initial_issue import initial_issue
+from enrolment_api.document_templates.registry import REVIEW_KEYS
 
 from coach_api.models import CoachCalendarEvent
 from login.permissions import _auth_gate_enabled, learner_self_or_staff, staff_only
@@ -110,9 +114,9 @@ def _iso(value):
     return value.isoformat() if value else None
 
 
-def _learner_information(learner):
+def _learner_information(learner, *, verified=False):
     """The read-only Learner Information panel, derived from the learner record."""
-    return {
+    info = {
         "name": _s(getattr(learner, "username", "")),
         "programmeName": _s(getattr(learner, "programme", "")),
         "programmeStartDate": _s(getattr(learner, "learner_start_date", "")) or "--",
@@ -122,6 +126,11 @@ def _learner_information(learner):
         "manager": _s(getattr(learner, "line_manager", "")),
         "mentor": _s(getattr(learner, "mentor", "")),
     }
+    if verified:
+        from enrolment_api.document_templates.learner_sources import document_dates
+        start, end, _ = document_dates(learner)
+        info.update(programmeStartDate=start.isoformat() if start else '', plannedEndDate=end.isoformat() if end else '')
+    return info
 
 
 def _skills_radar_context(review, learner):
@@ -307,7 +316,7 @@ def _serialize_form(review, learner, event):
     answers = review.form_answers if isinstance(review.form_answers, dict) else {}
     status = review.section_status if isinstance(review.section_status, dict) else {}
     sections = sections_for(review.review_type)
-    return {
+    payload = {
         "eventKey": review.event_key,
         "reviewType": review.review_type,
         "reviewLabel": review.review_label,
@@ -334,6 +343,10 @@ def _serialize_form(review, learner, event):
         "status": review.status,
         "signatures": _signatures(review),
     }
+
+
+    key = REVIEW_KEYS.get(review.review_type)
+    return template_service.with_template(key, review, payload) if key else payload
 
 
 def _lookup(kind, pk, event_key):
@@ -363,6 +376,7 @@ def _lookup(kind, pk, event_key):
 # staff conducting the review may write it; a reader (another learner, an
 # employer) is refused. Reads stay open — see learner_self_or_staff.
 @learner_self_or_staff(kwarg="pk")
+@template_service.review_write_transaction
 def enrolment_review_form(request, kind, pk, event_key):
     if request.method not in ("GET", "PATCH", "POST"):
         return _error("Method not allowed.", 405)
@@ -378,7 +392,9 @@ def enrolment_review_form(request, kind, pk, event_key):
     if request.method == "GET":
         # Opening the form for the first time records when the review started, so
         # "issued (or booked) but never opened" is distinguishable from "in progress".
-        if review.started_at is None and review.status in (EnrolmentReview.STATUS_BOOKED, EnrolmentReview.STATUS_ISSUED):
+        from enrolment_api.document_templates.revisions import content_locked
+        locked_copy = bool(REVIEW_KEYS.get(review.review_type) and content_locked(REVIEW_KEYS[review.review_type], review))
+        if not locked_copy and review.started_at is None and review.status in (EnrolmentReview.STATUS_BOOKED, EnrolmentReview.STATUS_ISSUED):
             try:
                 review.started_at = timezone.now()
                 review.save(update_fields=["started_at", "updated_at"])
@@ -386,6 +402,12 @@ def enrolment_review_form(request, kind, pk, event_key):
                 # Not worth failing the read over.
                 logger.exception("enrolment_review_form: could not stamp started_at")
         return JsonResponse(_serialize_form(review, learner, event))
+
+    if template_service.review_is_signed(review):
+        return _error('This review has recorded signatures. Withdraw its existing signatures before changing answers; the previous signed rendering remains in history.', 409)
+    from enrolment_api.document_templates.revisions import content_locked
+    if REVIEW_KEYS.get(review.review_type) and content_locked(REVIEW_KEYS[review.review_type], review):
+        return _error('This historical document is locked. Create a new learner revision for changes.', 409)
 
     try:
         payload = json.loads(request.body or b"{}")
@@ -510,6 +532,10 @@ def _sign_authorization_error(request, pk, learner, party):
 
 
 def record_signature(review, party, signature, name):
+    return template_service.sign_review_with_history(review, party, signature, name, _record_signature_legacy)
+
+
+def _record_signature_legacy(review, party, signature, name):
     """Save (or, with an empty signature, clear) one party's sign-off.
 
     The one place a review signature is written, so the learner's page, the
@@ -604,6 +630,8 @@ def enrolment_review_sign(request, kind, pk, event_key):
     try:
         promoted = record_signature(review, party, signature, name)
     except DatabaseError as exc:
+        from enrolment_api.document_templates.revisions import RevisionLocked
+        if isinstance(exc, RevisionLocked): return _error(str(exc), 409)
         logger.exception("enrolment_review_sign: save failed")
         return _error(f"Database error: {exc}", 502)
 
@@ -770,6 +798,7 @@ def onboarding_reviews(request, kind, pk):
 
 @csrf_exempt
 @staff_only()
+@initial_issue('review')
 def issue_onboarding_review(request, kind, pk):
     """Issue one onboarding review to the learner. Staff only; each review is issued once."""
     if request.method != "POST":
@@ -794,23 +823,26 @@ def issue_onboarding_review(request, kind, pk):
         owner_email, owner_name, owner_id = _case_owner_record(learner)
         account = getattr(request, "login_account", None)
         issued_by = (getattr(account, "display_name", None) or getattr(account, "email", None) or "") if account else ""
-        EnrolmentReview.objects.create(
-            # One key per learner and review type, so a double click (or two
-            # officers at once) hits the unique Event_key rather than issuing twice.
-            event_key=f"review:{kind}:{pk}:{review_type}",
-            review_type=review_type,
-            review_label=ONBOARDING_REVIEW_LABELS[review_type],
-            learner_kind=kind,
-            learner_id=pk,
-            learner_name=_s(getattr(learner, "username", "")),
-            learner_email=_s(getattr(learner, "email", "")),
-            coach_id=owner_id,
-            coach_name=owner_name,
-            coach_email=owner_email,
-            status=EnrolmentReview.STATUS_ISSUED,
-            notes=f"Issued by {issued_by}" if issued_by else "Issued",
-            booked_at=timezone.now(),
-        )
+        with transaction.atomic(using='enrolment') if template_service.ready() else nullcontext():
+            review = EnrolmentReview.objects.create(
+                # One key per learner and review type, so a double click (or two
+                # officers at once) hits the unique Event_key rather than issuing twice.
+                event_key=f"review:{kind}:{pk}:{review_type}",
+                review_type=review_type,
+                review_label=ONBOARDING_REVIEW_LABELS[review_type],
+                learner_kind=kind,
+                learner_id=pk,
+                learner_name=_s(getattr(learner, "username", "")),
+                learner_email=_s(getattr(learner, "email", "")),
+                coach_id=owner_id,
+                coach_name=owner_name,
+                coach_email=owner_email,
+                status=EnrolmentReview.STATUS_ISSUED,
+                notes=f"Issued by {issued_by}" if issued_by else "Issued",
+                booked_at=timezone.now(),
+            )
+            if template_service.ready():
+                template_service.bind_review_issue(review, learner)
     except IntegrityError:
         return JsonResponse({"error": "This review has already been issued.", **_slots_payload(learner, kind, pk)}, status=409)
     except DatabaseError as exc:

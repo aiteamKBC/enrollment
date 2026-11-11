@@ -1,3 +1,5 @@
+import { persistOriginalPdf } from '@/features/compliance-documents/persistOriginalPdf';
+import { pendingSignaturesChanged } from '@/features/pending-signatures/events';
 import { readLearnerJson } from './learnerRead';
 // ============================================================================
 // Individual Learner Record API client
@@ -24,6 +26,7 @@ export interface IlrPartyState {
 }
 
 export interface IlrDocument {
+  template?: import('@/features/compliance-documents/types').IssuedTemplate;
   id: string;
   status: 'active' | 'superseded' | string;
   fullySigned: boolean;
@@ -57,9 +60,11 @@ export async function fetchIlrDocument(learnerId: string | number): Promise<IlrR
 
 /** Issue the ILR, freezing the current details and answers onto a new row. */
 export async function issueIlrDocument(learnerId: string | number): Promise<IlrDocument> {
-  const data = await readJson<{ document: IlrDocument }>(
-    await fetch(`${BASE}/${learnerId}/issue/`, { method: 'POST', credentials: 'include' }),
+  const data = await readJson<{ document: IlrDocument; issuedDocumentSnapshot?: IlrDocument }>(
+    await fetch(`${BASE}/${learnerId}/issue/`, { method: 'POST', credentials: 'include', headers: { 'X-Document-Issue-Mode': 'initial' } }),
   );
+  await persistOriginalPdf(learnerId, data.issuedDocumentSnapshot || data.document);
+  pendingSignaturesChanged();
   return data.document;
 }
 
@@ -78,5 +83,6 @@ export async function signIlrDocument(
       body: JSON.stringify({ party, name, signature }),
     }),
   );
+  pendingSignaturesChanged();
   return data.document;
 }

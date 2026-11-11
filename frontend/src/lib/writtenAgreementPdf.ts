@@ -13,6 +13,8 @@
 // complete rather than invented figures.
 // ============================================================================
 import jsPDF from 'jspdf';
+import { renderManagedDocument } from '@/features/compliance-documents/render';
+import type { IssuedTemplate } from '@/features/compliance-documents/types';
 import { formatHoursMinutes } from '@/lib/format';
 
 const PAGE_W = 210;
@@ -346,6 +348,7 @@ export function writtenAgreementFilename(learnerName: string): string {
 
 /** Render an issued Written Agreement from its record, with the marks on file. */
 export function renderWrittenAgreementPdf(document: {
+  template?: IssuedTemplate;
   particulars: WrittenAgreementParticulars;
   delivery: Record<string, any>;
   epa: Record<string, string>;
@@ -358,6 +361,8 @@ export function renderWrittenAgreementPdf(document: {
   };
   marks: { learner: string; employer: string; provider: string };
 }) {
+  const managed = renderManagedDocument(document.template, document);
+  if (managed) return managed;
   const pick = (
     state: { signed: boolean; name: string; position: string; signedAt: string | null },
     mark: string,

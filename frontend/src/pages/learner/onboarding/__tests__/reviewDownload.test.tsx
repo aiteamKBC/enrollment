@@ -12,6 +12,9 @@ import type { OnboardingReviewSlot } from '@/api/reviewForm';
 vi.mock('@/components/feature/WorkspaceShell', () => ({ WorkspaceShell: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock('@/hooks/useMyLearner', () => ({ useMyLearner: () => ({ kind: 'apprenticeship', id: '670' }) }));
 vi.mock('@/hooks/useLearnerNavGate', () => ({ useEnrolmentSubmitted: () => true }));
+// Revision access/actions have their own API-backed component tests. Keep these
+// existing review download tests focused on the original review cards.
+vi.mock('@/features/compliance-documents/LearnerDocumentRevisions', () => ({ LearnerDocumentRevisions: () => null }));
 const form = vi.hoisted(() => ({ fetchReviewForm: vi.fn(), fetchOnboardingReviewSlots: vi.fn() }));
 vi.mock('@/api/reviewForm', async (original) => ({ ...(await original<typeof import('@/api/reviewForm')>()), ...form }));
 const doc = vi.hoisted(() => ({ downloadReviewPdf: vi.fn() }));

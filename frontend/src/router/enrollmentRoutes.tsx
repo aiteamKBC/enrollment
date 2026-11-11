@@ -12,6 +12,7 @@ const Wizard = lazy(() => import('@/pages/users/wizard/WizardPage'));
 const WizardBuilder = lazy(() => import('@/pages/users/wizard-builder/page'));
 const ProgrammeStructure = lazy(() => import('@/pages/users/programme-structure/page'));
 const EligibilityBuilder = lazy(() => import('@/pages/users/eligibility-builder/page'));
+const ComplianceDocumentsBuilder = lazy(() => import('@/features/compliance-documents/page'));
 const EligibilityApplications = lazy(() => import('@/pages/users/eligibility-applications/page'));
 const FirstSessions = lazy(() => import('@/pages/users/first-sessions/page'));
 const CoachDirectory = lazy(() => import('@/pages/admin/coach-directory/page'));
@@ -41,6 +42,7 @@ export const enrollmentRoutes: RouteObject[] = [
     { path: '/users/wizard-builder', element: <WizardBuilder /> },
     { path: '/users/programme-structure', element: <ProgrammeStructure /> },
     { path: '/users/eligibility-builder', element: <EligibilityBuilder /> },
+    { path: '/users/compliance-documents', element: <ComplianceDocumentsBuilder /> },
     { path: '/users/eligibility-applications', element: <EligibilityApplications /> },
     { path: '/users/eligibility-applications/:applicationId', element: <EligibilityApplications /> },
     { path: '/users/first-sessions', element: <FirstSessions /> },
