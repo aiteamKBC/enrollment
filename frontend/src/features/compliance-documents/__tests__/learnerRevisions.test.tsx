@@ -19,6 +19,16 @@ beforeEach(() => {
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:synthetic'); vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 });
 describe('learner document versions', () => {
+  it('keeps old unsigned copies viewable but offers signing only on the latest issued version', async () => {
+    api.revisionHistory.mockResolvedValue({ results: [row(1, 'Original', 'original'), row(2, 'Available', 'sign-again'), row(3, 'Available', 'sign-again')], setupRequired: false });
+    render(<MemoryRouter><LearnerDocumentRevisions learnerId="1" documentKey="apprenticeship-agreement" /></MemoryRouter>);
+    await screen.findByText('Version 3 — Available');
+    const cards = screen.getAllByRole('article');
+    expect(within(cards[0]).getByRole('button', { name: 'View' })).toBeEnabled();
+    expect(within(cards[1]).getByRole('button', { name: 'Download' })).toBeEnabled();
+    expect(within(cards[1]).queryByRole('button', { name: 'Sign revised document' })).not.toBeInTheDocument();
+    expect(within(cards[2]).getByRole('button', { name: 'Sign revised document' })).toBeEnabled();
+  });
   it('shows R1 Signed then R2 Updated Copy under the same V1, with View and Download and no Edit', async () => {
     render(<MemoryRouter><LearnerDocumentRevisions learnerId="1" documentKey="apprenticeship-agreement" sourceId="original-id" /></MemoryRouter>);
     await screen.findByText('Version 2 — Updated Copy');

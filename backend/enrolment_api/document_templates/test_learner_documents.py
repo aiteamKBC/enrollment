@@ -9,7 +9,7 @@ from django.db import connection
 from django.test import TestCase, override_settings
 from . import test_binding_audit as fixtures, test_blank_documents as edits, revisions, revision_views as views, service
 from .models import LearnerDocumentRevision as Revision
-from .registry import seed, seeds
+from .registry import seed, seeds, TemplateError
 
 
 @override_settings(DOCUMENT_REVISIONS_ENABLED=True)
@@ -58,6 +58,43 @@ class LearnerDocumentTests(TestCase):
         learner = learner or self.learner
         return self.result(self.request(views.start_revision, 'POST', {'sourceId': str(source.pk), 'mode': 'learner',
             'requestId': request_id or str(uuid.uuid4())}, pk=learner.pk, key=key), status)
+
+    def test_create_can_finalize_unchanged_without_reason_and_save_optional_reasons(self):
+        for key in ('apprenticeship-agreement', 'ilr', 'training-plan', 'written-agreement'):
+            with self.subTest(key=key):
+                source, original = self.issued(key, self.learner)
+                detail = self.create(source, key)
+                final = self.finalize(detail)  # No content edits and no save required.
+                self.assertEqual(final['revision']['reason'], '')
+                self.assertEqual(final['revision']['signatureMethod'], 'sign-again')
+                self.assertFalse(final['revision']['fullySigned'])
+                for reason in ('', '   ', 'Optional note for this new document'):
+                    detail = self.create(source, key)
+                    saved = self.result(self.request(views.revision_detail, 'PUT', {
+                        'editVersion': detail['revision']['editVersion'], 'content': detail['preview']['template']['content'],
+                        'reason': reason, 'signatureMethod': 'sign-again',
+                    }, pk=self.learner.pk, identifier=detail['revision']['id']))
+                    final = self.finalize(saved)
+                    self.assertEqual(final['revision']['reason'], reason.strip())
+                    self.assertTrue(final['revision']['finalizedAt'])
+                source.refresh_from_db()
+                self.assertEqual(revisions.serialize_source(key, source, self.learner), original)
+
+    def test_edit_still_requires_reason_and_create_still_validates_supplied_reason(self):
+        source, _ = self.issued('training-plan', self.learner)
+        detail = self.create(source)
+        revision = Revision.objects.select_related('issue', 'base').get(pk=detail['revision']['id'])
+        for reason in (None, 123, 'x' * 2001):
+            with self.subTest(reason_type=type(reason).__name__), self.assertRaises(TemplateError):
+                revisions.save(revision, {'editVersion': revision.edit_version, 'content': revision.content,
+                    'reason': reason, 'signatureMethod': 'sign-again'}, 'Synthetic Admin')
+        # The edit workflow retains its required change explanation.
+        revision.changes = {}; revision.reason = ''
+        with self.assertRaisesMessage(TemplateError, 'Provide a reason'):
+            revisions.save(revision, {'editVersion': revision.edit_version, 'content': revision.content,
+                'reason': '', 'signatureMethod': 'sign-again'}, 'Synthetic Admin')
+        with self.assertRaisesMessage(TemplateError, 'Provide a reason'):
+            revisions.finalize(revision, 'Synthetic Admin')
 
     def test_all_eight_current_sources_are_scoped_populated_unsigned_and_frozen(self):
         from .preview import learner_data

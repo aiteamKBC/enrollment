@@ -15,6 +15,8 @@ import { isPcpRadar, radarProfileProgramme, resolvePcpRadar } from '@/features/p
 import { isMmRadar, mmRadarProfileProgramme, resolveMmRadar } from '@/features/programme-suitability/skills-radar/marketingManager';
 import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/programme-suitability/skills-radar/marketingExecutive';
 import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
+import styles from './SkillsRadar.module.css';
+import { useLearnerStepPresentation } from '@/features/learner-enrolment/stepPresentation';
 
 /**
  * Skills Radar: a sequential self-assessment questionnaire.
@@ -65,6 +67,7 @@ function workingFrom(existing?: KsbAssessment): WorkingAnswer {
 }
 
 export default function SkillsRadar() {
+  const learnerPresentation = useLearnerStepPresentation();
   const { draft, setSection, readOnly, board, suitability, modules, radarCatalogue } = useWizard();
   const managed = Boolean(radarCatalogue?.enabled && !(radarCatalogue.data && !radarCatalogue.data.catalogue));
   const pcp = isPcpRadar(suitability?.state);
@@ -212,6 +215,7 @@ export default function SkillsRadar() {
 
   const renderQuestion = (ksb: Ksb, i: number) => {
     const level = sr.assessments[ksb.id]?.level ?? null;
+    const actionLabel = readOnly ? 'View' : level !== null ? 'Edit' : learnerPresentation ? 'Assess' : 'Answer';
     const meta = competenceMeta(level);
     const score = competenceScore(level);
     const linkedModules = coverageById.get(ksb.id) ?? ksb.codes.flatMap((code) => coverageByCode.has(code) ? [coverageByCode.get(code)!] : []);
@@ -219,12 +223,20 @@ export default function SkillsRadar() {
     // After a refused Next, every competency still to rate is marked.
     const unrated = showErrors && !readOnly && !level;
     return (
-      <div key={ksb.id} className={`grid grid-cols-[minmax(0,55fr)_minmax(150px,28fr)_minmax(145px,17fr)] items-center gap-3 px-3 py-2.5 max-sm:grid-cols-1${unrated ? ' bg-red-50 ring-1 ring-inset ring-red-500' : ''}`}>
-        <span className="min-w-0 [overflow-wrap:anywhere]"><span className="mr-2 text-[12px] font-semibold text-foreground-400">{i + 1}.</span>
-          <span className="text-[13px] text-foreground-800">{ksb.codes.join(', ')} {ksb.title}</span>
+      <div key={ksb.id} role="row" className={`${styles.row}${unrated ? ` ${styles.unrated}` : ''}`}>
+        <span role="cell" className={styles.description}>
+          <span className={styles.number}>{i + 1}.</span>
+          <span><span className={styles.question}>{ksb.codes.join(', ')} {ksb.title}</span>
+            <span className={styles.meta}>{ksb.theme} &middot; {ksb.kind}</span>
+          </span>
         </span>
-        <span className="min-w-0 text-[11px] text-foreground-600 max-sm:pl-7">{linkedModules.map((name) => <span key={name} className="mr-1 inline-block rounded-full bg-primary-50 px-2 py-0.5 text-primary-700">{name}</span>)}{coverageLabel && <span className="text-foreground-400">{coverageLabel}</span>}</span>
-        <span className="flex min-w-0 items-center justify-start gap-3 max-sm:pl-7">
+        <div role="cell" className={styles.coverageCell}>
+          <span className={styles.mobileLabel}>Covered by Modules</span>
+          <div className={styles.chips}>{linkedModules.map((name) => <span key={name} className={styles.chip}>{name}</span>)}</div>
+          {coverageLabel && <span className="text-foreground-400">{coverageLabel}</span>}
+        </div>
+        <div role="cell" className={styles.answerCell}>
+          <span className={styles.mobileLabel}>Answer</span>
         {score != null && meta ? (
           <span className={`text-[11px] font-bold w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${meta.tintBg} ${meta.tintText}`} title={meta.label}>
             {score}
@@ -234,23 +246,22 @@ export default function SkillsRadar() {
         ) : (
           <span className="text-[11px] text-foreground-300 shrink-0">Not rated</span>
         )}
-        {/* Fixed-width slot so the scores stay in one column. */}
-        <span className="w-7 shrink-0">{isHighRating(level) && <HighRatingFlag />}</span>
+        {isHighRating(level) && <HighRatingFlag />}
         <button
           onClick={() => open(i)}
-          aria-label={moduleBased ? `${readOnly ? 'View' : level ? 'Edit' : 'Answer'} ${ksb.codes[0]}` : undefined}
+          aria-label={moduleBased ? `${actionLabel} ${ksb.codes[0]}` : undefined}
           aria-invalid={unrated || undefined}
-          className={`${btnSecondary} !py-1 !px-3 !text-[11px] shrink-0`}
+          className={`${btnSecondary} ${styles.action}`}
         >
-          <AppIcon className={readOnly ? 'ri-eye-line' : 'ri-edit-line'} />{readOnly ? 'View' : level ? 'Edit' : 'Answer'}
+          <AppIcon className={readOnly ? 'ri-eye-line' : 'ri-edit-line'} />{actionLabel}
         </button>
-        </span>
+        </div>
       </div>
     );
   };
 
   return (
-    <div>
+    <div className={styles.radar}>
       <StepHeading
         title={t('block.skillsRadar.title')}
         subtitle={programme ? `${programme} [${ksbs.length}]` : 'No programme assigned'}
@@ -294,23 +305,30 @@ export default function SkillsRadar() {
       )}
 
       {ksbs.length > 0 && <>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
+        <div className={styles.categories}>
           {(['Knowledge', 'Skill', 'Behaviour'] as const).map((kind) => {
             const items = ksbs.filter((k) => k.kind === kind); const answered = items.filter((k) => sr.assessments[k.id]?.level).length;
             const pct = items.length ? Math.round(answered / items.length * 100) : 0; const tone = pct === 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-amber-500' : 'bg-red-500';
-            return <button type="button" key={kind} onClick={() => setCategoryFilter(categoryFilter === kind ? 'all' : kind)} aria-pressed={categoryFilter === kind} className={`rounded-xl border border-primary-100 bg-primary-50/40 p-3 text-left hover:border-primary-300 ${categoryFilter === kind ? 'ring-2 ring-primary-300' : ''}`}>
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground-800"><span className={`h-2.5 w-2.5 rounded-full ${tone}`} />{kind === 'Skill' ? 'Skills' : kind}</div><div className="mt-1 flex items-center justify-between gap-2 text-xs text-foreground-600"><span>{answered} / {items.length} answered</span><span className="font-semibold">{pct}%</span></div><div className="mt-2 h-1.5 rounded-full bg-primary-100"><div className="h-full rounded-full bg-primary-500" style={{width: `${pct}%`}} /></div>
+            return <button type="button" key={kind} onClick={() => setCategoryFilter(categoryFilter === kind ? 'all' : kind)} aria-pressed={categoryFilter === kind} className={`${styles.category} ${categoryFilter === kind ? styles.selected : ''}`}>
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground-800"><span className={`h-2.5 w-2.5 rounded-full ${tone}`} />{kind === 'Skill' ? 'Skills' : kind}</div><div className="mt-1 flex items-center justify-between gap-2 text-xs text-foreground-600"><span>{answered} / {items.length} answered</span><span className="font-semibold">{pct}%</span></div><div className="mt-2 h-1.5 rounded-full bg-primary-100"><div className={styles.progressFill} style={{width: `${pct}%`}} /></div>
             </button>;
           })}
         </div>
-        <div className="mb-4 flex flex-wrap gap-2"><button type="button" onClick={() => setCategoryFilter('all')} className={`rounded-full px-3 py-1 text-xs ${categoryFilter === 'all' ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-700'}`}>All KSBs ({ksbs.length})</button></div>
-        {moduleCoverage.length > 0 && <nav aria-label="Selected modules" className="mb-5 rounded-xl border border-primary-100 bg-primary-50/30 p-3"><label className="sr-only" htmlFor="selected-module-skills">Selected module skills assessments</label><input id="selected-module-skills" className="sr-only" readOnly /><h3 className="mb-2 text-sm font-semibold text-foreground-900">Coverage by selected modules</h3><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{moduleCoverage.map((module) => <div key={module.title} className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2.5 text-xs"><span className="min-w-0 flex-1 truncate font-medium text-foreground-800" title={module.title}>{module.title}</span><span className="shrink-0 whitespace-nowrap font-semibold text-primary-700">{module.answered} of {module.count} answered</span></div>)}</div></nav>}
+        <div className={styles.filters}><button type="button" onClick={() => setCategoryFilter('all')} aria-pressed={categoryFilter === 'all'} className={`${styles.allFilter} ${categoryFilter === 'all' ? styles.activeFilter : ''}`}>All KSBs ({ksbs.length})</button></div>
+        {moduleCoverage.length > 0 && <nav aria-label="Selected modules" className={styles.moduleCoverage}>
+          <label className="sr-only" htmlFor="selected-module-skills">Selected module skills assessments</label><input id="selected-module-skills" className="sr-only" readOnly />
+          <h3>Coverage by selected modules</h3>
+          <div className={styles.moduleGrid}>{moduleCoverage.map((module) => <div key={module.title} className={styles.moduleCard}>
+            <span className={styles.moduleName}>{module.title}</span>
+            <span className={styles.moduleCount}>{module.answered} of {module.count} answered</span>
+          </div>)}</div>
+        </nav>}
       </>}
 
       {/* Progress */}
       {ksbs.length > 0 && (
-      <div className="h-1.5 bg-background-200 rounded-full overflow-hidden mb-5">
-        <div className="h-full bg-primary-500 rounded-full transition-all duration-300" style={{ width: `${(answeredCount / ksbs.length) * 100}%` }} />
+      <div className={styles.overallProgress}>
+        <div className={styles.progressFill} style={{ width: `${(answeredCount / ksbs.length) * 100}%` }} />
       </div>
       )}
 
@@ -323,14 +341,14 @@ export default function SkillsRadar() {
         </button>
       )}
 
-      {/* Same answer rows and popup, grouped for confirmed PCP, MM, ME and APM programmes. */}
-      {grouping?.status === 'ready' ? <div className="border border-foreground-200/70 rounded-xl divide-y divide-foreground-100 overflow-hidden"><div className="grid grid-cols-[minmax(0,55fr)_minmax(150px,28fr)_minmax(145px,17fr)] gap-3 px-3 py-2 bg-background-100/60 max-sm:grid-cols-1"><span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider">SKILL DESCRIPTION</span><span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider">COVERED BY MODULES</span><span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider">ANSWER</span></div>{visibleKsbs.map((ksb) => renderQuestion(ksb, questionIndex.get(ksb.id)!))}</div> : !moduleBased && <div className="border border-foreground-200/70 rounded-xl divide-y divide-foreground-100 overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,55fr)_minmax(150px,28fr)_minmax(145px,17fr)] gap-3 px-3 py-2 bg-background-100/60 max-sm:grid-cols-1">
-          <span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider">SKILL DESCRIPTION</span>
-          <span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider">COVERED BY MODULES</span>
-          <span className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider">ANSWER</span>
+      {/* One assessment row per stable KSB ID, for both learner and staff views. */}
+      {(grouping?.status === 'ready' || !moduleBased) && <div role="table" aria-label="Skills assessments" className={styles.table}>
+        <div role="row" className={styles.tableHeader}>
+          <span role="columnheader">SKILL DESCRIPTION</span>
+          <span role="columnheader">COVERED BY MODULES</span>
+          <span role="columnheader">ANSWER</span>
         </div>
-        {visibleKsbs.map(renderQuestion)}
+        {visibleKsbs.map((ksb) => renderQuestion(ksb, questionIndex.get(ksb.id)!))}
       </div>}
 
       {/* Question modal */}
@@ -356,7 +374,7 @@ export default function SkillsRadar() {
         >
           {/* Position within the questionnaire */}
           <div className="h-1.5 bg-background-200 rounded-full overflow-hidden mb-4">
-            <div className="h-full bg-primary-500 rounded-full transition-all duration-300" style={{ width: `${((openIndex + 1) / ksbs.length) * 100}%` }} />
+            <div className={styles.progressFill} style={{ width: `${((openIndex + 1) / ksbs.length) * 100}%` }} />
           </div>
 
           <p className="text-[14px] text-foreground-900 mb-4">
@@ -374,6 +392,7 @@ export default function SkillsRadar() {
                 return (
                   <label
                     key={lvl.level}
+                    className={`flex items-center gap-3 px-3 py-2.5 transition-smooth ${readOnly ? '' : 'cursor-pointer hover:bg-background-50'} ${selected ? lvl.tintBg : ''}`}
                   >
                     <input
                       type="radio"
@@ -402,6 +421,7 @@ export default function SkillsRadar() {
               <p className="text-[12px] leading-relaxed text-amber-800">
                 {readOnly ? (
                   <>
+                    <span className="font-semibold">Flagged: the learner rated this above {FLAG_ABOVE_SCORE}.</span>{' '}
                     High self-ratings may affect their eligibility for this apprenticeship, which requires substantial new learning.
                   </>
                 ) : (

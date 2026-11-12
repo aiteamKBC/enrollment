@@ -23,6 +23,11 @@ import { REQUIRED_MESSAGE } from '@/features/programme-suitability/useSuitabilit
 import ProgrammeSuitabilityStep from '@/features/programme-suitability/ProgrammeSuitabilityStep';
 import { SUITABILITY_STEP } from '@/features/programme-suitability/wizardStep';
 import { canPreviewIlrStep } from '@/lib/localIlrPreview';
+import { EnrolmentStepIcon } from '@/features/learner-enrolment/EnrolmentVisuals';
+import { LearnerEnrolmentVisualContext } from '@/features/learner-enrolment/enrolmentPresentation';
+import enrolmentStyles from '@/features/learner-enrolment/learnerEnrolment.module.css';
+import { Check } from 'lucide-react';
+import { LearnerStepContent } from '@/features/learner-enrolment/LearnerStepContent';
 
 /**
  * The step bodies are mode-agnostic — every one reads and writes only through
@@ -346,7 +351,7 @@ export function WizardShell({
   );
 
   return (
-    <div className={mode === 'staff' ? 'min-h-full bg-background-200' : ''}>
+    <div className={mode === 'staff' ? 'min-h-full bg-background-200' : enrolmentStyles.wizard}>
       <div className={mode === 'staff' ? 'max-w-6xl mx-auto px-6 py-6' : ''}>
         {header}
 
@@ -355,13 +360,13 @@ export function WizardShell({
             so the labels were clipped to "Personal Learning …" and two arrow
             buttons were needed to reach the rest. Down the side every step reads
             in full and the wide dead space beside the form is what pays for it. */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className={`flex flex-col gap-4 lg:flex-row lg:items-start ${mode === 'learner' ? enrolmentStyles.wizardLayout : ''}`}>
           {/* Step rail — lg and up. Below that the same list would push the form
               off the fold, so small screens get the compact header inside the
               card instead (both drive the same navigateTo). */}
-          <nav className="hidden shrink-0 lg:block lg:w-64 xl:w-72">
-            <div className="overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
-              <div className="border-b border-foreground-100 px-4 py-3.5">
+          <nav className={`hidden shrink-0 lg:block lg:w-64 xl:w-72 ${mode === 'learner' ? enrolmentStyles.progressRail : ''}`}>
+            <div className={`overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm ${mode === 'learner' ? enrolmentStyles.progressPanel : ''}`}>
+              <div className={`border-b border-foreground-100 px-4 py-3.5 ${mode === 'learner' ? enrolmentStyles.progressHeading : ''}`}>
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Your progress</span>
                   <span className="text-[12px] font-semibold text-primary-700">{statusKnown ? `${pct}%` : '—'}</span>
@@ -379,7 +384,7 @@ export function WizardShell({
                     : 'Loading your answers…'}
                 </p>
               </div>
-              <div role="tablist" aria-label="Enrolment steps" aria-orientation="vertical" className="p-2">
+              <div role="tablist" aria-label="Enrolment steps" aria-orientation="vertical" className={`p-2 ${mode === 'learner' ? enrolmentStyles.timeline : ''}`}>
                 {steps.map((step, i) => {
                   const active = i === currentIndex;
                   const isLocked = locked(i);
@@ -399,7 +404,7 @@ export function WizardShell({
                       aria-label={step.label}
                       title={isLocked ? `${step.label} — complete the earlier steps first` : step.label}
                       onClick={() => navigateTo(i)}
-                      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-smooth ${
+                      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-smooth ${mode === 'learner' ? enrolmentStyles.timelineItem : ''} ${
                         active
                           ? 'cursor-pointer bg-primary-50 text-primary-700'
                           : isLocked
@@ -413,6 +418,7 @@ export function WizardShell({
                           padlock while it is still out of reach, its number
                           otherwise — so the rail says both where you are and
                           what remains. */}
+                      {mode === 'learner' ? <span className={enrolmentStyles.timelineIcon}><EnrolmentStepIcon slug={step.slug} locked={isLocked} /></span> : (
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
                           done
@@ -426,15 +432,17 @@ export function WizardShell({
                       >
                         {done ? <AppIcon className="ri-check-line text-[13px]" /> : isLocked ? <AppIcon className="ri-lock-line text-[12px]" /> : i + 1}
                       </span>
+                      )}
                       <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-[12.5px] ${active ? 'font-semibold' : 'font-medium'}`}>{step.label}</span>
-                        <span className="block text-[10.5px] text-foreground-400">
+                        <span className={`block truncate text-[12.5px] ${active ? 'font-semibold' : 'font-medium'} ${mode === 'learner' ? enrolmentStyles.timelineLabel : ''}`}>{step.label}</span>
+                        <span className={`block text-[10.5px] text-foreground-400 ${mode === 'learner' ? enrolmentStyles.timelineStatus : ''}`}>
                           {/* "Not started" is a claim about the learner's saved
                               work, so it is withheld until that work has loaded;
                               the step they are on is knowable either way. */}
                           {done ? 'Complete' : active ? 'In progress' : !statusKnown ? '' : isLocked ? 'Locked' : 'Not started'}
                         </span>
                       </span>
+                      {mode === 'learner' && done && <span className={enrolmentStyles.timelineDone}><Check size={16} strokeWidth={2.5} aria-hidden="true" /></span>}
                     </button>
                   );
                 })}
@@ -443,11 +451,11 @@ export function WizardShell({
           </nav>
 
           {/* Main panel */}
-          <div className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
+          <div className={`min-w-0 flex-1 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm ${mode === 'learner' ? enrolmentStyles.wizardCard : ''}`}>
             {/* Compact step header — below lg, where the rail is hidden. Keeps a
                 horizontal step list so narrow screens can still jump between
                 steps; the rail above owns the tablist role. */}
-            <div className="border-b border-foreground-100 px-3 py-3 sm:px-4 lg:hidden">
+            <div className={`border-b border-foreground-100 px-3 py-3 sm:px-4 lg:hidden ${mode === 'learner' ? enrolmentStyles.compactSteps : ''}`}>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Step {currentIndex + 1} of {steps.length}</span>
                 <span className="truncate text-xs font-semibold text-primary-700">{currentStep?.label}</span>
@@ -501,7 +509,7 @@ export function WizardShell({
 
             {/* Step title bar — names the step beside the form on wide screens,
                 where the card no longer carries a tab strip of its own. */}
-            <div className="hidden items-center justify-between gap-4 border-b border-foreground-100 px-5 py-3.5 md:px-6 lg:flex">
+            <div className={`hidden items-center justify-between gap-4 border-b border-foreground-100 px-5 py-3.5 md:px-6 lg:flex ${mode === 'learner' ? enrolmentStyles.stepHeader : ''}`}>
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground-400">
                   Step {currentIndex + 1} of {steps.length}
@@ -510,7 +518,7 @@ export function WizardShell({
               </div>
               {/* Same gate as the footer Next — this arrow is a second way
                   forward, so it cannot be allowed to skip the check. */}
-              <button onClick={() => !isLast && navigateTo(currentIndex + 1, true)} disabled={isLast || navigatingSignature.current} aria-label="Next step" className="primary-action flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary-500 text-white transition-smooth hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40">
+              <button onClick={() => !isLast && navigateTo(currentIndex + 1, true)} disabled={isLast || navigatingSignature.current} aria-label="Next step" className={`primary-action flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary-500 text-white transition-smooth hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40 ${mode === 'learner' ? enrolmentStyles.nextArrow : ''}`}>
                 <AppIcon className="ri-arrow-right-line" />
               </button>
             </div>
@@ -520,9 +528,11 @@ export function WizardShell({
                 half-typed row) doesn't leak into the next one. That makes every
                 switch a fresh mount, so the entrance has to be cheap — a 0.7s
                 slide-from-invisible replayed here read as a page reload. */}
-            <div key={currentIndex} ref={bodyRef} className="animate-step-in p-4 sm:p-5 md:p-6 lg:px-8 lg:py-7">
+            <div key={currentIndex} ref={bodyRef} className={`animate-step-in p-4 sm:p-5 md:p-6 lg:px-8 lg:py-7 ${mode === 'learner' ? enrolmentStyles.wizardBody : ''}`}>
               <StepErrorsContext.Provider value={{ show: showErrors, missing: currentMissing }}>
-                {body}
+                <LearnerEnrolmentVisualContext.Provider value={mode === 'learner'}>
+                  <LearnerStepContent slug={currentStep?.slug}>{body}</LearnerStepContent>
+                </LearnerEnrolmentVisualContext.Provider>
               </StepErrorsContext.Provider>
             </div>
 
@@ -541,7 +551,7 @@ export function WizardShell({
             )}
 
             {/* Footer */}
-            <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-foreground-100 bg-background-100/40 px-4 py-4 sm:gap-3 sm:px-5 lg:px-8">
+            <div className={`flex flex-wrap items-center justify-end gap-2.5 border-t border-foreground-100 bg-background-100/40 px-4 py-4 sm:gap-3 sm:px-5 lg:px-8 ${mode === 'learner' ? enrolmentStyles.wizardFooter : ''}`}>
               {/* Routed through navigateTo, not onNavigateStep, so Back saves on
                   the learner side exactly as a backward tab-click does — a
                   learner who typed on this step and pressed Back was otherwise

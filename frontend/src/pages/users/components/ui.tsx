@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useLearnerStepPresentation } from '@/features/learner-enrolment/stepPresentation';
 
 // ---- Button / input class strings (match app conventions) ----
 export const btnPrimary =
@@ -138,8 +139,9 @@ export function FieldRow({
   value?: ReactNode;
   children?: ReactNode;
 }) {
+  const learnerStep = useLearnerStepPresentation();
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,240px)_1fr] gap-1 sm:gap-4 py-2.5 border-b border-foreground-100 last:border-0">
+    <div data-enrolment-row={learnerStep ? '' : undefined} className="grid grid-cols-1 sm:grid-cols-[minmax(0,240px)_1fr] gap-1 sm:gap-4 py-2.5 border-b border-foreground-100 last:border-0">
       <div className="text-[12px] text-foreground-500 font-medium sm:pt-1.5">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}

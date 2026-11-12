@@ -1,0 +1,86 @@
+.page { position: relative; isolation: isolate; color: #2d0b52; }
+.page::before { content: ''; position: absolute; z-index: -1; pointer-events: none; width: min(52%, 720px); height: 170px; right: 0; top: -60px; border-radius: 60% 50% 0 0; background: linear-gradient(145deg, #d8b5f63d, #e9d5fb22); }
+.documentCard { min-width: 0; padding: 16px 22px; border: 1px solid #e0c9f7; border-radius: 22px; background: linear-gradient(125deg, #fff, #fcf8ff); box-shadow: 0 5px 12px #6630941a, 0 2px 3px #6630940d; }
+.documentHeader { display: flex; align-items: center; gap: 18px; margin-bottom: 12px; }
+.documentIcon { display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; flex-shrink: 0; border-radius: 18px; color: #7309c9; background: linear-gradient(135deg, #f4eaff, #e9d6fc); box-shadow: 0 3px 6px #8034b41a; }
+.documentIntro { min-width: 0; flex: 1; }
+.documentIntro h3 { margin: 0; color: #2c0753; font-size: 22px; line-height: 1.25; font-weight: 800; letter-spacing: -.55px; }
+.documentIntro > p { margin: 3px 0 0; max-width: 780px; color: #413054; font-size: 13px; line-height: 1.5; }
+.documentIntro > .signedBy { color: #695277; font-size: 11px; }
+.statusBadge { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0; padding: 9px 15px; border-radius: 25px; color: #77410a; background: linear-gradient(110deg, #fff3d8, #ffe5a6); font-size: 12px; line-height: 1.4; font-weight: 750; }
+.documentCard[data-document-status='signed'] .statusBadge { color: #1e744a; background: linear-gradient(110deg, #e8f9ee, #d6f1df); }
+.documentCard[data-document-status='unissued'] .statusBadge { color: #655574; background: #eee7f5; }
+.detailPanels { display: grid; grid-template-columns: 1.2fr .9fr 1.2fr; gap: 17px; }
+.fieldGroup { min-width: 0; padding: 11px 17px; border: 1px solid #e0d2ef; border-radius: 10px; background: linear-gradient(125deg, #fdfbff, #f5effb); }
+.fieldGroup h4 { display: flex; align-items: center; gap: 12px; margin: 0 0 9px; color: #4f0b91; font-size: 14px; font-weight: 750; line-height: 1.35; }
+.fieldGroup h4 svg { color: #7b13cc; flex-shrink: 0; }
+.fieldGroup dl { display: grid; gap: 6px; margin: 0; }
+.field { display: grid; grid-template-columns: minmax(100px, .9fr) minmax(0, 1.1fr); align-items: baseline; gap: 4px 12px; min-width: 0; }
+.field dt { color: #4a3c67; font-size: 10px; line-height: 1.5; font-weight: 650; text-transform: uppercase; letter-spacing: .1px; overflow-wrap: anywhere; }
+.field dd { margin: 0; min-width: 0; color: #25103f; font-size: 13px; line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
+.missing { color: #5d5071; font-weight: 400; }
+.fieldHint { grid-column: 1 / -1; margin: 0; color: #73617e; font-size: 10px; line-height: 1.4; }
+.documentFooter { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px 20px; margin-top: 9px; padding: 7px 13px; border-radius: 12px; background: linear-gradient(110deg, #f5edff, #faf6ff); }
+.signatureStatus { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 24px; min-width: 0; color: #453254; font-size: 12px; line-height: 1.5; }
+.signatureHeading { display: inline-flex; align-items: center; gap: 10px; padding-right: 24px; border-right: 1px solid #c3a0e0; color: #4d0c84; font-weight: 750; }
+.signatureHeading svg { color: #7712c2; }
+.partyState { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.partyState svg { color: #776086; flex-shrink: 0; }
+.partyState[data-signed] svg { color: #17945b; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-left: auto; }
+.outlineButton, .signButton { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 35px; padding: 7px 18px; border: 1px solid #c9b2df; border-radius: 11px; color: #350965; background: linear-gradient(120deg, #fff, #f9f4ff); box-shadow: 0 3px 6px #67359520; font-size: 13px; font-weight: 650; line-height: 1.4; cursor: pointer; transition: filter .16s, box-shadow .16s; }
+.signButton { color: #fff; border-color: #a32ce4; background: radial-gradient(ellipse at 10% 0, #b12ef1, transparent 70%), linear-gradient(120deg, #8d0cd2, #5604a2); box-shadow: inset 0 2px 3px #efb9ff55, 0 3px 7px #6c16ae30; }
+.outlineButton:hover:not(:disabled), .signButton:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 4px 10px #67359530; }
+.outlineButton:focus-visible, .signButton:focus-visible { outline: 3px solid #a134e2; outline-offset: 3px; }
+.outlineButton:disabled, .signButton:disabled { opacity: .5; cursor: default; }
+.unissuedNotice { margin: 12px 0 0; padding: 10px 13px; border: 1px solid #e7d9f6; border-radius: 10px; color: #675273; background: #fbf7ff; font-size: 12px; line-height: 1.6; }
+.history { position: relative; min-width: 0; margin-top: 8px; }
+.historyIcon { display: none; }
+.history:has(article) .historyIcon { display: block; position: absolute; left: 31px; top: 15px; color: #7413ba; pointer-events: none; }
+.history > section { margin-bottom: 0; }
+.history article { padding: 9px 13px 9px 57px; border-color: #e7d8f8; border-radius: 12px; background: linear-gradient(110deg, #f5edff, #faf7ff); }
+.history article > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.history article p:first-child { color: #4e0b87; }
+.history article button { border-radius: 10px; }
+.history article button:not([class~='primary-action']) { min-height: 34px; padding: 7px 16px; border: 1px solid #c9b2df; background: linear-gradient(120deg, #fff, #f9f4ff); color: #350965; box-shadow: 0 3px 6px #67359520; }
+.signingPanel { margin-top: 12px; border-radius: 13px; background: #fcf9ff; }
+@media (max-width: 1399px) {
+  .detailPanels { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .fieldGroup:last-child { grid-column: 1 / -1; }
+  .signatureStatus { gap: 9px 18px; }
+}
+@media (max-width: 1023px) {
+  .documentCard { padding: 17px; }
+  .documentHeader { flex-wrap: wrap; gap: 13px; }
+  .documentIntro { flex-basis: calc(100% - 80px); }
+  .statusBadge { margin-left: 73px; }
+  .detailPanels { grid-template-columns: minmax(0, 1fr); }
+  .fieldGroup:last-child { grid-column: auto; }
+  .documentFooter { align-items: flex-start; }
+}
+@media (max-width: 767px) {
+  .documentCard { padding: 16px 13px; border-radius: 19px; }
+  .documentHeader { gap: 11px; }
+  .documentIcon { width: 47px; height: 50px; border-radius: 14px; }
+  .documentIcon svg { width: 27px; height: 27px; }
+  .documentIntro { flex-basis: calc(100% - 60px); }
+  .documentIntro h3 { font-size: 20px; letter-spacing: -.35px; }
+  .statusBadge { margin-left: 58px; padding: 7px 12px; }
+  .fieldGroup { padding: 12px; }
+  .field { grid-template-columns: minmax(95px, .9fr) minmax(0, 1.1fr); gap: 4px 10px; }
+  .fieldGroup h4 { font-size: 14px; gap: 9px; }
+  .signatureStatus { flex-basis: 100%; gap: 8px 15px; }
+  .signatureHeading { width: 100%; border-right: 0; padding-right: 0; }
+  .actions { margin-left: 0; justify-content: flex-start; }
+  .outlineButton, .signButton { padding: 8px 12px; }
+  .history article { flex-wrap: wrap; gap: 10px; }
+}
+@media (max-width: 380px) {
+  .actions { width: 100%; }
+  .actions button { flex: 1 1 100%; }
+  .field { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .fieldGroup dl { gap: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .outlineButton, .signButton { transition: none; }
+}

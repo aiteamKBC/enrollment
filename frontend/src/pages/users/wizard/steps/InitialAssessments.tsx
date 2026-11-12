@@ -12,6 +12,10 @@ import { btnPrimary } from '../../components/ui';
 import { useWizard } from '../WizardContext.helpers';
 import { useText } from '../layout/textsContext';
 import { StepHeading } from './fields';
+import { useLearnerEnrolmentVisuals } from '@/features/learner-enrolment/enrolmentPresentation';
+import { BookOpen, CalendarDays, TriangleAlert } from 'lucide-react';
+import { FinalStepHeader } from './FinalStepHeader';
+import styles from './finalSteps.module.css';
 
 const SUBJECT_LABELS: Record<InitialAssessmentSubject, string> = {
   english: 'English',
@@ -61,6 +65,7 @@ function statusClass(status: InitialAssessmentStatus): string {
 }
 
 export default function InitialAssessments() {
+  const learner = useLearnerEnrolmentVisuals();
   const { userId, isCommercial } = useWizard();
   const t = useText();
   const [assessments, setAssessments] = useState<InitialAssessment[]>([
@@ -152,9 +157,10 @@ export default function InitialAssessments() {
   };
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div>
-        <StepHeading title={t('block.initialAssessments.title')} />
+    <div className={learner ? `${styles.finalStep} ${styles.initialStep}` : 'max-w-4xl space-y-6'}>
+      {learner && <FinalStepHeader title={t('block.initialAssessments.title')} />}
+      <div className={learner ? styles.informationPanel : undefined}>
+        {!learner && <StepHeading title={t('block.initialAssessments.title')} />}
         <h3 className="mt-5 text-[15px] font-semibold text-foreground-900">{t('block.initialAssessments.what')}</h3>
         <p className="mt-1 text-[13px] leading-relaxed text-foreground-700">
           {t('block.initialAssessments.whatBody')}
@@ -170,13 +176,13 @@ export default function InitialAssessments() {
       </div>
 
       {(error || !enabled) && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-800">
-          <AppIcon className="ri-error-warning-line mr-1.5" />
-          {error || 'BKSB is currently unavailable. You can continue onboarding and try again later.'}
+        <div role="alert" className={learner ? styles.warning : 'rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-800'}>
+          {learner ? <span className={styles.warningIcon} aria-hidden="true"><TriangleAlert size={23} /></span> : <AppIcon className="ri-error-warning-line mr-1.5" />}
+          <span>{error || 'BKSB is currently unavailable. You can continue onboarding and try again later.'}</span>
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className={learner ? styles.assessmentGrid : 'grid gap-4 md:grid-cols-2'}>
         {(['english', 'maths'] as const).map((subject) => {
           const item = bySubject.get(subject) || emptyAssessment(subject);
           const label = SUBJECT_LABELS[subject];
@@ -201,8 +207,9 @@ export default function InitialAssessments() {
             ? formatSystemTimestamp(item.assessmentDate, { day: 'numeric', month: 'short', year: 'numeric' })
             : '';
           return (
-            <section key={subject} className={`rounded-xl border p-4 ${statusClass(displayStatus)}`} aria-labelledby={`bksb-${subject}`}>
-              <div className="flex items-start justify-between gap-3">
+            <section key={subject} className={learner ? styles.assessmentCard : `rounded-xl border p-4 ${statusClass(displayStatus)}`} data-assessment-status={learner ? displayStatus : undefined} aria-labelledby={`bksb-${subject}`}>
+              <div className={learner ? styles.assessmentHeader : 'flex items-start justify-between gap-3'}>
+                {learner && <span className={styles.subjectIcon} aria-hidden="true">{subject === 'english' ? <BookOpen size={24} /> : <CalendarDays size={24} />}</span>}
                 <div>
                   <h4 id={`bksb-${subject}`} className="text-[16px] font-semibold text-foreground-900">{label}</h4>
                   <p className="mt-1 text-[12px] font-medium text-foreground-600">{STATUS_LABELS[displayStatus]}</p>
@@ -220,7 +227,7 @@ export default function InitialAssessments() {
               {item.error && item.status === 'error' && !directLaunchError && <p className="mt-3 text-[12px] text-red-700">{item.error}</p>}
               <button
                 type="button"
-                className={`${btnPrimary} mt-4`}
+                className={learner ? `primary-action ${styles.assessmentButton}` : `${btnPrimary} mt-4`}
               onClick={() => void openBksbAccount(subject)}
                 disabled={loading || working !== null || accountWorking}
               >

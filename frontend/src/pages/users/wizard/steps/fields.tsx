@@ -4,7 +4,11 @@ import { FieldRow, inputClass } from '../../components/ui';
 import { SignaturePad } from './SignaturePad';
 import { FieldError, invalidClass } from '../stepErrors';
 import { missingMessage, useMissing } from "../stepErrors.helpers";
+import { useLearnerStepPresentation } from '@/features/learner-enrolment/stepPresentation';
+import { StepArtwork } from '@/features/learner-enrolment/LearnerStepContent';
+import learnerStyles from '@/features/learner-enrolment/learnerSteps.module.css';
 import { DatePickerField } from '@/components/feature/DatePickerField';
+
 
 export function LabeledInput({
   label,
@@ -263,6 +267,11 @@ export function SignatureField({
 }
 
 export function StepHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+  const step = useLearnerStepPresentation();
+  if (step) return <div className={learnerStyles.stepIntro}>
+    <StepArtwork slug={step} />
+    <div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>
+  </div>;
   return (
     <div className="mb-5">
       <h2 className="font-heading text-lg font-semibold tracking-tight text-foreground-900 sm:text-[20px]">{title}</h2>

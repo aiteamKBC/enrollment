@@ -132,7 +132,10 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
       placed.add(item.key);
       items.push({ ...resolveLegacyCustomType(item), hidden: Boolean(item.hidden) });
     }
-    steps.push({ ...raw, label: raw.label || raw.slug, hidden: Boolean(raw.hidden), items });
+    // Historical publications may mark the reserved assessment slug as custom.
+    // Its registered body owns the saved result/modules, even with no items.
+    steps.push({ ...raw, builtin: raw.slug === SUITABILITY_STEP.slug ? true : raw.builtin,
+      label: raw.label || raw.slug, hidden: Boolean(raw.hidden), items });
   }
 
   // Built-in steps the layout doesn't mention go back at their default index.

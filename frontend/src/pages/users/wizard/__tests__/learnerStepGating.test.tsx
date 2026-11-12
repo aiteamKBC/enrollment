@@ -139,6 +139,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('learner step gating', () => {
+  it('keeps the final three tabs locked while earlier learner steps are incomplete', async () => {
+    renderShell('learner');
+    await waitForHydration();
+    for (const name of ['Policies', 'Initial Assessments', 'What Happens Now?']) {
+      await waitFor(() => expect(screen.getByRole('tab', { name })).toHaveAttribute('aria-disabled', 'true'));
+    }
+    expect(saveExtendedIlr).not.toHaveBeenCalled();
+  });
+
   it('temporarily allows ILR to Extended ILR navigation without answers only in local preview', async () => {
     vi.stubEnv('DEV', true);
     vi.stubEnv('MODE', 'eligibility-local');

@@ -107,7 +107,13 @@ def compliance_document_state(learner_kind, learner_id):
             logger.exception("compliance_document_state: %s lookup failed", name)
             state[name] = False
             continue
-        state[name] = bool(document and document.fully_signed)
+        try:
+            from enrolment_api.document_templates.revisions import current_signoff
+            current = current_signoff(COMPLIANCE_DOCUMENT_KEYS[name], document)
+            state[name] = bool(current.get('fullySigned')) if current is not None else bool(document and document.fully_signed)
+        except DatabaseError:
+            logger.exception("compliance_document_state: revision lookup failed")
+            state[name] = False
     return state
 
 
@@ -119,18 +125,31 @@ LEARNER_SIGNATURE_FIELDS = {
     "writtenAgreement": "learner_signature",
 }
 
+COMPLIANCE_DOCUMENT_KEYS = {
+    'apprenticeshipAgreement': 'apprenticeship-agreement', 'ilr': 'ilr',
+    'trainingPlan': 'training-plan', 'writtenAgreement': 'written-agreement',
+}
+
 
 def learner_signed_compliance_documents(learner_kind, learner_id):
-    """True once the learner has signed all four issued compliance documents.
+    """True once the learner has signed each document's latest issued copy.
 
     Their own signatures only — the employer's and provider's may still be
     outstanding. It is what opens their first learning session booking.
+    Earlier unsigned versions remain history, not additional obligations.
     """
     for name, model in COMPLIANCE_DOCUMENT_MODELS:
         try:
             document = model.objects.filter(
                 learner_kind=learner_kind, learner_id=learner_id, status=model.STATUS_ACTIVE,
-            ).only(LEARNER_SIGNATURE_FIELDS[name]).first()
+            ).first()
+            if document is None: return False
+            from enrolment_api.document_templates.revisions import current_signoff
+            current = current_signoff(COMPLIANCE_DOCUMENT_KEYS[name], document)
+            if current is not None:
+                party = LEARNER_SIGNATURE_FIELDS[name].removesuffix('_signature')
+                if not current.get('signatures', {}).get(party, {}).get('signed'): return False
+                continue
         except DatabaseError:
             logger.exception("learner_signed_compliance_documents: %s lookup failed", name)
             return False
