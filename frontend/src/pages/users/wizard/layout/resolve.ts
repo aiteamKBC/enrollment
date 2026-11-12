@@ -61,16 +61,12 @@ const APPRENTICESHIP_ONLY_ITEMS = new Set(['block.inclusion', 'ild.niApplied', '
  */
 export function layoutForLearner(layout: WizardLayout, commercial: boolean): WizardLayout {
   if (!commercial) {
-    // Keep the common builder catalog for commercial delivery and historical
-    // answers. Apprenticeships always retire its Personal Details page, even
-    // when an older publication explicitly showed or reordered that page.
     const steps = layout.steps.map(step => ({ ...step, items: step.items.map(item => ({ ...item })) }));
     const signature = steps.flatMap(step => step.items).find(item => item.builtin && item.key === 'pd.signature')
       ?? { key: 'pd.signature', builtin: true, hidden: false };
     const declaration = steps.flatMap(step => step.items).find(item => item.builtin && item.key === 'ild.signature')
       ?? { key: 'ild.signature', builtin: true };
     for (const step of steps) {
-      if (step.slug === 'personal-details') step.hidden = true;
       step.items = step.items.filter(item => !(item.builtin && ['pd.signature', 'ild.signature', 'ild.postcodePrior'].includes(item.key)));
     }
     const ilr = steps.find(step => step.slug === 'ilr-details');

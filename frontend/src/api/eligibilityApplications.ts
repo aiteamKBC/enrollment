@@ -1,17 +1,6 @@
-/** Enrolment staff review API. Applicant data is never cached locally. */
+/** Eligibility applications API. Applicant data is never cached locally. */
+import { prefetchAssessmentSecurity } from '@/features/programme-suitability/api';
 export type AssessmentStatus = 'pending_assessment' | 'provisional_eligible' | 'not_eligible';
-export type ReviewStatus = 'approved' | 'rejected' | 'more_evidence_required';
-export interface ReviewAction {
-  action: ReviewStatus; notes: string; expectedVersion: number; requestId: string;
-}
-export interface ReviewEntry {
-  id: string; applicationId: string; version: number; reviewerId: string; reviewerName: string;
-  previousStatus: string; status: ReviewStatus; notes: string; decidedAt: string;
-}
-export interface ApplicationReview {
-  status: ReviewStatus | null; version: number; history: ReviewEntry[];
-  enabled: boolean; available: boolean; allowedActions: ReviewStatus[];
-}
 export interface EligibilityApplication {
   id: string;
   first_name: string | null;
@@ -24,8 +13,6 @@ export interface EligibilityApplication {
   workplace_arrangement: string | null;
   assessment_status: AssessmentStatus | null;
   assessment_reason: string | null;
-  review_status?: ReviewStatus | null;
-  review_version?: number | null;
 }
 export type ApplicationDetail = EligibilityApplication & Record<string, string | boolean | number | null>;
 export interface ApplicationsPage {
@@ -37,11 +24,10 @@ export interface ApplicationsPage {
 
 const BASE = '/enrolment_api/eligibility-applications/';
 
-async function read<T>(url: string, action?: ReviewAction): Promise<T> {
+async function read<T>(url: string): Promise<T> {
   const response = await fetch(url, {
-    method: action ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
-    headers: { 'X-Requested-With': 'XMLHttpRequest', ...(action ? { 'Content-Type': 'application/json' } : {}) },
-    ...(action ? { body: JSON.stringify(action) } : {}),
+    method: 'GET', credentials: 'include', cache: 'no-store',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) throw Object.assign(new Error(data?.error || 'Could not load eligibility applications.'), { status: response.status });
@@ -56,10 +42,27 @@ export function fetchEligibilityApplication(id: string): Promise<{ application: 
   return read(`${BASE}${encodeURIComponent(id)}/`);
 }
 
-export function fetchApplicationReview(id: string): Promise<ApplicationReview> {
-  return read(`${BASE}${encodeURIComponent(id)}/reviews/`);
+export interface EligibilityExceptionPreview {
+  existingLearner: { id: string; name: string; email: string; programmeStatus: string } | null;
+  linkedLearnerId: string | null;
+  overrideReason: string | null;
+  activationVerified: boolean;
 }
 
-export function recordApplicationReview(id: string, action: ReviewAction): Promise<ApplicationReview> {
-  return read(`${BASE}${encodeURIComponent(id)}/reviews/`, action);
+export function fetchEligibilityException(id: string): Promise<EligibilityExceptionPreview> {
+  return read(`${BASE}${encodeURIComponent(id)}/exception/`);
+}
+
+export async function approveEligibilityException(id: string, reason: string, confirmEmail: string): Promise<{
+  learnerId: string; invitation: 'sent' | 'notSent' | 'alreadySent' | 'alreadyActivated'; message?: string;
+}> {
+  const csrfToken = (await prefetchAssessmentSecurity()).csrfToken;
+  const response = await fetch(`${BASE}${encodeURIComponent(id)}/exception/`, {
+    method: 'POST', credentials: 'include', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify({ reason, confirmEmail }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || 'Could not approve the exception.');
+  return data;
 }

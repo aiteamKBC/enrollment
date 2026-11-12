@@ -49,7 +49,7 @@ describe('staff enrolment wizard step scroll', () => {
     await act(async () => { await router.navigate('/users/41/wizard/personal-details'); });
 
     expect(scroller.scrollTop).toBe(0);
-    expect(router.state.location.pathname).toBe('/users/41/wizard/ilr-details');
+    expect(router.state.location.pathname).toBe('/users/41/wizard/personal-details');
   });
 
   it('leaves the scroll alone when the step has not changed', async () => {

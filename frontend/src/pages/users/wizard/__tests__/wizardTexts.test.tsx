@@ -70,7 +70,7 @@ describe('the formatting language', () => {
 describe('published wording', () => {
   it('describes the apprenticeship employer section as a company address', async () => {
     render(<ToastProvider><WizardProvider userId="20" board={BOARD} layout={defaultLayout()}>
-      <WizardShell currentIndex={3} mode="staff" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
+      <WizardShell currentIndex={4} mode="staff" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
     </WizardProvider></ToastProvider>);
     expect(await screen.findByText("Please provide your employer's company address:")).toBeInTheDocument();
   });
@@ -78,7 +78,7 @@ describe('published wording', () => {
   it('preserves a published custom employer section intro', async () => {
     const layout={...defaultLayout(),texts:{'xilr.h.employer.intro':'Published company instructions'}};
     render(<ToastProvider><WizardProvider userId="20" board={BOARD} layout={layout}>
-      <WizardShell currentIndex={3} mode="staff" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
+      <WizardShell currentIndex={4} mode="staff" onNavigateStep={vi.fn()} onFinish={vi.fn()} />
     </WizardProvider></ToastProvider>);
     expect(await screen.findByText('Published company instructions')).toBeInTheDocument();
     expect(screen.queryByText("Please provide your employer's company address:")).not.toBeInTheDocument();

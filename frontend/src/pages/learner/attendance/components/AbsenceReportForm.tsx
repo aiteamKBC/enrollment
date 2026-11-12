@@ -7,6 +7,7 @@ import {
   type MissedAttendanceSession,
 } from '@/api/absenceReports';
 import { useMyLearner } from '@/hooks/useMyLearner';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { Panel } from '@/components/ui/Panel';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -466,7 +467,7 @@ export default function AbsenceReportForm({
             {recoveryMethod === 'recorded' && selectedSession && <div className={styles.recoveryDetails}>
               <div className={styles.recoveryUnavailable}><AppIcon className="ri-information-line" /><span>Watching the recording supports your learning, but attendance remains absent.</span></div>
               <div className={styles.bookingFields}>
-                <label>Viewing date *<input aria-label="Recording viewing date" type="date" min={selectedSession.dateIso} value={recordingDate} onChange={event => { setRecordingDate(event.target.value); setConfirmed(false); }} required /></label>
+                <div>Viewing date *<DatePickerField label="Recording viewing date" hideLabel min={selectedSession.dateIso} value={recordingDate} onChange={value => { setRecordingDate(value); setConfirmed(false); }} required /></div>
                 <label>Viewing time *<input aria-label="Recording viewing time" type="time" value={recordingTime} onChange={event => { setRecordingTime(event.target.value); setConfirmed(false); }} required /></label>
               </div>
             </div>}

@@ -1,5 +1,4 @@
 import { canPreviewIlrStep } from '@/lib/localIlrPreview';
-import { canPreviewFinalEnrolmentStep } from '@/lib/localEnrolmentDesignPreview';
 
 export function shouldRedirectLearnerWizardStep({
   ready,
@@ -12,5 +11,5 @@ export function shouldRedirectLearnerWizardStep({
   reachable: number;
   stepSlug?: string;
 }): boolean {
-  return ready && currentIndex > reachable && !canPreviewIlrStep(stepSlug) && !canPreviewFinalEnrolmentStep(stepSlug);
+  return ready && currentIndex > reachable && !canPreviewIlrStep(stepSlug);
 }

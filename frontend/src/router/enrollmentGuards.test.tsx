@@ -1,13 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { LearnerStart, WelcomeEntry } from './enrollmentGuards';
+import { LearnerOnboardingGate, LearnerStart, WelcomeEntry } from './enrollmentGuards';
 
 const state = vi.hoisted(() => ({ kind: 'apprenticeship', board: vi.fn(), session: vi.fn(), welcome: vi.fn() }));
 vi.mock('@/hooks/useMyLearner', () => ({ useMyLearner: () => ({ kind: state.kind, id: '41' }) }));
 vi.mock('@/api/enrolmentUsers', () => ({ fetchEnrolmentBoard: state.board }));
 vi.mock('@/api/learnerCalendar', () => ({ fetchLearnerFirstSession: state.session }));
 vi.mock('@/api/firstLoginDetails', () => ({ fetchFirstLoginDetails: state.welcome }));
+vi.mock('@/hooks/useAuth.helpers', () => ({ useAuth: () => ({ auth: { account: { role: 'learner' } } }) }));
 
 beforeEach(() => {
   vi.clearAllMocks(); state.kind = 'apprenticeship';
@@ -19,16 +20,31 @@ function open(welcome = false) {
   render(<MemoryRouter><Routes>
     <Route path="/" element={welcome ? <WelcomeEntry><h1>Existing commercial entry</h1></WelcomeEntry> : <LearnerStart />} />
     <Route path="/learner/onboarding" element={<h1>Wizard entry</h1>} />
+    <Route path="/learner/pending" element={<h1>Waiting for onboarding</h1>} />
     <Route path="/lms" element={<h1>Learning</h1>} />
   </Routes></MemoryRouter>);
 }
 
-it.each(['Fresh user', 'Onboarding'])('sends %s apprentices directly to the wizard without a Welcome API gate', async status => {
-  state.board.mockResolvedValue({ programme: { status } }); open();
+it('sends Fresh apprentices to the waiting page without starting the wizard', async () => {
+  state.board.mockResolvedValue({ programme: { status: 'Fresh user' } }); open();
+  expect(await screen.findByRole('heading', { name: 'Waiting for onboarding' })).toBeInTheDocument();
+  expect(state.welcome).not.toHaveBeenCalled(); expect(state.session).not.toHaveBeenCalled();
+});
+it('sends Onboarding apprentices to the wizard without a Welcome API gate', async () => {
+  state.board.mockResolvedValue({ programme: { status: 'Onboarding' } }); open();
   expect(await screen.findByRole('heading', { name: 'Wizard entry' })).toBeInTheDocument();
   expect(state.welcome).not.toHaveBeenCalled(); expect(state.session).not.toHaveBeenCalled();
 });
+it('blocks a direct wizard URL while the apprentice is Fresh', async () => {
+  render(<MemoryRouter initialEntries={['/learner/onboarding']}><Routes>
+    <Route path="/learner/onboarding" element={<LearnerOnboardingGate><h1>Wizard entry</h1></LearnerOnboardingGate>} />
+    <Route path="/learner/pending" element={<h1>Waiting for onboarding</h1>} />
+  </Routes></MemoryRouter>);
+  expect(await screen.findByRole('heading', { name: 'Waiting for onboarding' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Wizard entry' })).not.toBeInTheDocument();
+});
 it('redirects an old apprenticeship Welcome bookmark without rendering either step', async () => {
+  state.board.mockResolvedValue({ programme: { status: 'Onboarding' } });
   open(true);
   expect(await screen.findByRole('heading', { name: 'Wizard entry' })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Existing commercial entry' })).not.toBeInTheDocument();

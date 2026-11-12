@@ -17,7 +17,7 @@ from django.middleware.csrf import get_token
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
-from enrolment_api.eligibility_form import COUNTRY_OPTIONS, TITLE_OPTIONS
+from enrolment_api.eligibility_form import COUNTRY_OPTIONS
 from enrolment_api.models import WizardIlrLearnerDetails
 from enrolment_api.postcode_lookup import formatted, is_valid
 from login.permissions import learner_self_only
@@ -25,6 +25,7 @@ from login.permissions import learner_self_only
 from .models import EnrolmentUser
 
 logger = logging.getLogger(__name__)
+TITLE_OPTIONS = ('Mr', 'Mrs', 'Miss', 'Ms', 'Mx', 'Dr', 'Prof')
 PHONE_ALLOWED = re.compile(r"^\+?[0-9 ()\-]+$")
 
 

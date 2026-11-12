@@ -23,7 +23,6 @@ import { REQUIRED_MESSAGE } from '@/features/programme-suitability/useSuitabilit
 import ProgrammeSuitabilityStep from '@/features/programme-suitability/ProgrammeSuitabilityStep';
 import { SUITABILITY_STEP } from '@/features/programme-suitability/wizardStep';
 import { canPreviewIlrStep } from '@/lib/localIlrPreview';
-import { canPreviewFinalEnrolmentStep } from '@/lib/localEnrolmentDesignPreview';
 import { EnrolmentStepIcon } from '@/features/learner-enrolment/EnrolmentVisuals';
 import { LearnerEnrolmentVisualContext } from '@/features/learner-enrolment/enrolmentPresentation';
 import enrolmentStyles from '@/features/learner-enrolment/learnerEnrolment.module.css';
@@ -109,9 +108,8 @@ export function WizardShell({
   header?: ReactNode;
   sidebar?: ReactNode;
 }) {
-  const { draft, hydrated, ready, saveIlr, ilrSaving, ilrFinalisedAt, ilrLegacyReadOnly, layout, steps, suitability, isCommercial } = useWizard();
+  const { draft, hydrated, ready, layoutReady, saveIlr, ilrSaving, ilrFinalisedAt, ilrLegacyReadOnly, layout, steps, suitability, isCommercial } = useWizard();
   const previewIlr = mode === 'learner' && !isCommercial && canPreviewIlrStep(steps[currentIndex]?.slug);
-  const previewFinalSteps = mode === 'learner' && !isCommercial && canPreviewFinalEnrolmentStep(steps[currentIndex]?.slug);
   const continuedAssessment = useRef(0);
   const assessmentIndex = steps.findIndex((step) => step.slug === SUITABILITY_STEP.slug);
   const assessmentMissing = Boolean((layout.programmeSuitability?.enabled || draft.programmeSuitability?.required) && draft.programmeSuitability?.required !== false && (draft.programmeSuitability?.status !== 'SUBMITTED' || !draft.programmeSuitability.selectionConfirmed));
@@ -147,8 +145,7 @@ export function WizardShell({
   );
   /** First step before `target` that is still unfilled, or -1 if the path is clear. */
   const blockingStep = (target: number) => stepComplete.slice(0, target).findIndex((c) => !c);
-  const locked = (i: number) => gated && (i > currentIndex || previewFinalSteps) && blockingStep(i) !== -1
-    && !(mode === 'learner' && !isCommercial && canPreviewFinalEnrolmentStep(steps[i]?.slug))
+  const locked = (i: number) => gated && i > currentIndex && blockingStep(i) !== -1
     && !(previewIlr && canPreviewIlrStep(steps[i]?.slug));
 
   // What the rail and the progress count call complete. Next Steps has nothing
@@ -208,11 +205,6 @@ export function WizardShell({
   const navigateTo = useCallback(async (target: number, viaNext = false) => {
     if (target < 0 || target >= steps.length) return;
     if (navigatingSignature.current) return;
-    if (mode === 'learner' && !isCommercial && (previewFinalSteps || canPreviewFinalEnrolmentStep(steps[target]?.slug))) {
-      // Design navigation does not save answers or sign the page being left.
-      onNavigateStep(target);
-      return;
-    }
     const leavingUnsignedIlr = mode === 'learner' && !isCommercial && !ilrFinalisedAt && !ilrLegacyReadOnly
       && steps[currentIndex]?.slug === 'ilr-details' && target > currentIndex;
     if (leavingUnsignedIlr && !viaNext) {
@@ -282,7 +274,7 @@ export function WizardShell({
     }
 
     await leaveStep();
-  }, [steps, saveIlr, error, currentIndex, mode, isCommercial, ilrFinalisedAt, ilrLegacyReadOnly, hydrated, assessmentIndex, ready, assessmentMissing, modulesMissing, suitability, gated, stepComplete, onNavigateStep, previewIlr, previewFinalSteps]);
+  }, [steps, saveIlr, error, currentIndex, mode, isCommercial, ilrFinalisedAt, ilrLegacyReadOnly, hydrated, assessmentIndex, ready, assessmentMissing, modulesMissing, suitability, gated, stepComplete, onNavigateStep, previewIlr]);
 
   const currentStep = steps[Math.min(currentIndex, steps.length - 1)];
   const BuiltinBody = currentStep && currentStep.builtin && !BLOCK_STEPS.has(currentStep.slug) ? BODIES_BY_SLUG[currentStep.slug] : undefined;
@@ -343,7 +335,15 @@ export function WizardShell({
     navigateTo(currentIndex + 1);
   }, [suitability?.continueToken, suitability?.status, suitability?.selectionConfirmed, suitability?.state?.selectedProgramme, draft.programmeModulesCompletion?.required, mode, currentStep?.slug, isLast, currentIndex, navigateTo, finish, ready]);
 
-  if (mode === 'learner' && !previewFinalSteps && assessmentIndex >= 0 && currentIndex > assessmentIndex && (assessmentMissing || modulesMissing)) return (
+  // The default registry includes every built-in step. Rendering it while the
+  // learner's published layout loads briefly exposes steps removed by admins.
+  if (layoutReady === false) return (
+    <div role="status" className="rounded-2xl border border-foreground-200/60 bg-background-50 p-5 text-sm text-foreground-500">
+      Loading enrolment layout…
+    </div>
+  );
+
+  if (mode === 'learner' && assessmentIndex >= 0 && currentIndex > assessmentIndex && (assessmentMissing || modulesMissing)) return (
     <div role="alert" className="rounded-xl border border-primary-200 bg-primary-50 p-4">
       <p>{assessmentMissing ? REQUIRED_MESSAGE : moduleMessage}</p>
       <button type="button" className={`${btnPrimary} mt-3`} onClick={() => onNavigateStep(assessmentIndex)}>Return to {SUITABILITY_STEP.label}</button>
@@ -571,7 +571,7 @@ export function WizardShell({
               )}
               {/* Assessment submission is independent; ordinary step data saves behind navigation. */}
               {isLast ? (
-                <button onClick={finish} disabled={submitting || previewFinalSteps} className={btnSuccess}>
+                <button onClick={finish} disabled={submitting} className={btnSuccess}>
                   {submitting ? <><AppIcon className="ri-loader-4-line animate-spin" />Submitting…</> : <><AppIcon className="ri-check-double-line" />{finishLabel}</>}
                 </button>
               ) : (

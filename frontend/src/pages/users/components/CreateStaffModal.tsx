@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { useToast } from "@/hooks/useToast.helpers";
 import { ADMIN_POSITION, TUTOR_POSITION, createStaffUser } from '@/api/staffUsers';
@@ -220,6 +221,8 @@ export function CreateStaffModal({ variant, onClose, onCreated }: {
                 </label>
               ))}
             </div>
+          ) : field.type === 'date' ? (
+            <DatePickerField label={field.label} hideLabel inputId={`cs-${field.name}`} value={value} onChange={next => setField(field.name, next)} required={field.required} />
           ) : (
             <input
               id={`cs-${field.name}`}

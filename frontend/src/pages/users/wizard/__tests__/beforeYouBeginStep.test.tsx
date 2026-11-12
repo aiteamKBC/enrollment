@@ -18,7 +18,7 @@ beforeAll(() => {
 describe('Before You Begin step', () => {
   it('comes straight after the Introduction, with a body for every step', () => {
     expect(WIZARD_STEPS.slice(0, 3).map((step) => step.slug)).toEqual([
-      'introduction', 'before-you-begin', 'ilr-details',
+      'introduction', 'before-you-begin', 'personal-details',
     ]);
     expect(STEP_BODIES).toHaveLength(WIZARD_STEPS.length);
     expect(STEP_BODIES[index('before-you-begin')]).toBe(BeforeYouBegin);

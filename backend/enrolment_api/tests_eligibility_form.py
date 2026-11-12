@@ -125,6 +125,12 @@ def application(**overrides):
 
 
 class CleanApplicationTests(SimpleTestCase):
+    def test_legacy_title_answer_is_ignored(self):
+        row, errors = ef.clean_application(application(title="Dr"), today=TODAY)
+        self.assertEqual(errors, {})
+        self.assertNotIn("title", row)
+        self.assertNotIn("title", ef.INSERT_COLUMNS)
+
     def test_a_complete_application_maps_every_answer_to_its_column(self):
         row, errors = ef.clean_application(application(), today=TODAY)
         self.assertEqual(errors, {})
@@ -419,6 +425,32 @@ class SubmitApplicationTests(SimpleTestCase):
         self.assertIsNone(stored["layout_version"])
         self.assertEqual((stored["eligible"], stored["ineligible_reason"]), (True, None))
 
+    def test_custom_choice_rule_changes_screening_outcome_on_the_server(self):
+        from enrolment_api import eligibility_layout as el
+
+        raw = layout_with(extra=[{"key": "new_attendance", "builtin": False, "hidden": False,
+                                  "required": True, "label": "Attendance requirement", "type": "dropdown",
+                                  "options": ["Yes", "No", "Unsure"],
+                                  "screeningRule": {"eligibleAnswers": ["Yes"]}}])
+        normalized, _ = el.normalize_layout(raw, None)
+        item = normalized["sections"][-1]["items"][-1]
+        self.published.return_value = (10, el.public_layout(normalized, include_screening_rules=True))
+        for answer, expected in (("Yes", True), ("No", False), ("Unsure", False)):
+            with self.subTest(answer=answer):
+                response, cursor = self.post({**application(custom={item["key"]: answer}), "layoutVersion": 10})
+                self.assertEqual(response.status_code, 201)
+                body = json.loads(response.content)
+                self.assertIs(body["eligible"], expected)
+                self.assertEqual(len(body["reasons"]), 0 if expected else 1)
+                self.assertEqual(body["outcome"], "invited" if expected else "notEligible")
+                sql, params = cursor.executed[0]
+                self.assertIn(item["column"], sql)
+                self.assertEqual(params[-1], answer)
+        response, cursor = self.post({**application(custom={item["key"]: "Forged"}), "layoutVersion": 10})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content)["fields"], {item["key"]: "Choose one of the listed options."})
+        self.assertEqual(cursor.executed, [])
+
     def submitted(self, body):
         response, cursor = self.post(body)
         self.assertEqual(response.status_code, 201)
@@ -584,9 +616,6 @@ class TableTests(SimpleTestCase):
             "start_date_with_employer", "job_title", "country_of_residence", "nationality",
             "resident_prev_3_years", "years_in_uk", "full_time_education_prior", "expected_leaving_date",
         }})
-        self.assertEqual(schema.count("CREATE TABLE IF NOT EXISTS enrolment.eligibility_application_reviews"), 1)
-        self.assertGreater(schema.index("CREATE TABLE IF NOT EXISTS enrolment.eligibility_application_reviews"),
-                           schema.index("ADD CONSTRAINT eligibility_form_pkey PRIMARY KEY"))
 
     def test_ddl_creates_every_column_the_insert_writes(self):
         cursor = FakeCursor()

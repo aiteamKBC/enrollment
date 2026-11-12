@@ -3,7 +3,7 @@
  * added and edited in the Add/Edit PLR form, with certificates stored as files.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppIcon } from '@/components/feature/AppIcon';
 import type { PlrRecord, WizardDraft } from '../../types';
@@ -34,7 +34,7 @@ const GCSE: PlrRecord = {
   id: 'rec-1', placeOfStudy: 'Canterbury College', qualificationType: 'GCSE', subject: 'Maths', level: '2',
   startDate: '2018-09-01', endDate: '2020-06-30', awardDate: '2020-08-20', credits: 0, grade: '5', recordType: 'Manual',
 };
-const dialog = () => screen.getByRole('dialog');
+const dialog = () => screen.getByRole('dialog', { name: /^(Add|Edit) PLR$/ });
 const combos = () => within(dialog()).getAllByRole('combobox');
 const box = (label: string) => within(dialog()).getByText(label).closest('label')!.querySelector('input')!;
 
@@ -92,7 +92,7 @@ describe('Personal Learning Record step', () => {
 
     await userEvent.type(box('Please specify the subject'), 'Geography');
     await userEvent.type(box('Level'), '2');
-    await userEvent.type(box('Award date'), '2020-08-20');
+    fireEvent.change(within(dialog()).getByRole('combobox', { name: 'Award date' }), { target: { value: '20/08/2020' } });
     await userEvent.type(box('Grade'), '6');
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
 

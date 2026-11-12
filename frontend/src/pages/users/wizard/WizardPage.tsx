@@ -16,9 +16,9 @@ import { DEFAULT_LAYOUT, visibleSteps } from './layout/resolve';
 const DEFAULT_STEPS = visibleSteps(DEFAULT_LAYOUT);
 
 function WizardInner({ stepSlug }: { stepSlug: string }) {
-  const { userId, isCommercial, board, draft, saveIlr, steps = DEFAULT_STEPS } = useWizard();
+  const { userId, isCommercial, board, draft, saveIlr, ready, steps = DEFAULT_STEPS } = useWizard();
   // Resolved against the published layout's steps, so a step added in the
-  // wizard builder has an address and a removed one falls back to the first.
+  // wizard builder has an address and a removed one redirects to the first.
   const idx = steps.findIndex((s) => s.slug === stepSlug);
   const currentIndex = idx === -1 ? 0 : idx;
   const navigate = useNavigate();
@@ -30,6 +30,12 @@ function WizardInner({ stepSlug }: { stepSlug: string }) {
   const profileHref = `/users/${userId}${suffix}`;
 
   const goTo = (i: number) => navigate(`/users/${userId}/wizard/${steps[i].slug}${suffix}`);
+
+  useEffect(() => {
+    if (ready && idx === -1 && steps[0]) {
+      navigate(`/users/${userId}/wizard/${steps[0].slug}${suffix}`, { replace: true });
+    }
+  }, [ready, idx, steps, navigate, userId, suffix]);
 
   const finish = async () => {
     const pd = draft.personalDetails;
@@ -122,7 +128,6 @@ function WizardPageContent() {
   // generic next-step link reaches the ILR route, land on the next real step.
   // Neither ILR step applies to commercial delivery.
   const resolvedStepSlug = isCommercial && (stepSlug === 'ilr' || stepSlug === 'ilr-details') ? 'plr' : stepSlug;
-  if (!isCommercial && stepSlug === 'personal-details') return <Navigate to={`/users/${userId}/wizard/ilr-details${suffix}`} replace />;
 
   if (loading || loadError || !board) {
     return (

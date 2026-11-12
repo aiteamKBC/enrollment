@@ -2,7 +2,7 @@
  * Reading a layout: the standard form as a layout, a published layout made
  * whole, and what each item is called and answers.
  */
-import { ADDRESS_GROUPS, ALWAYS_VISIBLE_PUBLIC_FIELDS, BUILTIN_ITEMS, BUILTIN_SECTIONS, NEW_PUBLIC_FIELDS, RETIRED_PUBLIC_FIELDS, RETIRED_PUBLIC_ITEMS, WORKPLACE_FIELDS, TEXT_SLOTS, builtinSection, isBuiltinQuestion, textFor } from './registry';
+import { ADDRESS_GROUPS, ALWAYS_VISIBLE_PUBLIC_FIELDS, BUILTIN_ITEMS, BUILTIN_SECTIONS, FORM_PROTECTED_FIELDS, NEW_PUBLIC_FIELDS, RETIRED_PUBLIC_FIELDS, RETIRED_PUBLIC_ITEMS, SCREENING_PROTECTED_FIELDS, WORKPLACE_FIELDS, TEXT_SLOTS, builtinSection, isBuiltinQuestion, textFor } from './registry';
 import { QUESTION_TYPES, type EligibilityItem, type EligibilityLayout, type EligibilitySection } from './types';
 
 const TYPES = new Set<string>(QUESTION_TYPES.map((t) => t.value));
@@ -215,16 +215,41 @@ export function resolveLayout(raw: EligibilityLayout | null | undefined, workpla
     sections.splice(sections.indexOf(retired), 1);
   }
   const texts = cleanTexts(raw.texts);
+  // Restore screening inputs in old layouts without rewriting stored versions
+  // or changing whether their answers are required.
+  for (const key of SCREENING_PROTECTED_FIELDS) {
+    if (WORKPLACE_FIELDS.has(key) && !workplaceEnabled) continue;
+    const home = sections.find(section => section.slug === BUILTIN_ITEMS[key].section)!;
+    const existing = sections.flatMap(section => section.items).find(item => item.builtin && item.key === key);
+    if (existing && !home.items.includes(existing)) {
+      for (const section of sections) section.items = section.items.filter(item => item !== existing);
+      home.items.push(existing);
+    } else if (!existing) {
+      home.items.push({ key, builtin: true, hidden: false });
+    }
+    home.hidden = false;
+    home.items.find(item => item.builtin && item.key === key)!.hidden = false;
+  }
   const birthSection = sections.find(section => section.items.some(item => item.builtin && item.key === 'dateOfBirth'))!;
   birthSection.hidden = false;
   for (const item of birthSection.items) if (item.builtin && item.key === 'dateOfBirth') Object.assign(item, { hidden: false, required: true });
-  return texts ? { sections, texts, workplaceEnabled } : { sections, workplaceEnabled };
+  return {
+    sections,
+    workplaceEnabled,
+    ...(texts ? { texts } : {}),
+    ...(typeof raw.activationEmailHtml === 'string' ? { activationEmailHtml: raw.activationEmailHtml } : {}),
+  };
 }
 
 /** Whether the item is a built-in question that must always be asked. */
 export function isLocked(item: EligibilityItem): boolean {
   const def = item.builtin ? BUILTIN_ITEMS[item.key] : undefined;
   return isBuiltinQuestion(def) && Boolean(def.locked);
+}
+
+/** Whether a built-in question must stay on the form. */
+export function isRemovalProtected(item: EligibilityItem): boolean {
+  return isLocked(item) || Boolean(item.screeningRule) || (item.builtin && (SCREENING_PROTECTED_FIELDS.has(item.key) || FORM_PROTECTED_FIELDS.has(item.key)));
 }
 
 /** What the builder calls an item. */
@@ -244,7 +269,7 @@ export function sectionDescription(section: EligibilitySection): string {
 /** A built-in choice question's answer list, edited or standard. */
 export function builtinOptions(item: EligibilityItem): readonly string[] | undefined {
   const def = item.builtin ? BUILTIN_ITEMS[item.key] : undefined;
-  if (item.builtin && ['workplaceArrangement', 'title'].includes(item.key) && isBuiltinQuestion(def)) return def.options;
+  if (item.builtin && item.key === 'workplaceArrangement' && isBuiltinQuestion(def)) return def.options;
   return isBuiltinQuestion(def) && def.options ? item.options ?? def.options : undefined;
 }
 

@@ -45,7 +45,7 @@ import { ToastProvider } from '@/hooks/useToast';
 import { fetchInclusionStatus } from '@/api/wizardInclusion';
 import { WizardProvider } from '../WizardContext';
 import { WizardShell } from '../WizardShell';
-import { WIZARD_STEPS } from '../../types';
+import { defaultLayout } from '../layout/resolve';
 import type { EnrolmentBoard, IlrForm, IlrLearnerDetails, PersonalDetails } from '../../types';
 
 // Only the branches the wizard reads are populated; the board type is far wider
@@ -105,10 +105,12 @@ const COMPLETE_EXTENDED_ILR: IlrForm = {
 } as IlrForm;
 
 function renderShell(mode: 'learner' | 'staff', onNavigateStep = vi.fn(), children?: ReactNode) {
+  const layout = defaultLayout();
+  layout.steps.find((step) => step.slug === 'personal-details')!.hidden = true;
   render(
     <ToastProvider>
-      <WizardProvider userId="20" board={BOARD}>
-        {/* Step 2 — Personal Details, the first step with anything to fill in. */}
+      <WizardProvider userId="20" board={BOARD} layout={layout}>
+        {/* This fixture explicitly removes Personal Details, so ILR is step 3. */}
         <WizardShell currentIndex={2} mode={mode} onNavigateStep={onNavigateStep} onFinish={vi.fn()} />
         {children}
       </WizardProvider>
@@ -137,19 +139,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('learner step gating', () => {
-  it('opens only the final three tabs for local design without saving or signing earlier steps', async () => {
-    vi.stubEnv('DEV', true);
-    vi.stubEnv('VITE_LOCAL_ENROLMENT_DESIGN_PREVIEW', '1');
-    const navigate = renderShell('learner');
+  it('keeps the final three tabs locked while earlier learner steps are incomplete', async () => {
+    renderShell('learner');
     await waitForHydration();
     for (const name of ['Policies', 'Initial Assessments', 'What Happens Now?']) {
-      await waitFor(() => expect(screen.getByRole('tab', { name })).not.toHaveAttribute('aria-disabled', 'true'));
+      await waitFor(() => expect(screen.getByRole('tab', { name })).toHaveAttribute('aria-disabled', 'true'));
     }
-    expect(screen.getByRole('tab', { name: 'Inclusion' })).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(screen.getByRole('tab', { name: 'Policies' }));
-    expect(navigate).toHaveBeenCalledWith(WIZARD_STEPS.findIndex(step => step.slug === 'policies'));
     expect(saveExtendedIlr).not.toHaveBeenCalled();
   });
+
   it('temporarily allows ILR to Extended ILR navigation without answers only in local preview', async () => {
     vi.stubEnv('DEV', true);
     vi.stubEnv('MODE', 'eligibility-local');
@@ -234,13 +232,13 @@ describe('learner step gating', () => {
       meta: { updatedAt: '2026-08-01T00:00:00Z' },
     });
     const onNavigateStep = renderShell('learner');
-    await screen.findByDisplayValue('2024-01-15');
+    await screen.findByDisplayValue('15/01/2024');
 
     // Something the learner actually changed — a save is only owed on answers
     // that differ from what was hydrated (see the no-op test below).
     // Found by its hydrated value — the wizard's labels aren't wired to their
     // inputs with htmlFor, so getByLabelText doesn't reach them.
-    fireEvent.change(screen.getByDisplayValue('2024-01-15'), { target: { value: '2024-01-16' } });
+    fireEvent.change(screen.getByDisplayValue('15/01/2024'), { target: { value: '16/01/2024' } });
 
     // Held open so the write is still in flight when the move is asserted: the
     // learner must not be made to wait for the network to read the next step.
@@ -267,9 +265,9 @@ describe('learner step gating', () => {
     });
     saveExtendedIlr.mockRejectedValue(new Error('network down'));
     const onNavigateStep = renderShell('learner');
-    await screen.findByDisplayValue('2024-01-15');
+    await screen.findByDisplayValue('15/01/2024');
 
-    fireEvent.change(screen.getByDisplayValue('2024-01-15'), { target: { value: '2024-01-16' } });
+    fireEvent.change(screen.getByDisplayValue('15/01/2024'), { target: { value: '16/01/2024' } });
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     await waitFor(() => expect(saveExtendedIlr).toHaveBeenCalledTimes(1));
@@ -283,7 +281,7 @@ describe('learner step gating', () => {
       meta: { updatedAt: '2026-08-01T00:00:00Z' },
     });
     const onNavigateStep = renderShell('learner');
-    await screen.findByDisplayValue('2024-01-15');
+    await screen.findByDisplayValue('15/01/2024');
 
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 

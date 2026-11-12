@@ -52,10 +52,12 @@ function LearnerWizard({ stepSlug, onDone }: { stepSlug: string | undefined; onD
   const reachableSlug = steps[reachable]?.slug;
   const currentSlug = steps[currentIndex]?.slug;
   useEffect(() => {
-    if (shouldRedirectLearnerWizardStep({ ready, currentIndex, reachable, stepSlug: currentSlug }) && reachableSlug) {
+    if (ready && idx === -1 && steps[0]) {
+      navigate(`/learner/onboarding/${steps[0].slug}`, { replace: true });
+    } else if (shouldRedirectLearnerWizardStep({ ready, currentIndex, reachable, stepSlug: currentSlug }) && reachableSlug) {
       navigate(`/learner/onboarding/${reachableSlug}`, { replace: true });
     }
-  }, [ready, currentIndex, reachable, reachableSlug, currentSlug, navigate]);
+  }, [ready, idx, steps, currentIndex, reachable, reachableSlug, currentSlug, navigate]);
 
   const finish = async () => {
     // Backstop to the step gating: completeness is judged live, so the whole
@@ -135,8 +137,7 @@ export default function LearnerOnboardingPage() {
   // also clears an old bookmarked/sidebar URL once the account type is known.
   useEffect(() => {
     if (isCommercial) navigate('/workspace/learner', { replace: true });
-    else if (stepSlug === 'personal-details') navigate('/learner/onboarding/ilr-details', { replace: true });
-  }, [isCommercial, navigate, stepSlug]);
+  }, [isCommercial, navigate]);
 
   useEffect(() => {
     if (isCommercial) {
