@@ -110,7 +110,7 @@ export default function ComplianceDocumentsBuilder() {
     edit({ ...content, blocks }); selectBlock(next.id);
   };
   const matchesSearch = (template: TemplateListItem, text: string) =>
-    `${template.title} ${template.category} ${template.programmes.map((p) => index?.programmes[p]).join(' ')}`.toLowerCase().includes(text.toLowerCase());
+    `${template.title} ${template.fullTitle || ''} ${template.category} ${template.programmes.map((p) => index?.programmes[p]).join(' ')}`.toLowerCase().includes(text.toLowerCase());
   const filtered = index?.results.filter((template) => matchesSearch(template, query)) || [];
   const selectedCategoryLabel = categories.find((category) => category.value === selectedCategory)?.label;
   const documents = filtered.filter((template) => template.category === selectedCategory);
@@ -145,10 +145,10 @@ export default function ComplianceDocumentsBuilder() {
             {!selectedCategory ? <p className="py-8 text-center text-sm text-foreground-500">Select a document category</p> : <>
               <h2 className="mb-4 font-semibold">{selectedCategoryLabel}</h2>
               <div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm"><thead><tr><th className="p-2">Document title</th><th>Category</th><th>Programmes</th><th>Published version</th><th>Draft</th><th>Last updated</th><th>Actions</th></tr></thead><tbody>
-          {documents.map((t) => <tr key={t.templateId} className="border-t align-top"><th className="p-2">{t.title}</th><td className="p-2">{t.category}</td><td className="p-2">{t.programmes.length ? t.programmes.map((p) => index!.programmes[p]).join(', ') : 'Shared — all programmes'}</td><td className="p-2">{t.publishedVersion ? t.publishedVersion.number ? `v${t.publishedVersion.number}` : 'Original' : 'Not published'}</td><td className="p-2">{t.draft ? 'Saved draft' : '—'}</td><td className="p-2">{t.updatedAt ? new Date(t.updatedAt).toLocaleString('en-GB') : 'Original template'}</td><td className="p-2"><div className="flex flex-wrap gap-2">
-            <button className={btnSecondary} disabled={busy} aria-label={`Edit ${t.title}`} onClick={() => void open(t.templateId)}>Edit</button>
+          {documents.map((t) => <tr key={t.templateId} className="border-t align-top"><th className="p-2"><div>{t.title}</div>{t.fullTitle && <div className="mt-1 text-xs font-normal text-foreground-600">PDF: {t.fullTitle}</div>}</th><td className="p-2">{t.category}</td><td className="p-2">{t.programmes.length ? t.programmes.map((p) => index!.programmes[p]).join(', ') : 'Shared — all programmes'}</td><td className="p-2">{t.dynamic ? 'Learner-specific' : t.publishedVersion ? t.publishedVersion.number ? `v${t.publishedVersion.number}` : 'Original' : 'Not published'}</td><td className="p-2">{t.dynamic ? 'Managed by report workflow' : t.draft ? 'Saved draft' : '—'}</td><td className="p-2">{t.dynamic ? 'Finalised report snapshot' : t.updatedAt ? new Date(t.updatedAt).toLocaleString('en-GB') : 'Original template'}</td><td className="p-2"><div className="flex flex-wrap gap-2">
+            {t.dynamic ? <span className="text-xs text-foreground-600">Open from the learner’s Suitability &amp; RPL Report tab</span> : <><button className={btnSecondary} disabled={busy} aria-label={`Edit ${t.title}`} onClick={() => void open(t.templateId)}>Edit</button>
             <button className={btnSecondary} disabled={busy || !t.publishedVersion} aria-label={`Preview ${t.title}`} onClick={() => void previewSaved(t.templateId, t.publishedVersion?.id)}>Preview</button>
-            <button className={btnSecondary} disabled={busy} aria-label={`Version history for ${t.title}`} onClick={() => { setBusy(true); void api.templateHistory(t.templateId).then((data) => setHistory({ id: t.templateId, versions: data.results })).catch((e: Error) => setError(e.message)).finally(() => setBusy(false)); }}>Version history</button>
+            <button className={btnSecondary} disabled={busy} aria-label={`Version history for ${t.title}`} onClick={() => { setBusy(true); void api.templateHistory(t.templateId).then((data) => setHistory({ id: t.templateId, versions: data.results })).catch((e: Error) => setError(e.message)).finally(() => setBusy(false)); }}>Version history</button></>}
           </div></td></tr>)}
         </tbody></table>{index && !documents.length && <p className="p-3 text-sm">{query ? 'No matching templates in this category.' : 'No templates in this category.'}</p>}</div>
             </>}

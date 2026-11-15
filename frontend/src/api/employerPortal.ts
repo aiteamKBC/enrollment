@@ -22,6 +22,7 @@ import type { CoachMeetingArtifactsResponse } from '@/pages/coach/shared/calenda
 import type { ProgressMetric } from '@/api/learnerMetrics';
 import type { DashboardOverviewPayload } from '@/api/dashboardTabs';
 import type { DashboardTrainingPayload } from '@/api/dashboardTraining';
+import { prefetchAssessmentSecurity } from '@/features/programme-suitability/api';
 
 const BASE = '/learner_api/employer-portal';
 
@@ -142,7 +143,7 @@ export interface EmployerDocumentRow {
    * 'agreement' is the Apprenticeship Agreement, which has its own table and
    * signing endpoint but appears in the same signable list as everything else.
    */
-  kind: 'document' | 'agreement' | 'training-plan' | 'written-agreement';
+  kind: 'document' | 'agreement' | 'training-plan' | 'written-agreement' | 'suitability-rpl-report';
   id: string;
   docType: string;
   label: string;
@@ -503,6 +504,24 @@ export function signDocumentAsEmployer(
     `/enrolment_api/documents/${kind}/${learnerId}/${docId}/sign/`,
     { method: 'POST', body: JSON.stringify(input) },
   );
+}
+
+export async function signSuitabilityRplReportAsEmployer(
+  kind: LearnerKind,
+  learnerId: string,
+  issueId: string,
+  payload: { name: string; signature: string },
+) {
+  const csrf = await prefetchAssessmentSecurity();
+  return request<{ status: unknown }>(`/enrolment_api/programme-suitability/${kind}/${learnerId}/suitability-rpl/issued/${issueId}/signatures/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(csrf.csrfToken ? { 'X-CSRFToken': csrf.csrfToken } : {}) },
+    body: JSON.stringify({
+      role: 'employer', name: payload.name, signature: payload.signature,
+      consent: true,
+      consentText: 'I have reviewed the exact issued Suitability & RPL Report PDF and consent to signing this immutable version.',
+    }),
+  });
 }
 
 /**

@@ -117,6 +117,37 @@ def pending_for(learner_id, include_reviews=True):
         unsigned = {str(r['id']) for r in marks(query, role).filter(signature_length=0).values('id')}
         for revision in eligible:
             if revision['signing_source_id'] in unsigned: results.append(notification(key, sources[key], revision))
+
+    # Dynamic Suitability & RPL issues use their own immutable signature
+    # envelope.  Surface the learner's pending signature in the same queue,
+    # without exposing report evidence or allowing a draft to become signable.
+    try:
+        from programme_suitability.rpl_report import REPORT_DOCUMENT_KEY, _signature_status
+        report_issues = IssuedTemplate.objects.filter(
+            document_key=REPORT_DOCUMENT_KEY, learner_kind='apprenticeship', learner_id=learner_id,
+        ).order_by('-issued_at')
+        for issue in report_issues:
+            artifact = RenderHistory.objects.filter(issue=issue, payload__kind='suitability-rpl-issued-pdf-v1').first()
+            status = _signature_status(issue, artifact)
+            if not status or not status['signingEnabled'] or status['signatures']['learner']['signed']:
+                continue
+            results.append({
+                'id': f"document:suitability-rpl-report:{issue.pk}",
+                'documentKey': REPORT_DOCUMENT_KEY,
+                'documentId': str(issue.pk),
+                'revisionId': None,
+                'revisionNumber': status['reportRevision'],
+                'title': 'Suitability & RPL Report',
+                'category': 'Review',
+                'templateVersion': status['reportVersion'],
+                'issuedAt': issue.issued_at.isoformat() if issue.issued_at else None,
+                'status': 'pending',
+                'requiresLearnerSignature': True,
+                'href': '/learner/compliance-documents?signature=' + quote(f"signature-suitability-rpl-report-{issue.pk}"),
+            })
+            break
+    except DatabaseError:
+        logger.exception('Could not load issued Suitability & RPL signature request')
     results.sort(key=lambda r: (r['issuedAt'] or '', r['id']), reverse=True)
     return {'count': len(results), 'results': results}
 

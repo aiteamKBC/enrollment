@@ -51,6 +51,7 @@ import {
 } from '@/lib/writtenAgreementPdf';
 import { DocumentCard, Field, FieldGroup } from './DocumentCard';
 import { RowsSkeleton } from '@/components/feature/Skeletons';
+import { SuitabilityRplIssuedCard } from '@/features/compliance-documents/SuitabilityRplIssuedCard';
 import { Building2, CalendarDays, ClipboardList, FileSignature, FileText, Flag, GraduationCap, Layers3, Phone, UserRound } from 'lucide-react';
 import styles from './compliance.module.css';
 import { currentDocument } from './currentDocument';
@@ -487,6 +488,8 @@ export default function LearnerCompliancePage() {
               }
             />
             </DocumentSignatureTarget>
+            {written && <LearnerDocumentRevisions learnerId={String(id)} documentKey="written-agreement" sourceId={written.id} />}
+            <SuitabilityRplIssuedCard kind={kind} learnerId={String(id)} signatoryName={agreementName || writtenData?.learner.name || ''} />
           </>
         )}
       </div>

@@ -69,6 +69,9 @@ export async function loadEmployerDocumentPreview(employerId: string, target: Si
     ]);
     return { kind: 'pdf', blob: buildReviewPdf(review, REVIEW_QUESTION_LABELS).output('blob'), filename: reviewDocumentFilename(review) };
   }
+  if (item.kind === 'suitability-rpl-report') {
+    return readPdf(`/enrolment_api/document-templates/learners/${learnerId}/issued/${encodeURIComponent(item.id)}/pdf/`, filename, signal);
+  }
   const response = await checkedResponse(`${base}/documents/${item.kind}/${encodeURIComponent(item.id)}/`, signal);
   const stored = await response.json() as StoredDocument;
   if (stored.kind !== item.kind) throw new Error('The document type did not match. Please reload the list.');
