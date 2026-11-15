@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { AlignCenter, AlignLeft, AlignRight, Bold, Italic, Underline, List, ListOrdered, Undo2, Redo2, CalendarDays, FilePlus2, Braces, Signature, type LucideIcon } from 'lucide-react';
+import { EditorTableMenu } from './EditorTableMenu';
 import { btnSecondary, inputClass } from '@/pages/users/components/ui';
 import { blockIsProtected, documentPages, escapeHtml, fromPages, pageHtml, readPage } from './pageDocument';
 import type { DocumentTemplate, FieldDefinition } from './types';
@@ -17,6 +19,7 @@ export function FullPageEditor({ content, fields, data, presentationTheme, onCha
   const surface = useRef<HTMLDivElement>(null); const selection = useRef<Range | null>(null); const rendered = useRef('');
   const history = useRef<{ past: DocumentTemplate[]; future: DocumentTemplate[] }>({ past: [], future: [] });
   const [problem, setProblem] = useState(''); const [overflow, setOverflow] = useState(false); const [, refreshHistory] = useState(0);
+  const [selectedFormatting, setFormatting] = useState<{ snapshot: string; page: number; values: Record<string, boolean> }>({ snapshot: '', page: 0, values: {} });
   const [field, chooseField] = useState(''); const [size, chooseSize] = useState('3');
   const themed = isLavender(content);
   const reference = isReferencePurple(content), palette=documentPalette(content);
@@ -27,6 +30,7 @@ export function FullPageEditor({ content, fields, data, presentationTheme, onCha
   const margins = branded ? editorMargins(content, brand, index + 1) : settingsMargins;
   const checkOverflow = () => { if (surface.current) setOverflow(surface.current.scrollHeight > (branded ? surface.current.clientHeight : (297 - margins.top - margins.bottom) * 96 / 25.4) + 4); };
   const snapshotKey = JSON.stringify(page.blocks) + content.title + content.designTheme + presentationTheme + JSON.stringify(data?.signatures) + JSON.stringify(data?.signatureProvenance);
+  const formatting = selectedFormatting.snapshot === snapshotKey && selectedFormatting.page === index ? selectedFormatting.values : {};
   useEffect(() => {
     if (!surface.current || rendered.current === snapshotKey) return;
     surface.current.innerHTML = pageHtml(page, displayContent, data); if (branded) decorateBrandedContent(surface.current); rendered.current = snapshotKey; selection.current = null; checkOverflow();
@@ -50,7 +54,19 @@ export function FullPageEditor({ content, fields, data, presentationTheme, onCha
       emit(fromPages(content, next)); setProblem(''); checkOverflow();
     } catch (e) { setProblem((e as Error).message); surface.current.innerHTML = pageHtml(page, displayContent, data); if (branded) decorateBrandedContent(surface.current); }
   };
-  const saveSelection = () => { const active = window.getSelection(); if (active?.rangeCount && surface.current?.contains(active.anchorNode)) selection.current = active.getRangeAt(0).cloneRange(); };
+  const saveSelection = () => {
+    const active = window.getSelection();
+    if (active?.rangeCount && surface.current?.contains(active.anchorNode)) {
+      selection.current = active.getRangeAt(0).cloneRange();
+      if (typeof document.queryCommandState === 'function') {
+        const next: Record<string, boolean> = {};
+        for (const name of ['bold', 'italic', 'underline', 'justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList']) {
+          try { if (!document.queryCommandIndeterm?.(name)) next[name] = document.queryCommandState(name); } catch { /* Unsupported commands have no selected state. */ }
+        }
+        setFormatting({ snapshot: rendered.current, page: index, values: next });
+      }
+    }
+  };
   const restoreSelection = () => { surface.current?.focus(); if (selection.current && surface.current?.contains(selection.current.startContainer)) { const active = window.getSelection(); active?.removeAllRanges(); active?.addRange(selection.current); } };
   const command = (name: string, value?: string) => { restoreSelection(); document.execCommand(name, false, value); capture(); saveSelection(); };
   const insert = (html: string) => command('insertHTML', html);
@@ -100,6 +116,13 @@ export function FullPageEditor({ content, fields, data, presentationTheme, onCha
     capture(); selection.current = null;
   };
   const toolbarButton = (label: string, action: () => void, disabled = false) => <button type="button" className={`${btnSecondary} !px-2 !py-1`} disabled={disabled} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={action}>{label}</button>;
+  const iconButton = (label: string, Icon: LucideIcon, action: () => void, options: { disabled?: boolean; command?: string; text?: string } = {}) =>
+    <button type="button" title={label} aria-label={label} aria-pressed={options.command ? formatting[options.command] : undefined}
+      disabled={options.disabled} className={`${btnSecondary} !min-h-9 !gap-1.5 !px-2 !py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-400 ${options.command && formatting[options.command] ? '!border-primary-300 !bg-primary-100 !text-primary-900' : ''}`}
+      onMouseDown={(event) => { event.preventDefault(); saveSelection(); }} onClick={action}>
+      <Icon size={18} aria-hidden="true" />{options.text && <span>{options.text}</span>}
+    </button>;
+  const groupClass = 'flex min-w-0 flex-wrap items-center gap-1 border-r border-foreground-200 pr-2 last:border-r-0 last:pr-0';
   return <div className="space-y-3" aria-label="Full-page document editor">
     {problem && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{problem}</p>}
     <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
@@ -116,19 +139,43 @@ export function FullPageEditor({ content, fields, data, presentationTheme, onCha
         <p className="text-xs text-foreground-600">Pages use explicit breaks. Overflow continues onto additional PDF pages; PDF Preview shows the final pagination.</p>
       </nav>
       <div className="min-w-0 space-y-3">
-        <div role="toolbar" aria-label="Document formatting" className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border bg-background-50 p-3">
-          {toolbarButton('Bold', () => command('bold'))}{toolbarButton('Italic', () => command('italic'))}{toolbarButton('Underline', () => command('underline'))}
-          <label className="text-xs">Font size<select aria-label="Font size" className={inputClass} value={size} onChange={(e) => { chooseSize(e.target.value); command('fontSize', e.target.value); }}><option value="1">8</option><option value="2">10</option><option value="3">12</option><option value="4">14</option><option value="5">18</option><option value="6">24</option></select></label>
-          <label className="text-xs">Paragraph style<select aria-label="Paragraph style" className={inputClass} defaultValue="p" onChange={(e) => command('formatBlock', e.target.value)}><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option></select></label>
-          {toolbarButton('Align left', () => command('justifyLeft'))}{toolbarButton('Align centre', () => command('justifyCenter'))}{toolbarButton('Align right', () => command('justifyRight'))}
-          {toolbarButton('Bullet list', () => command('insertUnorderedList'))}{toolbarButton('Numbered list', () => command('insertOrderedList'))}
-          {toolbarButton('Add table', () => insert('<table style="width:100%;border-collapse:collapse"><thead><tr><th>Column 1</th><th>Column 2</th></tr></thead><tbody><tr><td><br></td><td><br></td></tr></tbody></table><p><br></p>'))}
-          {toolbarButton('Add row', () => tableEdit('add-row'))}{toolbarButton('Remove row', () => tableEdit('remove-row'))}{toolbarButton('Add column', () => tableEdit('add-column'))}{toolbarButton('Remove column', () => tableEdit('remove-column'))}
-          <select aria-label="Learner or document field" className={`${inputClass} !w-auto max-w-60 text-xs`} value={field} onChange={(e) => chooseField(e.target.value)}><option value="">Choose a learner or document field</option>{fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
-          {toolbarButton('Insert dynamic field', () => insert(`<span contenteditable="false" data-field-key="${escapeHtml(field)}">{{${escapeHtml(field)}}}</span>`), !field)}
-          {toolbarButton('Insert date', () => { const dateField = fields.find((f) => f.format === 'date'); if (dateField) insert(`<span contenteditable="false" data-field-key="${escapeHtml(dateField.key)}">{{${escapeHtml(dateField.key)}}}</span>`); })}
-          {toolbarButton('Insert signature block', () => { const missing = content.signatureRoles.find((role) => !content.blocks.some((b) => b.type === 'signature' && b.role === role)); if (!missing) { setProblem('All required signature blocks are already present on the document pages.'); return; } const next = pages.map((p, i) => i === index ? { ...p, blocks: [...p.blocks, { id: `signature-${missing}`, type: 'signature' as const, role: missing, label: `${missing} signature` }] } : p); emit(fromPages(content, next)); rendered.current = ''; })}
-          {toolbarButton('Insert page break', () => pageBreak())}{toolbarButton('Undo', () => undo(), !history.current.past.length)}{toolbarButton('Redo', () => undo(true), !history.current.future.length)}
+        <div role="toolbar" aria-label="Document formatting" className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border bg-background-50 p-2">
+          <div role="group" aria-label="Text formatting" className={groupClass}>
+            {iconButton('Bold', Bold, () => command('bold'), { command: 'bold' })}
+            {iconButton('Italic', Italic, () => command('italic'), { command: 'italic' })}
+            {iconButton('Underline', Underline, () => command('underline'), { command: 'underline' })}
+          </div>
+          <div role="group" aria-label="Font and paragraph" className={groupClass}>
+            <label className="flex flex-col gap-1 text-xs">Font size<select aria-label="Font size" className={`${inputClass} !w-20`} value={size} onChange={(e) => { chooseSize(e.target.value); command('fontSize', e.target.value); }}><option value="1">8</option><option value="2">10</option><option value="3">12</option><option value="4">14</option><option value="5">18</option><option value="6">24</option></select></label>
+            <label className="flex flex-col gap-1 text-xs">Paragraph style<select aria-label="Paragraph style" className={`${inputClass} !w-32`} defaultValue="p" onChange={(e) => command('formatBlock', e.target.value)}><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option></select></label>
+          </div>
+          <div role="group" aria-label="Alignment" className={groupClass}>
+            {iconButton('Align left', AlignLeft, () => command('justifyLeft'), { command: 'justifyLeft' })}
+            {iconButton('Align centre', AlignCenter, () => command('justifyCenter'), { command: 'justifyCenter' })}
+            {iconButton('Align right', AlignRight, () => command('justifyRight'), { command: 'justifyRight' })}
+          </div>
+          <div role="group" aria-label="Lists" className={groupClass}>
+            {iconButton('Bullet list', List, () => command('insertUnorderedList'), { command: 'insertUnorderedList' })}
+            {iconButton('Numbered list', ListOrdered, () => command('insertOrderedList'), { command: 'insertOrderedList' })}
+          </div>
+          <div role="group" aria-label="Tables" className={groupClass}>
+            <EditorTableMenu onCapture={saveSelection} operations={[
+              { label: 'Add table', run: () => insert('<table style="width:100%;border-collapse:collapse"><thead><tr><th>Column 1</th><th>Column 2</th></tr></thead><tbody><tr><td><br></td><td><br></td></tr></tbody></table><p><br></p>') },
+              { label: 'Add row', run: () => tableEdit('add-row') }, { label: 'Remove row', run: () => tableEdit('remove-row') },
+              { label: 'Add column', run: () => tableEdit('add-column') }, { label: 'Remove column', run: () => tableEdit('remove-column') },
+            ]} />
+          </div>
+          <div role="group" aria-label="Document fields and insert" className={groupClass}>
+            <label className="flex min-w-0 flex-col gap-1 text-xs">Learner or document field<select aria-label="Learner or document field" className={`${inputClass} !w-auto max-w-full sm:max-w-60 text-xs`} value={field} onChange={(e) => chooseField(e.target.value)}><option value="">Choose a learner or document field</option>{fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select></label>
+            {iconButton('Insert dynamic field', Braces, () => insert(`<span contenteditable="false" data-field-key="${escapeHtml(field)}">{{${escapeHtml(field)}}}</span>`), { disabled: !field, text: 'Dynamic field' })}
+            {iconButton('Insert date', CalendarDays, () => { const dateField = fields.find((f) => f.format === 'date'); if (dateField) insert(`<span contenteditable="false" data-field-key="${escapeHtml(dateField.key)}">{{${escapeHtml(dateField.key)}}}</span>`); }, { disabled: !fields.some((f) => f.format === 'date') })}
+            {iconButton('Insert signature block', Signature, () => { const missing = content.signatureRoles.find((role) => !content.blocks.some((b) => b.type === 'signature' && b.role === role)); if (!missing) { setProblem('All required signature blocks are already present on the document pages.'); return; } const next = pages.map((p, i) => i === index ? { ...p, blocks: [...p.blocks, { id: `signature-${missing}`, type: 'signature' as const, role: missing, label: `${missing} signature` }] } : p); emit(fromPages(content, next)); rendered.current = ''; }, { text: 'Signature block' })}
+            {iconButton('Insert page break', FilePlus2, () => pageBreak())}
+          </div>
+          <div role="group" aria-label="History" className={groupClass}>
+            {iconButton('Undo', Undo2, () => undo(), { disabled: !history.current.past.length })}
+            {iconButton('Redo', Redo2, () => undo(true), { disabled: !history.current.future.length })}
+          </div>
         </div>
         <details className="rounded-lg border bg-background-50 p-3 text-sm"><summary>Page setup — A4</summary><div className="mt-3 flex flex-wrap gap-3">{(['top', 'right', 'bottom', 'left'] as const).map((name) => <label key={name} className="text-xs">{name} margin (mm)<input type="number" min={10} max={35} className={inputClass} value={settingsMargins[name]} onChange={(e) => emit({ ...content, pageLayout: { size: 'a4', header: '', footer: '', pageNumbers: false, ...content.pageLayout, margins: { ...settingsMargins, [name]: Number(e.target.value) } } })} /></label>)}
           {(['header', 'footer'] as const).map((name) => <label className="text-xs" key={name}>{name}<input className={inputClass} value={content.pageLayout?.[name] || ''} onChange={(e) => emit({ ...content, pageLayout: { size: 'a4', margins: settingsMargins, header: '', footer: '', pageNumbers: false, ...content.pageLayout, [name]: e.target.value } })} /></label>)}
