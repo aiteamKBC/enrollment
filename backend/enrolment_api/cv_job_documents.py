@@ -98,6 +98,11 @@ def cv_documents(request, kind, learner_id):
             )
             row.documents = [*_items(row), item]
             row.save(update_fields=["documents", "updated_at"])
+            if item.get("docKind") == "cv":
+                from programme_suitability.models import SuitabilityCvExtraction
+                SuitabilityCvExtraction.objects.filter(
+                    learner_kind=kind, learner_id=learner_id, source_document_id=str(file_id),
+                ).delete()
     except DatabaseError as exc:
         logger.warning("Could not record CV document: %s", exc)
         uploads.discard(item["container"], item["blobName"])

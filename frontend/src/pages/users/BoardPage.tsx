@@ -68,10 +68,12 @@ import SignReviewModal from '@/pages/learner/onboarding/reviews/SignReviewModal'
 import { downloadReviewPdf } from '@/pages/learner/onboarding/reviews/reviewDocument';
 import { REVIEW_QUESTION_LABELS } from '@/pages/learner/onboarding/reviews/questions';
 import type { LearnerKind } from '@/api/extendedIlr';
+import { SuitabilityRplReportTab } from './suitability-rpl/SuitabilityRplReportTab';
+import { fetchSuitabilityRplIssuedDocuments, type SuitabilityRplIssuedDocument } from '@/api/suitabilityRplReport';
 import type { EnrolmentBoard, FsBlock } from './types';
 import { competenceMeta } from '@/mocks/enrolment-console';
 import {
-  AlertTriangle, Award, Briefcase, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, Flag,
+  AlertTriangle, Award, Briefcase, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, FileCheck2, Flag,
   FolderOpen, GraduationCap, History, LayoutGrid, ListChecks, MessageSquareText, Network, PenLine, Search,
   ShieldCheck, Target, Trash2, Upload, UserX, Users, Wand2, Wrench, type LucideIcon,
 } from 'lucide-react';
@@ -1208,12 +1210,16 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
   const [signing, setSigning] = useState<ReviewFormResponse | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [issueRetry, setIssueRetry] = useState<OnboardingReviewSlot | null>(null);
+  const [rplDocuments, setRplDocuments] = useState<SuitabilityRplIssuedDocument[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     fetchOnboardingReviewSlots(kind, learnerId)
       .then((r) => !cancelled && setReviews(r.reviews))
       .catch((e: Error) => !cancelled && setErr(e.message));
+    fetchSuitabilityRplIssuedDocuments(kind, learnerId)
+      .then((r) => !cancelled && setRplDocuments(r.documents))
+      .catch(() => { if (!cancelled) setRplDocuments([]); });
     return () => { cancelled = true; };
   }, [kind, learnerId, reload]);
 
@@ -1250,6 +1256,10 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
     <>
       {adminPreview.dialog}
       <p className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider mb-2">{programme || 'Programme Name'}</p>
+      {rplDocuments.map((document) => <div key={document.issueId} className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-foreground-100 px-3 py-2">
+        <span className="text-[12px] text-foreground-700 inline-flex flex-wrap items-center gap-2"><i className="ri-file-pdf-line text-red-500" /><span>Suitability &amp; RPL Report</span><span className="text-[11px] text-foreground-400">Version {document.reportVersion} · Issued {document.issuedAt ? new Date(document.issuedAt).toLocaleDateString('en-GB') : '—'}</span><span className="text-[10px] font-semibold text-primary-700">{document.fullySigned ? 'fully signed' : 'awaiting signatures'}</span></span>
+        <span className="flex flex-wrap items-center gap-2"><button type="button" className={btnSecondary} onClick={() => window.open(document.pdfUrl, '_blank', 'noopener,noreferrer')}>Preview</button><a className={btnSecondary} href={document.pdfUrl} download="Suitability-RPL-Report.pdf">Download</a>{document.signingEnabled && !document.signatures.admin.signed && <ActionLink label="Sign" icon="ri-pen-nib-line" onClick={() => navigate(`/users/${learnerId}?tab=suitability-rpl`)} />}</span>
+      </div>)}
       {err && <p role="alert" className="text-[12px] text-red-600 mb-2"><i className="ri-error-warning-line mr-1" />{err}{issueRetry && <button type="button" className={`${btnSecondary} ml-2`} disabled={Boolean(busy)} onClick={() => { void issue(issueRetry); }}>Retry issuing document</button>}</p>}
       {reviews === null && !err && <p className="text-[12px] text-foreground-400 py-2"><i className="ri-loader-4-line animate-spin mr-1.5" />Loading reviews…</p>}
       {reviews !== null && reviews.length === 0 && <EmptyState text="No enrolment reviews for this learner" />}
@@ -1402,7 +1412,7 @@ export default function BoardPage() {
 // writes any more appear only for learners who have some.                     //
 // --------------------------------------------------------------------------- //
 
-type TabId = 'overview' | 'documents' | 'skills' | 'activity';
+type TabId = 'overview' | 'suitability-rpl' | 'documents' | 'skills' | 'activity';
 
 /** A titled card, with an optional count and actions. */
 function Card({
@@ -1531,6 +1541,7 @@ function BoardView({
   refreshError: string | null;
 }) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [search, setSearch] = useSearchParams();
   const { info, success, error } = useToast();
   const userId = board.user.id;
@@ -1543,6 +1554,7 @@ function BoardView({
   // ---- tabs: kept in the URL, so a reload or a shared link reopens the same one ----
   const tabs: { id: TabId; label: string; icon: LucideIcon; count?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
+    ...(isAdmin ? [{ id: 'suitability-rpl' as const, label: 'Suitability & RPL Report', icon: FileCheck2 }] : []),
     // The compliance paperwork, reviews and uploads are apprenticeship-only.
     ...(isCommercial ? [] : [{ id: 'documents' as const, label: 'Documents', icon: FolderOpen }]),
     { id: 'skills', label: 'Skills & progress', icon: Target, count: board.competencies.length },
@@ -1727,6 +1739,10 @@ function BoardView({
         <BoardTabs tabs={tabs} active={tab} onChange={selectTab} />
 
         <div role="tabpanel" id={`board-panel-${tab}`} aria-labelledby={`board-tab-${tab}`} className="space-y-4">
+          {tab === 'suitability-rpl' && isAdmin && (
+            <SuitabilityRplReportTab kind={kind} learnerId={userId} learnerName={board.user.name} />
+          )}
+
           {tab === 'overview' && (
             <>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

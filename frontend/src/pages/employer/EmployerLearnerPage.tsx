@@ -266,6 +266,7 @@ function EmployerLearnerContent() {
           onClose={signingActions.closeSigning}
           onSign={signingActions.sign}
           onSaveReviewAnswers={signingActions.saveReviewAnswers}
+          onPreviewDocument={() => signingActions.openDocument(signingActions.signing!)}
         />
       )}
     </WorkspaceShell>

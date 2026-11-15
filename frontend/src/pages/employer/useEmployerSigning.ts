@@ -8,6 +8,7 @@ import {
   signReviewAsEmployer,
   signTrainingPlanAsEmployer,
   signWrittenAgreementAsEmployer,
+  signSuitabilityRplReportAsEmployer,
   type SignableItem,
 } from '@/api/employerPortal';
 import { fetchMigratedReviewForParty, signMigratedReviewAsParty } from '@/api/learnerCalendar';
@@ -93,6 +94,8 @@ export function useEmployerSigning(employerId: string, onSigned: () => void) {
     } else if (item.kind === 'agreement') {
       // Its own table, its own endpoint — see apprenticeship_agreement.py.
       await signAgreementAsEmployer(learnerId, { name, signature });
+    } else if (item.kind === 'suitability-rpl-report') {
+      await signSuitabilityRplReportAsEmployer(kind, learnerId, item.id, { name, signature });
     } else {
       await signDocumentAsEmployer(kind, learnerId, item.id, { name, signature });
     }
