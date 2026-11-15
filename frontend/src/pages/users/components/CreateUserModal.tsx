@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useToast } from "@/hooks/useToast.helpers";
 import { DatePickerField } from '@/components/feature/DatePickerField';
 import { SelectMenu } from '@/components/feature/SelectField';
@@ -226,6 +226,14 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   // Manager records are filtered by the selected organisation.
   const [employers, setEmployers] = useState<EmployerRow[]>([]);
   const [organisations, setOrganisations] = useState<OrganisationRow[]>([]);
+  const organisationNameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const org of organisations) {
+      const name = org.name.trim().replace(/\s+/g, ' ').toLowerCase();
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return counts;
+  }, [organisations]);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [staffError, setStaffError] = useState<string | null>(null);
   const [employerError, setEmployerError] = useState<string | null>(null);
@@ -534,7 +542,8 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
               onChange={(selected) => setField('organisationId', selected)}
               options={organisations.map((org) => ({
                 value: org.id,
-                label: org.postCode ? `${org.name} — ${org.postCode}` : org.name,
+                label: org.postCode && (organisationNameCounts.get(org.name.trim().replace(/\s+/g, ' ').toLowerCase()) ?? 0) > 1
+                  ? `${org.name} — ${org.postCode}` : org.name,
               }))}
               placeholder={employerError ? 'Could not load organisations' : 'Select organisation…'}
               searchable
