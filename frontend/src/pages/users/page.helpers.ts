@@ -177,6 +177,5 @@ export function matches(row: DirectoryRow, f: UsersFilter): boolean {
   // names are free text on the row like programme and cohort, so they are
   // compared the same folded way.
   if (f.caseOwner && f.caseOwner !== 'any' && differs(row.caseOwner, f.caseOwner)) return false;
-  if (f.referenceNumber && !(row.reference ?? '').toLowerCase().includes(f.referenceNumber.toLowerCase())) return false;
   return true;
 }

@@ -47,9 +47,6 @@ export interface AptemUserFields {
   legalSex?: string;
   age?: string;
   niNumber?: string;
-  referrer?: string;
-  referrerAddress?: string;
-  referrerContact?: string;
   targetProgramme?: string;
   postcode?: string;
   address?: string;
@@ -59,11 +56,8 @@ export interface AptemUserFields {
   county?: string;
   country?: string;
   caseOwner?: string;
-  learningProvider?: string;
   employerAddress?: string;
   mentor?: string;
-  referenceNumber?: string;
-  extendedBreak?: string;
   /** One of ATTENDANCE_TYPE_OPTIONS; null clears it. */
   attendanceType?: string | null;
   allowCheckpoint?: boolean;

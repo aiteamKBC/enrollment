@@ -1,0 +1,42 @@
+"""Retired learner fields cannot be written, including by older import files."""
+
+from io import BytesIO
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import SimpleTestCase
+from openpyxl import Workbook
+
+from .learner_import import COLUMNS, read_students
+from .mappers import write_fields, write_staff_fields
+
+
+class RetiredLearnerFieldsTests(SimpleTestCase):
+    def test_old_payload_fields_are_ignored(self):
+        old_fields = {
+            "referrer": "Old source",
+            "referrerAddress": "Old address",
+            "referrerContact": "Old contact",
+            "learningProvider": "Another provider",
+            "referenceNumber": "OLD-123",
+            "extendedBreak": "Legacy value",
+        }
+        self.assertEqual(write_fields(old_fields), {})
+        self.assertEqual(write_staff_fields({"learningProvider": "Another provider"}), {})
+
+    def test_old_import_headings_are_accepted_but_not_saved(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Students"
+        sheet.append(["First name", "Surname", "Email", "Case owner", "First session date", "Learning provider", "Referrer", "Referrer address", "Referrer contact", "Reference number", "Extended break"])
+        sheet.append(["New", "Learner", "new@example.invalid", "Coach", "2030-01-01", "Another provider", "Old source", "Old address", "Old contact", "OLD-123", "Legacy value"])
+        data = BytesIO()
+        workbook.save(data)
+        upload = SimpleUploadedFile("learners.xlsx", data.getvalue())
+
+        students, errors = read_students(upload)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(students, [(2, {"firstName": "New", "surname": "Learner", "email": "new@example.invalid", "caseOwner": "Coach", "firstSessionDate": "2030-01-01"})])
+        self.assertNotIn(("Learning provider", "learningProvider"), COLUMNS)
+        self.assertNotIn(("Reference number", "referenceNumber"), COLUMNS)
+        self.assertNotIn(("Extended break", "extendedBreak"), COLUMNS)

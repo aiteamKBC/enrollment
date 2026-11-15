@@ -105,7 +105,6 @@ export function buildRows(ilr: IlrForm, board: EnrolmentBoard, texts?: Record<st
 
   rows.push({ kind: 'section', title: 'Learner' });
   rows.push({ kind: 'text', label: 'Name', value: board.user.name });
-  rows.push({ kind: 'text', label: 'Learner reference number', value: board.user.reference });
   rows.push({ kind: 'text', label: 'Programme', value: board.programme.name });
   rows.push({ kind: 'text', label: 'Cohort', value: board.programme.cohort });
 

@@ -27,7 +27,6 @@ const CONTENT_W = PAGE_W - MARGIN_X * 2;
 const LABEL_W = 88;
 
 export interface IlrLearnerDetails {
-  learnerReferenceNumber?: string;
   uln?: string;
   familyName?: string;
   givenNames?: string;
@@ -111,7 +110,6 @@ export function buildIlrPdf(
   const rows: Row[] = [
     { kind: 'heading', text: 'Individual Learner Record' },
     { kind: 'section', text: 'Learner details' },
-    { kind: 'text', label: 'Learner reference number', value: details.learnerReferenceNumber ?? '' },
     { kind: 'text', label: 'ULN', value: details.uln ?? '' },
     { kind: 'text', label: 'Family name', value: details.familyName ?? '' },
     { kind: 'text', label: 'Given names', value: details.givenNames ?? '' },

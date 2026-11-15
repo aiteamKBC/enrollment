@@ -84,7 +84,6 @@ const GENDER_OPTIONS = opts(['Male', 'Female', 'Prefer not to say']);
 // The full country list, shared with the employer and organisation forms. Still
 // UK-first — see src/lib/countries.ts.
 const COUNTRY_OPTIONS = opts(ALL_COUNTRIES);
-const PROVIDER_OPTIONS = opts(['Kent Business College']);
 
 // The form, section by section, in Aptem's order. There is no Invitation
 // section: enrolling a learner always invites them, so the question was a way
@@ -107,15 +106,6 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
-    title: 'Referral',
-    icon: 'ri-share-forward-line',
-    fields: [
-      { name: 'referrer', label: 'Referrer', type: 'text', placeholder: 'e.g. Jobcentre Plus' },
-      { name: 'referrerAddress', label: 'Referrer address', type: 'text' },
-      { name: 'referrerContact', label: 'Referrer contact', type: 'text' },
-    ],
-  },
-  {
     title: 'Programme',
     icon: 'ri-book-open-line',
     // Programme -> Cohort -> Group is a live cascade off the `curriculum` schema
@@ -125,6 +115,7 @@ const SECTIONS: SectionDef[] = [
       { name: 'programme', label: 'Programme', type: 'select', lookup: 'programme' },
       { name: 'cohort', label: 'Cohort', type: 'select', lookup: 'cohort' },
       { name: 'group', label: 'Group', type: 'select', lookup: 'group' },
+      { name: 'attendanceType', label: 'Attendance type', type: 'select', options: opts(ATTENDANCE_TYPE_OPTIONS) },
     ],
   },
   {
@@ -180,20 +171,15 @@ const SECTIONS: SectionDef[] = [
       // Required: the first session below is booked with this person, and a
       // learner cannot be enrolled without someone to hold it.
       { name: 'caseOwner', label: 'Case owner', type: 'select', lookup: 'caseOwner', required: true },
-      { name: 'learningProvider', label: 'Learning provider', type: 'select', options: PROVIDER_OPTIONS },
-      { name: 'attendanceType', label: 'Attendance type', type: 'select', options: opts(ATTENDANCE_TYPE_OPTIONS) },
-      { name: 'organisationId', label: 'Organisation', type: 'select', lookup: 'organisation', hint: 'Choose the employing company first.' },
+      { name: 'organisationId', label: 'Organisation', type: 'select', lookup: 'organisation' },
       { name: 'employer', label: 'Manager', type: 'select', lookup: 'employer', hint: 'Optional. Only people linked to the selected organisation appear.' },
       { name: 'mentor', label: 'Mentor', type: 'text' },
-      { name: 'referenceNumber', label: 'Reference number', type: 'text', placeholder: 'refnumber' },
-      { name: 'extendedBreak', label: 'Extended break', type: 'text' },
     ],
   },
 ];
 
 // Type/Status aren't asked for here — they're stamped on submit.
 const INITIAL: Record<string, string> = {
-  learningProvider: 'Kent Business College',
   country: DEFAULT_COUNTRY,
 };
 
@@ -416,9 +402,6 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       preferredName: formData.preferredName,
       gender: formData.gender,
       niNumber: formData.niNumber,
-      referrer: formData.referrer,
-      referrerAddress: formData.referrerAddress,
-      referrerContact: formData.referrerContact,
       postcode: formData.postcode,
       addressLine1: formData.addressLine1,
       addressLine2: formData.addressLine2,
@@ -426,11 +409,8 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       county: formData.county,
       country: formData.country,
       caseOwner: formData.caseOwner,
-      learningProvider: formData.learningProvider,
       employerAddress: formData.employerAddress,
       mentor: formData.mentor,
-      referenceNumber: formData.referenceNumber,
-      extendedBreak: formData.extendedBreak,
       // Optional: "Select…" is sent as null, which clears it on edit and leaves
       // it unset on create.
       attendanceType: formData.attendanceType || null,
@@ -561,6 +541,7 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
               searchPlaceholder="Search organisations"
               emptyMessage="No organisations match your search"
               size="sm"
+              triggerClassName="!h-[38px] [&>span:first-of-type]:!text-[13px]"
             />
           ) : field.lookup === 'employer' ? (
             /* Keyed on the manager record id; names can repeat. */

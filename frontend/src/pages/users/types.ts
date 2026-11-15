@@ -145,7 +145,6 @@ export interface UsersFilter {
   programmeStatus?: string;
   niNumber?: string;
   caseOwner?: string | 'any';
-  referenceNumber?: string;
   /** '' is unset. Learners only: staff and employers have no attendance mode. */
   attendanceMode?: '' | 'live' | 'lazy';
   page: number; // 1-based
