@@ -1,3 +1,4 @@
+import { editorGroup } from './adminTestHelpers';
 import { useState } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -68,7 +69,7 @@ it('edits notes, mandatory flags and optional counts in a private draft and prev
   await userEvent.selectOptions(screen.getByLabelText('Programme'), 'PCP_L6');
   const note = screen.getByLabelText('Pathway Note');
   await userEvent.clear(note); await userEvent.type(note, 'Edited operational note');
-  const risk = within(screen.getByRole('group', { name: 'Edit module Risk Management (APM)' }));
+  const risk = within(editorGroup({ name: 'Edit module Risk Management (APM)' }));
   await userEvent.selectOptions(risk.getByLabelText('Mandatory Module'), 'no');
   const count = screen.getByLabelText('Required Optional Modules Count');
   await userEvent.clear(count); await userEvent.type(count, '3');
@@ -90,7 +91,7 @@ it('blocks impossible rule configurations and keeps parent headings without mand
   expect(screen.getByRole('button', { name: 'Save Draft' })).toBeDisabled();
   expect(screen.getByRole('alert')).toHaveTextContent('Required optional module count exceeds');
   await userEvent.selectOptions(screen.getByLabelText('PCP pathway'), 'chartered');
-  const parent = screen.getByRole('group', { name: 'Edit group Certified PMO Professional Level 6' });
+  const parent = editorGroup({ name: 'Edit group Certified PMO Professional Level 6' });
   expect(within(parent).getAllByLabelText('Mandatory Module')).toHaveLength(4);
 });
 

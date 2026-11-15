@@ -15,6 +15,8 @@ from .permissions import is_staff
 from .views import body, learner_record
 from learner_api.models import LearnerProfile
 from .programme_structure import resolve_published, resolve_assigned_cohort, learner_published_layout
+from .programme_identity import find_structure_programme
+from .home_cohort import read_home_cohort, pending_home_cohort
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,12 @@ def learner_modules(request, kind, learner_id):
             return JsonResponse(result)
         row, version, config = pinned_configuration(kind, learner_id)
         saved = saved_choices(row.learner_kind, learner_id, row)
+        try:
+            home_cohort = read_home_cohort(row, kind, learner_id, version)
+        except Exception:
+            # Display metadata must not break existing assessment/module flows.
+            # No raw database exception or guessed name is returned to clients.
+            home_cohort = pending_home_cohort(row.selected_programme, 'lookup_unavailable')
         assigned_cohort = None
         learner_configuration = config
         profile = None
@@ -56,14 +64,13 @@ def learner_modules(request, kind, learner_id):
                     assigned_cohort = resolve_assigned_cohort(resolved['snapshot'], profile.programme_id, profile.cohort_id)
                     if resolved['source'] == 'canonical' and assigned_cohort is None:
                         return JsonResponse({'error': 'The assigned Cohort is unavailable in this learner\'s saved published layout. Admissions must review the assignment.'}, status=409)
-                    if assigned_cohort and profile.programme_id in {'ME_L4', 'MM_L6', 'APM_L4'}:
-                        canonical = next((p for p in resolved['snapshot'].get('programmes', []) if p.get('id') == profile.programme_id), None)
-                        if canonical:
-                            import copy
-                            learner_configuration = copy.deepcopy(config)
-                            target = next((p for p in learner_configuration.get('programmes', []) if p.get('id') == profile.programme_id), None)
-                            if target:
-                                target['modules'] = copy.deepcopy(assigned_cohort.get('modules', []))
+                    canonical = find_structure_programme(resolved['snapshot'], profile.programme_id)
+                    if assigned_cohort and canonical and canonical['id'] in {'ME_L4', 'MM_L6', 'APM_L4'}:
+                        import copy
+                        learner_configuration = copy.deepcopy(config)
+                        target = next((p for p in learner_configuration.get('programmes', []) if p.get('id') == canonical['id']), None)
+                        if target:
+                            target['modules'] = copy.deepcopy(assigned_cohort.get('modules', []))
         except LookupError as exc:
             return JsonResponse({'error': str(exc)}, status=409)
         except Exception:
@@ -76,6 +83,7 @@ def learner_modules(request, kind, learner_id):
                              'assignedProgrammeId': getattr(profile, 'programme_id', None) if 'profile' in locals() and profile else None,
                              'assignedCohortId': getattr(profile, 'cohort_id', None) if 'profile' in locals() and profile else None,
                              'cohortResolution': assigned_cohort,
+                             'homeCohort': home_cohort,
                              'selectionComplete': selection_complete(row, saved), 'savedSelection': saved,
                              'selectionRevision': row.modules_revision})
     except ModuleSelectionConflict as exc:

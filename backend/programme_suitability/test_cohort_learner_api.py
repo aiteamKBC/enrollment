@@ -19,6 +19,120 @@ class CohortLearnerApiTests(TestCase):
     databases = {'default', 'enrolment'}
     ksb_id = 'ksb:ME_L4:K1'
 
+    def prepare_account_only_assignment(self):
+        # Disposable fixtures only: model deletion would traverse unmanaged
+        # lifecycle tables that this focused test runner deliberately excludes.
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute('DELETE FROM "Learner".learners WHERE enrolment_id = %s', [8101])
+        EnrolmentUser.all_learners.filter(pk=8101).update(cohort='Feb 2027')
+        outcome = {'status': 'APPLIED', 'programmeId': 'PROG-ME-L4', 'programmeName': 'Marketing Executive',
+                   'cohortAssignmentVersion': 1, 'cohortId': 'ME_L4-FEB-2027',
+                   'cohortName': 'Feb 2027', 'cohortPublicationVersion': 1, 'profileId': None}
+        Assessment.objects.filter(learner_id=8101).update(review={'programmeAssignment': outcome})
+        return outcome
+
+    @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
+    def test_account_only_assignment_resolves_in_step_six_and_admin_without_creating_profile(self):
+        self.prepare_account_only_assignment()
+        from .home_cohort import cohort_label_for_board
+        before = Assessment.objects.filter(learner_id=8101).values().get()
+        response = self.clients[8101].get('/enrolment_api/programme-suitability/apprenticeship/8101/modules/')
+        self.assertEqual(response.status_code, 200, response.content)
+        home = response.json()['homeCohort']
+        self.assertEqual(home['status'], 'resolved')
+        self.assertEqual(home['cohortId'], 'ME_L4-FEB-2027')
+        source = EnrolmentUser.all_learners.get(pk=8101)
+        self.assertEqual(home['name'], cohort_label_for_board(source, source.cohort))
+        self.assertEqual(Assessment.objects.filter(learner_id=8101).values().get(), before)
+        self.assertFalse(LearnerProfile.objects.filter(enrolment_id=8101).exists())
+
+    def test_account_only_assignment_reads_saved_publication_without_adopting_new_latest(self):
+        self.prepare_account_only_assignment()
+        from .home_cohort import read_home_cohort
+        with connections[CONN].cursor() as cursor:
+            cursor.execute('DELETE FROM enrolment."Wizard_Layout_Assignments" WHERE "Learner_id" = %s', [8101])
+        Assessment.objects.filter(learner_id=8101).update(modules_configuration_version=None)
+        row = Assessment.objects.get(learner_id=8101)
+        home = read_home_cohort(row, 'apprenticeship', 8101, None)
+        self.assertEqual(home['status'], 'resolved')
+        self.assertEqual(home['layoutVersion'], 1)  # Current is 2, assignment was saved against 1.
+        with connections[CONN].cursor() as cursor:
+            cursor.execute('SELECT COUNT(*) FROM enrolment."Wizard_Layout_Assignments" WHERE "Learner_id" = %s', [8101])
+            self.assertEqual(cursor.fetchone()[0], 0)  # Display creates no pin.
+
+    def test_recorded_cohort_cannot_override_a_conflicting_explicit_historical_pin(self):
+        self.prepare_account_only_assignment()
+        from .home_cohort import read_home_cohort
+        with connections[CONN].cursor() as cursor:
+            cursor.execute('UPDATE enrolment."Wizard_Layout_Assignments" SET "Pinned_version" = %s WHERE "Learner_id" = %s', [2, 8101])
+        row = Assessment.objects.get(learner_id=8101)
+        home = read_home_cohort(row, 'apprenticeship', 8101, 1)
+        self.assertEqual(home['reason'], 'cohort_publication_mismatch')
+
+    def test_later_manual_account_assignment_is_preserved(self):
+        self.prepare_account_only_assignment()
+        from .home_cohort import read_home_cohort, cohort_label_for_board
+        EnrolmentUser.all_learners.filter(pk=8101).update(cohort='Staff assigned group')
+        row = Assessment.objects.get(learner_id=8101)
+        self.assertEqual(read_home_cohort(row, 'apprenticeship', 8101, 1)['reason'], 'account_assignment_changed')
+        source = EnrolmentUser.all_learners.get(pk=8101)
+        self.assertEqual(cohort_label_for_board(source, source.cohort), 'Staff assigned group')
+
+    def test_old_applied_sync_and_legacy_text_do_not_become_a_new_assignment(self):
+        outcome = self.prepare_account_only_assignment()
+        outcome.pop('cohortAssignmentVersion')
+        outcome['automaticCohort'] = ['ME_L4-FEB-2027', 'Feb 2027', False]
+        Assessment.objects.filter(learner_id=8101).update(review={'programmeAssignment': outcome})
+        from .home_cohort import read_home_cohort
+        row = Assessment.objects.get(learner_id=8101)
+        before = json.dumps(row.review, sort_keys=True)
+        self.assertEqual(read_home_cohort(row, 'apprenticeship', 8101, 1)['reason'], 'assignment_missing')
+        row.refresh_from_db()
+        self.assertEqual(json.dumps(row.review, sort_keys=True), before)
+
+    @override_settings(PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED=False)
+    @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
+    def test_display_metadata_translates_persisted_id_while_rollout_is_disabled(self):
+        LearnerProfile.objects.filter(enrolment_id=8101).update(programme_id='PROG-ME-L4')
+        before = Assessment.objects.filter(learner_id=8101).values().get()
+        profile_before = LearnerProfile.objects.filter(enrolment_id=8101).values().get()
+        response = self.clients[8101].get('/enrolment_api/programme-suitability/apprenticeship/8101/modules/')
+        self.assertEqual(response.status_code, 200)
+        home = response.json()['homeCohort']
+        self.assertEqual(home['status'], 'resolved')
+        self.assertEqual(home['programmeId'], 'ME_L4')
+        self.assertEqual(home['cohortId'], 'ME_L4-FEB-2027')
+        self.assertEqual(home['name'], 'Feb 2027')
+        self.assertEqual(home['layoutVersion'], 1)  # Never replace with latest v2.
+        self.assertEqual(Assessment.objects.filter(learner_id=8101).values().get(), before)
+        self.assertEqual(LearnerProfile.objects.filter(enrolment_id=8101).values().get(), profile_before)
+
+    @override_settings(PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED=False)
+    @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
+    def test_missing_canonical_or_pinned_publication_keeps_modules_and_pending_label(self):
+        with connections[CONN].cursor() as cursor:
+            cursor.execute('UPDATE enrolment."Wizard_Form_Layouts" SET "Layout" = %s WHERE id = %s',
+                           [json.dumps({'programmeModules': {'programmes': []}}), 1])
+        endpoint = '/enrolment_api/programme-suitability/apprenticeship/8101/modules/'
+        response = self.clients[8101].get(endpoint)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['homeCohort']['reason'], 'canonical_publication_missing')
+        with connections[CONN].cursor() as cursor:
+            cursor.execute('DELETE FROM enrolment."Wizard_Form_Layouts" WHERE id = %s', [1])
+        response = self.clients[8101].get(endpoint)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['homeCohort']['reason'], 'pinned_publication_unavailable')
+
+    @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
+    def test_existing_cohort_scoped_modules_also_accept_curriculum_ids(self):
+        LearnerProfile.objects.filter(enrolment_id=8101).update(programme_id='PROG-ME-L4')
+        response = self.clients[8101].get('/enrolment_api/programme-suitability/apprenticeship/8101/modules/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([m['id'] for m in response.json()['configuration']['programmes'][0]['modules']],
+                         ['FEB-A', 'FEB-B'])
+        self.assertEqual(response.json()['homeCohort']['layoutVersion'], 1)
+
     @staticmethod
     def module(identifier, title, sessions):
         return {'id': identifier, 'title': title, 'sessions': sessions,

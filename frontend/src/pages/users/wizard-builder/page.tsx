@@ -546,12 +546,11 @@ function StepEditor({
       )}
       {!step.label.trim() && <p role="alert" className="mx-5 mt-3 text-[12px] text-red-600">Give the step a name before publishing.</p>}
 
-      {step.slug === 'programme-suitability' && <SuitabilityAdmin value={layout.programmeSuitability} onChange={(configuration) => edit((l) => ({
+      {step.slug === 'programme-suitability' && <SuitabilityAdmin modulesEditor={<ModulesAdmin version={version} value={layout.programmeModules}
+        onChange={(programmeModules) => edit((l) => ({ ...l, programmeModules }))} />} value={layout.programmeSuitability} onChange={(configuration) => edit((l) => ({
         ...l, programmeSuitability: configuration,
         steps: l.steps.map((s) => s.slug === 'programme-suitability' && configuration.enabled ? { ...s, hidden: false } : s),
       }))} />}
-      {step.slug === 'programme-suitability' && <ModulesAdmin version={version} value={layout.programmeModules}
-        onChange={(programmeModules) => edit((l) => ({ ...l, programmeModules }))} />}
       {step.items.some((item) => item.key === 'block.skillsRadar') && <CatalogueAdmin layout={layout} version={version}
         onChange={(configuration) => edit((l) => ({ ...l, ...configuration }))} />}
       <ol

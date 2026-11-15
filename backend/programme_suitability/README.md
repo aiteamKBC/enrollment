@@ -146,11 +146,21 @@ in `recommendationFlags`. Both-zero/no-evidence results remain `INSUFFICIENT_INF
 The same interpretation applies to existing stored scores without recalculating answers.
 A confirmed save/continue audits a policy upgrade rather than silently replacing old choices.
 
-The existing editable thresholds (minimum index 60, difference 15, coverage 80%, two distinct
-critical indicators) and mixed-evidence rules still calculate internal diagnostics. Their
-outcome/flags are preserved in `admissionsReviewOutcome` and `admissionsFlags`. They do not
-veto the weighted learner recommendation. The assessment still requires its required answers
-before submission. A programme matching index is not eligibility or acceptance probability.
+New wizard publications store `scoringPolicy: GENERAL_WEIGHTED_V1`. The existing
+minimum index, score difference, weighted coverage and mixed-evidence rules still
+calculate admissions diagnostics in `admissionsReviewOutcome` and `admissionsFlags`.
+Critical indicator count, strength and question flags no longer participate in new
+policy calculations and have no active builder controls. Their saved JSON fields
+are retained for compatibility. The returned `criticalIndicators` mapping remains
+as an empty mapping of per-programme lists for new calculations.
+
+Configurations without this marker retain their historical scoring interpretation.
+Reading configurations does not upgrade them; draft previews simulate the policy
+that the next wizard publication will activate. Existing assessment snapshots and
+saved results are never rewritten by this change. Started assessments remain pinned
+to their original policy. General review flags still do not veto the weighted learner
+recommendation. Required answers remain required before submission; a programme
+matching index is not eligibility or acceptance probability.
 
 ## Storage, migration and security
 

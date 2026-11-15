@@ -18,8 +18,13 @@ export interface ProgrammeModuleSelection {
   programme: 'PCP_L6'; pathway: string; modulesByPathway: Record<string, string[]>;
   configurationVersion?: number | null;
 }
+export interface HomeCohort {
+  status: 'resolved' | 'pending'; programmeId: ProgrammeId;
+  cohortId: string | null; name: string | null; layoutVersion: number | null;
+  reason?: string | null;
+}
 export interface ModulesState { configuration: ModulesConfiguration; configurationVersion: number | null; selectedProgramme: ProgrammeId;
-  selectionComplete?: boolean; savedSelection?: ProgrammeModuleSelection | null; selectionRevision?: number }
+  selectionComplete?: boolean; savedSelection?: ProgrammeModuleSelection | null; selectionRevision?: number; homeCohort?: HomeCohort }
 
 export interface ModuleSelectionCommit { selection: ProgrammeModuleSelection; selectionComplete: boolean; selectionRevision: number }
 

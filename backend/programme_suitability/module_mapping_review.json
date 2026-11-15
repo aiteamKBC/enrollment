@@ -1,0 +1,1658 @@
+{
+  "document_type": "review_only_not_runtime_configuration",
+  "audit_date_uk": "2026-11-13",
+  "approval_state": "unapproved",
+  "programme_ids": {
+    "ME_L4": "PROG-ME-L4",
+    "MM_L6": "PROG-MM-L6",
+    "APM_L4": "PROG-20260907141619067932",
+    "PCP_L6": "PROG-PCP-L6"
+  },
+  "provenance": {
+    "source_audit": ".cache/phase2_mapping_report.json",
+    "current_apprenticeship_publication": 16,
+    "lms_master_programme_and_group_tables_inspected": false,
+    "historical_pinned_versions_preserved": [
+      7,
+      11,
+      16,
+      20
+    ],
+    "candidate_offerings_are_separate_g1_g2_records": true
+  },
+  "module_definitions": [
+    {
+      "enrolment_programme_id": "ME_L4",
+      "enrolment_academic_module_id": "marketing-impact",
+      "academic_display_name": "Marketing Impact and Planning",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "G2-Juliane\u2013 Impact &amp;Planning",
+        "Impact& Planning",
+        "Marketing Impact and Planning"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-2026082296DC36E43929",
+          "title": "G2-Juliane\u2013 Impact &amp;Planning",
+          "cohort_id": "APTEM-COHORT-282383f1d8588946fe182da5dcc91226",
+          "cohort_name": "Jun 2026",
+          "group_id": "APTEM-GROUP-c865cebb4c7d8e6cb8130f6e50920392",
+          "group_name": "G2-Juliane -Impact and Planning June 2026",
+          "start_date": "2026-06-01",
+          "end_date": "2026-10-18",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912105734147219",
+          "title": "Marketing Impact and Planning",
+          "cohort_id": "COHORT-20260912125252180773",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912125344504865",
+          "group_name": "G1",
+          "start_date": "2026-09-29",
+          "end_date": "2027-02-23",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202609170923319254807B020222EFAA",
+          "title": "Impact& Planning",
+          "cohort_id": "COHORT-20260917092025244736D2820D958B44",
+          "cohort_name": "Feb 2027",
+          "group_id": "GROUP-20260917092119530122F3F181E8BFB0",
+          "group_name": "Group 1",
+          "start_date": "2027-02-01",
+          "end_date": "2027-05-21",
+          "cohort_status": "planned"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-202609170923319254807B020222EFAA"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Marketing Impact and Planning"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "ME_L4",
+      "enrolment_academic_module_id": "social-media",
+      "academic_display_name": "Social Media",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "candidate",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Social Media"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260921081039161503EB58ACC4DD01",
+          "title": "Social Media",
+          "cohort_id": "APTEM-COHORT-282383f1d8588946fe182da5dcc91226",
+          "cohort_name": "Jun 2026",
+          "group_id": "GROUP-20260921115837423561E79D154A1979",
+          "group_name": "G1-Julian Social Media",
+          "start_date": "2026-09-30",
+          "end_date": "2027-01-20",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-202609211208476573216D584A576BEF",
+          "title": "Social Media",
+          "cohort_id": "APTEM-COHORT-282383f1d8588946fe182da5dcc91226",
+          "cohort_name": "Jun 2026",
+          "group_id": "GROUP-202609211159360971368DB0592873D3",
+          "group_name": "G2-Juliane Social Media",
+          "start_date": "2026-10-02",
+          "end_date": "2027-01-29",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912110325036606",
+          "title": "Social Media",
+          "cohort_id": "COHORT-20260912125252180773",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912125344504865",
+          "group_name": "G1",
+          "start_date": "2027-02-15",
+          "end_date": "2027-05-30",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912110325036606"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Social Media"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "ME_L4",
+      "enrolment_academic_module_id": "martech",
+      "academic_display_name": "Marketing Technology (MarTech)",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Martech",
+        "Martech - Fri",
+        "Martech - Thur"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-2026091512020150578265761A284979",
+          "title": "Martech - Thur",
+          "cohort_id": "APTEM-COHORT-423ea36a0bae25f747c94886ebf3b7d5",
+          "cohort_name": "Feb 2026",
+          "group_id": "GROUP-20260915115821609636D9DE76BB67DF",
+          "group_name": "G1-MarTech",
+          "start_date": "2026-09-17",
+          "end_date": "2026-12-10",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260915120636149383B681A6F2D5CF",
+          "title": "Martech - Fri",
+          "cohort_id": "APTEM-COHORT-423ea36a0bae25f747c94886ebf3b7d5",
+          "cohort_name": "Feb 2026",
+          "group_id": "GROUP-202609151158437869356D6056E63925",
+          "group_name": "G2-MarTech",
+          "start_date": "2026-09-17",
+          "end_date": "2026-12-25",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912102543166910",
+          "title": "Martech",
+          "cohort_id": "COHORT-20260912125252180773",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912125344504865",
+          "group_name": "G1",
+          "start_date": "2027-06-10",
+          "end_date": "2027-09-15",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912102543166910"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Marketing Technology (MarTech)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "MM_L6",
+      "enrolment_academic_module_id": "marketing-strategy",
+      "academic_display_name": "Marketing Strategy and Planning",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "candidate",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Marketing Strategy&Planning"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260912130830641004",
+          "title": "Marketing Strategy&Planning",
+          "cohort_id": "COHORT-20260912123900478752",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912125025166293",
+          "group_name": "G1",
+          "start_date": "2026-09-29",
+          "end_date": "2027-02-14",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202610011453094831311A09A17AA0FE",
+          "title": "Marketing Strategy&Planning",
+          "cohort_id": "COHORT-20260912123900478752",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20261001143122550981F3020EEE3F53",
+          "group_name": "G2",
+          "start_date": "2026-10-02",
+          "end_date": "2027-02-26",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [
+        {
+          "version": 7,
+          "display_name": "Marketing Strategy and Planning"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "MM_L6",
+      "enrolment_academic_module_id": "customer-journey",
+      "academic_display_name": "Customer Journey Optimisation",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "candidate",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Customer Journey Optimisation"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260911124647037289",
+          "title": "Customer Journey Optimisation",
+          "cohort_id": "APTEM-COHORT-463da4392169b39426a9bd8d296ad451",
+          "cohort_name": "Jun 2026",
+          "group_id": "GROUP-20260928143455519285CEBAAAED556C",
+          "group_name": "G1-Keith Customer Journey Optimisation",
+          "start_date": "2026-09-30",
+          "end_date": "2027-02-03",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-202609301354380952694569FE544702",
+          "title": "Customer Journey Optimisation",
+          "cohort_id": "APTEM-COHORT-463da4392169b39426a9bd8d296ad451",
+          "cohort_name": "Jun 2026",
+          "group_id": "GROUP-20260930135400889703823E0C35DCAE",
+          "group_name": "G2-Keith Customer Journey Optimisation",
+          "start_date": "2026-10-01",
+          "end_date": "2027-01-28",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912130240756878",
+          "title": "Customer Journey Optimisation",
+          "cohort_id": "COHORT-20260912123900478752",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912125025166293",
+          "group_name": "G1",
+          "start_date": "2027-02-22",
+          "end_date": "2027-05-30",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912130240756878"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 7,
+          "display_name": "Customer Journey Optimisation"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "MM_L6",
+      "enrolment_academic_module_id": "commercial-intelligence",
+      "academic_display_name": "Commercial Intelligence",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "candidate",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Commercial Intelligence"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20261002145217180409FC6342F2CE88",
+          "title": "Commercial Intelligence",
+          "cohort_id": "APTEM-COHORT-a4fdc26e0429e472d712096ccb6ae62c",
+          "cohort_name": "Feb 2026",
+          "group_id": "GROUP-20260919124138417113A1DF3F878219",
+          "group_name": "G1-Femi Commercial Intelligence Wednesday",
+          "start_date": "2026-09-30",
+          "end_date": "2027-02-03",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-202610030949476057995921FD6A1D0C",
+          "title": "Commercial Intelligence",
+          "cohort_id": "APTEM-COHORT-a4fdc26e0429e472d712096ccb6ae62c",
+          "cohort_name": "Feb 2026",
+          "group_id": "GROUP-20260919124937500707B11B559601EF",
+          "group_name": "G2-Femi Commerical Intelligence Thursday",
+          "start_date": "2026-10-01",
+          "end_date": "2027-02-04",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912131150211624",
+          "title": "Commercial Intelligence",
+          "cohort_id": "APTEM-COHORT-a4fdc26e0429e472d712096ccb6ae62c",
+          "cohort_name": "Feb 2026",
+          "group_id": "GROUP-20260919125108849156FE1CA3BFB3B4",
+          "group_name": "G3-Femi Commercial Intelligence Friday",
+          "start_date": "2026-10-02",
+          "end_date": "2027-02-05",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-2026100114185277472098BA44BEB889",
+          "title": "Commercial Intelligence",
+          "cohort_id": "COHORT-20260912123900478752",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912125025166293",
+          "group_name": "G1",
+          "start_date": "2027-06-15",
+          "end_date": "2027-10-04",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-2026100114185277472098BA44BEB889"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 7,
+          "display_name": "Commercial Intelligence"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "MM_L6",
+      "enrolment_academic_module_id": "ai-marketing",
+      "academic_display_name": "AI in Marketing",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "candidate",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "AI In Marketing"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-202609211343157699387AACDDCD8A5B",
+          "title": "AI In Marketing",
+          "cohort_id": "APTEM-COHORT-405be62ffe7708323eea70ab7fe2e61d",
+          "cohort_name": "Oct 2025",
+          "group_id": "GROUP-202609211450104210840E55F05D542A",
+          "group_name": "G1-Sharon Ai in Marketing Tuesday",
+          "start_date": "2026-09-29",
+          "end_date": "2027-01-25",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260921085233798880517CB0D243D0",
+          "title": "AI In Marketing",
+          "cohort_id": "APTEM-COHORT-405be62ffe7708323eea70ab7fe2e61d",
+          "cohort_name": "Oct 2025",
+          "group_id": "GROUP-202609210905110684506B246BDED88E",
+          "group_name": "G2-Sharon Ai in Marketing Wednesday",
+          "start_date": "2026-09-30",
+          "end_date": "2027-02-02",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260921085217095815146F2085A499",
+          "title": "AI In Marketing",
+          "cohort_id": "APTEM-COHORT-405be62ffe7708323eea70ab7fe2e61d",
+          "cohort_name": "Oct 2025",
+          "group_id": "GROUP-2026092114510315918150BCE8C38FD8",
+          "group_name": "G3-Sharon Ai in Marketing Friday",
+          "start_date": "2026-10-02",
+          "end_date": "2027-01-28",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912132513706682",
+          "title": "AI In Marketing",
+          "cohort_id": "COHORT-20260912123900478752",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912125025166293",
+          "group_name": "G1",
+          "start_date": "2027-09-27",
+          "end_date": "2028-01-23",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912132513706682"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 7,
+          "display_name": "AI in Marketing"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "APM_L4",
+      "enrolment_academic_module_id": "pmp",
+      "academic_display_name": "Project Management Professional",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "unavailable",
+      "ambiguity_explanation": "No verified fixed-module counterpart exists. Test-like, unrelated and general project-management records must not be substituted.",
+      "candidate_lms_names": [],
+      "candidate_offerings": [],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "APM_L4",
+      "enrolment_academic_module_id": "ai-project-management",
+      "academic_display_name": "AI in Project Management",
+      "pcp_pathway": null,
+      "classification": "fixed",
+      "credits": null,
+      "mapping_status": "unavailable",
+      "ambiguity_explanation": "No verified fixed-module counterpart exists. Test-like, unrelated and general project-management records must not be substituted.",
+      "candidate_lms_names": [],
+      "candidate_offerings": [],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "pmp",
+      "academic_display_name": "Project Management Professional (PMP)",
+      "pcp_pathway": "operational",
+      "classification": "mandatory",
+      "credits": 2,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Project Management Professional",
+        "Ray-Project Management Professional-June 2026"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260822F0AC1422DF9E",
+          "title": "Ray-Project Management Professional-June 2026",
+          "cohort_id": "APTEM-COHORT-b52bfd08a338facec3acc1dd6c5de8e0",
+          "cohort_name": "Jun 2026",
+          "group_id": "APTEM-GROUP-85791b934b945abe5f4fe8451002925a",
+          "group_name": "Ray | PMP \u2013 June 2026",
+          "start_date": "2026-06-03",
+          "end_date": "2027-03-03",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-202609261454114640792DFF608589E9",
+          "title": "Project Management Professional",
+          "cohort_id": "APTEM-COHORT-b52bfd08a338facec3acc1dd6c5de8e0",
+          "cohort_name": "Jun 2026",
+          "group_id": "APTEM-GROUP-f916f18e64e2a54709b38bc4410c3728",
+          "group_name": "Project Controls Professional Level 6",
+          "start_date": "2026-06-10",
+          "end_date": "2027-01-27",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912111853582488",
+          "title": "Project Management Professional",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2026-09-30",
+          "end_date": "2027-05-26",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-20260928135023350643B5BC306DA206",
+          "title": "Project Management Professional",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2026-10-08",
+          "end_date": "2027-06-02",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202610011050132958491BA070C51715",
+          "title": "Project Management Professional",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2026-10-08",
+          "end_date": "2027-06-02",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Project Management Professional (PMP)"
+        },
+        {
+          "version": 16,
+          "display_name": "Project Management Professional (PMP)"
+        },
+        {
+          "version": 20,
+          "display_name": "Project Management Professional (PMP)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "ai-project-control",
+      "academic_display_name": "AI in Project Management/Control",
+      "pcp_pathway": "operational",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "AI in Project Control is a candidate, not an approved equivalence to the combined Management/Control academic definition.",
+      "candidate_lms_names": [
+        "AI in Project Control"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260912134643669112",
+          "title": "AI in Project Control",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2027-06-09",
+          "end_date": "2027-09-22",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-20261001110057418256848067C3F46B",
+          "title": "AI in Project Control",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2027-06-10",
+          "end_date": "2027-09-29",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912134643669112",
+        "MOD-20261001110057418256848067C3F46B"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "AI in Project Management/Control"
+        },
+        {
+          "version": 16,
+          "display_name": "AI in Project Management/Control"
+        },
+        {
+          "version": 20,
+          "display_name": "AI in Project Management/Control"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "risk-apm",
+      "academic_display_name": "Risk Management (APM)",
+      "pcp_pathway": "operational",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "candidate",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Risk Management"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260916132543446957B40D238B7516",
+          "title": "Risk Management",
+          "cohort_id": "COHORT-20260916132930775309040E3582FB69",
+          "cohort_name": "May 2025",
+          "group_id": "GROUP-20260916133211259140317E31913672",
+          "group_name": "Group 1",
+          "start_date": "2026-09-11",
+          "end_date": "2027-01-14",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912133526796221",
+          "title": "Risk Management",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2027-09-27",
+          "end_date": "2028-01-19",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-20261001110237531696ACBE5C3BB08E",
+          "title": "Risk Management",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2027-10-07",
+          "end_date": "2028-01-26",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912133526796221",
+        "MOD-20261001110237531696ACBE5C3BB08E"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Risk Management (APM)"
+        },
+        {
+          "version": 16,
+          "display_name": "Risk Management (APM)"
+        },
+        {
+          "version": 20,
+          "display_name": "Risk Management (APM)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "planning-control",
+      "academic_display_name": "Project Planning and Control (APMG Qualification)",
+      "pcp_pathway": "operational",
+      "classification": "optional",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "PPC is an abbreviation; do not collapse this optional qualification with the separate chartered planning/control component.",
+      "candidate_lms_names": [
+        "PPC",
+        "Steve-Project Planning and Control(PPC)"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20261029093006054077DEFAEF52A90B",
+          "title": "Steve-Project Planning and Control(PPC)",
+          "cohort_id": "APTEM-COHORT-455d4927b79d27e352db15e30bd8b450",
+          "cohort_name": "Oct 2025",
+          "group_id": "GROUP-2026102908472339278881E5E5626584",
+          "group_name": "G1",
+          "start_date": "2026-11-04",
+          "end_date": "2027-03-03",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912132052479676",
+          "title": "PPC",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2028-02-10",
+          "end_date": "2028-05-31",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-2026100111101527614080126D27D623",
+          "title": "PPC",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2028-02-10",
+          "end_date": "2028-05-31",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912132052479676",
+        "MOD-2026100111101527614080126D27D623"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Project Planning and Control (APMG Qualification)"
+        },
+        {
+          "version": 16,
+          "display_name": "Project Planning and Control (APMG Qualification)"
+        },
+        {
+          "version": 20,
+          "display_name": "Project Planning and Control (APMG Qualification)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "earned-value",
+      "academic_display_name": "Earned Value Management (EVM)",
+      "pcp_pathway": "operational",
+      "classification": "optional",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "Operational EVM and chartered APMG variants share this local ID in different pathways; no qualification equivalence has been approved.",
+      "candidate_lms_names": [
+        "EVM",
+        "Steve-Earned Value Management(EVM)"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-2026092614305006682733BA20B0D627",
+          "title": "Steve-Earned Value Management(EVM)",
+          "cohort_id": "APTEM-COHORT-455d4927b79d27e352db15e30bd8b450",
+          "cohort_name": "Oct 2025",
+          "group_id": "APTEM-GROUP-2676a39ec60710b8a73200bdaf4fba8a",
+          "group_name": "Steve-Earned Value Management(EVM)2026",
+          "start_date": "2026-07-22",
+          "end_date": "2026-10-28",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912113803682139",
+          "title": "EVM",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2028-06-08",
+          "end_date": "2028-09-27",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202610011112472281824E5986C4E06B",
+          "title": "EVM",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2028-06-08",
+          "end_date": "2028-09-27",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912113803682139",
+        "MOD-202610011112472281824E5986C4E06B"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Earned Value Management (EVM)"
+        },
+        {
+          "version": 16,
+          "display_name": "Earned Value Management (EVM)"
+        },
+        {
+          "version": 20,
+          "display_name": "Earned Value Management (EVM)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "pmi-sp",
+      "academic_display_name": "PMI-SP",
+      "pcp_pathway": "operational",
+      "classification": "optional",
+      "credits": 1,
+      "mapping_status": "candidate",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "PMI-SP Scheduling Professional"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20261001105703419367E214F45713C3",
+          "title": "PMI-SP Scheduling Professional",
+          "cohort_id": "APTEM-COHORT-6c02084ae2e88522bac93c144b638ff7",
+          "cohort_name": "Feb 2026",
+          "group_id": "GROUP-20260930103053144495AF571D01A8EF",
+          "group_name": "G1-W",
+          "start_date": "2026-09-02",
+          "end_date": "2026-12-16",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912134748896463",
+          "title": "PMI-SP Scheduling Professional",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2027-06-09",
+          "end_date": "2027-09-22",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912134748896463"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "PMI-SP"
+        },
+        {
+          "version": 16,
+          "display_name": "PMI-SP"
+        },
+        {
+          "version": 20,
+          "display_name": "PMI-SP"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "pmp",
+      "academic_display_name": "Project Management Professional (PMP)",
+      "pcp_pathway": "strategic",
+      "classification": "mandatory",
+      "credits": 2,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Project Management Professional",
+        "Ray-Project Management Professional-June 2026"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260822F0AC1422DF9E",
+          "title": "Ray-Project Management Professional-June 2026",
+          "cohort_id": "APTEM-COHORT-b52bfd08a338facec3acc1dd6c5de8e0",
+          "cohort_name": "Jun 2026",
+          "group_id": "APTEM-GROUP-85791b934b945abe5f4fe8451002925a",
+          "group_name": "Ray | PMP \u2013 June 2026",
+          "start_date": "2026-06-03",
+          "end_date": "2027-03-03",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-202609261454114640792DFF608589E9",
+          "title": "Project Management Professional",
+          "cohort_id": "APTEM-COHORT-b52bfd08a338facec3acc1dd6c5de8e0",
+          "cohort_name": "Jun 2026",
+          "group_id": "APTEM-GROUP-f916f18e64e2a54709b38bc4410c3728",
+          "group_name": "Project Controls Professional Level 6",
+          "start_date": "2026-06-10",
+          "end_date": "2027-01-27",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912111853582488",
+          "title": "Project Management Professional",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2026-09-30",
+          "end_date": "2027-05-26",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-20260928135023350643B5BC306DA206",
+          "title": "Project Management Professional",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2026-10-08",
+          "end_date": "2027-06-02",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202610011050132958491BA070C51715",
+          "title": "Project Management Professional",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2026-10-08",
+          "end_date": "2027-06-02",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Project Management Professional (PMP)"
+        },
+        {
+          "version": 16,
+          "display_name": "Project Management Professional (PMP)"
+        },
+        {
+          "version": 20,
+          "display_name": "Project Management Professional (PMP)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "ai-project-control",
+      "academic_display_name": "AI in Project Management/Control",
+      "pcp_pathway": "strategic",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "AI in Project Control is a candidate, not an approved equivalence to the combined Management/Control academic definition.",
+      "candidate_lms_names": [
+        "AI in Project Control"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260912134643669112",
+          "title": "AI in Project Control",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2027-06-09",
+          "end_date": "2027-09-22",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-20261001110057418256848067C3F46B",
+          "title": "AI in Project Control",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2027-06-10",
+          "end_date": "2027-09-29",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912134643669112",
+        "MOD-20261001110057418256848067C3F46B"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "AI in Project Management/Control"
+        },
+        {
+          "version": 16,
+          "display_name": "AI in Project Management/Control"
+        },
+        {
+          "version": 20,
+          "display_name": "AI in Project Management/Control"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "risk-apm",
+      "academic_display_name": "Risk Management (APM)",
+      "pcp_pathway": "strategic",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "candidate",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "Risk Management"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260916132543446957B40D238B7516",
+          "title": "Risk Management",
+          "cohort_id": "COHORT-20260916132930775309040E3582FB69",
+          "cohort_name": "May 2025",
+          "group_id": "GROUP-20260916133211259140317E31913672",
+          "group_name": "Group 1",
+          "start_date": "2026-09-11",
+          "end_date": "2027-01-14",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912133526796221",
+          "title": "Risk Management",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2027-09-27",
+          "end_date": "2028-01-19",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-20261001110237531696ACBE5C3BB08E",
+          "title": "Risk Management",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2027-10-07",
+          "end_date": "2028-01-26",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912133526796221",
+        "MOD-20261001110237531696ACBE5C3BB08E"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Risk Management (APM)"
+        },
+        {
+          "version": 16,
+          "display_name": "Risk Management (APM)"
+        },
+        {
+          "version": 20,
+          "display_name": "Risk Management (APM)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "pmi-pmo",
+      "academic_display_name": "PMI (PMO)",
+      "pcp_pathway": "strategic",
+      "classification": "optional",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "PMI PMO must not be substituted for Project Management Office; review certification/content and each offering ID.",
+      "candidate_lms_names": [
+        "PMI PMO"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260912133050641690",
+          "title": "PMI PMO",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2028-02-09",
+          "end_date": "2028-05-24",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-2026100111080958797426535A71280F",
+          "title": "PMI PMO",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2028-02-10",
+          "end_date": "2028-05-31",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912133050641690",
+        "MOD-2026100111080958797426535A71280F"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "PMI (PMO)"
+        },
+        {
+          "version": 16,
+          "display_name": "PMI (PMO)"
+        },
+        {
+          "version": 20,
+          "display_name": "PMI (PMO)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "portfolio",
+      "academic_display_name": "Portfolio Management (APMG)",
+      "pcp_pathway": "strategic",
+      "classification": "optional",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "LMS does not establish the APMG qualification or a shared academic ID. Similar titles are insufficient.",
+      "candidate_lms_names": [
+        "Portfolio Management",
+        "Stephen-Portfolio Management"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-202609261436007348803668051194D7",
+          "title": "Stephen-Portfolio Management",
+          "cohort_id": "APTEM-COHORT-455d4927b79d27e352db15e30bd8b450",
+          "cohort_name": "Oct 2025",
+          "group_id": "APTEM-GROUP-58fc8541503788b1fa37f475d6bad273",
+          "group_name": "Stephen-Portfolio Management 2026",
+          "start_date": "2026-07-23",
+          "end_date": "2026-10-29",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912125821447490",
+          "title": "Portfolio Management",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2028-06-07",
+          "end_date": "2028-09-20",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202610011111188096444893DEB489B6",
+          "title": "Portfolio Management",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2028-06-08",
+          "end_date": "2028-09-27",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912125821447490",
+        "MOD-202610011111188096444893DEB489B6"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Portfolio Management (APMG)"
+        },
+        {
+          "version": 16,
+          "display_name": "Portfolio Management (APMG)"
+        },
+        {
+          "version": 20,
+          "display_name": "Portfolio Management (APMG)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "successful-programmes",
+      "academic_display_name": "Managing Successful Programmes",
+      "pcp_pathway": "strategic",
+      "classification": "optional",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "No shared academic identifier or explicit reviewed binding exists. Names are evidence for review only.",
+      "candidate_lms_names": [
+        "MSP",
+        "Managing Successful Programmes: Project Controls for Transformational Change"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20260930110509069516DE05CBE11E6E",
+          "title": "Managing Successful Programmes: Project Controls for Transformational Change",
+          "cohort_id": "APTEM-COHORT-6c02084ae2e88522bac93c144b638ff7",
+          "cohort_name": "Feb 2026",
+          "group_id": "GROUP-20260919193601595411EF24A705C61C",
+          "group_name": "G1",
+          "start_date": "2026-09-04",
+          "end_date": "2026-12-31",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912134909006787",
+          "title": "MSP",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2028-06-06",
+          "end_date": "2028-09-20",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202610011055392208554E5AEEA80347",
+          "title": "MSP",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2028-06-08",
+          "end_date": "2028-09-27",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912134909006787",
+        "MOD-202610011055392208554E5AEEA80347"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Managing Successful Programmes"
+        },
+        {
+          "version": 16,
+          "display_name": "Managing Successful Programmes"
+        },
+        {
+          "version": 20,
+          "display_name": "Managing Successful Programmes"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "pmo-planning-control",
+      "academic_display_name": "Project Planning and Control",
+      "pcp_pathway": "chartered",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "Candidate offerings also appear for planning-control. Distinct academic/pathway definitions require explicit review.",
+      "candidate_lms_names": [
+        "PPC",
+        "Steve-Project Planning and Control(PPC)"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-20261029093006054077DEFAEF52A90B",
+          "title": "Steve-Project Planning and Control(PPC)",
+          "cohort_id": "APTEM-COHORT-455d4927b79d27e352db15e30bd8b450",
+          "cohort_name": "Oct 2025",
+          "group_id": "GROUP-2026102908472339278881E5E5626584",
+          "group_name": "G1",
+          "start_date": "2026-11-04",
+          "end_date": "2027-03-03",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912132052479676",
+          "title": "PPC",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2028-02-10",
+          "end_date": "2028-05-31",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-2026100111101527614080126D27D623",
+          "title": "PPC",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2028-02-10",
+          "end_date": "2028-05-31",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912132052479676",
+        "MOD-2026100111101527614080126D27D623"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Project Planning and Control"
+        },
+        {
+          "version": 16,
+          "display_name": "Project Planning and Control"
+        },
+        {
+          "version": 20,
+          "display_name": "Project Planning and Control"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "pmo-stakeholders",
+      "academic_display_name": "Stakeholder Engagement and Communication",
+      "pcp_pathway": "chartered",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "Stakeholder Management & Reporting is not proven equivalent to Stakeholder Engagement and Communication.",
+      "candidate_lms_names": [
+        "Stakeholder Management & Reporting"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-KBC-PMP-M01-SMR",
+          "title": "Stakeholder Management & Reporting",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2026-09-30",
+          "end_date": "2027-01-26",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Stakeholder Engagement and Communication"
+        },
+        {
+          "version": 16,
+          "display_name": "Stakeholder Engagement and Communication"
+        },
+        {
+          "version": 20,
+          "display_name": "Stakeholder Engagement and Communication"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "pmo-risk-quality",
+      "academic_display_name": "Risk, Quality and Issue Management",
+      "pcp_pathway": "chartered",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "unavailable",
+      "ambiguity_explanation": "No verified counterpart for the complete Risk, Quality and Issue Management component; Risk Management alone is insufficient.",
+      "candidate_lms_names": [],
+      "candidate_offerings": [],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Risk, Quality and Issue Management"
+        },
+        {
+          "version": 16,
+          "display_name": "Risk, Quality and Issue Management"
+        },
+        {
+          "version": 20,
+          "display_name": "Risk, Quality and Issue Management"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "pmo-office",
+      "academic_display_name": "Project Management Office",
+      "pcp_pathway": "chartered",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "Only Project Management Office title candidates are listed; PMI PMO is not treated as equivalent.",
+      "candidate_lms_names": [
+        "Ray-Project Management Office(PMO)"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-202610290940226451730757D1447F42",
+          "title": "Ray-Project Management Office(PMO)",
+          "cohort_id": "APTEM-COHORT-455d4927b79d27e352db15e30bd8b450",
+          "cohort_name": "Oct 2025",
+          "group_id": "GROUP-202610290911114700814D950B874812",
+          "group_name": "G2",
+          "start_date": "2026-11-05",
+          "end_date": "2027-03-04",
+          "cohort_status": "planned"
+        }
+      ],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Project Management Office"
+        },
+        {
+          "version": 16,
+          "display_name": "Project Management Office"
+        },
+        {
+          "version": 20,
+          "display_name": "Project Management Office"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "ai-project-management",
+      "academic_display_name": "AI in Project Management",
+      "pcp_pathway": "chartered",
+      "classification": "mandatory",
+      "credits": 1,
+      "mapping_status": "unavailable",
+      "ambiguity_explanation": "AI in Project Control is not automatically equivalent to AI in Project Management.",
+      "candidate_lms_names": [],
+      "candidate_offerings": [],
+      "future_candidate_offerings_exist": false,
+      "future_candidate_offering_ids": [],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "AI in Project Management"
+        },
+        {
+          "version": 16,
+          "display_name": "AI in Project Management"
+        },
+        {
+          "version": 20,
+          "display_name": "AI in Project Management"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "portfolio",
+      "academic_display_name": "Portfolio Management (APMG)",
+      "pcp_pathway": "chartered",
+      "classification": "optional",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "LMS does not establish the APMG qualification or a shared academic ID. Similar titles are insufficient.",
+      "candidate_lms_names": [
+        "Portfolio Management",
+        "Stephen-Portfolio Management"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-202609261436007348803668051194D7",
+          "title": "Stephen-Portfolio Management",
+          "cohort_id": "APTEM-COHORT-455d4927b79d27e352db15e30bd8b450",
+          "cohort_name": "Oct 2025",
+          "group_id": "APTEM-GROUP-58fc8541503788b1fa37f475d6bad273",
+          "group_name": "Stephen-Portfolio Management 2026",
+          "start_date": "2026-07-23",
+          "end_date": "2026-10-29",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912125821447490",
+          "title": "Portfolio Management",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2028-06-07",
+          "end_date": "2028-09-20",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202610011111188096444893DEB489B6",
+          "title": "Portfolio Management",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2028-06-08",
+          "end_date": "2028-09-27",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912125821447490",
+        "MOD-202610011111188096444893DEB489B6"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Portfolio Management (APMG)"
+        },
+        {
+          "version": 16,
+          "display_name": "Portfolio Management (APMG)"
+        },
+        {
+          "version": 20,
+          "display_name": "Portfolio Management (APMG)"
+        }
+      ],
+      "approved": false
+    },
+    {
+      "enrolment_programme_id": "PCP_L6",
+      "enrolment_academic_module_id": "earned-value",
+      "academic_display_name": "Earned Value Management (APMG)",
+      "pcp_pathway": "chartered",
+      "classification": "optional",
+      "credits": 1,
+      "mapping_status": "ambiguous",
+      "ambiguity_explanation": "Operational EVM and chartered APMG variants share this local ID in different pathways; no qualification equivalence has been approved.",
+      "candidate_lms_names": [
+        "EVM",
+        "Steve-Earned Value Management(EVM)"
+      ],
+      "candidate_offerings": [
+        {
+          "module_catalogue_id": "MOD-2026092614305006682733BA20B0D627",
+          "title": "Steve-Earned Value Management(EVM)",
+          "cohort_id": "APTEM-COHORT-455d4927b79d27e352db15e30bd8b450",
+          "cohort_name": "Oct 2025",
+          "group_id": "APTEM-GROUP-2676a39ec60710b8a73200bdaf4fba8a",
+          "group_name": "Steve-Earned Value Management(EVM)2026",
+          "start_date": "2026-07-22",
+          "end_date": "2026-10-28",
+          "cohort_status": "planned"
+        },
+        {
+          "module_catalogue_id": "MOD-20260912113803682139",
+          "title": "EVM",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-20260912111638967115",
+          "group_name": "G1",
+          "start_date": "2028-06-08",
+          "end_date": "2028-09-27",
+          "cohort_status": "active"
+        },
+        {
+          "module_catalogue_id": "MOD-202610011112472281824E5986C4E06B",
+          "title": "EVM",
+          "cohort_id": "COHORT-20260912111441822802",
+          "cohort_name": "October 2026",
+          "group_id": "GROUP-2026100110425434687520181B1A2448",
+          "group_name": "G2",
+          "start_date": "2028-06-08",
+          "end_date": "2028-09-27",
+          "cohort_status": "active"
+        }
+      ],
+      "future_candidate_offerings_exist": true,
+      "future_candidate_offering_ids": [
+        "MOD-20260912113803682139",
+        "MOD-202610011112472281824E5986C4E06B"
+      ],
+      "saved_snapshot_definitions": [
+        {
+          "version": 11,
+          "display_name": "Earned Value Management (APMG)"
+        },
+        {
+          "version": 16,
+          "display_name": "Earned Value Management (APMG)"
+        },
+        {
+          "version": 20,
+          "display_name": "Earned Value Management (APMG)"
+        }
+      ],
+      "approved": false
+    }
+  ],
+  "pcp_eligibility_rule": "Use only modules_selection.modulesByPathway[modules_selection.pathway] against its saved modules_configuration/version. Never union inactive pathways.",
+  "future_selection_rule": "New PCP selections require start_date later than the current Europe/London date. Existing started choices remain stored and visible.",
+  "review_requirements": [
+    "No candidates are approved by this report.",
+    "Approve every academic equivalence and offering family explicitly, including qualification variants and pathway-specific components.",
+    "No test-like or unrelated APM records may be substituted.",
+    "Review dates again at UI implementation/save time; future flags in this report are a dated audit snapshot.",
+    "No Enrolment or LMS database mappings, cohorts, learners or publications have been changed."
+  ]
+}

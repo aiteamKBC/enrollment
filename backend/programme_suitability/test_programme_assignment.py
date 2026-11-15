@@ -3,13 +3,13 @@ import io
 import json
 import os
 from contextlib import nullcontext
-from datetime import date
+from datetime import date, datetime, timezone as datetime_timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.management import call_command
-from django.db import DatabaseError, connection, connections
-from django.test import RequestFactory, TestCase
+from django.db import DatabaseError, connection, connections, transaction
+from django.test import RequestFactory, TestCase, override_settings
 
 from learner_api.models import EnrolmentUser, LearnerProfile
 from . import views
@@ -21,6 +21,160 @@ from .tests import answers
 
 
 class ProgrammeAssignmentIntegrationTests(TestCase):
+    databases = {'default', 'enrolment'}
+
+    @override_settings(PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED=True)
+    def test_historical_reconciliation_cannot_enter_future_cohort_assignment(self):
+        self.submit()
+        row = Assessment.objects.get()
+        row.selection_confirmed_at = row.confirmed_at
+        row.save(update_fields=['selection_confirmed_at'])
+        from .programme_assignment import sync_confirmed_programme_to_learner
+        with patch('programme_suitability.future_cohort.resolve_future_cohort') as resolve:
+            with transaction.atomic():
+                result = sync_confirmed_programme_to_learner(row, reconcile=True, dry_run=True)
+        resolve.assert_not_called()
+        self.assertIsNone(result['automaticCohort'])
+        self.profile.refresh_from_db(); self.source.refresh_from_db()
+        self.assertIsNone(self.profile.cohort_id)
+        self.assertEqual(self.source.programme, '')
+
+    @override_settings(PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED=True,
+                       PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED=True)
+    def test_future_first_confirmation_persists_confirmed_programme_cohort_and_shared_display(self):
+        self.assert_future_confirmation_assignment(with_profile=True)
+
+    @override_settings(PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED=True,
+                       PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED=True)
+    def test_future_confirmation_without_profile_saves_stable_identity_and_shared_display(self):
+        self.assert_future_confirmation_assignment(with_profile=False)
+
+    @override_settings(PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED=True,
+                       PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED=True)
+    def test_account_write_failure_rolls_back_cohort_programme_and_confirmation_together(self):
+        self.assert_future_confirmation_assignment(with_profile=False, fail_first=True)
+
+    def assert_future_confirmation_assignment(self, *, with_profile, fail_first=False):
+        # All records below exist only in the isolated in-memory test databases.
+        # No Programme Structure implementation/defaults/publications are edited.
+        cohort = {'id': 'real-future-feb', 'programmeId': 'ME_L4', 'name': 'February 2027 - Real group',
+                  'status': 'planned', 'assignmentPeriod': {'year': 2027, 'startMonth': 10,
+                  'startDay': 16, 'endMonth': 2, 'endDay': 15},
+                  'modules': [{'id': 'fixed-module', 'title': 'Fixed module', 'active': True,
+                               'selection': 'required', 'sessions': 12}], 'mappings': []}
+        layout = {'programmeStructure': {'schemaVersion': 2, 'programmes': [{
+            'id': 'ME_L4', 'curriculumProgrammeId': 'PROG-ME-L4', 'title': 'Marketing Executive',
+            'modules': [], 'ksbs': [], 'mappings': [], 'cohorts': [cohort]}]}}
+        with connection.cursor() as cursor:
+            cursor.execute('UPDATE curriculum.programmes SET programme_id=%s WHERE programme_id=%s',
+                           ['PROG-ME-L4', 'CAT-ME_L4'])
+            cursor.execute('INSERT INTO curriculum.cohorts (cohort_id,cohort_name,programme_id,programme_name) VALUES (%s,%s,%s,%s)',
+                           [cohort['id'], cohort['name'], 'PROG-ME-L4', CATALOGUE_NAMES['ME_L4']])
+        with connections['enrolment'].cursor() as cursor:
+            cursor.execute('INSERT INTO enrolment."Wizard_Form_Layouts" (id,"Layout") VALUES (%s,%s)',
+                           [50, json.dumps(layout)])
+        if not with_profile:
+            with connection.cursor() as cursor:
+                cursor.execute('DELETE FROM "Learner".learners WHERE id = %s', [self.profile.pk])
+        self.submit()  # The assessment recommends MM_L6.
+        timestamp = datetime(2026, 12, 1, 10, 30, tzinfo=datetime_timezone.utc)
+        if fail_first:
+            with patch.object(EnrolmentUser, 'save', side_effect=DatabaseError('Synthetic account failure')):
+                failed = self.request({'revision': 1, 'action': 'select', 'selectedProgramme': 'ME_L4',
+                                       'alternativeSelectionReason': 'My confirmed delivery programme.'})
+            self.assertEqual(failed.status_code, 503, failed.content)
+            self.source.refresh_from_db()
+            self.assertEqual((self.source.programme, self.source.cohort), ('', ''))
+            failed_row = Assessment.objects.get()
+            self.assertIsNone(failed_row.selection_confirmed_at)
+            self.assertNotIn('programmeAssignment', failed_row.review)
+        with patch('programme_suitability.views.timezone.now', return_value=timestamp):
+            response = self.request({'revision': 1, 'action': 'select', 'selectedProgramme': 'ME_L4',
+                                     'alternativeSelectionReason': 'My confirmed delivery programme.'})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.source.refresh_from_db()
+        row = Assessment.objects.get()
+        self.assertEqual(row.selected_programme, 'ME_L4')
+        self.assertEqual(row.selection_confirmed_at, timestamp)
+        if with_profile:
+            self.profile.refresh_from_db()
+            self.assertEqual(self.profile.programme_id, 'PROG-ME-L4')
+            self.assertEqual(self.profile.cohort_id, cohort['id'])
+            self.assertEqual(self.profile.cohort, cohort['name'])
+        self.assertEqual(self.source.programme, CATALOGUE_NAMES['ME_L4'])
+        self.assertEqual(self.source.cohort, cohort['name'])
+        assignment = row.review['programmeAssignment']
+        self.assertEqual(assignment['cohortAssignmentVersion'], 1)
+        self.assertEqual(assignment['programmeId'], 'PROG-ME-L4')
+        self.assertEqual(assignment['cohortId'], cohort['id'])
+        self.assertEqual(assignment['cohortPublicationVersion'], 50)
+        self.assertEqual(assignment['profileId'], self.profile.pk if with_profile else None)
+        from .home_cohort import read_home_cohort, cohort_label_for_board
+        home = read_home_cohort(row, 'apprenticeship', self.source.pk, row.modules_configuration_version)
+        self.assertEqual(home['status'], 'resolved')
+        self.assertEqual(home['name'], cohort_label_for_board(self.source, self.source.cohort))
+        self.assertEqual(home['name'], cohort['name'])
+        from learner_api.mappers import to_board
+        self.assertEqual(to_board(self.source)['programme']['cohort'], home['name'])
+        before = Assessment.objects.values().get()
+        self.assertEqual(self.request({'revision': row.revision, 'action': 'continue'}).status_code, 200)
+        self.assertEqual(Assessment.objects.values().get(), before)
+        self.assertEqual(LearnerProfile.objects.count(), int(with_profile))
+        if with_profile:
+            self.profile.refresh_from_db(); self.assertEqual(self.profile.cohort_id, cohort['id'])
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.cohort, cohort['name'])
+
+    @override_settings(PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED=True)
+    def test_future_confirmation_without_canonical_publication_preserves_pending(self):
+        self.submit()
+        with patch('programme_suitability.programme_assignment.resolve_automatic_cohort') as resolve:
+            response = self.request({'revision': 1, 'action': 'continue'})
+        self.assertEqual(response.status_code, 200, response.content)
+        resolve.assert_not_called()
+        self.profile.refresh_from_db()
+        self.assertIsNone(self.profile.cohort_id)
+        self.assertEqual(self.profile.cohort, '')
+        self.assertTrue(Assessment.objects.get().review['programmeAssignment']['automaticCohort']['pending'])
+
+    def assert_legacy_cohort_is_not_reassigned(self, *, source_cohort, profile_cohort):
+        with connection.cursor() as cursor:
+            cursor.execute('INSERT INTO curriculum.cohorts (cohort_id, cohort_name, programme_id, programme_name) VALUES (%s,%s,%s,%s)',
+                           ['existing', 'Existing cohort', 'CAT-MM_L6', CATALOGUE_NAMES['MM_L6']])
+        EnrolmentUser.all_learners.filter(pk=self.source.pk).update(cohort=source_cohort)
+        LearnerProfile.objects.filter(pk=self.profile.pk).update(cohort=profile_cohort, cohort_id=None)
+        self.submit()
+        with patch('programme_suitability.programme_assignment.resolve_automatic_cohort') as resolve:
+            response = self.request({'revision': 1, 'action': 'continue'})
+        self.assertEqual(response.status_code, 200, response.content)
+        resolve.assert_not_called()
+        self.source.refresh_from_db(); self.profile.refresh_from_db()
+        self.assertEqual(self.source.cohort, source_cohort)
+        self.assertEqual(self.profile.cohort, profile_cohort)
+        self.assertIsNone(self.profile.cohort_id)
+
+    @override_settings(PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED=True)
+    def test_automatic_assignment_preserves_legacy_profile_cohort_without_an_id(self):
+        self.assert_legacy_cohort_is_not_reassigned(source_cohort='', profile_cohort='Existing cohort')
+
+    @override_settings(PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED=True)
+    def test_automatic_assignment_preserves_legacy_account_cohort_without_an_id(self):
+        self.assert_legacy_cohort_is_not_reassigned(source_cohort='Existing cohort', profile_cohort='')
+
+    @override_settings(PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED=True)
+    def test_confirmation_without_an_existing_profile_does_not_create_or_invent_one(self):
+        # Remove only this in-memory fixture; unrelated unmanaged FK tables
+        # intentionally do not exist in the isolated assignment-test database.
+        with connection.cursor() as cursor:
+            cursor.execute('DELETE FROM "Learner".learners WHERE id = %s', [self.profile.pk])
+        self.submit()
+        with patch('programme_suitability.programme_assignment.resolve_automatic_cohort') as resolve:
+            response = self.request({'revision': 1, 'action': 'continue'})
+        self.assertEqual(response.status_code, 200, response.content)
+        resolve.assert_not_called()
+        self.assertFalse(LearnerProfile.objects.filter(enrolment_id=self.source.pk).exists())
+        self.assertIsNone(Assessment.objects.get().review['programmeAssignment']['profileId'])
+
     def test_automatic_cohort_boundaries(self):
         self.assertEqual(automatic_cohort_window(date(2026, 11, 20)), ('Feb', 2027))
         self.assertEqual(automatic_cohort_window(date(2027, 2, 15)), ('Feb', 2027))
@@ -28,7 +182,8 @@ class ProgrammeAssignmentIntegrationTests(TestCase):
         self.assertEqual(automatic_cohort_window(date(2027, 6, 15)), ('Jun', 2027))
         self.assertEqual(automatic_cohort_window(date(2027, 6, 16)), ('Oct', 2027))
         self.assertEqual(automatic_cohort_window(date(2027, 10, 14)), ('Oct', 2027))
-        self.assertEqual(automatic_cohort_window(date(2027, 10, 15)), ('Feb', 2028))
+        self.assertEqual(automatic_cohort_window(date(2027, 10, 15)), ('Oct', 2027))
+        self.assertEqual(automatic_cohort_window(date(2027, 10, 16)), ('Feb', 2028))
 
     def test_configurable_calendar_supports_fourth_intake_and_rejects_invalid_dates(self):
         calendar = [

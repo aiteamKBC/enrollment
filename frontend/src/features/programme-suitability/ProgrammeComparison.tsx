@@ -6,7 +6,6 @@ const explanations: Record<string, string> = {
   BELOW_MINIMUM_MATCH: 'The evidence does not reach the configured recommendation threshold.',
   CLOSE_PROGRAMME_SCORES: 'The two programmes have similar matching evidence.',
   CONTRADICTORY_RESPONSIBILITIES: 'The answers indicate mixed responsibilities across both levels.',
-  MISSING_CRITICAL_LEVEL_6_EVIDENCE: 'More distinct evidence of Level 6 responsibilities is needed.',
 };
 
 export function ProgrammeComparison({ programmes, result, selected, onSelect }: {
@@ -18,7 +17,7 @@ export function ProgrammeComparison({ programmes, result, selected, onSelect }: 
       ? <>Preliminary recommendation: <strong>{recommended.title} Level {recommended.level}</strong>.</>
       : <strong>Further admissions review is needed to make a recommendation.</strong>}
       {' '}This is guidance about role responsibilities, not a final eligibility or admissions decision.</p>
-    {!recommended && <ul className="list-disc pl-5 text-sm">{result.reasons.map((reason) =>
+    {!recommended && <ul className="list-disc pl-5 text-sm">{result.reasons.filter((reason) => reason !== 'MISSING_CRITICAL_LEVEL_6_EVIDENCE').map((reason) =>
       <li key={reason}>{explanations[reason] ?? reason.replaceAll('_', ' ')}</li>)}</ul>}
     <div className="grid gap-4 md:grid-cols-2">{[...programmes].sort((a, b) => a.order - b.order).map((p) => <article key={p.id}
       className={`rounded-xl border p-4 ${recommended?.id === p.id ? 'border-primary-500 bg-primary-50' : 'border-foreground-200'}`}>

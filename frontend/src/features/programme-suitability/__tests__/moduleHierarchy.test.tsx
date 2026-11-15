@@ -1,3 +1,4 @@
+import { editorGroup } from './adminTestHelpers';
 import { useState } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -62,19 +63,23 @@ it('assigns and clears a parent by stable ID without changing module settings, s
   const view = render(<Admin />);
   await userEvent.selectOptions(screen.getByLabelText('Programme'), 'PCP_L6');
   await userEvent.selectOptions(screen.getByLabelText('PCP pathway'), 'chartered');
-  const parent = screen.getByRole('group', { name: `Edit group ${pmo.title}` });
-  for (const child of pmo.items!) expect(within(parent).getByRole('group', { name: `Edit module ${child.title}` })).toBeVisible();
+  const parent = editorGroup({ name: `Edit group ${pmo.title}` });
+  for (const child of pmo.items!) {
+    const childEditor = editorGroup({ name: `Edit module ${child.title}` });
+    expect(within(parent).getByRole('group', { name: `Edit module ${child.title}` })).toBe(childEditor);
+    expect(childEditor).toBeVisible();
+  }
   for (const id of independent) {
     const module = path.modules.find((item) => item.id === id)!;
-    const fieldset = screen.getByRole('group', { name: `Edit module ${module.title}` });
+    const fieldset = editorGroup({ name: `Edit module ${module.title}` });
     expect(parent).not.toContainElement(fieldset);
     expect(within(fieldset).getByLabelText('Parent group')).toHaveValue('');
   }
-  const portfolio = () => within(screen.getByRole('group', { name: 'Edit module Portfolio Management (APMG)' }));
+  const portfolio = () => within(editorGroup({ name: 'Edit module Portfolio Management (APMG)' }));
   await userEvent.selectOptions(portfolio().getByLabelText('Parent group'), 'certified-pmo');
-  expect(parent).toContainElement(screen.getByRole('group', { name: 'Edit module Portfolio Management (APMG)' }));
+  expect(parent).toContainElement(editorGroup({ name: 'Edit module Portfolio Management (APMG)' }));
   await userEvent.selectOptions(portfolio().getByLabelText('Parent group'), '');
-  expect(parent).not.toContainElement(screen.getByRole('group', { name: 'Edit module Portfolio Management (APMG)' }));
+  expect(parent).not.toContainElement(editorGroup({ name: 'Edit module Portfolio Management (APMG)' }));
   const changed = edited.programmes[3].pathways.find((item) => item.id === 'chartered')!;
   expect(changed.modules.find((item) => item.id === 'certified-pmo')!.items).toHaveLength(4);
   expect(changed.modules.find((item) => item.id === 'portfolio')).toEqual({ ...path.modules.find((item) => item.id === 'portfolio'), order: 4 });

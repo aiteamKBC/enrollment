@@ -1,11 +1,15 @@
-import { Fragment, useId } from 'react';
+import { Fragment, Suspense, lazy, useId } from 'react';
 import { useWizard } from '@/pages/users/wizard/WizardContext.helpers';
 import { btnSecondary } from '@/pages/users/components/ui';
 import { completion, selectionConfirmed } from '../useSuitability';
 import type { ProgrammeId } from '../types';
-import { ordered, isModuleGroup, selectableModules, selectedModuleIds, mandatoryIds, pathwaySelectionError, selectionFingerprint, moduleSelectionComplete, type ProgrammeModule, type ProgrammeModuleSelection, type ModulesConfiguration } from './configuration';
+import { ordered, isModuleGroup, selectableModules, selectedModuleIds, mandatoryIds, pathwaySelectionError, selectionFingerprint, moduleSelectionComplete, type ProgrammeModule, type ProgrammeModuleSelection, type ModulesConfiguration, type HomeCohort } from './configuration';
 import { useModuleSelectionSave } from './useModuleSelectionSave';
 import { useModulesConfiguration } from './useModulesConfiguration';
+import { schedulingPreviewEnabled } from './schedulingPreviewMode';
+import type { ScheduleContext } from './useModuleSchedules';
+
+const SchedulingTimeline = lazy(() => import('./ModuleSchedulingPreview'));
 
 function ModuleTable({ modules, selected = [], disabled = true, limitReached = false, onToggle }: {
   modules: ProgrammeModule[]; selected?: string[]; disabled?: boolean; limitReached?: boolean; onToggle?: (id: string) => void;
@@ -52,20 +56,24 @@ function ModuleTable({ modules, selected = [], disabled = true, limitReached = f
 }
 
 /** Shared by real learner rendering and a fully local administration preview. */
-export function ProgrammeModulesView({ configuration, programmeId, selection, onChange, readOnly = false, version }: {
+export function ProgrammeModulesView({ configuration, programmeId, selection, onChange, readOnly = false, version, homeCohort, showHomeCohort = false, schedulingPreview = false, scheduleContext }: {
   configuration: ModulesConfiguration; programmeId: ProgrammeId; selection?: ProgrammeModuleSelection;
   onChange?: (next: ProgrammeModuleSelection) => void; readOnly?: boolean; version?: number | null;
+  homeCohort?: HomeCohort; showHomeCohort?: boolean;
+  schedulingPreview?: boolean;
+  scheduleContext?: ScheduleContext;
 }) {
   const programme = configuration.programmes.find((p) => p.id === programmeId);
   if (!programme) return null;
   const pcp = programmeId === 'PCP_L6';
+  const showSchedulingPreview = import.meta.env.DEV && schedulingPreview;
   const paths = ordered(programme.pathways).filter((p) => p.active);
   const columns = paths.length === 1 ? '' : paths.length === 2 || paths.length === 4 ? 'lg:grid-cols-2' : 'lg:grid-cols-3';
   return <section aria-label="Programme Modules" className={`mt-6 rounded-xl border border-primary-200 bg-background-50 p-4 md:p-5 ${pcp ? 'max-w-7xl' : 'max-w-3xl'}`}>
     <h3 className="text-lg font-semibold">Programme Modules</h3>
     <p className="mt-1 text-sm text-foreground-600">These are the modules for your selected programme.</p>
-    <p className="mb-5 mt-2 text-sm font-semibold text-primary-700">{programme.title}</p>
-    {!pcp ? <ModuleTable modules={programme.modules} /> : <div role="radiogroup" aria-label="Project Controls Professional pathway" className={`grid gap-4 ${columns}`}>
+    <p className="mb-5 mt-2 text-sm font-semibold text-primary-700"><span>{programme.title}</span></p>
+    {showSchedulingPreview ? <Suspense fallback={<p role="status">Loading scheduling preview…</p>}><SchedulingTimeline programme={programme} selection={selection} homeCohort={homeCohort} samplePreview /></Suspense> : !pcp ? <ModuleTable modules={programme.modules} /> : <div role="radiogroup" aria-label="Project Controls Professional pathway" className={`grid gap-4 ${columns}`}>
       {paths.map((pathway) => {
         const active = selection?.programme === 'PCP_L6' && selection.pathway === pathway.id;
         const selected = selectedModuleIds(selection, pathway);
@@ -102,11 +110,14 @@ export function ProgrammeModulesView({ configuration, programmeId, selection, on
       })}
       {paths.length === 0 && <p className="text-sm text-foreground-600">No pathways are currently available.</p>}
     </div>}
+    {showHomeCohort && !showSchedulingPreview && <div className="mt-6 border-t border-primary-100 pt-5" data-module-timeline>
+      <Suspense fallback={<p role="status">Loading module timeline…</p>}><SchedulingTimeline programme={programme} selection={selection} homeCohort={homeCohort} scheduleContext={scheduleContext} /></Suspense>
+    </div>}
   </section>;
 }
 
-function SavedModules({ configuration, programmeId, version, previewOnly = false }: { configuration: ModulesConfiguration; programmeId: ProgrammeId; version: number | null; previewOnly?: boolean }) {
-  const { readOnly, hydrated } = useWizard();
+function SavedModules({ configuration, programmeId, version, previewOnly = false, homeCohort }: { configuration: ModulesConfiguration; programmeId: ProgrammeId; version: number | null; previewOnly?: boolean; homeCohort?: HomeCohort }) {
+  const { readOnly, hydrated, userId, isCommercial } = useWizard();
   const { selection, status, error, update, retry } = useModuleSelectionSave();
   const path = configuration.programmes.find((p) => p.id === programmeId)?.pathways.find((p) => p.id === selection?.pathway);
   const reviewed: ProgrammeModuleSelection | undefined = selection && path ? { ...selection, configurationVersion: version,
@@ -115,8 +126,9 @@ function SavedModules({ configuration, programmeId, version, previewOnly = false
   return <>
     {selection && selection.configurationVersion !== version && !(version === 0 && selection.configurationVersion === undefined) &&
       <p role="status" className="mt-4 text-sm text-amber-800">Published module settings have changed. Review your choices and save them before continuing.</p>}
-    <ProgrammeModulesView configuration={configuration} programmeId={programmeId} version={version} selection={selection}
-      onChange={previewOnly ? undefined : programmeId === 'PCP_L6' ? update : undefined} readOnly={previewOnly || readOnly || !hydrated} />
+    <ProgrammeModulesView configuration={configuration} programmeId={programmeId} version={version} selection={selection} homeCohort={homeCohort} showHomeCohort={!previewOnly}
+      onChange={previewOnly ? undefined : programmeId === 'PCP_L6' ? update : undefined} readOnly={previewOnly || readOnly || !hydrated}
+      scheduleContext={previewOnly ? undefined : { id: userId, kind: isCommercial ? 'commercial' : 'apprenticeship' }} />
     {!readOnly && canSaveReview && <button type="button" className={`${btnSecondary} mt-3`} disabled={status === 'saving' || !hydrated}
       onClick={() => update(reviewed)}>Save reviewed module selection</button>}
     {!previewOnly && !readOnly && programmeId === 'PCP_L6' && <p role="status" aria-live="polite" className="mt-3 text-xs text-foreground-600">
@@ -129,7 +141,7 @@ function SavedModules({ configuration, programmeId, version, previewOnly = false
 }
 
 export function ProgrammeModulesCard() {
-  const { suitability, userId, isCommercial, modules } = useWizard();
+  const { suitability, userId, isCommercial, modules, draft } = useWizard();
   const state = suitability?.state;
   const confirmed = selectionConfirmed(state ?? null);
   const resolvedProgramme = state?.selectedProgramme || modules?.data?.selectedProgramme;
@@ -140,5 +152,8 @@ export function ProgrammeModulesCard() {
   if (!confirmed && !preview) return <p role="status" className="mt-6 text-sm text-foreground-600">Confirm your programme selection to load its modules.</p>;
   if (error) return <div role="alert" className="mt-6 text-sm text-red-700">{error}<button type="button" className={`${btnSecondary} ml-3`} onClick={retry}>Retry loading modules</button></div>;
   if (!data) return <p role="status" className="mt-6 text-sm">Loading programme modules…</p>;
-  return <SavedModules key={userId} configuration={data.configuration} programmeId={resolvedProgramme} version={data.configurationVersion} previewOnly={!confirmed} />;
+  // Bypass the save-queue component entirely: sample session clicks cannot enqueue writes.
+  if (confirmed && schedulingPreviewEnabled()) return <ProgrammeModulesView configuration={data.configuration} programmeId={resolvedProgramme}
+    version={data.configurationVersion} selection={draft.programmeModules} homeCohort={data.homeCohort} showHomeCohort schedulingPreview readOnly />;
+  return <SavedModules key={userId} configuration={data.configuration} programmeId={resolvedProgramme} version={data.configurationVersion} previewOnly={!confirmed} homeCohort={data.homeCohort} />;
 }

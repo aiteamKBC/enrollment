@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { btnSecondary, inputClass } from '@/pages/users/components/ui';
 import { ordered, isModuleGroup, type ProgrammeModule } from './configuration';
 import { newModule, moveOrdered, asModuleGroup, moduleGroups, assignModuleParent } from './editorOps';
@@ -8,6 +9,7 @@ export function ModuleRowsEditor({ items, onChange, selectable = false, hierarch
   items: ProgrammeModule[]; onChange: (items: ProgrammeModule[]) => void; selectable?: boolean;
   hierarchy?: ModuleHierarchy;
 }) {
+  const [editing, setEditing] = useState<string[]>([]);
   const tree = hierarchy ?? { groups: moduleGroups(items), parentId: '',
     assignParent: (moduleId: string, parentId: string) => onChange(assignModuleParent(items, moduleId, parentId)) };
   return <div className="space-y-3">
@@ -18,8 +20,13 @@ export function ModuleRowsEditor({ items, onChange, selectable = false, hierarch
         const value = { ...module, ...changes };
         replace(group ? asModuleGroup(value, value.items ?? []) : value);
       };
-      return <details key={module.id} open className="rounded-xl border border-foreground-200 p-3">
-        <summary className="cursor-pointer text-sm font-semibold">{module.title || 'Unnamed module'}{group ? ' (Module Group)' : ''}{!module.active ? ' (Inactive)' : ''}</summary>
+      return <details key={module.id} open={editing.includes(module.id)} className="rounded-xl border border-foreground-200 p-3">
+        <summary className="cursor-pointer text-sm" onClick={(event) => { event.preventDefault(); setEditing((ids) => ids.includes(module.id) ? ids.filter((id) => id !== module.id) : [...ids, module.id]); }}>
+          <span className="font-semibold">{module.title || 'Unnamed module'}{group ? ' (Module Group)' : ''}</span>
+          <span className="ml-3">{group ? `${module.items?.length ?? 0} child modules` : `${module.sessions ?? '\u2014'} sessions / ${module.credits ?? '\u2014'} credits`} /  {module.active ? 'Active' : 'Inactive'}</span>
+          <button type="button" className={`${btnSecondary} ml-3`} aria-label={`Edit ${module.title || 'Unnamed module'}`} aria-expanded={editing.includes(module.id)}
+            onClick={(event) => { event.preventDefault(); event.stopPropagation(); setEditing((ids) => ids.includes(module.id) ? ids.filter((id) => id !== module.id) : [...ids, module.id]); }}>{editing.includes(module.id) ? 'Close editor' : 'Edit'}</button>
+        </summary>
         <fieldset aria-label={`Edit ${group ? 'group' : 'module'} ${module.title}`} className="mt-3 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm sm:col-span-2">{group ? 'Group name' : 'Module name'}<input className={inputClass} value={module.title} onChange={(e) => patch({ title: e.target.value })} /></label>
@@ -38,7 +45,9 @@ export function ModuleRowsEditor({ items, onChange, selectable = false, hierarch
             </select></label>}
           </div>
           <label className="block text-sm">Description<textarea rows={2} className={inputClass} value={module.description} onChange={(e) => patch({ description: e.target.value })} /></label>
-          <p className="text-xs text-foreground-500">Stable ID: {module.id}</p>
+          <details className="rounded-lg border p-3"><summary className="cursor-pointer text-sm font-semibold">Advanced Settings</summary>
+            <p className="mt-2 text-xs text-foreground-500">Stable ID: {module.id}</p>
+          </details>
           <div className="flex flex-wrap gap-2">
             <button type="button" className={btnSecondary} disabled={index === 0} onClick={() => onChange(moveOrdered(items, index, -1))}>Move {group ? 'group' : 'module'} up</button>
             <button type="button" className={btnSecondary} disabled={index === items.length - 1} onClick={() => onChange(moveOrdered(items, index, 1))}>Move {group ? 'group' : 'module'} down</button>
@@ -49,6 +58,6 @@ export function ModuleRowsEditor({ items, onChange, selectable = false, hierarch
         </fieldset>
       </details>;
     })}
-    <button type="button" className={btnSecondary} onClick={() => onChange([...items, newModule(items.length)])}>Add Module</button>
+    <button type="button" className={btnSecondary} onClick={() => { const added = newModule(items.length); onChange([...items, added]); setEditing((ids) => [...ids, added.id]); }}>Add Module</button>
   </div>;
 }

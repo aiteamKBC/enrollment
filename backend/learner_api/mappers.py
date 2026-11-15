@@ -265,6 +265,7 @@ def to_board(u):
     # Imported here, not at module scope: enrolment_api.models imports from
     # learner_api.models, so a top-level import would be circular.
     from .board_wizard import fmt_date, merge_wizard_sections, record_address, saved_signature
+    from programme_suitability.home_cohort import cohort_label_for_board
 
     enrolled_at, enrolled_by = _split_enrolled(u.enrolled_time_and_user)
     saved_signature_value, saved_signature_date = saved_signature(u.id)
@@ -324,7 +325,7 @@ def to_board(u):
         "programme": {
             "type": "Delivery",
             "name": _s(u.programme),
-            "cohort": _s(u.cohort),
+            "cohort": cohort_label_for_board(u, _s(u.cohort)),
             "status": programme_status(u) or DEFAULT_PROGRAMME_STATUS,
             # Cohort dates, matched from curriculum.cohort_authoring_details.
             # apprenticeship_end_date is the learner's own override and only
