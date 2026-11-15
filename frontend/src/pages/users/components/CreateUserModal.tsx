@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useToast } from "@/hooks/useToast.helpers";
 import { DatePickerField } from '@/components/feature/DatePickerField';
+import { SelectMenu } from '@/components/feature/SelectField';
 import { reviewHandoverMessage } from '@/api/reviewHandover';
 import { fetchProgrammes, fetchCohorts, fetchGroups } from '@/api/curriculum';
 import { fetchCaseOwners } from '@/api/staffUsers';
@@ -546,12 +547,21 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
         </label>
         <div className="min-w-0">
           {field.lookup === 'organisation' ? (
-            <select id={`cu-${field.name}`} value={formData.organisationId ?? ''}
-              onChange={(e) => setField('organisationId', e.target.value)}
-              className={`${inputClass} cursor-pointer`}>
-              <option value="">{employerError ? 'Could not load organisations' : 'Select organisation…'}</option>
-              {organisations.map((org) => <option key={org.id} value={org.id}>{org.name}{org.postCode ? ` — ${org.postCode}` : ''}</option>)}
-            </select>
+            <SelectMenu
+              id={`cu-${field.name}`}
+              ariaLabel={field.label}
+              value={formData.organisationId ?? ''}
+              onChange={(selected) => setField('organisationId', selected)}
+              options={organisations.map((org) => ({
+                value: org.id,
+                label: org.postCode ? `${org.name} — ${org.postCode}` : org.name,
+              }))}
+              placeholder={employerError ? 'Could not load organisations' : 'Select organisation…'}
+              searchable
+              searchPlaceholder="Search organisations"
+              emptyMessage="No organisations match your search"
+              size="sm"
+            />
           ) : field.lookup === 'employer' ? (
             /* Keyed on the manager record id; names can repeat. */
             <select

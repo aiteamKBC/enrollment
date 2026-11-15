@@ -35,7 +35,9 @@ describe('successful creation awaiting a manual invitation', () => {
       // themselves after signing in. A case owner is still required, because
       // that is who they will book with.
       fireEvent.change(await screen.findByLabelText(/^Case owner/), { target: { value: 'Test Coach' } });
-      fireEvent.change(await screen.findByLabelText(/^Organisation/), { target: { value: '1' } });
+      fireEvent.click(await screen.findByRole('combobox', { name: 'Organisation' }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search organisations' }), { target: { value: 'Test' } });
+      fireEvent.click(screen.getByRole('option', { name: 'Test organisation' }));
     }
     fireEvent.click(screen.getByRole('button', { name: /^Create/ }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(row));
