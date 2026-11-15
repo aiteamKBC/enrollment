@@ -97,7 +97,7 @@ class LearnerBindingAuditTests(TestCase):
         self.people=[]
         for tag, programme in [('A','ME_L4'),('B','APM_L4')]:
             organisation=Organisation.objects.create(name=f'AUDIT_{tag}_COMPANY',address_1=f'AUDIT_{tag}_WORKPLACE',post_code=f'{tag}1 1AA')
-            employer=Employer.objects.create(first_name=f'AUDIT_{tag}_EMPLOYER',surname='Contact',employer_group_ids=[organisation.pk],address_1='PERSONAL ADDRESS',post_code='PERSONAL CODE')
+            employer=Employer.objects.create(first_name=f'AUDIT_{tag}_EMPLOYER',surname='Contact',employer_group_ids=[organisation.pk])
             learner=EnrolmentUser.all_learners.create(username=f'AUDIT_{tag}_LEARNER',email=f'{tag.lower()}@audit.invalid',phone_number=f'0700000000{1 if tag=="A" else 2}',
                 employer_id=employer.pk,employer=f'AUDIT_{tag}_COMPANY',line_manager=f'AUDIT_{tag}_MANAGER',learning_provider=f'AUDIT_{tag}_PROVIDER',
                 programme=PROGRAMMES[programme],cohort=f'AUDIT_{tag}_COHORT',group=f'AUDIT_{tag}_GROUP',

@@ -81,7 +81,7 @@ def register_enrolment_records():
             # who looks after them
             'coach_name', 'coach_email', 'mentor', 'case_owner', 'learning_provider',
             # who they work for
-            'employer', 'employer_id', 'organization', 'line_manager',
+            'employer', 'employer_id', 'organisation_id', 'organization', 'line_manager',
             # the dates and hours the funding rests on
             'start_date', 'end_date', 'learner_start_date', 'learner_end_date',
             'practical_period_end_date', 'apprenticeship_end_date',
@@ -153,16 +153,15 @@ def register_enrolment_records():
         # Both halves of the name: neither identifies a contact on its own.
         title=('first_name', 'surname'),
         title_fallback='email',
-        context=('email', 'town_city', 'country'),
+        context=('email',),
         using='enrolment',
         columns=(
             'id', 'uuid', 'first_name', 'surname', 'email',
-            'town_city', 'county', 'country',
             'signature_name', 'signature_date',
             'created_at', 'updated_at',
-            'mobile', 'post_code', 'gender', 'signature',
+            'mobile', 'gender', 'signature',
         ),
-        redact=('mobile', 'post_code', 'gender', 'signature'),
+        redact=('mobile', 'gender', 'signature'),
     )
 
     register_model(

@@ -39,7 +39,7 @@ from .mappers import (
 )
 from login.permissions import staff_only
 
-from .models import Employer, Organisation, StaffUser
+from .models import Employer, EnrolmentUser, Organisation, StaffUser
 from .views import _error, _parse_body, _send_platform_invitation
 from login.services import sync_account
 
@@ -167,6 +167,11 @@ def _resync_group_names(org):
             names = _resolve_groups(ids)
             emp.employer_group_names = [names.get(i, name) for i in ids]
             emp.save(update_fields=["employer_group_names", "updated_at"])
+        # The id is authoritative, but the learner directory still carries a
+        # text label for older clients and exports.
+        EnrolmentUser.all_learners.filter(organisation_id=org.pk).update(
+            organization=name, employer=name,
+        )
     except DatabaseError:
         pass
 

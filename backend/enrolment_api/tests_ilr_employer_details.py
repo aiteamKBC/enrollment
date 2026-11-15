@@ -14,7 +14,7 @@ from learner_api.apprenticeship_agreement import _employer_address
 
 
 def _learner(employer_id=7, organization="", employer=""):
-    return SimpleNamespace(employer_id=employer_id, organization=organization, employer=employer)
+    return SimpleNamespace(employer_id=employer_id, organisation_id=None, organization=organization, employer=employer)
 
 
 def _employer(group_ids=(3,)):
@@ -28,6 +28,15 @@ ORG = SimpleNamespace(name="Example Ltd", post_code="CT1 1AA", address_1="1 Offi
 
 
 class EmployerDetailsTests(SimpleTestCase):
+    def test_direct_organisation_link_works_without_manager(self):
+        learner = _learner(employer_id=None)
+        learner.organisation_id = 3
+        details, employers, organisations = self._resolve(learner, organisation=ORG)
+        organisations.objects.filter.assert_called_once_with(pk=3)
+        employers.objects.filter.assert_not_called()
+        self.assertEqual(details["organisationName"], "Example Ltd")
+        self.assertEqual(details["postcode"], "CT1 1AA")
+
     def _resolve(self, learner, employer=None, organisation=None):
         with patch.object(view, "Employer") as employers, patch.object(view, "Organisation") as organisations:
             employers.objects.filter.return_value.first.return_value = employer

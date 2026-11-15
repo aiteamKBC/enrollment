@@ -7,11 +7,9 @@ nothing typed or saved is overwritten; every value stays editable.
 
 Sources, in the order agreed for the ILR:
 
-* Organisation name, postcode, address, city — the organisation the learner's
-  employer belongs to (enrolment."Organisations", via the employer's
-  Employer_group_ids). With no single linked organisation, only the name is
-  offered, from the learner's own Orgnization / Employer text; an address is
-  never guessed.
+* Organisation name, postcode, address, city — the learner's direct company
+  reference. Older records can resolve through a manager linked to exactly one
+  organisation; otherwise only the learner's recorded company name is offered.
 * Line manager name, email, phone — the learner's assigned employer person
   (enrolment."Employers", via Created_users."Employer_id").
 
@@ -52,7 +50,10 @@ def _organisation_of(employer):
 
 
 def organisation_for_learner(learner):
-    """Resolve the learner's company through their assigned manager, if unambiguous."""
+    """Use the direct company reference; retain a safe legacy fallback."""
+    organisation_id = getattr(learner, "organisation_id", None)
+    if organisation_id:
+        return Organisation.objects.filter(pk=organisation_id).first()
     employer_id = getattr(learner, "employer_id", None)
     employer = Employer.objects.filter(pk=employer_id).first() if employer_id else None
     return _organisation_of(employer) if employer is not None else None
@@ -61,7 +62,11 @@ def organisation_for_learner(learner):
 def employer_details_for(learner):
     details = dict.fromkeys(FIELDS, "")
     employer = Employer.objects.filter(pk=learner.employer_id).first() if learner.employer_id else None
-    organisation = _organisation_of(employer) if employer is not None else None
+    organisation = organisation_for_learner(learner)
+    if organisation is not None and employer is not None and getattr(learner, "organisation_id", None) and str(learner.organisation_id) not in {
+        str(value) for value in (employer.employer_group_ids or [])
+    }:
+        employer = None
 
     if organisation is not None:
         details["organisationName"] = _s(organisation.name)

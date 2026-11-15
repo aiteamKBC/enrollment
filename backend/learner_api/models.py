@@ -290,11 +290,13 @@ class EnrolmentUser(models.Model):
     phone_number = models.TextField(db_column="Phone_number", null=True, blank=True)
     date_of_birth = models.TextField(db_column="Date_of_birth", null=True, blank=True)
     organization = models.TextField(db_column="Orgnization", null=True, blank=True)  # source spelling
+    # Direct company reference. Install the nullable column before deploying this
+    # model change; older learner rows remain unlinked until explicitly resolved.
+    organisation_id = models.BigIntegerField(db_column="Organisation_id", null=True, blank=True)
     employer = models.TextField(db_column="Employer", null=True, blank=True)
     # The employer's record in enrolment."Employers". `employer` above stays as the
     # display name (it predates employer profiles and is what a plain listing
-    # shows); this is the actual reference, so a learner can reach that employer's
-    # address, contact details and organisation membership.
+    # shows); this identifies the assigned person, never the learner's company.
     #
     # A plain IntegerField, not a ForeignKey: these tables are unmanaged, and the
     # sibling Employers -> Organisations link is id-in-jsonb for the same reason.
@@ -1705,13 +1707,6 @@ class Employer(models.Model):
     gender = models.TextField(db_column="Gender", null=True, blank=True)
     email = models.TextField(db_column="Email", null=True, blank=True)
     mobile = models.TextField(db_column="Mobile", null=True, blank=True)
-
-    post_code = models.TextField(db_column="Post_code", null=True, blank=True)
-    address_1 = models.TextField(db_column="Address_1", null=True, blank=True)
-    address_2 = models.TextField(db_column="Address_2", null=True, blank=True)
-    town_city = models.TextField(db_column="Town_City", null=True, blank=True)
-    county = models.TextField(db_column="County", null=True, blank=True)
-    country = models.TextField(db_column="Country", null=True, blank=True)
 
     employer_group_ids = SafeJSONField(db_column="Employer_group_ids", default=list, blank=True)
     employer_group_names = SafeJSONField(db_column="Employer_group_names", default=list, blank=True)

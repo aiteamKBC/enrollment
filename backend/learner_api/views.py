@@ -78,7 +78,7 @@ from .mappers import (
     validate_learner_dates,
     write_staff_fields,
 )
-from .models import CommercialUser, Employer, EnrolmentUser, LearnerProfile, LearnerTrainingPlanModule, StaffUser
+from .models import CommercialUser, Employer, EnrolmentUser, LearnerProfile, LearnerTrainingPlanModule, Organisation, StaffUser
 from .constants import ACCESS_TUTOR
 from .progress_rules import progress_record_counts_as_achieved
 from .teams_attendance import fetch_verified_teams_attendance_rows
@@ -407,18 +407,28 @@ def _send_platform_invitation(request, subject_type, subject_id, subject=None,
     )
 
 
-def _check_employer_id(fields):
-    """Reject an "Employer_id" that names no employer record.
-
-    The column is a plain integer rather than a real FK (these tables are
-    unmanaged), so this is where referential integrity is actually enforced.
-    Clearing it to None is always allowed.
-    """
-    employer_id = fields.get("employer_id")
+def _check_employer_id(fields, existing=None):
+    """Validate the company first, then ensure the assigned person belongs to it."""
+    if "organisation_id" not in fields and "employer_id" not in fields:
+        return
+    org_id = fields.get("organisation_id", getattr(existing, "organisation_id", None))
+    if org_id is not None:
+        organisation = Organisation.objects.filter(pk=org_id).first()
+        if organisation is None:
+            raise ValidationError(f"Unknown organisationId: {org_id}")
+        fields["organization"] = organisation.name
+        fields["employer"] = organisation.name
+    elif "organisation_id" in fields:
+        fields["organization"] = ""
+        fields["employer"] = ""
+    employer_id = fields.get("employer_id", getattr(existing, "employer_id", None))
     if employer_id is None:
         return
-    if not Employer.objects.filter(pk=employer_id).exists():
+    employer = Employer.objects.filter(pk=employer_id).first()
+    if employer is None:
         raise ValidationError(f"Unknown employerId: {employer_id}")
+    if org_id is not None and str(org_id) not in {str(value) for value in employer.employer_group_ids or []}:
+        raise ValidationError("The selected manager is not linked to this organisation.")
 
 
 def _profile_is_apprenticeship(profile):
@@ -982,7 +992,7 @@ def enrolment_user_detail(request, pk):
                 if message:
                     return _error(message, 409)
             validate_learner_dates(fields, user)
-            _check_employer_id(fields)
+            _check_employer_id(fields, user)
         except ValidationError as exc:
             return _error(str(exc), 400)
         try:

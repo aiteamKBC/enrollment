@@ -175,7 +175,7 @@ def derive_particulars(learner):
 
     return {
         "apprenticeName": _s(learner.username),
-        "employerName": _s(learner.employer),
+        "employerName": _s(learner.organization) or _s(learner.employer),
         "employerAddress": _employer_address(learner),
         # We hold no level/version for the standard, so the programme name is
         # what we can honestly state; an officer completes the rest.

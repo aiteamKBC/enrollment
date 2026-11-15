@@ -9,7 +9,7 @@ vi.mock('@/api/enrolmentUsers', async () => ({ ...await vi.importActual('@/api/e
 vi.mock('@/api/curriculum', () => ({ fetchProgrammes: async () => [], fetchCohorts: async () => [], fetchGroups: async () => [] }));
 vi.mock('@/api/staffUsers', () => ({ fetchCaseOwners: async () => ['Test Coach'] }));
 vi.mock('@/api/employers', () => ({ createEmployer: mocks.createEmployer, listEmployers: async () => ({ results: [] }),
-  listOrganisations: async () => ({ results: [{ id: 'org-1', name: 'Test organisation' }], count: 1 }) }));
+  listOrganisations: async () => ({ results: [{ id: '1', name: 'Test organisation' }], count: 1 }) }));
 vi.mock("@/hooks/useToast.helpers", () => ({ useToast: () => ({ success: mocks.success, error: mocks.error }) }));
 vi.mock('../Modal', () => ({ Modal: ({ children, footer }: { children: React.ReactNode; footer: React.ReactNode }) => <div>{children}{footer}</div> }));
 
@@ -35,6 +35,7 @@ describe('successful creation awaiting a manual invitation', () => {
       // themselves after signing in. A case owner is still required, because
       // that is who they will book with.
       fireEvent.change(await screen.findByLabelText(/^Case owner/), { target: { value: 'Test Coach' } });
+      fireEvent.change(await screen.findByLabelText(/^Organisation/), { target: { value: '1' } });
     }
     fireEvent.click(screen.getByRole('button', { name: /^Create/ }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(row));
