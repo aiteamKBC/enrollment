@@ -23,15 +23,15 @@ vi.mock('../modules/api', () => ({ getModules: api.modules, saveModuleSelection:
 const board = { user: { id: '41', name: 'Synthetic learner' }, contact: { email: '', phone: '', dob: '' },
   programme: { name: 'Project Controls Professional Level 6', onboardingStatus: 'In progress' } } as EnrolmentBoard;
 let latest: ReturnType<typeof useWizard>;
-function Step() {
+function Step({ staff = false }: { staff?: boolean }) {
   latest = useWizard();
   return <WizardShell currentIndex={latest.steps.findIndex(step => step.slug === 'programme-suitability')}
-    mode="learner" onNavigateStep={vi.fn()} onFinish={vi.fn()} />;
+    mode={staff ? 'staff' : 'learner'} onNavigateStep={vi.fn()} onFinish={vi.fn()} />;
 }
 function page(options: { layout?: WizardLayout; staff?: boolean; portal?: boolean } = {}) {
   return <ToastProvider><WizardProvider userId="41" board={board} layout={options.layout} readOnlyLearnerSteps={options.staff}
     recoverSavedAssessment={!options.staff && options.portal !== false}>
-    <Step />
+    <Step staff={options.staff} />
   </WizardProvider></ToastProvider>;
 }
 beforeEach(() => {
@@ -120,4 +120,15 @@ it('normalises only the reserved suitability identity, preserving layout text, i
     .toBeLessThan(resolved.steps.indexOf(resolved.steps.find(step => step.slug === 'programme-suitability')!));
   expect(resolved.texts).toEqual(saved.texts);
   expect(saved).toEqual(before);
+});
+
+
+it('reuses the learner content presentation for the actual staff suitability step without saving', async () => {
+  api.layout.mockResolvedValue({ layout: { ...defaultLayout(), programmeSuitability: confirmedPcp.configuration }, version: 14 });
+  const { container } = render(page({ staff: true }));
+  await savedResultIsVisible();
+  expect(container.querySelector('[data-enrolment-step="programme-suitability"] [data-recommendation-result]')).not.toBeNull();
+  expect(screen.queryByRole('region', { name: 'Programme comparison' })).toBeNull();
+  expect(screen.getByRole('group', { name: 'Admissions review' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Preview Assessment' })).toBeVisible();
 });

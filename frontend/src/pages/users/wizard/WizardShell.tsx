@@ -451,7 +451,7 @@ export function WizardShell({
           </nav>
 
           {/* Main panel */}
-          <div className={`min-w-0 flex-1 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm ${mode === 'learner' ? enrolmentStyles.wizardCard : ''}`}>
+          <div style={mode === 'staff' && currentStep?.slug === SUITABILITY_STEP.slug ? { container: 'enrolment-wizard / inline-size' } : undefined} className={`min-w-0 flex-1 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm ${mode === 'learner' ? enrolmentStyles.wizardCard : ''}`}>
             {/* Compact step header — below lg, where the rail is hidden. Keeps a
                 horizontal step list so narrow screens can still jump between
                 steps; the rail above owns the tablist role. */}
@@ -530,7 +530,7 @@ export function WizardShell({
                 slide-from-invisible replayed here read as a page reload. */}
             <div key={currentIndex} ref={bodyRef} className={`animate-step-in p-4 sm:p-5 md:p-6 lg:px-8 lg:py-7 ${mode === 'learner' ? enrolmentStyles.wizardBody : ''}`}>
               <StepErrorsContext.Provider value={{ show: showErrors, missing: currentMissing }}>
-                <LearnerEnrolmentVisualContext.Provider value={mode === 'learner'}>
+                <LearnerEnrolmentVisualContext.Provider value={mode === 'learner' || currentStep?.slug === SUITABILITY_STEP.slug}>
                   <LearnerStepContent slug={currentStep?.slug}>{body}</LearnerStepContent>
                 </LearnerEnrolmentVisualContext.Provider>
               </StepErrorsContext.Provider>

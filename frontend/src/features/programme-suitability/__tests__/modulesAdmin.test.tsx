@@ -1,3 +1,4 @@
+import { editorGroup } from './adminTestHelpers';
 import { useState } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -26,7 +27,7 @@ it.each(['ME_L4', 'MM_L6', 'APM_L4'])('edits names, sessions, credits and descri
   render(<Harness />);
   await userEvent.selectOptions(screen.getByLabelText('Programme'), id);
   const programme = edited.programmes.find((p) => p.id === id)!;
-  const row = within(screen.getByRole('group', { name: `Edit module ${programme.modules[0].title}` }));
+  const row = within(editorGroup({ name: `Edit module ${programme.modules[0].title}` }));
   const name = row.getByLabelText('Module name');
   await userEvent.clear(name); await userEvent.type(name, 'Edited module');
   const sessions = row.getByLabelText('Sessions'); await userEvent.clear(sessions); await userEvent.type(sessions, '16');
@@ -42,7 +43,7 @@ it.each(['ME_L4', 'MM_L6', 'APM_L4'])('edits names, sessions, credits and descri
 it('adds, deactivates and reorders modules; preview uses the draft without learner API writes', async () => {
   render(<Harness />);
   await userEvent.click(screen.getByRole('button', { name: 'Add Module' }));
-  const newRow = within(screen.getByRole('group', { name: 'Edit module New module' }));
+  const newRow = within(editorGroup({ name: 'Edit module New module' }));
   await userEvent.click(newRow.getByRole('button', { name: 'Move module up' }));
   expect(edited.programmes[0].modules[2].title).toBe('New module');
   await userEvent.click(newRow.getByRole('button', { name: 'Deactivate module' }));
@@ -58,7 +59,7 @@ it('edits PCP paths and nested Chartered modules, and supports adding a fourth p
   render(<Harness />);
   await userEvent.selectOptions(screen.getByLabelText('Programme'), 'PCP_L6');
   await userEvent.selectOptions(screen.getByLabelText('PCP pathway'), 'chartered');
-  const parent = within(screen.getByRole('group', { name: 'Edit group Certified PMO Professional Level 6' }));
+  const parent = within(editorGroup({ name: 'Edit group Certified PMO Professional Level 6' }));
   await userEvent.click(parent.getByRole('button', { name: 'Add child module' }));
   const pcp = edited.programmes.find((p) => p.id === 'PCP_L6')!;
   expect(pcp.pathways.find((p) => p.id === 'chartered')!.modules[0].items).toHaveLength(5);
@@ -66,7 +67,7 @@ it('edits PCP paths and nested Chartered modules, and supports adding a fourth p
   await userEvent.click(screen.getByRole('button', { name: 'Add Pathway' }));
   expect(edited.programmes.find((p) => p.id === 'PCP_L6')!.pathways).toHaveLength(4);
   await userEvent.click(screen.getByRole('button', { name: 'Add Module' }));
-  const row = within(screen.getByRole('group', { name: 'Edit module New module' }));
+  const row = within(editorGroup({ name: 'Edit module New module' }));
   await userEvent.click(row.getByLabelText('Learner-selectable'));
   await userEvent.type(row.getByLabelText('Credits'), '2.5');
   await userEvent.type(row.getByLabelText('Sessions'), '8');
@@ -86,7 +87,7 @@ it('edits PCP paths and nested Chartered modules, and supports adding a fourth p
 
 it('saves and reloads a private server draft without publishing it', async () => {
   const first = render(<Harness />);
-  const field = within(screen.getByRole('group', { name: 'Edit module Social Media' })).getByLabelText('Sessions');
+  const field = within(editorGroup({ name: 'Edit module Social Media' })).getByLabelText('Sessions');
   await userEvent.clear(field); await userEvent.type(field, '18');
   await userEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
   await screen.findByText('Modules draft saved. Published modules have not changed.');
@@ -96,12 +97,12 @@ it('saves and reloads a private server draft without publishing it', async () =>
   vi.mocked(getModulesDraft).mockResolvedValue({ configuration: draft, baseVersion: 7 });
   render(<Harness />);
   await userEvent.click(await screen.findByRole('button', { name: 'Load saved modules draft' }));
-  expect(within(screen.getByRole('group', { name: 'Edit module Social Media' })).getByLabelText('Sessions')).toHaveValue(18);
+  expect(within(editorGroup({ name: 'Edit module Social Media' })).getByLabelText('Sessions')).toHaveValue(18);
 });
 
 it('rejects negative/fractional sessions locally and keeps nullable sessions blank', async () => {
   render(<Harness />);
-  const field = within(screen.getByRole('group', { name: 'Edit module Social Media' })).getByLabelText('Sessions');
+  const field = within(editorGroup({ name: 'Edit module Social Media' })).getByLabelText('Sessions');
   await userEvent.clear(field); await userEvent.type(field, '-1');
   expect(screen.getByRole('button', { name: 'Save Draft' })).toBeDisabled();
   expect(screen.getByRole('alert')).toHaveTextContent('Sessions must be non-negative integers');
@@ -109,4 +110,18 @@ it('rejects negative/fractional sessions locally and keeps nullable sessions bla
   expect(screen.getByRole('button', { name: 'Save Draft' })).toBeDisabled();
   await userEvent.clear(field);
   expect(screen.getByRole('button', { name: 'Save Draft' })).toBeEnabled();
+});
+
+
+it('starts with compact module rows and leaves saved data unchanged until edited', async () => {
+  render(<Harness />);
+  const module = modulesConfiguration.programmes[0].modules[0];
+  const button = screen.getByRole('button', { name: `Edit ${module.title}` });
+  expect(button).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.getByRole('group', { name: `Edit module ${module.title}` })).not.toBeVisible();
+  expect(edited).toEqual(modulesConfiguration);
+  await userEvent.click(button);
+  expect(screen.getByRole('group', { name: `Edit module ${module.title}` })).toBeVisible();
+  expect(screen.getAllByText('Advanced Settings')[0].closest('details')).not.toHaveAttribute('open');
+  expect(saveModulesDraft).not.toHaveBeenCalled();
 });

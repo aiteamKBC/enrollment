@@ -4,11 +4,11 @@ import { btnPrimary, btnSecondary, inputClass } from '@/pages/users/components/u
 import { saveReview } from './api';
 import { selectionConfirmed } from './useSuitability';
 import { AssessmentDialog } from './AssessmentDialog';
-import { ProgrammeComparison } from './ProgrammeComparison';
+import { SubmittedAnswers } from './SubmittedAnswers';
 import { RecommendationResult } from './RecommendationResult';
 import type { AssessmentState, ProgrammeId } from './types';
 
-/** Review lives beside the existing CV uploads/job fields; no separate dashboard. */
+/** The saved learner result is shared; authorised admissions controls stay separate. */
 export function CvSuitabilityPanel() {
   const { userId, isCommercial, readOnly, suitability } = useWizard();
   const kind = isCommercial ? 'commercial' : 'apprenticeship';
@@ -27,40 +27,30 @@ export function CvSuitabilityPanel() {
     </div>}
     {!loading && !error && state && (!state.available || !state.configuration?.enabled) &&
       <p role="status" className="text-sm">The assessment is not currently available. Please contact the enrolment team if you expected to complete it.</p>}
-    {!readOnly && suitability.status === 'SUBMITTED' && state?.result && <RecommendationResult state={state} />}
-    {readOnly && state?.result && state.pathway && <>
-      <p className="text-sm">{state.reviewStatus.replaceAll('_', ' ')}</p>
-      <ProgrammeComparison programmes={state.configuration!.programmes.filter((p) => p.pathway === state.pathway && p.active)}
-        result={state.result} selected={state.selectedProgramme} />
-      <p className="text-sm">Learner preference: {programmeName(state.selectedProgramme) || 'Not confirmed'}{state.originalPreference ? ` / Original preference: ${programmeName(state.originalPreference)}` : ''}</p>
-      {selectionConfirmed(state) && state.selectedProgramme !== state.result.recommendedProgramme && state.alternativeSelectionReason && <div className="space-y-1 text-sm">
-        <h4 className="font-semibold">Learner-provided alternative programme reason</h4>
-        <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{state.alternativeSelectionReason}</p>
-      </div>}
-      {readOnly && <div className="text-sm"><h4 className="font-semibold">Critical Level 6 evidence</h4>
-        {Object.entries(state.result.criticalIndicators).filter(([id]) => state.configuration!.programmes.some((p) => p.id === id && p.level === 6)).map(([id, questionIds]) =>
-          <p key={id}>{programmeName(id)}: {questionIds.length} distinct indicators{questionIds.length ? ` / ${questionIds.map((qid) => state.configuration!.questions.find((q) => q.id === qid)?.title ?? qid).join('; ')}` : ' / no qualifying indicators'}</p>)}
-      </div>}
-      <details className="text-sm"><summary className="cursor-pointer font-semibold">Saved assessment answers</summary>
-        {state.configuration!.questions.filter((q) => q.pathway === state.pathway).map((q) => <div className="mt-3" key={q.id}>
-          <strong>{q.title}</strong><p>{q.id in state.responses ? state.responses[q.id].length
-            ? q.answers.filter((a) => state.responses[q.id].includes(a.id)).map((a) => a.text).join(' ')
-            : 'None apply' : 'Not answered'}</p></div>)}
-      </details>
-      {state.review?.reason && <p className="rounded-lg bg-primary-50 p-3 text-sm">Admissions review: {state.review.reason}
-        {state.review.recommendedProgramme ? ` Suggested programme: ${programmeName(state.review.recommendedProgramme)}. Your preference has been preserved.` : ''}</p>}
-      {state.review?.learnerRequest && <p className="rounded-lg bg-background-100 p-3 text-sm">Learner review request: {state.review.learnerRequest.reason}</p>}
-    </>}
+    {suitability.status === 'SUBMITTED' && state?.result && <RecommendationResult state={state} />}
+    {readOnly && state && suitability.status !== 'SUBMITTED' && <p role="status" className="text-sm">
+      {suitability.status === 'IN_PROGRESS' ? 'Assessment in progress' : 'Assessment not started'}
+    </p>}
+    {readOnly && suitability.status === 'SUBMITTED' && state?.result && <button type="button" className={btnPrimary} onClick={suitability.start}>Preview Assessment</button>}
     {!readOnly && (!state || (state.available && state.configuration?.enabled)) && <>
       <button type="button" className={btnPrimary} onClick={suitability.start}>
         {suitability.status === 'SUBMITTED' ? 'Preview Assessment' : state?.revision ? 'Resume Assessment' : 'Start Assessment'}
       </button>
       {!selectionConfirmed(state) && <p className="text-xs text-foreground-500">CV upload and experience text are optional for this assessment. Assessment progress saves separately.</p>}
     </>}
-    {readOnly && state?.result && <AdmissionsReview state={state} onSave={async (status, programme, reason) => {
-      const saved = await saveReview(kind, userId, state.revision, status, programme, reason); suitability.accept(saved);
-    }} />}
-    {suitability.open && <AssessmentDialog key={userId} initial={state} kind={kind} learnerId={userId}
+    {readOnly && state && <section aria-label="Admissions assessment details" className="space-y-4 border-t pt-4">
+      <p className="text-sm">Review status: {state.reviewStatus.replaceAll('_', ' ')}</p>
+      {state.pathway && <details className="text-sm"><summary className="cursor-pointer font-semibold">Saved assessment answers</summary>
+        <div className="mt-3"><SubmittedAnswers state={state} /></div>
+      </details>}
+      {state.review?.reason && <p className="rounded-lg bg-primary-50 p-3 text-sm">Admissions review: {state.review.reason}
+        {state.review.recommendedProgramme ? ` Suggested programme: ${programmeName(state.review.recommendedProgramme)}. Your preference has been preserved.` : ''}</p>}
+      {state.review?.learnerRequest && <p className="rounded-lg bg-background-100 p-3 text-sm">Learner review request: {state.review.learnerRequest.reason}</p>}
+      {state.result && <AdmissionsReview state={state} onSave={async (status, programme, reason) => {
+        const saved = await saveReview(kind, userId, state.revision, status, programme, reason); suitability.accept(saved);
+      }} />}
+    </section>}
+    {suitability.open && <AssessmentDialog key={userId} readOnly={readOnly} initial={state} kind={kind} learnerId={userId}
       loading={loading} loadError={error} onRetry={suitability.refresh} onSaved={suitability.accept}
       onClose={suitability.close} onSubmitted={suitability.submitted} onConfirmed={suitability.continued} />}
   </section>;

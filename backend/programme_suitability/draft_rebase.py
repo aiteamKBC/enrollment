@@ -77,7 +77,8 @@ def merge(base, draft, current, path='$'):
     raise RebaseConflict(f'Conflicting edits at {path}')
 
 
-def rebase_shared_draft(*, expected_base, expected_revision, expected_published, backup_dir, apply=False):
+def rebase_shared_draft(*, expected_base, expected_revision, expected_published, backup_dir, apply=False,
+                        preserve_content=False):
     from enrolment_api.wizard_layout import read_current, read_version
     database = router.db_for_write(ModuleConfigurationDraft) or 'default'
     # Both aliases point at the configured enrolment DB. Lock the published table
@@ -102,13 +103,21 @@ def rebase_shared_draft(*, expected_base, expected_revision, expected_published,
             path.write_text(encoded, encoding='utf-8')
             if json.loads(path.read_text(encoding='utf-8')) != json.loads(encoded):
                 raise RebaseConflict('Recovery backup verification failed.')
-            draft = copy.deepcopy(row.configuration)
-            draft.pop('version', None)
-            draft.pop('_draftRevision', None)
-            merged = merge(snapshot(original[1]), draft, snapshot(current[1]))
+            if preserve_content:
+                from .publication_scope import prepare_scope_rebase
+                target = read_version(cursor, current[0])
+                if not target:
+                    raise RebaseConflict('The apprenticeship target publication is unavailable.')
+                merged = prepare_scope_rebase(original, target, row.configuration)
+            else:
+                draft = copy.deepcopy(row.configuration)
+                draft.pop('version', None)
+                draft.pop('_draftRevision', None)
+                merged = merge(snapshot(original[1]), draft, snapshot(current[1]))
             validate_structure(merged)
             merged['_draftRevision'] = expected_revision + 1
-            merged['version'] = version(merged)
+            if not preserve_content:
+                merged['version'] = version(merged)
             if apply:
                 row.base_version = current[0]
                 row.configuration = merged

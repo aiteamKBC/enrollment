@@ -9,7 +9,8 @@ import { SubmittedAnswers } from './SubmittedAnswers';
 import { alternativeProgramme, recommendedProgramme } from './recommendation';
 import type { AssessmentChanges, AssessmentState, Pathway, ProgrammeId } from './types';
 
-export function AssessmentDialog({ initial, kind, learnerId, onClose, onConfirmed, onSubmitted, onSaved, loading = false, loadError = '', onRetry }: {
+export function AssessmentDialog({ initial, kind, learnerId, onClose, onConfirmed, onSubmitted, onSaved, loading = false, loadError = '', onRetry, readOnly = false }: {
+  readOnly?: boolean;
   initial: AssessmentState | null; kind: LearnerKind; learnerId: string; onClose: () => void;
   onConfirmed: (state: AssessmentState) => void; onSubmitted?: (state: AssessmentState) => void;
   onSaved?: (state: AssessmentState) => void; loading?: boolean; loadError?: string; onRetry?: () => Promise<AssessmentState | null> | void;
@@ -34,12 +35,12 @@ export function AssessmentDialog({ initial, kind, learnerId, onClose, onConfirme
   }, [initial, state]);
   const config = state?.configuration;
   const questions = config?.questions.filter((q) => q.pathway === state?.pathway) ?? [];
-  const canConfirm = completion(state) === 'SUBMITTED' && !selectionConfirmed(state);
+  const canConfirm = !readOnly && completion(state) === 'SUBMITTED' && !selectionConfirmed(state);
   const recommended = state ? recommendedProgramme(state) : undefined;
   const alternative = config?.programmes.find((p) => p.id === alternativeId);
 
   const persist = async (changes: AssessmentChanges, done?: (saved: AssessmentState) => void) => {
-    if (inFlight.current || !state) return null;
+    if (readOnly || inFlight.current || !state) return null;
     inFlight.current = true;
     setBusy(true); setError('');
     const sending = changes.responses || changes.pathway ? { ...changes, selectedProgramme: '' as const } : changes;
@@ -103,12 +104,13 @@ export function AssessmentDialog({ initial, kind, learnerId, onClose, onConfirme
     </div>}
     {!config && <p role="status">{loading ? 'Loading assessment…' : loadError ? 'The assessment could not be loaded.' : 'No published assessment is available.'}</p>}
     {config && state && <fieldset disabled={busy} className="min-w-0 space-y-4 disabled:opacity-70">
-      {stage === 'pathway' && <div className="grid gap-3 sm:grid-cols-2">{(['marketing', 'project-controls'] as Pathway[]).map((pathway) =>
+      {readOnly && (stage === 'pathway' || stage === 'questions') && <SubmittedAnswers state={state} />}
+      {!readOnly && stage === 'pathway' && <div className="grid gap-3 sm:grid-cols-2">{(['marketing', 'project-controls'] as Pathway[]).map((pathway) =>
         <button key={pathway} type="button" className={`${btnSecondary} min-h-24 justify-center`}
           onClick={() => { setStage('questions'); void persist({ pathway, ...(pathway !== state.pathway ? { responses: {}, selectedProgramme: '' } : {}) }); }}>
           {pathway === 'marketing' ? 'Marketing' : 'Project Controls'}
         </button>)}</div>}
-      {stage === 'questions' && <>
+      {!readOnly && stage === 'questions' && <>
         <AssessmentQuestions questions={questions} responses={state.responses} missing={missing}
           onChange={(responses) => { void persist({ responses }); }} />
         <p className="text-xs text-foreground-500">Each answer is saved to your assessment as you select it. Selecting none apply is valid and contributes no programme points.</p>
