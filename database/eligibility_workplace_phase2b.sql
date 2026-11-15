@@ -5,8 +5,7 @@
 -- The unique nullable fingerprint protects new preview applications only;
 -- historical records remain outside deduplication. Response receipts contain
 -- no applicant answers and allow identical retries to reuse the same row.
--- For Phase 2C.2A decisions, ALSO apply eligibility_review_phase2c2a.sql.
--- Screening statuses/constraints remain unchanged; staff decisions are separate.
+-- Screening statuses/constraints remain unchanged.
 
 BEGIN;
 ALTER TABLE enrolment.eligibility_form

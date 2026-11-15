@@ -266,17 +266,189 @@ describe('learner suitability journey', () => {
   });
 });
 
-function AdminHarness() {
-  const [config, setConfig] = useState<Configuration | undefined>(structuredClone(configuration));
+function AdminHarness({ initial = configuration }: { initial?: Configuration }) {
+  const [config, setConfig] = useState<Configuration | undefined>(structuredClone(initial));
   return <><SuitabilityAdmin value={config} onChange={setConfig} /><output aria-label="Draft JSON">{JSON.stringify(config)}</output></>;
 }
 const draft = () => JSON.parse(screen.getByLabelText('Draft JSON').textContent!) as Configuration;
 
 describe('wizard administration', () => {
+  it.each(['Marketing Assessment', 'Project Controls Assessment'])('keeps removals and legacy inactive items excluded without deleting their data in %s', async (tab) => {
+    const source = structuredClone(configuration);
+    const q = source.questions[tab === 'Marketing Assessment' ? 0 : 1];
+    const inactive = { ...structuredClone(q), id: `${q.id}-inactive`, slug: `${q.slug}-inactive`, title: 'Legacy removed question', active: false,
+      answers: q.answers.map((a) => ({ ...structuredClone(a), id: `${a.id}-inactive` })) };
+    source.questions.push(inactive);
+    q.answers[1].active = false;
+    const legacyAnswer = structuredClone(q.answers[1]);
+    render(<AdminHarness initial={source} />);
+    await userEvent.click(screen.getByRole('tab', { name: tab }));
+    expect(screen.queryByText('Legacy removed question')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.queryByLabelText('Active question')).toBeNull();
+    expect(screen.queryByLabelText('Active answer')).toBeNull();
+    expect(screen.queryByDisplayValue(legacyAnswer.text)).toBeNull();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Move answer down' })[0]);
+    await userEvent.click(screen.getByRole('button', { name: 'Add answer' }));
+    let edited = draft().questions.find((item) => item.id === q.id)!;
+    expect(edited.answers.find((a) => a.id === legacyAnswer.id)).toEqual(legacyAnswer);
+    expect(edited.answers.at(-1)).toMatchObject({ text: 'New answer', active: true });
+    const removedText = screen.getAllByLabelText('Answer text')[0] as HTMLTextAreaElement;
+    const text = removedText.value;
+    await userEvent.click(screen.getAllByRole('button', { name: 'Remove answer' })[0]);
+    expect(screen.queryByDisplayValue(text)).toBeNull();
+    expect(draft().questions.find((item) => item.id === q.id)!.answers.find((a) => a.text === text)!.active).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Add question' }));
+    expect(draft().questions.at(-1)).toMatchObject({ active: true, pathway: q.pathway });
+    expect(draft().questions.at(-1)!.answers.every((a) => a.active)).toBe(true);
+    const existing = within(screen.getByRole('region', { name: `Question 1: ${q.title}` }));
+    await userEvent.click(existing.getByRole('button', { name: 'Move question down' }));
+    expect(draft().questions.find((item) => item.id === inactive.id)).toEqual(inactive);
+    edited = draft().questions.find((item) => item.id === q.id)!;
+    await userEvent.click(existing.getByRole('button', { name: 'Remove question' }));
+    expect(screen.queryByText(q.title)).toBeNull();
+    expect(draft().questions.find((item) => item.id === q.id)).toEqual({ ...edited, active: false });
+    expect(source.questions.find((item) => item.id === q.id)!.active).toBe(true);
+    expect(api.saveAssessment).not.toHaveBeenCalled();
+  });
+
+  it('keeps advanced configuration collapsed and preserves all values across the four main tabs', async () => {
+    render(<AdminHarness />);
+    expect(screen.getByRole('tab', { name: 'Marketing Assessment' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('tab', { name: 'General Settings' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Scoring Rules' })).toBeNull();
+    const advanced = screen.getByText('Advanced configuration').closest('details')!;
+    expect(advanced.open).toBe(false);
+    expect(screen.getByLabelText('Enable assessment after publishing')).not.toBeVisible();
+    expect(screen.getByLabelText('Minimum match index (0–100)')).not.toBeVisible();
+    expect(within(screen.getByRole('tabpanel')).queryByLabelText('Learner introduction')).toBeNull();
+    for (const tab of ['Project Controls Assessment', 'Programme Modules', 'Preview & Test', 'Marketing Assessment']) {
+      await userEvent.click(screen.getByRole('tab', { name: tab }));
+      expect(draft()).toEqual(configuration);
+    }
+    await userEvent.click(screen.getByText('Advanced configuration'));
+    expect(screen.getByLabelText('Enable assessment after publishing')).toBeChecked();
+    expect(screen.getByLabelText('Learner introduction')).toHaveValue(configuration.introduction);
+    await userEvent.click(screen.getByLabelText('Enable assessment after publishing'));
+    await userEvent.type(screen.getByLabelText('Learner introduction'), ' Updated introduction');
+    expect(draft()).toEqual({ ...configuration, enabled: false, introduction: `${configuration.introduction} Updated introduction` });
+    expect(api.previewAssessment).not.toHaveBeenCalled();
+    expect(api.saveAssessment).not.toHaveBeenCalled();
+  });
+
+  it.each(['Marketing Assessment', 'Project Controls Assessment'])('edits inline scoring once per item and retains stable IDs after reordering in %s', async (tab) => {
+    render(<AdminHarness />);
+    const original = configuration.questions[tab === 'Marketing Assessment' ? 0 : 1];
+    const programmes = configuration.programmes.filter((p) => p.pathway === original.pathway);
+    await userEvent.click(screen.getByRole('tab', { name: tab }));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const advanced = screen.getByText('Advanced Settings').closest('details')!;
+    expect(advanced.open).toBe(false);
+    expect(within(advanced).queryByLabelText('Question weight')).toBeNull();
+    expect(within(advanced).queryByRole('spinbutton')).toBeNull();
+    const weights = screen.getAllByLabelText('Question weight');
+    expect(weights).toHaveLength(1);
+    expect(weights[0]).toBeVisible();
+    expect(weights[0]).toHaveValue(original.weight);
+    const row = within(screen.getByRole('group', { name: 'Answer 1' }));
+    for (const programme of programmes) {
+      const label = `${programme.title} affinity (0–1)`;
+      expect(screen.getAllByLabelText(label)).toHaveLength(original.answers.length);
+      expect(row.getByLabelText(label)).toBeVisible();
+      expect(row.getByLabelText(label)).toHaveValue(original.answers[0].affinities[programme.id] ?? 0);
+    }
+    const affinity = row.getByLabelText(`${programmes[0].title} affinity (0–1)`);
+    await userEvent.clear(weights[0]); await userEvent.type(weights[0], '22');
+    await userEvent.clear(affinity); await userEvent.type(affinity, '0.7');
+    await userEvent.click(row.getByRole('button', { name: 'Move answer down' }));
+    const changed = draft().questions.find((q) => q.id === original.id)!;
+    expect(changed.answers.find((answer) => answer.id === original.answers[0].id)).toMatchObject({
+      order: 1, affinities: { ...original.answers[0].affinities, [programmes[0].id]: 0.7 },
+    });
+    expect(within(screen.getByRole('group', { name: 'Answer 2' })).getByLabelText(`${programmes[0].title} affinity (0–1)`)).toHaveValue(0.7);
+    await userEvent.click(screen.getByRole('button', { name: 'Add question' }));
+    const originalRow = within(screen.getByRole('region', { name: `Question 1: ${original.title}` }));
+    await userEvent.click(originalRow.getByRole('button', { name: 'Move question down' }));
+    const moved = draft().questions.find((q) => q.id === original.id)!;
+    expect(moved).toEqual({ ...changed, order: 1 });
+    expect(moved.weight).toBe(22);
+    expect(api.saveAssessment).not.toHaveBeenCalled();
+    expect(api.previewAssessment).not.toHaveBeenCalled();
+  });
+
+  it('retires critical controls while retaining legacy fields and unrelated scoring settings', async () => {
+    render(<AdminHarness />);
+    await userEvent.click(screen.getByText('Advanced configuration'));
+    await userEvent.click(screen.getByText('Advanced Scoring Settings'));
+    expect(screen.queryByLabelText('Minimum distinct critical Level 6 indicators')).toBeNull();
+    expect(screen.queryByLabelText('Minimum answer strength for a critical indicator')).toBeNull();
+    expect(screen.getByLabelText('Per-programme strength defining mixed evidence')).toHaveValue(configuration.rules.mixedAffinityThreshold);
+    expect(draft().rules).toEqual(configuration.rules);
+    for (const tab of ['Marketing Assessment', 'Project Controls Assessment']) {
+      await userEvent.click(screen.getByRole('tab', { name: tab }));
+      await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+      await userEvent.click(screen.getByText('Advanced Settings'));
+      expect(screen.queryByLabelText('Critical Level 6 indicator')).toBeNull();
+      expect(screen.queryByLabelText('Critical indicator target')).toBeNull();
+      expect(screen.getByLabelText('Question weight')).toHaveValue(10);
+      expect(screen.getByLabelText('Allow multiple selected answers')).toBeChecked();
+    }
+    expect(draft()).toEqual(configuration);
+  });
+
+  it.each(['Marketing Assessment', 'Project Controls Assessment'])('keeps %s compact and preserves scoring and programme data through ordinary edits', async (tab) => {
+    render(<AdminHarness />);
+    await userEvent.click(screen.getByRole('tab', { name: tab }));
+    expect(screen.queryByLabelText('Question title')).toBeNull();
+    const index = tab === 'Marketing Assessment' ? 0 : 1;
+    expect(screen.getByText(configuration.questions[index].description)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const advanced = screen.getByText('Advanced Settings').closest('details')!;
+    expect(advanced.open).toBe(false);
+    expect(screen.getByLabelText('Question weight')).toBeVisible();
+    await userEvent.type(screen.getByLabelText('Question title'), ' updated');
+    await userEvent.type(screen.getAllByLabelText('Answer text')[0], ' updated');
+    await userEvent.click(screen.getByLabelText('Required question'));
+    expect(draft().programmes).toEqual(configuration.programmes);
+    expect(draft().rules).toEqual(configuration.rules);
+    expect(draft().questions[index]).toMatchObject({
+      id: configuration.questions[index].id, weight: configuration.questions[index].weight,
+      critical: configuration.questions[index].critical, criticalProgramme: configuration.questions[index].criticalProgramme,
+      required: false,
+    });
+    expect(draft().questions[index].answers.map((answer) => [answer.id, answer.affinities])).toEqual(
+      configuration.questions[index].answers.map((answer) => [answer.id, answer.affinities]));
+    await userEvent.click(screen.getByRole('button', { name: 'Close editor' }));
+    expect(screen.queryByLabelText('Question title')).toBeNull();
+  });
+
+  it('shows only the selected section and keeps modules available without assessment defaults', async () => {
+    render(<SuitabilityAdmin modulesEditor={<p>Existing modules editor</p>} onChange={vi.fn()} />);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Marketing Assessment', 'Project Controls Assessment', 'Programme Modules', 'Preview & Test',
+    ]);
+    expect(screen.getByText('Existing modules editor')).not.toBeVisible();
+    await userEvent.click(screen.getByRole('tab', { name: 'Programme Modules' }));
+    expect(screen.getByText('Existing modules editor')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Add the initial/ })).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: 'Marketing Assessment' }));
+    expect(screen.getByText('Existing modules editor')).not.toBeVisible();
+    expect(api.fetchDefaults).not.toHaveBeenCalled();
+  });
+
+  it('retains catalogue mapping edits in general settings without exposing programme content editing', async () => {
+    render(<AdminHarness />);
+    await userEvent.click(screen.getByText('Advanced configuration'));
+    await userEvent.click(screen.getByText('Advanced programme associations'));
+    await userEvent.type(screen.getByLabelText('Marketing Executive: existing catalogue ID (optional reference)'), 'catalogue-42');
+    expect(draft().programmes[0]).toEqual({ ...configuration.programmes[0], catalogueId: 'catalogue-42' });
+    expect(screen.queryByLabelText('Programme title')).toBeNull();
+  });
+
   it('edits questions, weights and answer affinities as local drafts', async () => {
     render(<AdminHarness />);
     await userEvent.click(screen.getByRole('tab', { name: 'Marketing Assessment' }));
-    await userEvent.click(screen.getByText('1. marketing responsibilities'));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     const weight = screen.getByLabelText('Question weight');
     await userEvent.clear(weight); await userEvent.type(weight, '20');
     const affinity = screen.getAllByLabelText('Marketing Executive affinity (0–1)')[0];
@@ -290,7 +462,7 @@ describe('wizard administration', () => {
   it('adds unlimited-within-validation answers and soft-deactivates items', async () => {
     render(<AdminHarness />);
     await userEvent.click(screen.getByRole('tab', { name: 'Marketing Assessment' }));
-    await userEvent.click(screen.getByText('1. marketing responsibilities'));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     await userEvent.click(screen.getByRole('button', { name: 'Add answer' }));
     expect(draft().questions[0].answers).toHaveLength(5);
     await userEvent.click(screen.getAllByRole('button', { name: 'Remove answer' })[0]);
@@ -302,13 +474,11 @@ describe('wizard administration', () => {
     expect(draft().questions[2].answers).toHaveLength(4);
   });
 
-  it('edits guidance and scoring rules and calculates a backend preview without a learner save', async () => {
+  it('preserves guidance while editing scoring rules and calculates a backend preview without a learner save', async () => {
     render(<AdminHarness />);
-    await userEvent.click(screen.getByRole('tab', { name: 'Programme Suitability Content' }));
-    const summary = screen.getAllByLabelText('Suitability summary')[0];
-    await userEvent.clear(summary); await userEvent.type(summary, 'New role guidance');
-    expect(draft().programmes[0].summary).toBe('New role guidance');
-    await userEvent.click(screen.getByRole('tab', { name: 'Scoring Rules' }));
+    expect(screen.queryByRole('tab', { name: 'Programme Suitability Content' })).toBeNull();
+    expect(draft().programmes).toEqual(configuration.programmes);
+    await userEvent.click(screen.getByText('Advanced configuration'));
     const threshold = screen.getByLabelText('Minimum match index (0–100)');
     await userEvent.clear(threshold); await userEvent.type(threshold, '70');
     await userEvent.click(screen.getByRole('tab', { name: 'Preview & Test' }));
@@ -350,9 +520,9 @@ describe('wizard administration', () => {
     await userEvent.type(within(review).getByLabelText('Reason for review / override'), 'Reviewed strategic job responsibilities');
     await userEvent.click(within(review).getByRole('button', { name: 'Save admissions review' }));
     await waitFor(() => expect(api.saveReview).toHaveBeenCalledWith('apprenticeship', '41', 2, 'REVIEW_COMPLETED', 'MM_L6', 'Reviewed strategic job responsibilities'));
-    expect(screen.getByText(/Learner preference: Marketing Executive Level 4/)).toBeInTheDocument();
-    expect(screen.getByText('Learner-provided alternative programme reason')).toBeInTheDocument();
+    expect(screen.getByText('You chose Marketing Executive Level 4 instead of Marketing Manager Level 6.')).toBeInTheDocument();
+    expect(screen.getByText('Your Reason')).toBeInTheDocument();
     expect(screen.getByText('My current job focuses on practical delivery.')).toBeInTheDocument();
-    expect(screen.getByText('Critical Level 6 evidence')).toBeInTheDocument();
+    expect(screen.queryByText('Critical Level 6 evidence')).toBeNull();
   });
 });

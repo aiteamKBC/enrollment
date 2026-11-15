@@ -30,6 +30,7 @@ export function QuestionEditor({
     return initial.type === 'dropdown' && initial.options.length === 0 ? { ...initial, options: ['', ''] } : initial;
   });
   const [tried, setTried] = useState(false);
+  const [showAnswers, setShowAnswers] = useState(false);
   const published = Boolean(item?.column || (item && /^cf_/.test(item.key)));
   const set = (patch: Partial<QuestionDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -38,6 +39,7 @@ export function QuestionEditor({
   const isDropdown = draft.type === 'dropdown';
   const isContent = draft.type === 'heading' || draft.type === 'description';
   const options = draft.options.map((o) => o.trim()).filter(Boolean);
+  const screeningAnswers = draft.type === 'yesno' ? ['Yes', 'No'] : options;
 
   const errors: string[] = [];
   if (!draft.label.trim()) errors.push(isContent ? 'Enter the content.' : 'Enter the question.');
@@ -46,9 +48,16 @@ export function QuestionEditor({
   if (draft.condition && (!source || draft.condition.values.length === 0)) {
     errors.push('Choose the question and at least one answer that shows this one.');
   }
+  if (draft.screeningRule && (draft.condition || !draft.required || !['yesno', 'dropdown'].includes(draft.type)
+    || draft.screeningRule.eligibleAnswers.length === 0
+    || draft.screeningRule.eligibleAnswers.length === screeningAnswers.length
+    || draft.screeningRule.eligibleAnswers.some(value => !screeningAnswers.includes(value)))) {
+    errors.push('Choose at least one passing and one failing answer. Screening questions must be mandatory and always shown.');
+  }
 
   const submit = () => {
     setTried(true);
+    if (isDropdown && (options.length === 0 || new Set(options).size !== options.length)) setShowAnswers(true);
     if (errors.length) return;
     onSave({
       ...draft,
@@ -59,7 +68,8 @@ export function QuestionEditor({
   };
 
   const chooseType = (type: EligibilityQuestionType) =>
-    set({ type, options: type === 'dropdown' && draft.options.length === 0 ? ['', ''] : draft.options });
+    set({ type, options: type === 'dropdown' && draft.options.length === 0 ? ['', ''] : draft.options,
+      screeningRule: type === draft.type ? draft.screeningRule : null });
 
   const toggleValue = (value: string) => {
     if (!draft.condition) return;
@@ -114,15 +124,44 @@ export function QuestionEditor({
           {published && <span className="mt-1 block text-[11px] font-normal text-foreground-400">Published questions keep their type — remove it and add a new question to change it.</span>}
         </label>
         {!isContent && <label className="flex items-center gap-2 self-end pb-2 text-[12px] font-medium text-foreground-700">
-          <input type="checkbox" className="accent-primary-500" checked={draft.required} onChange={(e) => set({ required: e.target.checked })} />
+          <input type="checkbox" className="accent-primary-500" checked={draft.required} disabled={Boolean(draft.screeningRule)} onChange={(e) => set({ required: e.target.checked })} />
           Mandatory — applicants must answer before moving on
         </label>}
         {isDropdown && (
-          <fieldset className="sm:col-span-2">
-            <legend className="text-[12px] font-medium text-foreground-600">Dropdown answers</legend>
-            <div className="mt-1">
+          <div className="sm:col-span-2">
+            <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-primary-100 bg-primary-50/40 px-3 py-2 text-left text-[12px] font-medium text-foreground-700 transition-colors hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500" aria-expanded={showAnswers} onClick={() => setShowAnswers((open) => !open)}>
+              Answers applicants choose from
+              <AppIcon className={showAnswers ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} />
+            </button>
+            {showAnswers && <div className="mt-2">
               <OptionsEditor options={draft.options} onChange={(next) => set({ options: next })} name="Dropdown" showInvalid={tried} />
-            </div>
+            </div>}
+          </div>
+        )}
+        {(draft.type === 'yesno' || isDropdown) && (
+          <fieldset className="rounded-lg border border-foreground-100 bg-background-50 p-3 sm:col-span-2">
+            <legend className="px-1 text-[12px] font-medium text-foreground-600">Automatic eligibility screening</legend>
+            <label className="flex items-center gap-2 text-[12px] text-foreground-700">
+              <input type="checkbox" className="accent-primary-500" checked={Boolean(draft.screeningRule)}
+                onChange={(e) => set({ screeningRule: e.target.checked ? { eligibleAnswers: [] } : null,
+                  required: e.target.checked ? true : draft.required,
+                  condition: e.target.checked ? null : draft.condition })} />
+              Use this question to determine eligibility
+            </label>
+            {draft.screeningRule && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] text-foreground-500">Select the answers that pass this check. Every other answer fails. Existing screening checks still apply.</p>
+                {screeningAnswers.map(answer => (
+                  <label key={answer} className="flex items-center gap-2 text-[12px] text-foreground-700">
+                    <input type="checkbox" className="accent-primary-500" checked={draft.screeningRule!.eligibleAnswers.includes(answer)}
+                      onChange={() => set({ screeningRule: { eligibleAnswers: draft.screeningRule!.eligibleAnswers.includes(answer)
+                        ? draft.screeningRule!.eligibleAnswers.filter(value => value !== answer)
+                        : [...draft.screeningRule!.eligibleAnswers, answer] } })} />
+                    {answer} passes
+                  </label>
+                ))}
+              </div>
+            )}
           </fieldset>
         )}
         {!isContent && <label className="block text-[12px] font-medium text-foreground-600 sm:col-span-2" htmlFor={`${idPrefix}-help`}>
@@ -136,7 +175,7 @@ export function QuestionEditor({
               type="checkbox"
               className="accent-primary-500"
               checked={Boolean(draft.condition)}
-              disabled={sources.length === 0}
+              disabled={sources.length === 0 || Boolean(draft.screeningRule)}
               onChange={(e) => set({ condition: e.target.checked ? { field: '', values: [] } : null })}
             />
             Only ask this question for certain answers to another question

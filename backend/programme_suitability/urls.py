@@ -2,8 +2,10 @@ from django.urls import path
 from . import views
 from . import modules_views
 from . import rpl_report
+from .module_schedules import learner_module_schedule
 
 urlpatterns = [
+    path('<str:kind>/<int:learner_id>/module-schedules/', learner_module_schedule, name='learner-module-schedules'),
     path('modules/defaults/', modules_views.modules_defaults, name='modules-defaults'),
     path('modules/draft/', modules_views.modules_draft, name='modules-draft'),
     path('<str:kind>/<int:learner_id>/modules/', modules_views.learner_modules, name='learner-modules'),

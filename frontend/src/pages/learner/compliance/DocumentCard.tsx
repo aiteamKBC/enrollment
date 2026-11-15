@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SignaturePad } from '@/pages/users/wizard/steps/SignaturePad';
+import { CheckCircle2, Circle, Download, Eye, FileText, Layers3, LockKeyhole, PenLine, Signature, type LucideIcon } from 'lucide-react';
+import styles from './compliance.module.css';
 
 // ============================================================================
 // One compliance document on the learner's page.
@@ -25,6 +27,8 @@ interface Props {
   /** Null until the provider issues it. */
   issued: boolean;
   fullySigned: boolean;
+  canSign?: boolean;
+  currentVersion?: number;
   /** The learner's own sign-off state. */
   learner?: PartyState;
   /** The other party (employer or provider), for the status line. */
@@ -35,6 +39,9 @@ interface Props {
   thirdLabel?: string;
   /** Field rows shown above the signature state. */
   fields: ReactNode;
+  /** Presentation only; document issuance and history remain owned by callers. */
+  icon?: LucideIcon;
+  revisions?: ReactNode;
   /** The learner's name — they sign as themselves, not as the logged-in account. */
   signatoryName?: string;
   busy: boolean;
@@ -50,12 +57,16 @@ export function DocumentCard({
   signedBy,
   issued,
   fullySigned,
+  canSign = true,
+  currentVersion,
   learner,
   other,
   otherLabel,
   third,
   thirdLabel,
   fields,
+  icon: Icon = FileText,
+  revisions,
   signatoryName,
   busy,
   onPreview,
@@ -81,38 +92,37 @@ export function DocumentCard({
   };
 
   return (
-    <section className="rounded-xl border border-foreground-200/60 bg-background-50 overflow-hidden">
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-foreground-200/50 p-5">
-        <div className="min-w-0">
-          <h3 className="text-sm font-heading font-semibold text-foreground-900">{title}</h3>
-          <p className="mt-1 max-w-2xl text-[12px] text-foreground-500">{blurb}</p>
-          <p className="mt-1 text-[11px] text-foreground-400">Signed by: {signedBy}</p>
+    <section className={styles.documentCard} data-document-status={fullySigned ? 'signed' : issued ? 'awaiting' : 'unissued'}>
+      <header className={styles.documentHeader}>
+        <span className={styles.documentIcon} aria-hidden="true"><Icon size={32} strokeWidth={1.8} /></span>
+        <div className={styles.documentIntro}>
+          <h3>{title}</h3>
+          {currentVersion && <p className={styles.signedBy}>Current document: Version {currentVersion}</p>}
+          <p>{blurb}</p>
+          <p className={styles.signedBy}>Signed by: {signedBy}</p>
         </div>
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-            fullySigned
-              ? 'bg-emerald-100 text-emerald-700'
-              : issued
-                ? 'bg-amber-100 text-amber-700'
-                : 'bg-background-100 text-foreground-500'
-          }`}
+          className={styles.statusBadge}
         >
+          {fullySigned ? <CheckCircle2 size={18} aria-hidden="true" /> : issued ? <Signature size={18} aria-hidden="true" /> : <LockKeyhole size={17} aria-hidden="true" />}
           {fullySigned ? 'Fully signed' : issued ? 'Awaiting signatures' : 'Not issued yet'}
         </span>
       </header>
 
-      <dl className="grid gap-x-6 gap-y-3 p-5 sm:grid-cols-2 lg:grid-cols-3">{fields}</dl>
+      <div className={styles.detailPanels}>{fields}</div>
 
       {!issued && (
-        <p className="border-t border-foreground-200/50 px-5 py-3 text-[12px] text-foreground-500">
+        <p className={styles.unissuedNotice}>
           <i className="ri-information-line mr-1.5 text-foreground-400" />
           Your training provider will issue this document. You can preview the details above now,
           and you'll be able to sign it once it's issued.
         </p>
       )}
 
+      <div className={styles.documentFooter}>
       {issued && (
-        <div className="flex flex-wrap items-center gap-4 border-t border-foreground-200/50 px-5 py-3 text-[12px]">
+        <div className={styles.signatureStatus}>
+          <span className={styles.signatureHeading}><Signature size={20} aria-hidden="true" />Signature status</span>
           <SignState label="You" signed={Boolean(learner?.signed)} at={learner?.signedAt} fmtDate={fmtDate} />
           <SignState label={otherLabel} signed={Boolean(other?.signed)} at={other?.signedAt} fmtDate={fmtDate} />
           {thirdLabel && (
@@ -121,34 +131,37 @@ export function DocumentCard({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-foreground-200/50 bg-background-100/40 px-5 py-3">
+      <div className={styles.actions}>
         <button
           onClick={onPreview}
           disabled={busy}
-          className="rounded-lg border border-foreground-200 px-3 py-1.5 text-[12px] font-medium text-foreground-600 hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 cursor-pointer disabled:opacity-50"
+          className={styles.outlineButton}
         >
-          <i className="ri-eye-line mr-1" /> Preview
+          <Eye size={18} aria-hidden="true" /> Preview
         </button>
 
         {issued && (
           <button
             onClick={onDownload}
             disabled={busy}
-            className="rounded-lg border border-foreground-200 px-3 py-1.5 text-[12px] font-medium text-foreground-600 hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-700 cursor-pointer"
+            className={styles.outlineButton}
           >
-            <i className="ri-download-line mr-1" /> Download
+            <Download size={18} aria-hidden="true" /> Download
           </button>
         )}
 
-        {issued && !learner?.signed && !signing && (
+        {issued && canSign && !learner?.signed && !signing && (
           <button
             onClick={() => setSigning(true)}
-            className="rounded-lg bg-primary-500 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-primary-600 cursor-pointer"
+            className={styles.signButton}
           >
-            <i className="ri-quill-pen-line mr-1" /> Sign
+            <PenLine size={18} aria-hidden="true" /> Sign
           </button>
         )}
       </div>
+      </div>
+
+      {revisions && <div className={styles.history}><Layers3 className={styles.historyIcon} size={23} aria-hidden="true" />{revisions}</div>}
 
       {/* Signing produces the learner's own name in a script face — the same
           mark every time, so there is nothing saved to pick from. */}
@@ -158,7 +171,7 @@ export function DocumentCard({
           tabIndex={-1}
           role="region"
           aria-label={`Sign ${title}`}
-          className="border-t border-foreground-200/50 p-5 space-y-3 scroll-mt-4 outline-none"
+          className={`border-t border-foreground-200/50 p-5 space-y-3 scroll-mt-4 outline-none ${styles.signingPanel}`}
         >
           <p className="text-[12px] text-foreground-500">
             Sign below to confirm you agree to these details.
@@ -177,14 +190,21 @@ export function DocumentCard({
 
 export function Field({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div>
-      <dt className="text-[10px] font-semibold uppercase tracking-wider text-foreground-400">{label}</dt>
-      <dd className="mt-0.5 text-[13px] text-foreground-900">
-        {value || <span className="text-foreground-300">Not recorded</span>}
+    <div className={styles.field}>
+      <dt>{label}</dt>
+      <dd>
+        {value || <span className={styles.missing}>Not recorded</span>}
       </dd>
-      {hint && <p className="text-[10px] text-foreground-400">{hint}</p>}
+      {hint && <p className={styles.fieldHint}>{hint}</p>}
     </div>
   );
+}
+
+export function FieldGroup({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: ReactNode }) {
+  return <section className={styles.fieldGroup}>
+    <h4><Icon size={19} aria-hidden="true" />{title}</h4>
+    <dl>{children}</dl>
+  </section>;
 }
 
 function SignState({
@@ -199,10 +219,10 @@ function SignState({
   fmtDate: (iso?: string | null) => string;
 }) {
   return (
-    <span className="flex items-center gap-1.5">
-      <i className={signed ? 'ri-checkbox-circle-fill text-emerald-500' : 'ri-time-line text-foreground-300'} />
-      <span className="text-foreground-600">{label}</span>
-      <span className="text-foreground-400">
+    <span className={styles.partyState} data-signed={signed || undefined}>
+      {signed ? <CheckCircle2 size={17} aria-hidden="true" /> : <Circle size={17} aria-hidden="true" />}
+      <span>{label}</span>
+      <span>
         {signed ? `signed${at ? ` ${fmtDate(at)}` : ''}` : 'not signed'}
       </span>
     </span>

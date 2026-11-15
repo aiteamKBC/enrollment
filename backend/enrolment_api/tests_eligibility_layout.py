@@ -5,6 +5,7 @@ SimpleTestCase with a recording fake cursor: no query reaches a database.
 """
 import json
 import os
+from copy import deepcopy
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -51,6 +52,43 @@ def standard_layout():
             for slug, (title, keys) in el.BUILTIN_SECTIONS.items()
         ]
     }
+
+
+class ActivationEmailLayoutTests(SimpleTestCase):
+    def test_invitation_uses_the_applicants_submitted_version(self):
+        cursor = FakeCursor(results=[("<p>Submitted version</p>",)])
+        with patch.object(el, "connections", FakeConnections(cursor)):
+            self.assertEqual(el.activation_email_for_application(42), "<p>Submitted version</p>")
+        sql, params = cursor.executed[0]
+        self.assertIn('l.id = a.layout_version', sql)
+        self.assertIn('COALESCE', sql)
+        self.assertEqual(params, [42])
+
+    def test_unlinked_invitation_reads_latest_published_email(self):
+        cursor = FakeCursor(results=[("<p>Current content</p>",)])
+        with patch.object(el, "connections", FakeConnections(cursor)):
+            self.assertEqual(el.activation_email_for_application(), "<p>Current content</p>")
+        self.assertIn('ORDER BY id DESC LIMIT 1', cursor.executed[0][0])
+
+    def test_html_is_versioned_but_excluded_from_public_layout(self):
+        raw = standard_layout()
+        raw["activationEmailHtml"] = "<p>{{greeting}} Please activate.</p>"
+        saved, _ = el.normalize_layout(raw, None)
+        self.assertEqual(saved["activationEmailHtml"], raw["activationEmailHtml"])
+        self.assertNotIn("activationEmailHtml", el.public_layout(saved))
+
+    def test_publishing_cannot_remove_a_previous_email(self):
+        previous = standard_layout()
+        previous["activationEmailHtml"] = "<p>Existing content</p>"
+        with self.assertRaises(LayoutError):
+            el.normalize_layout(standard_layout(), previous)
+
+    def test_active_html_and_unsafe_links_are_rejected(self):
+        for html in ("<script>alert(1)</script>", '<a href="javascript:alert(1)">click</a>', '<p onclick="alert(1)">Hi</p>'):
+            raw = standard_layout()
+            raw["activationEmailHtml"] = html
+            with self.subTest(html=html), self.assertRaises(LayoutError):
+                el.normalize_layout(raw, None)
 
 
 def custom(label, type_="text", **extra):
@@ -165,6 +203,52 @@ class RegistryTests(SimpleTestCase):
 
 
 class NormalizeLayoutTests(SimpleTestCase):
+    def test_pictured_builtin_questions_cannot_be_hidden_or_removed(self):
+        for key in ef.FORM_PROTECTED_FIELDS:
+            with self.subTest(key=key):
+                raw = standard_layout()
+                item(raw, key)["hidden"] = True
+                with self.assertRaisesRegex(LayoutError, "protected and cannot be removed"):
+                    el.normalize_layout(raw, standard_layout())
+
+                raw = standard_layout()
+                for section in raw["sections"]:
+                    section["items"] = [entry for entry in section["items"] if entry["key"] != key]
+                restored, _ = el.normalize_layout(raw, standard_layout())
+                self.assertFalse(item(restored, key)["hidden"])
+
+        raw = standard_layout()
+        item(raw, "employerAddressLine2")["required"] = False
+        normalized, _ = el.normalize_layout(raw, standard_layout())
+        self.assertFalse(item(normalized, "employerAddressLine2")["required"])
+
+    def test_published_residential_address_heading_can_be_removed_or_renamed(self):
+        previous = with_items(standard_layout(), "residency", custom(
+            "Residential Address Line", "heading", key="cf_residential_address_line"))
+        hidden = deepcopy(previous)
+        item(hidden, "cf_residential_address_line")["hidden"] = True
+        normalized, _ = el.normalize_layout(hidden, previous)
+        self.assertTrue(item(normalized, "cf_residential_address_line")["hidden"])
+
+        missing = deepcopy(previous)
+        items_of(missing, "residency").pop()
+        normalized, _ = el.normalize_layout(missing, previous)
+        self.assertTrue(item(normalized, "cf_residential_address_line")["hidden"])
+
+        renamed = deepcopy(previous)
+        item(renamed, "cf_residential_address_line")["label"] = "Current residential address"
+        normalized, _ = el.normalize_layout(renamed, previous)
+        self.assertEqual(item(normalized, "cf_residential_address_line")["label"], "Current residential address")
+
+    def test_legacy_title_is_removed_from_published_and_public_layouts(self):
+        raw = standard_layout()
+        raw["sections"][0]["items"].insert(2, {"key": "title", "builtin": True, "hidden": False})
+        raw["texts"] = {"title.label": "Preferred title"}
+        self.assertFalse(any(i["key"] == "title" for s in el.public_layout(raw)["sections"] for i in s["items"]))
+        saved, _ = el.normalize_layout(raw, raw)
+        self.assertFalse(any(i["key"] == "title" for s in saved["sections"] for i in s["items"]))
+        self.assertNotIn("title.label", saved.get("texts", {}))
+
     def test_the_standard_form_needs_no_columns(self):
         layout, columns = el.normalize_layout(standard_layout(), None)
         self.assertEqual(columns, {})
@@ -218,13 +302,45 @@ class NormalizeLayoutTests(SimpleTestCase):
         self.assertEqual(restored["column"], "custom_visa_expiry")
         self.assertEqual(columns, {"custom_visa_expiry": "date"})
 
-    def test_builtin_questions_and_sections_left_out_come_back_hidden(self):
+    def test_choice_screening_rule_is_saved_and_not_exposed_in_public_layout(self):
+        raw = with_items(standard_layout(), "residency", custom(
+            "Can you meet the attendance requirement?", "yesno", required=True,
+            screeningRule={"eligibleAnswers": ["Yes"]},
+        ))
+        layout, _ = el.normalize_layout(raw, None)
+        saved = item(layout, "cf_can_you_meet_the_attendance_requirement")
+        self.assertEqual(saved["screeningRule"], {"eligibleAnswers": ["Yes"]})
+        self.assertNotIn("screeningRule", item(el.public_layout(layout), saved["key"]))
+        self.assertEqual(item(el.public_layout(layout, include_screening_rules=True), saved["key"])["screeningRule"],
+                         {"eligibleAnswers": ["Yes"]})
+
+    def test_choice_screening_rule_requires_both_outcomes_and_cannot_be_hidden(self):
+        for rule in ({"eligibleAnswers": []}, {"eligibleAnswers": ["Yes", "No"]},
+                     {"eligibleAnswers": ["Maybe"]}):
+            raw = with_items(standard_layout(), "residency", custom(
+                "Can attend?", "yesno", required=True, screeningRule=rule))
+            with self.subTest(rule=rule), self.assertRaisesMessage(LayoutError, "passing answer"):
+                el.normalize_layout(raw, None)
+        for extra in ({"required": False}, {"hidden": True},
+                      {"condition": {"field": "livesInUk", "values": ["Yes"]}}):
+            raw = with_items(standard_layout(), "residency", custom(
+                "Can attend?", "yesno", **{"required": True, "screeningRule": {"eligibleAnswers": ["Yes"]}, **extra}))
+            with self.subTest(extra=extra), self.assertRaisesMessage(LayoutError, "mandatory, shown and unconditional"):
+                el.normalize_layout(raw, None)
+        raw = standard_layout()
+        raw["sections"].append({"slug": "new-screening", "title": "Additional screening", "builtin": False,
+                                "hidden": True, "items": [custom("Can attend?", "yesno", required=True,
+                                                               screeningRule={"eligibleAnswers": ["Yes"]})]})
+        with self.assertRaisesMessage(LayoutError, "affects eligibility"):
+            el.normalize_layout(raw, None)
+
+    def test_builtin_questions_left_out_are_restored_with_screening_section_visible(self):
         raw = standard_layout()
         raw["sections"] = [s for s in raw["sections"] if s["slug"] != "residency"]
         items_of(raw, "employment").remove(item(raw, "representativeEmail"))
         layout, _ = el.normalize_layout(raw, None)
         residency = next(s for s in layout["sections"] if s["slug"] == "residency")
-        self.assertTrue(residency["hidden"])
+        self.assertFalse(residency["hidden"])
         self.assertFalse(item(layout, "livesInUk")["hidden"])
         self.assertTrue(item(layout, "representativeEmail")["hidden"])
 
@@ -241,6 +357,34 @@ class NormalizeLayoutTests(SimpleTestCase):
         item(raw, "surname")["required"] = False
         layout, _ = el.normalize_layout(raw, None)
         self.assertNotIn("required", item(layout, "surname"))
+
+    def test_screening_questions_cannot_be_removed_or_hidden_with_their_section(self):
+        for key in ef.SCREENING_PROTECTED_FIELDS - {"dateOfBirth"}:
+            raw = standard_layout()
+            item(raw, key)["hidden"] = True
+            with self.subTest(key=key), self.assertRaisesMessage(LayoutError, "automatic screening"):
+                el.normalize_layout(raw, None)
+
+        raw = standard_layout()
+        next(section for section in raw["sections"] if section["slug"] == "employment")["hidden"] = True
+        with self.assertRaisesMessage(LayoutError, "automatic screening"):
+            el.normalize_layout(raw, None)
+
+    def test_missing_screening_question_is_restored_without_making_postcode_mandatory(self):
+        raw = standard_layout()
+        items_of(raw, "residency").remove(item(raw, "postcode"))
+        layout, _ = el.normalize_layout(raw, None)
+        self.assertFalse(item(layout, "postcode")["hidden"])
+        self.assertFalse(ef.asked_questions(layout)[0]["postcode"]["required"])
+
+    def test_old_public_layout_restores_screening_question_without_changing_stored_version(self):
+        raw = standard_layout()
+        item(raw, "postcode")["hidden"] = True
+        before = deepcopy(raw)
+        public = el.public_layout(raw)
+        self.assertFalse(item(public, "postcode")["hidden"])
+        self.assertFalse(ef.asked_questions(public)[0]["postcode"]["required"])
+        self.assertEqual(raw, before)
 
     def test_builtin_items_keep_only_layout_settings(self):
         raw = standard_layout()

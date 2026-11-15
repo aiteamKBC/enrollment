@@ -18,6 +18,8 @@ import { ONBOARDING_REVIEWS_ROUTE } from '@/hooks/useOnboardingRedirect';
 import { markEnrolmentSubmitted, syncLearnerStatus } from '@/hooks/useLearnerNavGate';
 import { RowsSkeleton } from '@/components/feature/Skeletons';
 import { shouldRedirectLearnerWizardStep } from './navigation';
+import { EnrolmentHero } from '@/features/learner-enrolment/EnrolmentVisuals';
+import enrolmentStyles from '@/features/learner-enrolment/learnerEnrolment.module.css';
 
 const learnerNav = roleNavMap.learner;
 
@@ -50,10 +52,12 @@ function LearnerWizard({ stepSlug, onDone }: { stepSlug: string | undefined; onD
   const reachableSlug = steps[reachable]?.slug;
   const currentSlug = steps[currentIndex]?.slug;
   useEffect(() => {
-    if (shouldRedirectLearnerWizardStep({ ready, currentIndex, reachable, stepSlug: currentSlug }) && reachableSlug) {
+    if (ready && idx === -1 && steps[0]) {
+      navigate(`/learner/onboarding/${steps[0].slug}`, { replace: true });
+    } else if (shouldRedirectLearnerWizardStep({ ready, currentIndex, reachable, stepSlug: currentSlug }) && reachableSlug) {
       navigate(`/learner/onboarding/${reachableSlug}`, { replace: true });
     }
-  }, [ready, currentIndex, reachable, reachableSlug, currentSlug, navigate]);
+  }, [ready, idx, steps, currentIndex, reachable, reachableSlug, currentSlug, navigate]);
 
   const finish = async () => {
     // Backstop to the step gating: completeness is judged live, so the whole
@@ -108,25 +112,7 @@ function LearnerWizard({ stepSlug, onDone }: { stepSlug: string | undefined; onD
       onNavigateStep={goTo}
       onFinish={finish}
       finishLabel="Submit enrolment"
-      header={
-        <div className="mb-4 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
-          {/* Tinted band so the instruction reads as a welcome rather than as an
-              alert — the flat grey panel it replaces was the least legible thing
-              on the page. */}
-          <div className="flex items-start gap-4 bg-primary-50/60 p-5 sm:items-center sm:p-6">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary-200/70 bg-background-50">
-              <AppIcon className="ri-file-list-3-line text-xl text-primary-600" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="font-heading text-base font-bold text-foreground-950 sm:text-lg">Your enrolment</h2>
-              <p className="mt-1 text-[13px] leading-relaxed text-foreground-600">
-                Please complete every step and sign where asked. Your answers save as you go, and the enrolment team
-                will review them once you submit.
-              </p>
-            </div>
-          </div>
-        </div>
-      }
+      header={<EnrolmentHero />}
     />
   );
 }
@@ -151,8 +137,7 @@ export default function LearnerOnboardingPage() {
   // also clears an old bookmarked/sidebar URL once the account type is known.
   useEffect(() => {
     if (isCommercial) navigate('/workspace/learner', { replace: true });
-    else if (stepSlug === 'personal-details') navigate('/learner/onboarding/ilr-details', { replace: true });
-  }, [isCommercial, navigate, stepSlug]);
+  }, [isCommercial, navigate]);
 
   useEffect(() => {
     if (isCommercial) {
@@ -202,7 +187,7 @@ export default function LearnerOnboardingPage() {
     >
       {/* w-full, matching the other learner pages — the shell already offsets for
           the collapsed sidebar rail, so an extra centred max-width fought it. */}
-      <main ref={topRef} className="page-container min-w-0 w-full space-y-3 p-3 md:space-y-4 md:p-6">
+      <main ref={topRef} className={`page-container min-w-0 w-full space-y-3 p-3 md:space-y-4 md:p-6 ${enrolmentStyles.onboardingPage}`}>
         {loading && (
           <div className="rounded-2xl border border-foreground-200/60 bg-background-50 p-5">
             <RowsSkeleton rows={5} />
@@ -215,7 +200,7 @@ export default function LearnerOnboardingPage() {
           </div>
         )}
         {!loading && !loadError && board && (
-          <WizardProvider userId={myLearner.id} isCommercial={isCommercial} board={board}>
+          <WizardProvider userId={myLearner.id} isCommercial={isCommercial} board={board} recoverSavedAssessment>
             {/* Straight to the reviews they now need to book, not the profile —
                 booking all four is what completes their enrolment. */}
             <LearnerWizard stepSlug={resolvedStepSlug} onDone={() => navigate(ONBOARDING_REVIEWS_ROUTE)} />

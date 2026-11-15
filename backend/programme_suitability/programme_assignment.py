@@ -25,6 +25,10 @@ class ProgrammeAssignmentError(ValueError):
 
 def automatic_cohort_window(completed_on, entries=None):
     """Return the annual intake label for a completion date."""
+    # Assignment-only correction for future default intake calculations. Do not
+    # edit shared calendar defaults or reinterpret explicit published periods.
+    if entries is None and (completed_on.month, completed_on.day) == (10, 15):
+        return 'Oct', completed_on.year
     return resolve_intake(completed_on, entries or DEFAULT_INTAKES)
 
 
@@ -233,23 +237,46 @@ def sync_confirmed_programme_to_learner(row, *, actor="system", reconcile=False,
     if profile:
         _check_placement(database, assignment, profile.cohort, profile.group_name, profile.cohort_id, profile.group_id)
     automatic_cohort = None
-    if profile and not profile.cohort_id and getattr(settings, 'PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED', False):
-        completed_on = timezone.localtime(row.selection_confirmed_at or row.confirmed_at).date()
-        automatic_cohort = resolve_automatic_cohort(database, identifier, completed_on, published_intake_calendar(database))
-        if automatic_cohort is None:
+    prepared_cohort = None
+    # A legacy text placement still represents an administrator's decision.
+    # Missing stable IDs do not authorize replacing it with a calculated intake.
+    legacy_cohort = bool(str(source.cohort or '').strip() or
+                         (profile and str(profile.cohort or '').strip()))
+    if not reconcile and not (profile and profile.cohort_id) and not legacy_cohort and getattr(settings, 'PROGRAMME_STRUCTURE_AUTOMATIC_COHORT_ASSIGNMENT_ENABLED', False):
+        from .future_cohort import confirmation_local_date, resolve_future_cohort
+        completed_on = confirmation_local_date(row.selection_confirmed_at, row.confirmed_at)
+        prepared_cohort = resolve_future_cohort(row, database, identifier, completed_on, include_publication=True)
+        if prepared_cohort is None:
             # Programme assignment is still valid, but cohort assignment needs
             # an explicit admissions decision when the curriculum is missing or
             # ambiguous. Never guess from a display name or default intake.
             automatic_cohort = {"pending": True, "intake": automatic_cohort_window(completed_on)[0], "year": automatic_cohort_window(completed_on)[1]}
+        else:
+            automatic_cohort = (prepared_cohort['cohortId'], prepared_cohort['name'], prepared_cohort['fallback'])
     outcome = {"status": "WOULD_APPLY" if dry_run else "APPLIED", **assignment,
                "previousProgramme": old_name, "profileId": profile.pk if profile else None,
                "automaticCohort": automatic_cohort,
                "at": timezone.now().isoformat(), "actor": actor}
+    if prepared_cohort is not None:
+        # The existing sync record already persists the programme identity and
+        # cohort outcome. Store explicit stable references there for accounts
+        # without a delivery profile; no new model/column or profile is needed.
+        outcome.update(cohortAssignmentVersion=1, cohortId=prepared_cohort['cohortId'],
+                       cohortName=prepared_cohort['name'],
+                       cohortPublicationVersion=prepared_cohort['publicationVersion'])
     if dry_run:
         return outcome
+    source_changes = []
     if old_name != name:
         source.programme = name
-        source.save(using=database, update_fields=["programme"])
+        source_changes.append('programme')
+    if prepared_cohort is not None:
+        # The guard above rejects every existing nonblank cohort. This is a
+        # display cache only; the stable identity is in the same sync outcome.
+        source.cohort = prepared_cohort['name']
+        source_changes.append('cohort')
+    if source_changes:
+        source.save(using=database, update_fields=source_changes)
     if profile:
         changes = []
         for field, value in {"programme": name, "programme_id": identifier, "enrolment_id": source.pk}.items():

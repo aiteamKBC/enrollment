@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { useToast } from "@/hooks/useToast.helpers";
 import { updateStaffUser, POSITION_OPTIONS, type StaffUserRow } from '@/api/staffUsers';
 import { STATUS_OPTIONS } from '@/api/enrolmentUsers';
@@ -50,7 +51,7 @@ const FIELDS: FieldDef[] = [
 
 /**
  * Date_of_birth is a free-text column, so a stored value isn't guaranteed to be
- * the YYYY-MM-DD an <input type="date"> can display. Anything else would render
+ * the ISO YYYY-MM-DD value the date picker can display. Anything else would render
  * as an empty input and then be diffed as "cleared" on the first save, silently
  * wiping the row — so a value the input can't show is dropped from the form and
  * left untouched by the patch.
@@ -159,6 +160,8 @@ export function EditStaffModal({
                 </label>
               ))}
             </div>
+          ) : field.type === 'date' ? (
+            <DatePickerField label={field.label} hideLabel inputId={`es-${field.name}`} value={value} onChange={next => setField(field.name, next)} required={field.required} />
           ) : (
             <input
               id={`es-${field.name}`}

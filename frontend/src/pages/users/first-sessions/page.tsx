@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPage, DataPanel, StatusBadge } from '@/pages/admin/_shared/AdminPage';
 import { AppIcon } from '@/components/feature/AppIcon';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { formatSystemTimestamp } from '@/lib/format';
 import {
   FILTER_KEYS,
@@ -134,25 +135,25 @@ export default function FirstSessionBookingsPage() {
         </label>
         <fieldset className="grid grid-cols-2 gap-2 min-w-0">
           <legend className="sr-only">Session date</legend>
-          <label className={labelClass}>
+          <div className={labelClass}>
             Session from
-            <input type="date" value={filters.sessionFrom} max={filters.sessionTo || undefined} onChange={event => setFilter('sessionFrom', event.target.value)} className={fieldClass} />
-          </label>
-          <label className={labelClass}>
+            <DatePickerField label="Session from" hideLabel value={filters.sessionFrom} max={filters.sessionTo || undefined} onChange={value => setFilter('sessionFrom', value)} />
+          </div>
+          <div className={labelClass}>
             Session to
-            <input type="date" value={filters.sessionTo} min={filters.sessionFrom || undefined} onChange={event => setFilter('sessionTo', event.target.value)} className={fieldClass} />
-          </label>
+            <DatePickerField label="Session to" hideLabel value={filters.sessionTo} min={filters.sessionFrom || undefined} onChange={value => setFilter('sessionTo', value)} />
+          </div>
         </fieldset>
         <fieldset className="grid grid-cols-2 gap-2 min-w-0">
           <legend className="sr-only">Booked-on date</legend>
-          <label className={labelClass}>
+          <div className={labelClass}>
             Booked from
-            <input type="date" value={filters.bookedFrom} max={filters.bookedTo || undefined} onChange={event => setFilter('bookedFrom', event.target.value)} className={fieldClass} />
-          </label>
-          <label className={labelClass}>
+            <DatePickerField label="Booked from" hideLabel value={filters.bookedFrom} max={filters.bookedTo || undefined} onChange={value => setFilter('bookedFrom', value)} />
+          </div>
+          <div className={labelClass}>
             Booked to
-            <input type="date" value={filters.bookedTo} min={filters.bookedFrom || undefined} onChange={event => setFilter('bookedTo', event.target.value)} className={fieldClass} />
-          </label>
+            <DatePickerField label="Booked to" hideLabel value={filters.bookedTo} min={filters.bookedFrom || undefined} onChange={value => setFilter('bookedTo', value)} />
+          </div>
         </fieldset>
         <button
           type="button"

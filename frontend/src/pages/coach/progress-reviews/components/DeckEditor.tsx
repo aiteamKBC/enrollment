@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppIcon } from '@/components/feature/AppIcon';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import {
   deckImageUrl,
   fetchDeckEditableFields,
@@ -117,7 +118,7 @@ function EvidenceCard({
         <Field label="What it shows"><TextInput multiline value={item.evidence_summary} onChange={(v) => onChange({ ...item, evidence_summary: v })} /></Field>
         <div className="grid gap-2 sm:grid-cols-2">
           <Field label="Date">
-            <input type="date" value={item.evidence_date ?? ''} className={inputClass} onChange={(e) => onChange({ ...item, evidence_date: e.target.value || null })} />
+            <DatePickerField label="Date" hideLabel value={item.evidence_date ?? ''} onChange={value => onChange({ ...item, evidence_date: value || null })} />
           </Field>
           <Field label="KSBs (comma separated)">
             <input
@@ -302,7 +303,7 @@ export default function DeckEditor({
                     <div className="grid gap-2 sm:grid-cols-[1fr_1fr_160px_auto]">
                       <Field label="Target"><TextInput value={action.title} onChange={(v) => set({ title: v })} /></Field>
                       <Field label="Owner"><TextInput value={action.owner} onChange={(v) => set({ owner: v })} /></Field>
-                      <Field label="Due by"><input type="date" className={inputClass} value={action.due_by ?? ''} onChange={(e) => set({ due_by: e.target.value || null })} /></Field>
+                      <Field label="Due by"><DatePickerField label="Due by" hideLabel value={action.due_by ?? ''} onChange={value => set({ due_by: value || null })} /></Field>
                       <button type="button" aria-label="Remove target" className={`${smallButton} self-end`} onClick={() => update('actions', fields.actions.filter((_, i) => i !== index))}><AppIcon className="ri-delete-bin-line" /></button>
                     </div>
                     <Field label="Detail"><TextInput value={action.detail} onChange={(v) => set({ detail: v })} /></Field>

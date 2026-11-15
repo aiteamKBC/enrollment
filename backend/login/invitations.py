@@ -130,7 +130,7 @@ def create_invitation(account, *, invited_by=None, ip=None):
     return invitation, token
 
 
-def send_invitation(account, *, invited_by=None, ip=None, user_agent=None):
+def send_invitation(account, *, invited_by=None, ip=None, user_agent=None, intro_html=None):
     """Create and email an invitation. Returns ``(invitation, sent, detail)``.
 
     A send failure is recorded on the row and returned, not raised: the account
@@ -147,6 +147,7 @@ def send_invitation(account, *, invited_by=None, ip=None, user_agent=None):
         expires_days=INVITATION_TTL.days,
         booking_owner=booking[0] if booking else None,
         booking_link=booking[1] if booking else None,
+        intro_html=intro_html,
     )
     sent, detail = email_azure.send_mail(
         to=account.email, subject=subject, html_body=html, text_body=text,

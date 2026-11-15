@@ -6,7 +6,9 @@ import { Booking, Waiting } from '@/components/feature/FirstSessionGate';
 import { roleNavMap } from '@/mocks/navigation';
 import { useMyLearner } from '@/hooks/useMyLearner';
 import { fetchLearnerFirstSession, type LearnerFirstSession } from '@/api/learnerCalendar';
-import { btnPrimary, btnSecondary } from '@/pages/users/components/ui';
+import { btnSecondary } from '@/pages/users/components/ui';
+import { LockedSessionPanel } from './LockedSessionPanel';
+import styles from './firstSession.module.css';
 
 const learnerNav = roleNavMap.learner;
 
@@ -44,8 +46,8 @@ export default function LearnerFirstSessionPage() {
       pageTitle="First Learning Session"
       pageSubtitle="Book the session that starts your programme"
     >
-      <main className="page-container min-w-0 w-full space-y-3 p-3 md:space-y-4 md:p-6">
-        <div className="mx-auto max-w-xl rounded-2xl border border-foreground-200 bg-background-50 p-6 sm:p-8">
+      <main className={styles.page}>
+        <div className={state && !canBook && !error ? undefined : `${styles.workflow} ${error || !state ? styles.feedback : ''}`}>
           {error ? (
             <div className="text-center">
               <p className="text-[13px] text-red-600"><i className="ri-error-warning-line mr-1.5" aria-hidden="true" />{error}</p>
@@ -54,17 +56,7 @@ export default function LearnerFirstSessionPage() {
           ) : !state ? (
             <RowsSkeleton rows={3} />
           ) : !canBook ? (
-            <div className="text-center">
-              <i className="ri-lock-line text-3xl text-primary-600" aria-hidden="true" />
-              <h2 className="mt-3 text-lg font-heading font-semibold text-foreground-900">Sign your compliance documents first</h2>
-              <p className="mt-2 text-[13px] leading-relaxed text-foreground-600">
-                Your first learning session can be booked once you have signed all four of your compliance documents:
-                the Apprenticeship Agreement, Individual Learner Record, Training Plan and Written Agreement.
-              </p>
-              <button className={`${btnPrimary} mt-5`} onClick={() => navigate('/learner/compliance-documents')}>
-                <i className="ri-shield-check-line" aria-hidden="true" />Go to Compliance documents
-              </button>
-            </div>
+            <LockedSessionPanel key={`${kind}:${id}`} learnerId={id} onCompliance={() => navigate('/learner/compliance-documents')} />
           ) : state.booked ? (
             <Waiting state={state} />
           ) : (

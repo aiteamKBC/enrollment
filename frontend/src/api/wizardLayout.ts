@@ -35,17 +35,17 @@ async function send<T>(url: string, init?: Parameters<typeof fetch>[1]): Promise
 }
 
 const layoutResource = createCachedResource<WizardLayoutResponse>('wizard-layout', (key) => send<WizardLayoutResponse>(
-  key === 'current' ? `${BASE}/` : `${BASE}/${key}/`,
+  key.startsWith('current:') ? `${BASE}/?kind=${key.slice('current:'.length)}` : key === 'current' ? `${BASE}/` : `${BASE}/${key}/`,
 ));
 
 export function fetchWizardLayout(options: { force?: boolean; kind?: LearnerKind; learnerId?: string } = {}): Promise<WizardLayoutResponse> {
-  const key = options.kind && options.learnerId ? `${options.kind}/${encodeURIComponent(options.learnerId)}` : 'current';
+  const key = options.kind && options.learnerId ? `${options.kind}/${encodeURIComponent(options.learnerId)}` : options.kind ? `current:${options.kind}` : 'current';
   return layoutResource.read(key, options);
 }
 
 /** The layout already in memory, if any — lets the wizard render it on its first frame. */
 export function peekWizardLayout(options: { kind?: LearnerKind; learnerId?: string } = {}): WizardLayoutResponse | undefined {
-  const key = options.kind && options.learnerId ? `${options.kind}/${encodeURIComponent(options.learnerId)}` : 'current';
+  const key = options.kind && options.learnerId ? `${options.kind}/${encodeURIComponent(options.learnerId)}` : options.kind ? `current:${options.kind}` : 'current';
   return layoutResource.peek(key);
 }
 
@@ -55,10 +55,10 @@ export function peekWizardLayout(options: { kind?: LearnerKind; learnerId?: stri
  * silently overwriting their changes.
  */
 export interface PublishWizardLayoutOptions {
+  learnerKind?: LearnerKind;
   scope?: 'default' | 'targeted';
   name?: string;
   parentVersion?: number | null;
-  assignTo?: { learnerKind: LearnerKind; learnerIds: string[]; reason?: string };
 }
 
 export async function publishWizardLayout(layout: WizardLayout, baseVersion: number | null, options: PublishWizardLayoutOptions = {}): Promise<WizardLayoutResponse> {
@@ -70,7 +70,10 @@ export async function publishWizardLayout(layout: WizardLayout, baseVersion: num
     headers: { 'Content-Type': 'application/json', ...security },
     body: JSON.stringify({ layout, baseVersion, ...options }),
   });
-  if ((options.scope ?? 'default') === 'default') layoutResource.prime('current', saved);
+  if ((options.scope ?? 'default') === 'default') {
+    layoutResource.prime(`current:${options.learnerKind ?? 'apprenticeship'}`, saved);
+    if (!options.learnerKind || options.learnerKind === 'apprenticeship') layoutResource.prime('current', saved);
+  }
   return saved;
 }
 
@@ -81,11 +84,25 @@ export interface WizardLayoutVersion {
   parentVersion: number | null;
   createdAt: string;
   createdBy: string;
+  learnerKind: LearnerKind | null;
+  archived: boolean;
 }
 
-export async function fetchWizardVersions(): Promise<WizardLayoutVersion[]> {
-  const data = await send<{ results: WizardLayoutVersion[] }>(`${BASE}/versions/`);
+export async function fetchWizardVersions(options: { kind?: LearnerKind; includeArchived?: boolean } = {}): Promise<WizardLayoutVersion[]> {
+  const params = new URLSearchParams();
+  if (options.kind) params.set('kind', options.kind);
+  if (options.includeArchived) params.set('includeArchived', 'true');
+  const data = await send<{ results: WizardLayoutVersion[] }>(`${BASE}/versions/${params.size ? `?${params}` : ''}`);
   return data.results;
+}
+
+export function fetchWizardVersion(version: number): Promise<WizardLayoutResponse & WizardLayoutVersion> {
+  return send(`${BASE}/versions/${version}/`);
+}
+
+export async function updateWizardVersion(version: number, change: { name?: string; archived?: boolean }): Promise<WizardLayoutResponse & WizardLayoutVersion> {
+  const security = { 'X-CSRFToken': (await prefetchAssessmentSecurity()).csrfToken };
+  return send(`${BASE}/versions/${version}/`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...security }, body: JSON.stringify(change) });
 }
 
 export async function assignWizardVersion(input: {

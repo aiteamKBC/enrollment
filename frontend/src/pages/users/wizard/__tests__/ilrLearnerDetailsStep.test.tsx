@@ -385,7 +385,7 @@ describe('ILR Learner Details completeness', () => {
     const slugs = WIZARD_STEPS.map((s) => s.slug);
     expect(WIZARD_STEPS[index].label).toBe('ILR');
     expect(slugs.slice(slugs.indexOf('before-you-begin'), slugs.indexOf('cv-job') + 1))
-      .toEqual(['before-you-begin', 'ilr-details', 'ilr', 'programme-suitability', 'cv-job']);
+      .toEqual(['before-you-begin', 'personal-details', 'ilr-details', 'ilr', 'programme-suitability', 'cv-job']);
   });
 
   it('is complete once every required answer is given', () => {

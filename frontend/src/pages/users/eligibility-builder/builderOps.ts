@@ -83,6 +83,7 @@ export interface QuestionDraft {
   helpText: string;
   required: boolean;
   condition: EligibilityCondition | null;
+  screeningRule?: { eligibleAnswers: string[] } | null;
 }
 
 export function questionDraftFrom(item?: EligibilityItem): QuestionDraft {
@@ -93,6 +94,7 @@ export function questionDraftFrom(item?: EligibilityItem): QuestionDraft {
     helpText: item?.helpText ?? '',
     required: item?.required ?? false,
     condition: item?.condition ?? null,
+    screeningRule: item?.screeningRule ?? null,
   };
 }
 
@@ -111,6 +113,7 @@ export function saveCustomQuestion(
     helpText: !contentOnly ? draft.helpText || undefined : undefined,
     required: contentOnly ? false : draft.required,
     condition: contentOnly ? null : draft.condition,
+    screeningRule: !contentOnly ? draft.screeningRule : null,
   };
   if (key) return { layout: updateItem(layout, key, fields), key };
   const newKey = `new_${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`;
@@ -124,6 +127,7 @@ export function saveCustomQuestion(
  * and the answers in it are kept and it can be restored.
  */
 export function removeItem(layout: EligibilityLayout, key: string): EligibilityLayout {
+  if (findItem(layout, key)?.screeningRule) return layout;
   const unpublished = (it: EligibilityItem) => !it.builtin && !it.column;
   return mapSections(layout, (s) => ({
     ...s,
@@ -138,8 +142,9 @@ export function setText(layout: EligibilityLayout, key: string, value: string | 
   const texts = { ...(layout.texts ?? {}) };
   if (value === undefined) delete texts[key];
   else texts[key] = value;
-  const next: EligibilityLayout = { sections: layout.sections };
+  const next: EligibilityLayout = { ...layout };
   if (Object.keys(texts).length) next.texts = texts;
+  else delete next.texts;
   return next;
 }
 
@@ -196,7 +201,20 @@ export function problems(layout: EligibilityLayout): string[] {
       if (isLocked(item) && (item.hidden || section.hidden)) {
         out.add(`“${label}” identifies the applicant, so it must stay on a section applicants see.`);
       }
+      if (item.screeningRule && (item.hidden || section.hidden)) {
+        out.add(`“${label}” affects eligibility, so it must stay on the form.`);
+      }
       if (item.hidden) continue;
+      if (item.screeningRule) {
+        const answers = answersOf(item);
+        const eligible = item.screeningRule.eligibleAnswers;
+        if (item.builtin || !answers || !['yesno', 'dropdown'].includes(item.type ?? '') || item.condition || !item.required || section.hidden) {
+          out.add(`“${label}” must be a visible, mandatory yes/no or dropdown question without a display condition to affect screening.`);
+        }
+        if (!Array.isArray(eligible) || eligible.length === 0 || eligible.some(value => !answers?.includes(value)) || eligible.length === answers?.length) {
+          out.add(`“${label}” needs at least one passing answer and at least one failing answer.`);
+        }
+      }
       if (!item.builtin && !item.label?.trim()) out.add('Every question needs a label.');
       const list = item.builtin ? item.options : item.type === 'dropdown' ? item.options ?? [] : undefined;
       if (list) {

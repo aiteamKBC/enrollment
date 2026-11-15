@@ -1,0 +1,54 @@
+.radar { min-width: 0; }
+.categories { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.category { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-width: 0; padding: 14px; text-align: left; border: 1px solid #e7d9f8; border-radius: 14px; background: linear-gradient(135deg, #fff, #f8f3ff); box-shadow: 0 2px 5px #49117805; }
+.category:hover { border-color: #bc8de4; }
+.category:focus-visible, .allFilter:focus-visible { outline: 2px solid #8a22d0; outline-offset: 3px; }
+.selected { border-color: #9d5bd5; box-shadow: 0 0 0 1px #9d5bd5; background: #f3e9ff; }
+.progressFill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a128e4, #6920bc); }
+.filters { display: flex; margin-bottom: 14px; }
+.allFilter { border: 1px solid #e4d4f6; border-radius: 999px; padding: 6px 13px; font-size: 12px; font-weight: 600; color: #66239f; background: #faf7ff; }
+.activeFilter { background: #ede0fa; border-color: #d1b3ed; color: #531584; }
+.moduleCoverage { margin-bottom: 18px; border: 1px solid #e5d8f5; border-radius: 14px; padding: 14px; background: linear-gradient(110deg, #fbf8ff, #f5eefc); }
+.moduleCoverage h3 { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #38145c; }
+.moduleGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.moduleCard { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; min-width: 0; padding: 10px 12px; border: 1px solid #ede3f7; border-radius: 9px; background: #ffffffd9; }
+.moduleName { font-size: 12px; line-height: 1.5; color: #42265e; font-weight: 600; overflow-wrap: anywhere; }
+.moduleCount { font-size: 11px; color: #7226ac; white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
+.overallProgress { height: 5px; margin-bottom: 18px; border-radius: 999px; overflow: hidden; background: #eee5f7; }
+.table { border: 1px solid #e4d7f0; border-radius: 14px; overflow: hidden; background: #fff; }
+.tableHeader, .row { display: grid; grid-template-columns: minmax(0, 55fr) minmax(0, 28fr) minmax(135px, 17fr); align-items: center; column-gap: 16px; padding: 13px 16px; }
+.tableHeader { background: #f4edf9; color: #624377; font-size: 10px; font-weight: 700; letter-spacing: .055em; border-bottom: 1px solid #e4d7f0; }
+.row { min-height: 76px; }
+.row + .row { border-top: 1px solid #eee6f5; }
+.row:nth-child(odd) { background: #fcfaff; }
+.row:hover { background: #f7f1fd; }
+.row.unrated { background: #fef2f2; box-shadow: inset 3px 0 #ef4444; }
+.description { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.description > span:last-child { min-width: 0; }
+.number { color: #927ea3; font-size: 11px; font-variant-numeric: tabular-nums; }
+.question { color: #32213f; font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.meta { display: block; color: #8b759a; font-size: 11px; line-height: 1.5; margin-top: 3px; }
+.coverageCell { min-width: 0; font-size: 11px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { display: inline-block; max-width: 100%; padding: 4px 8px; border: 1px solid #eaddf8; border-radius: 8px; background: #f4edfc; color: #7136a0; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.answerCell { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.answerCell .action { border: 1px solid #dfc8f1; border-radius: 999px; background: #fcf9ff; color: #7027a5; padding: 5px 10px; font-size: 11px; min-height: 29px; margin-left: auto; }
+.answerCell .action:hover { background: #eee1fa; border-color: #be90df; }
+.mobileLabel { display: none; }
+@media (max-width: 760px) {
+  .moduleGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tableHeader, .row { column-gap: 10px; padding: 12px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 112px; }
+}
+@media (max-width: 540px) {
+  .categories { gap: 6px; }
+  .category { padding: 10px 8px; border-radius: 11px; }
+  .category > div:first-child { flex-wrap: nowrap; gap: 5px; font-size: 12px; }
+  .category > div:nth-child(2) { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .moduleGrid { grid-template-columns: minmax(0, 1fr); }
+  .tableHeader { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px; }
+  .coverageCell, .answerCell { padding-left: 20px; }
+  .mobileLabel { display: block; color: #715c80; font-size: 10px; font-weight: 700; }
+  .coverageCell .mobileLabel { margin-bottom: 5px; }
+  .answerCell .action { margin-left: 0; }
+}

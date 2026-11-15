@@ -16,6 +16,7 @@
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
@@ -30,6 +31,8 @@ import { AppIcon } from '@/components/feature/AppIcon';
 export interface SelectOption {
   value: string;
   label: string;
+  /** Optional rich label for controls that need emphasis within an option. */
+  labelContent?: ReactNode;
   /** Second line under the label — the detail that makes two similar options tellable apart. */
   description?: string;
   /** Remix icon class, e.g. `ri-team-line`. */
@@ -324,7 +327,7 @@ export function SelectMenu({
       >
         {selected?.icon && <AppIcon className={`${selected.icon} shrink-0 text-foreground-400`}></AppIcon>}
         <span className={`min-w-0 flex-1 truncate text-[14px] ${selected ? 'font-semibold text-foreground-900' : 'font-medium text-foreground-400'}`}>
-          {selected ? selected.label : placeholder}
+          {selected ? selected.labelContent ?? selected.label : placeholder}
         </span>
         {selected?.meta && (
           <span className="shrink-0 rounded-full bg-background-100 px-2 py-0.5 text-[11px] font-bold text-foreground-500">{selected.meta}</span>
@@ -404,7 +407,7 @@ export function SelectMenu({
                   >
                     {option.icon && <AppIcon className={`${option.icon} shrink-0 text-lg ${active ? 'text-primary-600' : 'text-foreground-400'}`}></AppIcon>}
                     <span className="min-w-0 flex-1">
-                      <span className="block whitespace-normal break-words text-[14px] font-semibold">{option.label}</span>
+                      <span className="block whitespace-normal break-words text-[14px] font-semibold">{option.labelContent ?? option.label}</span>
                       {option.description && (
                         <span className="mt-0.5 block whitespace-normal break-words text-[12px] font-medium text-foreground-400">{option.description}</span>
                       )}

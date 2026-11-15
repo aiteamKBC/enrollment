@@ -38,7 +38,7 @@ function WorkingDatePicker({ month, value, label, rules, disabled, onChange }: {
     <span>{label}</span>
     <button type="button" aria-label={label} aria-expanded={open} disabled={disabled || !bounds || !rules}
       className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left disabled:bg-slate-100"
-      onClick={() => setOpen(current => !current)}>{value || 'Choose date'}</button>
+      onClick={() => setOpen(current => !current)}>{value ? value.split('-').reverse().join('/') : 'Choose date'}</button>
     {open && <div role="group" aria-label={`${label} calendar`} className="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
       <div className="mb-3 flex items-center justify-between"><strong>{new Date(`${month}-01T12:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</strong><button type="button" aria-label="Close calendar" onClick={() => setOpen(false)}>×</button></div>
       <div className="grid grid-cols-7 gap-1 text-center">

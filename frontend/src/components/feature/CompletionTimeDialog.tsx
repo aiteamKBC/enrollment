@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppIcon } from './AppIcon';
+import { DatePickerField } from './DatePickerField';
 import type { WorkingHoursHoliday } from '@/lib/componentAccessWindow';
 import {
   declaredCompletedAt,
@@ -161,14 +162,7 @@ export function CompletionTimeDialog({
               <label htmlFor={dateId} className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-foreground-500">
                 Completion date
               </label>
-              <input
-                id={dateId}
-                type="date"
-                value={day}
-                max={todayKey()}
-                onChange={event => { setDay(event.target.value); setTouched(true); }}
-                className="w-full rounded-xl border border-foreground-300 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
-              />
+              <DatePickerField label="Completion date" hideLabel inputId={dateId} value={day} max={todayKey()} onChange={value => { setDay(value); setTouched(true); }} />
             </div>
             <div className="min-w-0">
               <label htmlFor={timeId} className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-foreground-500">

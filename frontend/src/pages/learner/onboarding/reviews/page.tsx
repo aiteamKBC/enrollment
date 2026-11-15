@@ -22,16 +22,17 @@ import SignReviewModal from './SignReviewModal';
 import { downloadReviewPdf } from './reviewDocument';
 import { REVIEW_QUESTION_LABELS } from './questions';
 import { RowsSkeleton } from '@/components/feature/Skeletons';
+import { ArrowRight, CalendarDays, CircleCheck, FileText, HeartPulse, LockKeyhole, ShieldCheck, ShieldUser } from 'lucide-react';
+import { ReviewsBanner, ReviewStatusSummary } from './ReviewsPresentation';
+import styles from './reviews.module.css';
 
 const learnerNav = roleNavMap.learner;
-
-// Labels come from the backend (ONBOARDING_REVIEW_LABELS); only the icon is
-// presentational, so that is all this map carries.
-const REVIEW_ICONS: Record<OnboardingReviewType, string> = {
-  'eligibility-review': 'ri-shield-check-line',
-  workspace: 'ri-file-list-3-line',
-  'training-plan': 'ri-heart-pulse-line',
-  'uln-privacy': 'ri-shield-user-line',
+// Labels and availability still come from the API; these icons only decorate.
+const REVIEW_ICONS: Record<OnboardingReviewType, typeof ShieldCheck> = {
+  'eligibility-review': ShieldCheck,
+  workspace: FileText,
+  'training-plan': HeartPulse,
+  'uln-privacy': ShieldUser,
 };
 
 /**
@@ -41,7 +42,6 @@ const REVIEW_ICONS: Record<OnboardingReviewType, string> = {
 function ReviewCard({ review, onChanged }: { review: OnboardingReviewSlot; onChanged: () => void }) {
   const { kind, id } = useMyLearner();
   const navigate = useNavigate();
-  const icon = REVIEW_ICONS[review.type];
   const [err, setErr] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadErr, setDownloadErr] = useState('');
@@ -77,32 +77,25 @@ function ReviewCard({ review, onChanged }: { review: OnboardingReviewSlot; onCha
 
   const done = Boolean(review.completed);
   const learnerSigned = Boolean(review.signatures?.learner.signed);
+  const Icon = done ? CircleCheck : review.issued ? REVIEW_ICONS[review.type] : LockKeyhole;
 
   return (
     <DocumentSignatureTarget documentKey={REVIEW_DOCUMENT_KEYS[review.type]} sourceId={eventKey || undefined}>
-    <div className={`rounded-2xl border p-4 md:p-5 transition-smooth ${
-      done ? 'border-emerald-200 bg-emerald-50/40' : review.issued ? 'border-primary-200 bg-background-50' : 'border-foreground-200/70 bg-background-50'
-    }`}>
-      <div className="flex items-start gap-3">
-        <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-          done ? 'bg-emerald-500 text-white' : review.issued ? 'bg-primary-50 text-primary-600' : 'bg-background-100 text-foreground-400'
-        }`}>
-          <i className={`${done ? 'ri-check-line' : review.issued ? icon : 'ri-lock-line'} text-[18px]`} />
+    <div className={`rounded-2xl ${styles.reviewCard}`} data-status={done ? 'completed' : review.started ? 'progress' : review.issued ? 'ready' : 'unissued'}>
+      <div className={styles.cardLayout}>
+        <span className={styles.reviewIcon} aria-hidden="true">
+          <Icon size={34} strokeWidth={1.8} />
         </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[14px] font-heading font-semibold text-foreground-900">{review.label}</h3>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-              done ? 'bg-emerald-100 text-emerald-700'
-                : review.started ? 'bg-amber-100 text-amber-800'
-                  : review.issued ? 'bg-primary-100 text-primary-700' : 'bg-background-200 text-foreground-500'
-            }`}>
+        <div className={styles.reviewDetails}>
+          <div className={styles.reviewTitle}>
+            <h3>{review.label}</h3>
+            <span className={styles.statusBadge}>
               {done ? 'Completed' : review.started ? 'In progress' : review.issued ? 'Ready to start' : 'Not issued yet'}
             </span>
           </div>
           {review.issued && (review.issuedAt || (done && review.completedAt)) && (
-            <p className="text-[11px] text-foreground-500 mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
-              {review.issuedAt && <span><i className="ri-time-line mr-1" aria-hidden="true" />Issued {issuedLabel(review.issuedAt)}</span>}
+            <p className={styles.dates}>
+              {review.issuedAt && <span><CalendarDays size={18} aria-hidden="true" />Issued {issuedLabel(review.issuedAt)}</span>}
               {done && review.completedAt && (
                 <span className="text-emerald-700"><i className="ri-check-double-line mr-1" aria-hidden="true" />Completed {issuedLabel(review.completedAt)}</span>
               )}
@@ -110,28 +103,29 @@ function ReviewCard({ review, onChanged }: { review: OnboardingReviewSlot; onCha
           )}
 
           {!review.issued || !eventKey ? (
-            <p className="text-[12px] text-foreground-500 mt-2">
+            <p className={styles.description}>
               Your enrolment officer will issue this review to you. It will appear here, ready to start.
             </p>
           ) : (
-            <div className="mt-2.5 flex flex-wrap items-center gap-3">
-              <button onClick={() => navigate(`/learner/onboarding/reviews/${encodeURIComponent(eventKey)}`)} className={btnPrimary}>
+            <div className={styles.actions}>
+              <button onClick={() => navigate(`/learner/onboarding/reviews/${encodeURIComponent(eventKey)}`)} className={styles.primaryAction}>
                 {done
                   ? <><i className="ri-eye-line" />View review</>
                   : review.started
                     ? <><i className="ri-play-circle-line" />Continue review</>
                     : <><i className="ri-play-circle-line" />Start</>}
+                {!done && <ArrowRight size={19} aria-hidden="true" />}
               </button>
               {/* Signing opens only once the review is finished. */}
               {done && (
-                <button onClick={() => setSigning(true)} className={btnSecondary}>
+                <button onClick={() => setSigning(true)} className={`${btnSecondary} ${styles.secondaryAction}`}>
                   {learnerSigned
                     ? <><i className="ri-check-line text-emerald-600" />Signed</>
                     : <><i className="ri-pen-nib-line" />Sign review</>}
                 </button>
               )}
               {done && (
-                <button onClick={() => { void download(); }} disabled={downloading} className={btnSecondary}>
+                <button onClick={() => { void download(); }} disabled={downloading} className={`${btnSecondary} ${styles.secondaryAction}`}>
                   {downloading
                     ? <><i className="ri-loader-4-line animate-spin" />Preparing…</>
                     : <><i className="ri-download-2-line" />Download review</>}
@@ -273,26 +267,9 @@ export default function OnboardingReviewsPage() {
       userName="Learner"
       userRole="Learner"
     >
-      <main className="page-container min-w-0 w-full space-y-3 p-3 md:space-y-4 md:p-6">
-        <div className="rounded-2xl border border-foreground-200/60 bg-background-50 p-4 md:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-[15px] font-heading font-semibold text-foreground-900">Your enrolment reviews</h2>
-              <p className="text-[12px] text-foreground-500 mt-1 max-w-2xl leading-relaxed">
-                Thank you for submitting your enrolment. Your enrolment officer issues each of the four reviews below;
-                once a review is issued, open it, complete it and sign it.
-              </p>
-            </div>
-            <span className={`text-[12px] font-semibold px-3 py-1.5 rounded-full shrink-0 ${
-              completedCount === total ? 'bg-emerald-100 text-emerald-700' : 'bg-primary-50 text-primary-700'
-            }`}>
-              {completedCount} of {total} completed
-            </span>
-          </div>
-          <div className="mt-3 h-1.5 rounded-full bg-background-200 overflow-hidden">
-            <div className="h-full rounded-full bg-primary-500 transition-all duration-500" style={{ width: `${(completedCount / total) * 100}%` }} />
-          </div>
-        </div>
+      <main className={`page-container min-w-0 w-full space-y-3 p-3 md:space-y-4 md:p-6 ${styles.page}`}>
+        <ReviewsBanner completed={completedCount} total={total} />
+        {!loading && !error && data && <ReviewStatusSummary reviews={data.reviews} />}
 
         {loading && (
           <div className="rounded-2xl border border-foreground-200/60 bg-background-50 p-5">
@@ -308,7 +285,7 @@ export default function OnboardingReviewsPage() {
         )}
 
         {!loading && !error && data && (
-          <div className="space-y-3">
+          <div className={styles.reviewList}>
             {data.reviews.map((review) => (
               <ReviewCard key={review.type} review={review} onChanged={load} />
             ))}

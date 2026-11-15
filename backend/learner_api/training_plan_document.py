@@ -474,8 +474,8 @@ def sign_training_plan(request, pk, _revision_source=None):
             if document is None:
                 return _error("No training plan has been issued for this learner yet.", 404)
 
-            from enrolment_api.document_templates.revisions import source_locked
-            if source_locked('training-plan', document):
+            from enrolment_api.document_templates.revisions import signing_locked
+            if signing_locked('training-plan', document, party, signature):
                 return _error('This historical document is locked. Create a new learner revision for changes.', 409)
 
             now = timezone.now() if signature else None

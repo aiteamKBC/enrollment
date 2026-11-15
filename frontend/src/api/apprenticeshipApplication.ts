@@ -35,7 +35,6 @@ export const PROGRAMMES = [
 ] as const;
 
 export interface ApprenticeshipApplication {
-  title?: string;
   firstName: string;
   surname: string;
   workEmail: string;

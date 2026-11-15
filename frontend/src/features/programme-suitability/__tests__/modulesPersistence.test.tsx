@@ -22,7 +22,7 @@ vi.mock('@/api/wizardLayout', () => ({ fetchWizardLayout: async () => ({ layout:
   ...(!mocks.olderPinnedLayout ? { programmeSuitability: configuration } : {}) }, version: 3 }), peekWizardLayout: () => undefined }));
 vi.mock('@/api/enrolmentDocuments', () => ({ uploadEnrolmentDocument: vi.fn() }));
 vi.mock('@/hooks/useToast.helpers', () => ({ useToast: () => ({ error: vi.fn(), success: vi.fn() }) }));
-vi.mock('../api', () => ({ getAssessment: async () => ({ ...fresh(), pathway: 'project-controls',
+vi.mock('../api', () => ({ request: async () => ({ review: false, modules: [], offeringCount: 0 }), getAssessment: async () => ({ ...fresh(), pathway: 'project-controls',
   result: { ...result, outcome: 'RECOMMENDED_PCP_L6', recommendedProgramme: 'PCP_L6' }, selectedProgramme: 'PCP_L6', completionStatus: 'SUBMITTED',
   confirmedAt: '2026-11-01T12:00:00Z', selectionStatus: 'SELECTION_CONFIRMED', selectionConfirmedAt: '2026-11-01T12:01:00Z' }),
   peekAssessment: () => undefined, primeAssessment: vi.fn(), prefetchAssessmentSecurity: async () => ({ csrfToken: 'synthetic' }) }));

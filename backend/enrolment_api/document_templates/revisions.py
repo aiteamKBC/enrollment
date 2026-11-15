@@ -76,6 +76,23 @@ def independently_signed(key, data):
     return all(bool(data.get('signatures', {}).get(role, {}).get('signed')) for role in required_roles(key, data))
 
 
+def current_revision(key, document):
+    """Latest issued copy of this active root; drafts never supersede it."""
+    if document is None or not ready(): return None
+    return Revision.objects.select_related('issue').filter(issue__document_key=key,
+        issue__source_id=str(document.pk), issue__learner_id=document.learner_id,
+        issue__learner_kind=document.learner_kind, state='finalized').order_by('-number').first()
+
+
+def current_signoff(key, document):
+    revision = current_revision(key, document)
+    if revision is None: return None
+    if revision.signature_method == 'sign-again' and (not revision.signing_source_id
+            or source_record(key, document.learner_id, revision.signing_source_id) is None):
+        return {'fullySigned': False, 'signatures': {}}
+    return payload(revision)
+
+
 def get_revision(identifier, learner_id, lock=False):
     query = Revision.objects.filter(pk=identifier, issue_id__in=IssuedTemplate.objects.filter(learner_id=learner_id).values('pk'))
     # PostgreSQL FOR UPDATE OF rejects this legacy schema-qualified db_table
@@ -263,6 +280,12 @@ def preview_response(revision):
             if legacy:
                 result['pdfUrl'] = legacy
                 return result
+        from .legacy_snapshot import can_render_revision_snapshot, SNAPSHOT_NOTICE
+        if can_render_revision_snapshot(revision, data):
+            # Retain the pinned content/design and this revision's signing
+            # envelope. Viewing must not issue a document or store a substitute.
+            result['notice'] = SNAPSHOT_NOTICE
+            return result
         result['pdfUnavailable'] = 'This historical PDF was not stored by the branded renderer. It will not be regenerated or restyled when viewed.'
     return result
 
@@ -330,7 +353,8 @@ def save(revision, data, actor):
     if any(content[k] != baseline[k] for k in ('templateId', 'documentKey', 'programmes', 'signatureRoles')): raise TemplateError('A learner revision must retain its original template identity and applicability.')
     if not blank or source_template: preserve_system_fields(content, baseline)
     reason = data.get('reason', '')
-    if not isinstance(reason, str) or not reason.strip() or len(reason) > 2000: raise TemplateError('Provide a reason for changing this learner document (up to 2,000 characters).')
+    if not isinstance(reason, str) or len(reason) > 2000: raise TemplateError('The reason must be text of up to 2,000 characters.')
+    if not blank and not reason.strip(): raise TemplateError('Provide a reason for changing this learner document (up to 2,000 characters).')
     method = data.get('signatureMethod', '')
     if method not in ('', 'keep', 'sign-again'): raise TemplateError('Choose Keep Existing Signatures or Sign Again.')
     if blank and method != 'sign-again': raise TemplateError('New documents require fresh signatures; historical signatures cannot be kept.')
@@ -384,7 +408,12 @@ def clone_for_signing(revision):
 
 def finalize(revision, actor):
     if revision.state != 'draft': raise TemplateError('This revision is already finalized and cannot be changed.')
-    if revision.signature_method not in ('keep', 'sign-again') or not revision.reason.strip(): raise TemplateError('Choose a signature option and provide a reason before finalizing.')
+    # Serialize issuance with first-issue signing, whose writer locks this row
+    # before checking whether revised wording has already been issued.
+    source_record(revision.issue.document_key, revision.issue.learner_id, revision.issue.source_id, lock=True)
+    if revision.signature_method not in ('keep', 'sign-again'): raise TemplateError('Choose a signature option before finalizing.')
+    if not blank_documents.is_blank(revision) and not revision.reason.strip():
+        raise TemplateError('Provide a reason for changing this learner document before finalizing.')
     validate(revision.content, publishing=True)
     if blank_documents.is_blank(revision):
         if revision.signature_method != 'sign-again' or revision.provenance: raise TemplateError('New documents require fresh signatures.')
@@ -414,3 +443,18 @@ def source_locked(key, document):
 
 def content_locked(key, document):
     return ready() and (source_locked(key, document) or Revision.objects.filter(issue__document_key=key, signing_source_id=str(document.pk), state='finalized').exists())
+
+
+def signing_locked(key, document, party, signature):
+    if not source_locked(key, document): return False
+    # Capturing R1 for an edit/Create freezes content, not the outstanding
+    # signing obligations on the active first issue. Permit only an absent
+    # party's first signature; never clear or replace historical evidence.
+    if (key.startswith('review-') or not signature or party not in seed(key)['signatureRoles']
+            or document.status != document.STATUS_ACTIVE or document.fully_signed
+            or str(getattr(document, f'{party}_signature', '') or '').strip()):
+        return True
+    # Once revised wording has actually been issued, the old source remains
+    # historical. Its independent signing envelope is the place to sign.
+    return Revision.objects.filter(issue__document_key=key, issue__source_id=str(document.pk),
+                                   state='finalized', number__gt=1).exists()

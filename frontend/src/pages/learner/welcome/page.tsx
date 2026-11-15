@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import {
   AlertCircle, ArrowLeft, ArrowRight, Check, Eraser, ImageUp, MapPin, PenLine, RefreshCw, ShieldCheck, Trash2, Type, UserRound,
 } from 'lucide-react';
@@ -270,7 +271,7 @@ function DetailsStep({
             </div>
             <div className="max-w-[16rem]">
               <Field id="fl-dateOfBirth" label="Date of Birth" required error={errors.dateOfBirth}>
-                <input {...input('dateOfBirth', { type: 'date', max: todayIso(), min: '1900-01-01', autoComplete: 'bday' })} />
+                <DatePickerField label="Date of Birth" hideLabel inputId="fl-dateOfBirth" value={values.dateOfBirth} onChange={value => onChange('dateOfBirth', value)} required min="1900-01-01" max={todayIso()} error={errors.dateOfBirth} autoComplete="bday" />
               </Field>
             </div>
             <div className="max-w-[20rem]">

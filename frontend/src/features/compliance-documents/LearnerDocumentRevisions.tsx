@@ -31,6 +31,7 @@ export function LearnerDocumentRevisions({ learnerId, documentKey, sourceId, his
   const run = async (action: () => Promise<unknown>) => { setBusy(true); setError(''); try { await action(); } catch (e) { const failure = e as Error & { details?: { setupRequired?: boolean; setup?: api.RevisionStorageSetup } }; setError(failure.message); if (failure.details?.setupRequired) { setSetup(true); setSetupInfo(failure.details.setup || null); } } finally { setBusy(false); } };
   // Review cards use event keys while revision records preserve numeric source IDs.
   const filtered = sourceId != null && !documentKey.startsWith('review-') ? rows.filter((r) => r.sourceId === String(sourceId)) : rows;
+  const latestIssuedNumber = Math.max(0, ...filtered.filter(r => r.state === 'finalized').map(r => r.number));
   const onCountChange = historyControl?.onCountChange;
   useEffect(() => { onCountChange?.(filtered.length); }, [onCountChange, filtered.length]);
   const open = (r: api.DocumentRevision) => void run(async () => showPreview((await api.readRevision(learnerId, r.id)).preview));
@@ -71,7 +72,7 @@ export function LearnerDocumentRevisions({ learnerId, documentKey, sourceId, his
       <div><p className="text-sm font-semibold">Version {r.number} — {r.number === 1 ? 'Original' : r.state === 'draft' ? 'Draft' : r.signatureMethod === 'keep' ? 'Updated Copy' : r.status}</p><p className="text-xs text-foreground-600">{templateLabel(r.templateVersionNumber)} / Revision R{r.number} · <span>{r.status}</span></p></div>
       <div className="flex flex-wrap gap-2"><button className={btnSecondary} disabled={busy} onClick={() => open(r)}>View</button><button className={btnSecondary} disabled={busy} onClick={() => download(r)}>Download</button>
         {adminActions(r)}
-        {r.state === 'finalized' && r.signatureMethod === 'sign-again' && !r.fullySigned && Object.keys(r.signatures).filter((party) => (admin ? ['admin', 'provider'] : role === 'employer' ? ['employer'] : role === 'learner' ? ['learner', 'apprentice'] : []).includes(party)).map((party) => <button key={party} className={btnPrimary} disabled={busy || r.signatures[party].signed} onClick={() => setSigning({ revision: r, party })}>{r.signatures[party].signed ? 'Signed by you' : 'Sign revised document'}</button>)}
+        {r.state === 'finalized' && r.number === latestIssuedNumber && r.signatureMethod === 'sign-again' && !r.fullySigned && Object.keys(r.signatures).filter((party) => (admin ? ['admin', 'provider'] : role === 'employer' ? ['employer'] : role === 'learner' ? ['learner', 'apprentice'] : []).includes(party)).map((party) => <button key={party} className={btnPrimary} disabled={busy || r.signatures[party].signed} onClick={() => setSigning({ revision: r, party })}>{r.signatures[party].signed ? 'Signed by you' : 'Sign revised document'}</button>)}
       </div>
     </article></DocumentSignatureTarget>)}
     </>}

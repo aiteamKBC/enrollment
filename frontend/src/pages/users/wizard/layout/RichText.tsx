@@ -72,11 +72,15 @@ function Block({ block, classes }: { block: RichBlock; classes: Required<RichTex
   }
 }
 
-export function RichText({ source, classes }: { source: string; classes?: RichTextClasses }) {
+export function RichTextBlocks({ blocks, classes }: { blocks: RichBlock[]; classes?: RichTextClasses }) {
   const merged = { ...DEFAULT_CLASSES, ...classes };
   return (
     <div className={merged.container}>
-      {parseRich(source).map((block, i) => <Block key={i} block={block} classes={merged} />)}
+      {blocks.map((block, i) => <Block key={i} block={block} classes={merged} />)}
     </div>
   );
+}
+
+export function RichText({ source, classes }: { source: string; classes?: RichTextClasses }) {
+  return <RichTextBlocks blocks={parseRich(source)} classes={classes} />;
 }

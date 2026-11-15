@@ -951,6 +951,11 @@ def enrolment_user_detail(request, pk):
         advance_learner(user)
         return JsonResponse(to_board(user))
     if request.method in ("PATCH", "PUT"):
+        if (getattr(request, "learner_self_write", False)
+                and str(getattr(user, "learner_type", "") or "apprenticeship").strip().casefold() == "apprenticeship"
+                and str(getattr(user, "programme_status", "") or DEFAULT_PROGRAMME_STATUS).strip().casefold()
+                == DEFAULT_PROGRAMME_STATUS.casefold()):
+            return _error("Onboarding is not available yet.", 403)
         handover = None
         try:
             payload = _parse_body(request)

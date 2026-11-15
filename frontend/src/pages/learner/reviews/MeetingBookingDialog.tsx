@@ -2,6 +2,7 @@ import { Component, useEffect, useId, useRef, useState, type ErrorInfo, type For
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { AppIcon } from '@/components/feature/AppIcon';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import type { LearnerKind } from '@/api/learnerDetail';
 import type { MeetingAttendance } from '@/api/meetingAttendance';
 import {
@@ -340,7 +341,7 @@ function MeetingBookingForm({ session, title, learner, rules, attendance, onClos
       </select></label>
       {rescheduling && target && <p role="note" className={styles.description}>Current booking: {target.scheduledDate} at {target.scheduledTime} UK time · {target.durationMinutes || 60} minutes. Select an available replacement below.</p>}
       <div className={styles.fields}>
-        <label>Date<input aria-label="Day" type="date" required min={bookingToday()} value={date} disabled={saving || Boolean(loadError)} onChange={event => { edited.current.date = true; setDate(event.target.value); setTime(''); setError(''); }} /></label>
+        <div>Date<DatePickerField label="Day" hideLabel required min={bookingToday()} value={date} disabled={saving || Boolean(loadError)} onChange={value => { edited.current.date = true; setDate(value); setTime(''); setError(''); }} /></div>
         {reviewBooking ? <label>Time (UK time · Europe/London)<select aria-label="Time" required value={time} disabled={saving || Boolean(loadError) || coachAvailabilityLoading || Boolean(coachAvailabilityError) || Boolean(connections.length && availabilityError) || !reviewAvailabilityTimes.length} onChange={event => { edited.current.time = true; setTime(event.target.value); setError(''); }}>
           <option value="">{coachAvailabilityLoading ? 'Checking coach availability…' : 'Select an available time'}</option>
           {reviewAvailabilityTimes.map(value => <option key={value} value={value}>{value}</option>)}

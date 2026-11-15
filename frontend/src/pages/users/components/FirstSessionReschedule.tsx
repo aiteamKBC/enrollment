@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import {
   fetchLearnerCalendarEvents,
   rescheduleLearnerCalendarSession,
@@ -195,21 +196,12 @@ export function FirstSessionReschedule({ kind, learnerId, onMoved }: {
       {open && (
         <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3">
           <div className="flex flex-wrap items-start gap-3">
-            <label className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 New date
               </span>
-              <input
-                type="date"
-                value={date}
-                // The college's today, so a session cannot be moved into the
-                // past from a machine whose clock is on another continent.
-                min={ukToday()}
-                disabled={saving}
-                onChange={event => { setDate(event.target.value); setError(''); }}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-800 outline-none hover:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-60"
-              />
-            </label>
+              <DatePickerField label="New date" hideLabel value={date} min={ukToday()} disabled={saving} onChange={value => { setDate(value); setError(''); }} />
+            </div>
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 New time (UK)

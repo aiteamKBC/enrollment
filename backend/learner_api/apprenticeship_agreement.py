@@ -446,8 +446,8 @@ def sign_agreement(request, pk, _revision_source=None):
             agreement = _revision_source if _revision_source is not None else _active_agreement(_learner_kind(learner), learner.pk, lock=True)
             if agreement is None:
                 return _error("No agreement has been issued for this learner yet.", 404)
-            from enrolment_api.document_templates.revisions import source_locked
-            if source_locked('apprenticeship-agreement', agreement):
+            from enrolment_api.document_templates.revisions import signing_locked
+            if signing_locked('apprenticeship-agreement', agreement, party, signature):
                 return _error('This historical document is locked. Create a new learner revision for changes.', 409)
 
             now = timezone.now() if signature else None

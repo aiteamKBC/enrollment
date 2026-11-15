@@ -14,6 +14,7 @@ export interface Question {
   critical: boolean; criticalProgramme: ProgrammeId | null; answers: Answer[];
 }
 export interface Configuration {
+  scoringPolicy?: 'GENERAL_WEIGHTED_V1';
   schemaVersion: 1; enabled: boolean; introduction: string; programmes: Programme[]; questions: Question[];
   rules: { minimumScore: number; minimumDifference: number; minimumCoverage: number;
     minimumCriticalIndicators: number; criticalStrength: number; mixedQuestionThreshold: number; mixedAffinityThreshold: number };

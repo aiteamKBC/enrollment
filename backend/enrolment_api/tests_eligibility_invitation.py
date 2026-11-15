@@ -15,6 +15,7 @@ from django.test import SimpleTestCase
 
 from enrolment_api import eligibility_form as ef
 from enrolment_api import eligibility_invitation as ei
+from enrolment_api import eligibility_layout as el
 from enrolment_api.tests_eligibility_form import FakeCursor, URL, application, stub_lookup
 from learner_api.models import EnrolmentUser
 from login import services
@@ -38,17 +39,6 @@ def started(test, target, attribute, **kwargs):
     p = patch.object(target, attribute, **kwargs)
     test.addCleanup(p.stop)
     return p.start()
-
-
-class ManualReviewInvitationGuardTests(SimpleTestCase):
-    def test_every_manual_decision_blocks_accounts_and_mail_even_with_forged_automatic_approval(self):
-        with patch.object(ei, "has_account") as accounts, patch.object(EnrolmentUser.all_learners, "create") as create, patch.object(services, "invite_eligible_applicant") as mail:
-            for status in ("approved", "rejected", "more_evidence_required"):
-                outcome = ei.invite_applicant({**ROW, "review_status": status, "eligible": True, "assessment_status": "provisional_eligible"})
-                self.assertEqual(outcome, "notEligible" if status == "rejected" else "pendingAssessment")
-            accounts.assert_not_called()
-            create.assert_not_called()
-            mail.assert_not_called()
 
 
 class SubmitInvitesTests(SimpleTestCase):
@@ -274,11 +264,18 @@ class InviteEligibleApplicantTests(SimpleTestCase):
         self.account = SimpleNamespace(has_password=False, subject_type=SUBJECT_LEARNER)
         self.ensure = started(self, services, "ensure_account", return_value=(self.account, True))
         self.send = started(self, services, "send_invitation", return_value=(object(), True, None))
+        self.template = started(self, el, "activation_email_for_application", return_value="<p>{{greeting}} Welcome.</p>")
 
     def test_a_new_learner_account_is_sent_the_invitation(self):
         self.assertEqual(services.invite_eligible_applicant(self.learner, ip="ip", user_agent="ua"), (True, None))
         self.ensure.assert_called_once_with(SUBJECT_LEARNER, 812, subject=self.learner)
-        self.send.assert_called_once_with(self.account, invited_by="eligibility form", ip="ip", user_agent="ua")
+        self.send.assert_called_once_with(self.account, invited_by="eligibility form", ip="ip", user_agent="ua",
+                                          intro_html="<p>{{greeting}} Welcome.</p>")
+
+    def test_no_invitation_is_created_without_a_published_email(self):
+        self.template.return_value = None
+        self.assertEqual(services.invite_eligible_applicant(self.learner), (False, "activation-email-template-unavailable"))
+        self.send.assert_not_called()
 
     def test_an_existing_account_is_never_sent_a_set_password_link(self):
         self.ensure.return_value = (self.account, False)

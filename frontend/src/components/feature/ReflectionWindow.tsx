@@ -10,6 +10,7 @@ import {
 } from '@/api/reflectionSubmission';
 import { useReflectionAutosave } from './useReflectionAutosave';
 import { useManualTimeConfirmation } from '@/hooks/useManualTimeConfirmation';
+import { DatePickerField } from './DatePickerField';
 
 /** The saved reflection always stores hours; show it in the field's unit. */
 function savedActualTime(hours: string, inMinutes: boolean): string {
@@ -1181,12 +1182,7 @@ function ReflectionWindowForm({
               </Field>
               {timeInput()}
               <Field label="Date completed">
-                <input
-                  type="date"
-                  value={dateCompleted}
-                  onChange={event => setDateCompleted(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-foreground-200 bg-white px-3 text-sm focus:border-primary-400 focus:outline-none"
-                />
+                <DatePickerField label="Date completed" hideLabel value={dateCompleted} onChange={setDateCompleted} />
               </Field>
             </div>
             <fieldset className="mt-5">

@@ -630,6 +630,18 @@ class MailFallbackTests(SimpleTestCase):
 
 
 class MessageTemplateTests(SimpleTestCase):
+    def test_custom_invitation_content_keeps_activation_link_and_plain_text(self):
+        subject, html, text = email_azure.invitation_message(
+            display_name="Pat & Jones", link="https://host/set-password?token=T", expires_days=7,
+            intro_html="<h2>{{greeting}}</h2><p>Please activate your account.</p>",
+        )
+        self.assertIn("Hello Pat &amp; Jones,", html)
+        self.assertIn("Please activate your account.", html)
+        self.assertIn("Set your password", html)
+        self.assertIn("https://host/set-password?token=T", html)
+        self.assertIn("Please activate your account.", text)
+        self.assertIn("https://host/set-password?token=T", text)
+
     def test_invitation_message_carries_the_link(self):
         subject, html, text = email_azure.invitation_message(
             display_name="Pat Jones", link="https://host/set-password?token=T", expires_days=7

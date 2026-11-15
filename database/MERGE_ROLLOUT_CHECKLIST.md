@@ -26,13 +26,12 @@ Run each script as a separately reviewed transaction on the **verified target**,
 after a backup and successful rehearsal. These scripts are additive; existing
 answers, signatures, and application decisions are not rewritten.
 
-1. `eligibility_submission_fields.sql`, `eligibility_structured_addresses.sql`,
-   `eligibility_title.sql`. The submission script already adds
+1. `eligibility_submission_fields.sql`, `eligibility_structured_addresses.sql`.
+   The submission script already adds
    `expected_leaving_date`; `eligibility_expected_leaving_date.sql` is an
    idempotent standalone alternative, not an additional dependency.
 2. `eligibility_workplace_phase2a.sql`, then
-   `eligibility_workplace_phase2b.sql`, then
-   `eligibility_review_phase2c2a.sql`. The latter two depend on the earlier
+   `eligibility_workplace_phase2b.sql`. Phase 2B depends on the earlier
    workplace columns/statuses. Keep workplace preview disabled in live use.
 3. `eligibility_learner_links.sql`, after both `eligibility_form` and
    `"Created_users"` exist. This adds the provenance/invitation-recovery table;

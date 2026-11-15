@@ -38,7 +38,7 @@ function Harness({ enabled = true, legacy = false, staff = false, hasQualificati
     board: { programme: { name: 'Marketing Manager Level 6' } } as EnrolmentBoard,
     draft: { cvJob: cv, custom: { 'custom-cv-choice': 'Saved choice' } } as unknown as WizardDraft,
     setSection: (key, value) => { change(key, value); if (key === 'cvJob') setCv(value as CvJobForm); },
-    setCustom: change, layout, steps: layout.steps, completed: [], markComplete: vi.fn(),
+    setCustom: change, layout, layoutReady: true, steps: layout.steps, completed: [], markComplete: vi.fn(),
     saveIlr: vi.fn(), saveModules: vi.fn(), ilrSaving: false, ilrSavedAt: '', hydrated: true, ready: !suitability.loading,
     fileIlrDocument: vi.fn(), ilrFiling: false, inclusionCheck: { checking: false, error: null, refresh: vi.fn() },
   };

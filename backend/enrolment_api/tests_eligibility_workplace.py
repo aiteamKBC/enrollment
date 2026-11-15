@@ -33,7 +33,7 @@ class ReceiptCursor(FakeCursor):
                 self.result = (row["id"],)
         elif sql.startswith("SELECT"):
             row = self.rows.get(params[0])
-            self.result = (row["id"], row["eligible"], row["assessment_status"], row["submission_response"], row.get("review_status"), row.get("review_version")) if row else None
+            self.result = (row["id"], row["eligible"], row["assessment_status"], row["submission_response"]) if row else None
         elif sql.startswith("UPDATE"):
             row = next(row for row in self.rows.values() if row["id"] == params[1])
             row["submission_response"] = json.loads(params[0])
@@ -502,28 +502,6 @@ class WorkplacePreviewTests(SimpleTestCase):
         self.post(cursor=cursor, employerPostcode="ex34mp", workEmail="SAM@EMPLOYER.EXAMPLE")
         self.assertEqual(len(cursor.rows), 1)
         self.invite.assert_called_once()
-
-    def test_reviewed_submission_replays_current_decision_without_rewriting_receipt_or_inviting(self):
-        for status in ("approved", "rejected", "more_evidence_required"):
-            with self.subTest(status=status):
-                cursor = ReceiptCursor()
-                stored = self.seed_historical_pending(cursor, majorityHoursInEngland=False)
-                original_receipt = deepcopy(stored["submission_response"])
-                fingerprint = stored["submission_fingerprint"]
-                stored.update(review_status=status, review_version=1)
-                for _retry in range(2):
-                    response, data, _cursor, _row = self.post(cursor=cursor, majorityHoursInEngland=False,
-                        eligible=True, review_status="approved", reviewerId=999)
-                    self.assertEqual(response.status_code, 201)
-                    self.assertEqual(data["review"]["status"], status)
-                    self.assertEqual(data["outcome"], "notEligible" if status == "rejected" else ef.PENDING_OUTCOME)
-                    self.assertIs(data["eligible"], False if status == "rejected" else None)
-                self.assertEqual(stored["submission_response"], original_receipt)
-                self.assertEqual(stored["submission_fingerprint"], fingerprint)
-                self.assertEqual(stored["assessment_status"], ef.PENDING_ASSESSMENT)
-                self.assertIsNone(stored["eligible"])
-                self.assertEqual(len(cursor.rows), 1)
-        self.invite.assert_not_called()
 
     def test_invitation_technical_retry_reuses_the_original_record(self):
         cursor = ReceiptCursor()

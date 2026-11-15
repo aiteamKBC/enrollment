@@ -12,12 +12,13 @@ import {
   PAGE_TEXT_SLOTS,
   RETIRED_PUBLIC_ITEMS,
   REQUIRED_ADDRESS_FIELDS,
+  SCREENING_PROTECTED_FIELDS,
   WORKPLACE_FIELDS,
   builtinSection,
   isBuiltinQuestion,
   textFor,
 } from '@/pages/apprenticeship-application/layout/registry';
-import { builtinOptions, isLocked, itemLabel, resolveLayout, sectionDescription } from '@/pages/apprenticeship-application/layout/resolve';
+import { builtinOptions, isLocked, isRemovalProtected, itemLabel, resolveLayout, sectionDescription } from '@/pages/apprenticeship-application/layout/resolve';
 import { QUESTION_TYPES, type EligibilityItem, type EligibilityLayout, type EligibilitySection } from '@/pages/apprenticeship-application/layout/types';
 import { btnPrimary, btnSecondary, iconBtn, inputClass } from '../components/ui';
 import { TextEditor } from '../wizard-builder/TextEditor';
@@ -44,6 +45,7 @@ const enrolmentNav = roleNavMap.apprentice;
 
 /** The left-hand entry for the page heading, ahead of the sections. */
 const PAGE = '__page';
+const EMAIL = '__activation_email';
 
 const TYPE_LABEL: Record<string, string> = Object.fromEntries(QUESTION_TYPES.map((t) => [t.value, t.label]));
 
@@ -86,7 +88,7 @@ export default function EligibilityBuilderPage() {
         setVersion(res.version);
         setUpdatedAt(res.updatedAt ?? '');
         setUpdatedBy(res.updatedBy ?? '');
-        setSelected((cur) => (cur === PAGE || resolved.sections.some((s) => s.slug === cur) ? cur : resolved.sections[0]?.slug ?? PAGE));
+        setSelected((cur) => (cur === PAGE || cur === EMAIL || resolved.sections.some((s) => s.slug === cur) ? cur : resolved.sections[0]?.slug ?? PAGE));
       })
       .catch((e: Error) => { if (!cancelled) setLoadError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -117,9 +119,9 @@ export default function EligibilityBuilderPage() {
       setUpdatedAt(saved.updatedAt ?? '');
       setUpdatedBy(saved.updatedBy ?? '');
       // A new section's temporary slug is replaced by the server's.
-      setSelected((cur) => (cur === PAGE || resolved.sections.some((s) => s.slug === cur) ? cur : resolved.sections[resolved.sections.length - 1]?.slug ?? PAGE));
+      setSelected((cur) => (cur === PAGE || cur === EMAIL || resolved.sections.some((s) => s.slug === cur) ? cur : resolved.sections[resolved.sections.length - 1]?.slug ?? PAGE));
       setConfirming(false);
-      success('Eligibility form published', 'Applicants see the changes the next time they open the form.');
+      success('Eligibility form published', 'Form changes apply to new visitors; email changes apply to eligible applicants who submit this version.');
     } catch (e) {
       error('Could not publish the eligibility form', e instanceof Error ? e.message : 'Unexpected error');
     } finally {
@@ -134,7 +136,7 @@ export default function EligibilityBuilderPage() {
       <div className="admin-console-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6">
         <AdminPageHeader
           title="Apprenticeship eligibility form"
-          description="Add, remove, reorder and require the questions applicants answer on the public eligibility form, and edit their wording and answer lists. Published changes apply to everyone who opens the form afterwards."
+          description="Edit the public eligibility form and its eligible applicant activation email. Published changes apply to new form visitors and applicants who submit the new version."
           icon="ri-task-line"
           eyebrow="Enrolment"
           actions={
@@ -186,6 +188,8 @@ export default function EligibilityBuilderPage() {
               />
               {selected === PAGE ? (
                 <PageEditor layout={layout} edit={edit} />
+              ) : selected === EMAIL ? (
+                <ActivationEmailEditor layout={layout} edit={edit} />
               ) : (
                 section && (
                   <SectionEditor
@@ -246,6 +250,22 @@ function SectionList({
           </span>
         </button>
       </div>
+      <div className="border-b border-foreground-100 p-2">
+        <button
+          type="button"
+          onClick={() => onSelect(EMAIL)}
+          aria-current={selected === EMAIL ? 'step' : undefined}
+          className={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${selected === EMAIL ? 'bg-primary-50 text-primary-700' : 'text-foreground-700 hover:bg-background-100'}`}
+        >
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] ${selected === EMAIL ? 'border-primary-300 bg-primary-100' : 'border-foreground-200'}`}>
+            <AppIcon className="ri-mail-line text-[11px]" />
+          </span>
+          <span className="min-w-0">
+            <span className={`block truncate text-[12.5px] ${selected === EMAIL ? 'font-semibold' : 'font-medium'}`}>Activation email</span>
+            <span className="block text-[10.5px] text-foreground-400">Sent to eligible applicants</span>
+          </span>
+        </button>
+      </div>
       <ol className="space-y-0.5 p-2">
         {layout.sections.map((s, i) => {
           if (!s.hidden) number += 1;
@@ -297,6 +317,37 @@ function PageEditor({ layout, edit }: { layout: EligibilityLayout; edit: (fn: (l
   );
 }
 
+function ActivationEmailEditor({ layout, edit }: {
+  layout: EligibilityLayout;
+  edit: (fn: (l: EligibilityLayout) => EligibilityLayout) => void;
+}) {
+  const value = layout.activationEmailHtml ?? '';
+  const preview = value.replaceAll('{{greeting}}', 'Hello Learner,').replaceAll('{{start_text}}', 'Getting started is simple: set your password and log in.');
+  const setEmail = (html: string) => edit((current) => ({ ...current, activationEmailHtml: html }));
+  return (
+    <section aria-label="Activation email" className="min-w-0 flex-1 space-y-4 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 p-5 shadow-sm">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground-800">Eligible applicant activation email</h2>
+        <p className="mt-1 text-[12px] text-foreground-500">Edit the HTML content above the set password button. The subject, activation link, expiry information, booking step and footer remain in place.</p>
+      </div>
+      <label htmlFor="activation-email-html" className="block text-[12px] font-medium text-foreground-700">Email content (HTML)</label>
+      <textarea
+        id="activation-email-html"
+        className={`${inputClass} min-h-64 font-mono text-[12px]`}
+        value={value}
+        maxLength={40000}
+        spellCheck={false}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <p className="text-[11px] text-foreground-500">Use {'{{greeting}}'} and {'{{start_text}}'} for the learner greeting and relevant next step. A published HTML template is required before eligible applicants can be invited.</p>
+      <div>
+        <h3 className="mb-2 text-[12px] font-medium text-foreground-700">Preview of editable content</h3>
+        <iframe title="Activation email content preview" sandbox="" srcDoc={`<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;padding:16px;color:#241b35">${preview}</body></html>`} className="h-80 w-full rounded-xl border border-foreground-200 bg-white" />
+      </div>
+    </section>
+  );
+}
+
 function SectionEditor({
   layout,
   section,
@@ -314,8 +365,8 @@ function SectionEditor({
   const removed = section.items.filter((it) => it.hidden && !RETIRED_PUBLIC_ITEMS.has(it.key));
   const [showRemoved, setShowRemoved] = useState(false);
   const addRef = useRef<HTMLButtonElement>(null);
-  // Hiding this section would hide a question that identifies the applicant.
-  const holdsLocked = shown.some(isLocked);
+  // Hiding this section would hide identity or screening questions.
+  const holdsLocked = shown.some(isRemovalProtected);
 
   const saveQuestion = (draft: QuestionDraft) => {
     if (editing) {
@@ -327,7 +378,7 @@ function SectionEditor({
   };
 
   return (
-    <section aria-label={`${section.title || 'Untitled'} section`} className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
+    <section aria-label={`${section.title || 'Untitled'} section`} className="min-w-0 flex-1 rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
       <div className="grid gap-3 border-b border-foreground-100 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-end">
         <label className="min-w-[220px] text-[12px] font-medium text-foreground-600" htmlFor="eligibility-section-name">
           Section name
@@ -356,7 +407,7 @@ function SectionEditor({
             }}
           />
         </label>
-        {holdsLocked && <p className="text-[11px] text-foreground-400 sm:col-span-2"><AppIcon className="ri-lock-line mr-1 inline" />This section asks the questions that identify the applicant, so it is always shown.</p>}
+        {holdsLocked && <p className="text-[11px] text-foreground-400 sm:col-span-2"><AppIcon className="ri-lock-line mr-1 inline" />This section contains identity or screening questions, so it is always shown.</p>}
       </div>
       {section.hidden && (
         <p className="mx-5 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
@@ -405,7 +456,7 @@ function SectionEditor({
             <ul className="mt-2 space-y-1.5">
               {removed.map((item) => (
                 <li key={item.key} className="flex items-center justify-between gap-3 rounded-lg border border-foreground-100 px-3 py-2">
-                  <span className="min-w-0 truncate text-[12px] text-foreground-500">{itemLabel(layout, item)}</span>
+                  <span className="min-w-0 break-words text-[12px] text-foreground-500">{itemLabel(layout, item)}</span>
                   <button type="button" className="shrink-0 cursor-pointer text-[12px] font-medium text-primary-600 hover:underline" onClick={() => edit((l) => updateItem(l, item.key, { hidden: false }))}>
                     Restore
                   </button>
@@ -443,6 +494,8 @@ function ItemRow({
   const contentOnly = !item.builtin && (item.type === 'heading' || item.type === 'description');
   const label = itemLabel(layout, item);
   const locked = isLocked(item);
+  const removalProtected = isRemovalProtected(item);
+  const usedInScreening = Boolean(item.screeningRule || (item.builtin && SCREENING_PROTECTED_FIELDS.has(item.key)));
   const workplace = item.builtin && WORKPLACE_FIELDS.has(item.key);
   const addressRequired = item.builtin && REQUIRED_ADDRESS_FIELDS.has(item.key);
   const required = addressRequired || (workplace ? item.key === 'workplaceArrangement' : locked || (item.builtin ? item.required ?? question?.required ?? false : Boolean(item.required)));
@@ -452,37 +505,49 @@ function ItemRow({
   const otherSections = layout.sections.filter((s) => s.slug !== section.slug);
   const trigger = item.condition ? findItem(layout, item.condition.field) : question?.followUpOf ? findItem(layout, question.followUpOf.key) : undefined;
   const shownFor = item.condition?.values ?? (question?.followUpOf ? [question.followUpOf.value ? 'Yes' : 'No'] : []);
+  const conditionText = trigger && shownFor.length > 0 ? `Asked when “${itemLabel(layout, trigger)}” is ${shownFor.join(' / ')}` : '';
   const hint = question ? textFor(layout.texts, `${item.key}.hint`) : item.helpText;
   // Information is all wording, so it opens with its wording showing.
-  const [panel, setPanel] = useState<'wording' | 'answers' | null>(note ? 'wording' : null);
-  const wordingEdited = slots.some((s) => typeof layout.texts?.[s.key] === 'string' && textFor(layout.texts, s.key) !== s.default);
+  const [expanded, setExpanded] = useState(note);
+  const [showAnswers, setShowAnswers] = useState(false);
 
   const remove = () => {
     if (deps.length && !window.confirm(`${deps.length} question${deps.length === 1 ? '' : 's'} only asked for an answer to this question will stop being asked.\n\nRemove it from the form?`)) return;
     edit((l) => removeItem(l, item.key));
   };
 
-  const toggle = (which: 'wording' | 'answers') => setPanel((p) => (p === which ? null : which));
-
   return (
     <div className="rounded-xl border border-foreground-100 bg-background-50 px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-foreground-900">{label}</p>
-          {hint && !note && <p className="mt-0.5 truncate text-[12px] text-foreground-500">{hint}</p>}
+        <div className="min-w-0 flex-[1_1_16rem]">
+          <p className="break-words text-[13px] font-medium text-foreground-900">{label}</p>
+          {hint && !note && <p className="mt-0.5 break-words text-[12px] text-foreground-500">{hint}</p>}
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px]">
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {note ? 'Information' : item.builtin ? 'Standard question' : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
             {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
-            {locked && <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"><AppIcon className="ri-lock-line mr-0.5 inline" />Identifies the applicant — always asked</span>}
-            {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
-            {trigger && shownFor.length > 0 && (
-              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">
-                Asked when “{itemLabel(layout, trigger)}” is {shownFor.join(' / ')}
+            {removalProtected && (
+              <span
+                className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"
+                title={usedInScreening ? 'Used in screening — cannot remove' : locked ? 'Identifies the applicant — cannot remove' : 'Protected — cannot remove'}
+                role={usedInScreening ? undefined : 'img'}
+                aria-label={usedInScreening ? undefined : locked ? 'Identifies the applicant — cannot remove' : 'Protected — cannot remove'}
+              >
+                <AppIcon className={`ri-lock-line inline${usedInScreening ? ' mr-0.5' : ''}`} />
+                {usedInScreening && 'Used in screening'}
               </span>
             )}
-            {wordingEdited && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">Wording edited</span>}
+            {item.screeningRule && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Eligibility rule — {item.screeningRule.eligibleAnswers.join(' / ')} pass</span>}
+            {question?.postcode && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Postcode checked and located</span>}
+            {conditionText && (
+              <span className="group relative inline-flex cursor-help items-center rounded-full bg-sky-100 px-2 py-0.5 text-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500" tabIndex={0} role="img" aria-label={conditionText}>
+                <AppIcon className="ri-link" />
+                <span aria-hidden="true" className="pointer-events-none invisible absolute bottom-full left-0 z-20 mb-1 w-72 max-w-[80vw] rounded-lg bg-foreground-900 px-3 py-2 text-left text-[11px] leading-4 text-white shadow-lg group-hover:visible group-focus:visible">
+                  {conditionText}
+                </span>
+              </span>
+            )}
             {item.builtin && item.options && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">Answers edited</span>}
           </div>
         </div>
@@ -493,7 +558,7 @@ function ItemRow({
               type="checkbox"
               className="accent-primary-500"
               checked={required}
-              disabled={locked || workplace || addressRequired}
+              disabled={locked || workplace || addressRequired || Boolean(item.screeningRule)}
               onChange={(e) => edit((l) => updateItem(l, item.key, { required: e.target.checked }))}
             />
             Mandatory
@@ -502,13 +567,13 @@ function ItemRow({
         {otherSections.length > 0 && (
           <select
             aria-label={`Move ${label} to another section`}
-            className={`${inputClass} !w-auto shrink-0 cursor-pointer !py-1.5 text-[12px]`}
+            className={`${inputClass} !w-28 shrink-0 cursor-pointer !border-foreground-100 !bg-background-50/70 !px-2 !py-1 !text-[11px] !text-foreground-600`}
             value=""
             disabled={workplace}
             onChange={(e) => e.target.value && edit((l) => moveItemToSection(l, item.key, e.target.value))}
           >
-            <option value="">Move to section…</option>
-            {otherSections.map((s) => <option key={s.slug} value={s.slug}>{s.title || 'Untitled section'}{s.hidden ? ' (hidden)' : ''}</option>)}
+            <option value="">Move to…</option>
+            {otherSections.filter(s => !removalProtected || !s.hidden).map((s) => <option key={s.slug} value={s.slug}>{s.title || 'Untitled section'}{s.hidden ? ' (hidden)' : ''}</option>)}
           </select>
         )}
         <div className="flex shrink-0 items-center">
@@ -518,73 +583,59 @@ function ItemRow({
           <button type="button" className={iconBtn} disabled={last || workplace} aria-label={`Move ${label} down`} onClick={() => edit((l) => moveItem(l, section.slug, item.key, 1))}>
             <AppIcon className="ri-arrow-down-line" />
           </button>
-          {slots.length > 0 && (
+          {((item.builtin && (slots.length > 0 || list)) || !item.builtin) && (
             <button
               type="button"
-              className={`${iconBtn}${panel === 'wording' ? ' !bg-primary-50 !text-primary-700' : ''}`}
-              aria-label={`Edit wording of ${label}`}
-              aria-expanded={panel === 'wording'}
-              title="Edit wording"
-              onClick={() => toggle('wording')}
+              className={`${iconBtn}${item.builtin && expanded ? ' !bg-primary-50 !text-primary-700' : ''}`}
+              aria-label={`Edit ${label}`}
+              aria-expanded={item.builtin ? expanded : undefined}
+              onClick={item.builtin ? () => { setShowAnswers(false); setExpanded((open) => !open); } : onEdit}
             >
-              <AppIcon className="ri-edit-line" />
-            </button>
-          )}
-          {list && (
-            <button
-              type="button"
-              className={`${iconBtn}${panel === 'answers' ? ' !bg-primary-50 !text-primary-700' : ''}`}
-              aria-label={`Edit answers of ${label}`}
-              aria-expanded={panel === 'answers'}
-              title="Edit answers"
-              onClick={() => toggle('answers')}
-            >
-              <AppIcon className="ri-list-unordered" />
-            </button>
-          )}
-          {!item.builtin && (
-            <button type="button" className={iconBtn} aria-label={`Edit ${label}`} onClick={onEdit}>
               <AppIcon className="ri-pencil-line" />
             </button>
           )}
-          {!locked && !workplace && (
+          {!removalProtected && !workplace && (
             <button type="button" className={`${iconBtn} hover:!text-red-600`} aria-label={`Remove ${label}`} onClick={remove}>
               <AppIcon className="ri-delete-bin-line" />
             </button>
           )}
         </div>
       </div>
-      {panel === 'wording' && slots.length > 0 && (
-        <div className="mt-3 space-y-3 border-t border-foreground-100 pt-3">
+      {item.builtin && expanded && (
+        <div className="mt-3 space-y-4 border-t border-foreground-100 pt-3">
           {slots.map((slot) => (
             <TextEditor key={slot.key} slot={slot} texts={layout.texts} onChange={(v) => edit((l) => setText(l, slot.key, v))} />
           ))}
-        </div>
-      )}
-      {panel === 'answers' && list && question?.optionLabels && (
-        <p className="text-[12px] text-foreground-600">These verification choices are fixed: {Object.values(question.optionLabels).join(' ')}</p>
-      )}
-      {panel === 'answers' && list && question?.options && !question.optionLabels && (
-        <div className="mt-3 space-y-2 border-t border-foreground-100 pt-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[12px] font-medium text-foreground-600">Answers applicants choose from</p>
-            {item.options && (
-              <button type="button" className="cursor-pointer text-[11.5px] font-medium text-primary-600 hover:underline" onClick={() => edit((l) => updateItem(l, item.key, { options: undefined }))}>
-                Reset to standard answers
+          {list && (question?.optionLabels || question?.options) && (
+            <div className="space-y-2">
+              <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-primary-100 bg-primary-50/40 px-3 py-2 text-left text-[12px] font-medium text-foreground-700 transition-colors hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500" aria-expanded={showAnswers} onClick={() => setShowAnswers((open) => !open)}>
+                Answers applicants choose from
+                <AppIcon className={showAnswers ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} />
               </button>
-            )}
-          </div>
-          <OptionsEditor
-            options={list}
-            name={label}
-            showInvalid
-            onChange={(next) => {
-              const standard = question.options!;
-              const same = next.length === standard.length && next.every((o, i) => o === standard[i]);
-              edit((l) => updateItem(l, item.key, { options: same ? undefined : next }));
-            }}
-          />
-          <p className="text-[11px] text-foreground-400">Applications already submitted keep the answer they gave, even if it is no longer listed.</p>
+              {showAnswers && (question.optionLabels ? (
+                <p className="text-[12px] text-foreground-600">These verification choices are fixed: {Object.values(question.optionLabels).join(' ')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {item.options && (
+                    <button type="button" className="cursor-pointer text-[11.5px] font-medium text-primary-600 hover:underline" onClick={() => edit((l) => updateItem(l, item.key, { options: undefined }))}>
+                      Reset to standard answers
+                    </button>
+                  )}
+                  <OptionsEditor
+                    options={list}
+                    name={label}
+                    showInvalid
+                    onChange={(next) => {
+                      const standard = question.options!;
+                      const same = next.length === standard.length && next.every((o, i) => o === standard[i]);
+                      edit((l) => updateItem(l, item.key, { options: same ? undefined : next }));
+                    }}
+                  />
+                  <p className="text-[11px] text-foreground-400">Applications already submitted keep the answer they gave, even if it is no longer listed.</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import copy
 import hashlib
 import json
 from typing import Any
+from .programme_identity import find_structure_programme
 
 KEY = "programmeStructure"
 SCHEMA_VERSION = 2
@@ -151,10 +152,12 @@ def resolve_assigned_cohort(snapshot, programme_id, cohort_id):
     """
     if not programme_id or not cohort_id:
         return None
-    programme = next((p for p in snapshot.get("programmes", []) if p.get("id") == programme_id), None)
+    programme = find_structure_programme(snapshot, programme_id)
     if not programme:
         return None
-    return next((c for c in programme.get("cohorts", []) if c.get("id") == cohort_id and c.get("programmeId", programme_id) == programme_id), None)
+    matches = [c for c in programme.get('cohorts', []) if c.get('id') == cohort_id
+               and c.get('programmeId', programme['id']) == programme['id']]
+    return matches[0] if len(matches) == 1 else None
 
 
 def learner_published_layout(kind, learner_id, *, module_version=None):

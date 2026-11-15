@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useToast } from "@/hooks/useToast.helpers";
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { reviewHandoverMessage } from '@/api/reviewHandover';
 import { fetchProgrammes, fetchCohorts, fetchGroups } from '@/api/curriculum';
 import { fetchCaseOwners } from '@/api/staffUsers';
@@ -658,6 +659,8 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
               onChange={(e) => setField(field.name, e.target.value)}
               className={inputClass}
             />
+          ) : field.type === 'date' ? (
+            <DatePickerField label={field.label} hideLabel inputId={`cu-${field.name}`} value={value} onChange={next => setField(field.name, next)} required={field.required} />
           ) : (
             <input
               id={`cu-${field.name}`}

@@ -125,15 +125,6 @@ class EligibilityApplicationsTests(SimpleTestCase):
             self.get({"status": status})
             self.assertEqual(self.cursor.executed[-1][1], [status, 25, 0])
 
-    def test_staff_decision_filters_and_pending_queue_are_separate_from_screening_status(self):
-        self.get()
-        self.assertIn("NOT IN ('approved', 'rejected')", self.cursor.executed[-1][0])
-        for status in ("approved", "rejected", "more_evidence_required"):
-            self.get({"status": status})
-            sql, params = self.cursor.executed[-1]
-            self.assertIn("to_jsonb(a)->>'review_status' = %s", sql)
-            self.assertEqual(params, [status, 25, 0])
-
     def test_search_and_pagination_are_bounded_parameterised_and_stably_ordered(self):
         self.cursor = ReadCursor([json.dumps(PENDING)], total=60)
         query = "sam%' OR 1=1 --"
@@ -156,7 +147,8 @@ class EligibilityApplicationsTests(SimpleTestCase):
         self.assertEqual(data, {"applications": [], "total": 0, "page": 1, "pageSize": 25})
 
     def test_invalid_filters_do_not_reach_persistence(self):
-        for query in ({"status": "retryLater"}, {"status": "pendingAssessment"}, {"search": "x" * 201},
+        for query in ({"status": "retryLater"}, {"status": "pendingAssessment"},
+                      {"status": "approved"}, {"status": "rejected"}, {"search": "x" * 201},
                       {"page": "0"}, {"page": "-1"}, {"page": "1.5"}, {"page": "1000001"},
                       {"pageSize": "101"}, {"pageSize": "no"}, {"page": "²"}):
             response, _data = self.get(query)

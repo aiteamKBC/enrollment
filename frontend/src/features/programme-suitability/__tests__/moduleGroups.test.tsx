@@ -1,3 +1,4 @@
+import { editorGroup } from './adminTestHelpers';
 import { useState } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -67,12 +68,12 @@ it('edits group metadata and child fields independently, saves/reloads a private
   const view = render(<Admin />);
   await userEvent.selectOptions(screen.getByLabelText('Programme'), 'PCP_L6');
   await userEvent.selectOptions(screen.getByLabelText('PCP pathway'), 'chartered');
-  const parent = screen.getByRole('group', { name: `Edit group ${group.title}` });
+  const parent = editorGroup({ name: `Edit group ${group.title}` });
   const ownLabels = Array.from(parent.querySelectorAll('label')).filter((label) => label.querySelector('input,textarea,select')?.closest('fieldset') === parent).map((label) => label.textContent);
   expect(ownLabels).toEqual(['Group name', 'Display order', 'Active group', 'Description']);
   const name = within(parent).getByLabelText('Group name');
   await userEvent.clear(name); await userEvent.type(name, 'Renamed PMO group');
-  const child = within(screen.getByRole('group', { name: `Edit module ${group.items![0].title}` }));
+  const child = within(editorGroup({ name: `Edit module ${group.items![0].title}` }));
   await userEvent.type(child.getByLabelText('Sessions'), '8');
   await userEvent.clear(child.getByLabelText('Module name')); await userEvent.type(child.getByLabelText('Module name'), 'Renamed child');
   expect(child.getByLabelText('Credits')).toHaveValue(1);

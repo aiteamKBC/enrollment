@@ -9,6 +9,7 @@ PROGRAMMES = {"ME_L4": ("marketing", 4), "MM_L6": ("marketing", 6),
               "APM_L4": ("project-controls", 4), "PCP_L6": ("project-controls", 6)}
 PATHWAYS = {"marketing", "project-controls"}
 KEY = "programmeSuitability"
+GENERAL_WEIGHTED_POLICY = "GENERAL_WEIGHTED_V1"
 
 
 class ConfigurationError(ValueError):
@@ -16,7 +17,9 @@ class ConfigurationError(ValueError):
 
 
 def defaults():
-    return json.loads(Path(__file__).with_name("seed.json").read_text(encoding="utf-8"))
+    config = json.loads(Path(__file__).with_name("seed.json").read_text(encoding="utf-8"))
+    config["scoringPolicy"] = GENERAL_WEIGHTED_POLICY
+    return config
 
 
 def number(value, label, minimum=0, maximum=100, integer=False):
@@ -51,6 +54,10 @@ def validate(raw):
     config = copy.deepcopy(raw)
     if type(config.get("schemaVersion")) is not int or config["schemaVersion"] != 1:
         raise ConfigurationError("Unsupported suitability configuration version.")
+    policy = config.get("scoringPolicy")
+    if policy is not None and policy != GENERAL_WEIGHTED_POLICY:
+        raise ConfigurationError("Unsupported suitability scoring policy.")
+    legacy_critical = policy is None
     flag(config, "enabled")
     text(config.get("introduction"), "Assessment introduction", 4000)
     programmes = config.get("programmes")
@@ -83,9 +90,10 @@ def validate(raw):
         raise ConfigurationError("Scoring rules are required.")
     for key in ("minimumScore", "minimumDifference", "minimumCoverage", "mixedQuestionThreshold"):
         number(rules.get(key), key, 0, 100)
-    number(rules.get("minimumCriticalIndicators"), "Minimum critical indicators", 0, 100, True)
-    for key in ("criticalStrength", "mixedAffinityThreshold"):
-        number(rules.get(key), key, 0.01, 1)
+    number(rules.get("mixedAffinityThreshold"), "mixedAffinityThreshold", 0.01, 1)
+    if legacy_critical:
+        number(rules.get("minimumCriticalIndicators"), "Minimum critical indicators", 0, 100, True)
+        number(rules.get("criticalStrength"), "criticalStrength", 0.01, 1)
     questions = config.get("questions")
     if not isinstance(questions, list) or len(questions) > 100:
         raise ConfigurationError("The assessment supports at most 100 questions.")
@@ -103,14 +111,14 @@ def validate(raw):
         pathway = q.get("pathway")
         if not isinstance(pathway, str) or pathway not in PATHWAYS:
             raise ConfigurationError("Unknown question pathway.")
-        for key in ("active", "required", "multiple", "critical"):
+        for key in ("active", "required", "multiple") + (("critical",) if legacy_critical else ()):
             flag(q, key)
         text(q.get("title"), "Question title", 300)
         text(q.get("description"), "Question description", 3000)
         number(q.get("weight"), "Question weight", 0.01, 1000)
         number(q.get("order"), "Question order", 0, 10000, True)
         target = q.get("criticalProgramme")
-        if q["critical"] and (not isinstance(target, str) or target not in PROGRAMMES or PROGRAMMES[target] != (pathway, 6)):
+        if legacy_critical and q["critical"] and (not isinstance(target, str) or target not in PROGRAMMES or PROGRAMMES[target] != (pathway, 6)):
             raise ConfigurationError("A critical indicator must target its pathway's Level 6 programme.")
         answers = q.get("answers")
         if not isinstance(answers, list) or not 1 <= len(answers) <= 30:
@@ -145,11 +153,26 @@ def validate(raw):
     return config
 
 
+def publication_configuration(raw):
+    """Activate the current policy only in a draft preview or a new publication.
+
+    validate() and saved assessment snapshots never upgrade a historical policy.
+    Retired fields remain untouched in JSON for older configuration consumers.
+    """
+    if not isinstance(raw, dict):
+        raise ConfigurationError("Programme suitability configuration must be an object.")
+    if raw.get("scoringPolicy") not in (None, GENERAL_WEIGHTED_POLICY):
+        raise ConfigurationError("Unsupported suitability scoring policy.")
+    config = copy.deepcopy(raw)
+    config["scoringPolicy"] = GENERAL_WEIGHTED_POLICY
+    return validate(config)
+
+
 def integrate_layout(raw, previous, layout):
     """One publication transaction and version, owned by the existing wizard."""
     value = raw.get(KEY) if raw.get(KEY) is not None else (previous or {}).get(KEY)
     if value is not None:
-        layout[KEY] = validate(value)
+        layout[KEY] = publication_configuration(value)
 
 
 def learner_configuration(config):

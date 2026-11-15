@@ -1,7 +1,6 @@
 from django.urls import include, path
 from .pending_signatures import pending_signatures
-from . import eligibility_applications, eligibility_review, programme_structure_views
-
+from . import eligibility_applications, eligibility_exception, programme_structure_views
 from . import bksb, cv_job_documents, documents, eligibility_form, eligibility_layout, extended_ilr, ilr_eligibility_evidence, ilr_employer_details, ilr_learner_record, plr_evidence, policy_documents, postcode_lookup, views, wizard_bootstrap, wizard_custom_uploads, wizard_inclusion, wizard_layout
 
 urlpatterns = [
@@ -11,7 +10,7 @@ urlpatterns = [
     # Saved applications: enrolment staff only; strictly read-only.
     path('eligibility-applications/', eligibility_applications.eligibility_applications, name='eligibility-applications'),
     path('eligibility-applications/<int:application_id>/', eligibility_applications.eligibility_application_detail, name='eligibility-application-detail'),
-    path('eligibility-applications/<int:application_id>/reviews/', eligibility_review.application_reviews, name='eligibility-application-reviews'),
+    path('eligibility-applications/<int:application_id>/exception/', eligibility_exception.eligibility_exception, name='eligibility-application-exception'),
     path('skills-radar/', include('enrolment_api.skills_radar.urls')),
     path('programme-structure/validate/', programme_structure_views.programme_structure_validate, name='programme-structure-validate'),
     path('programme-structure/preview/', programme_structure_views.programme_structure_preview, name='programme-structure-preview'),
@@ -54,10 +53,11 @@ urlpatterns = [
     path('wizard/<str:kind>/<int:learner_id>/initial-assessments/bksb-account/', bksb.auto_login_account, name='wizard-bksb-auto-login'),
     path('wizard/<str:kind>/<int:learner_id>/initial-assessments/<str:subject>/launch/', bksb.launch_initial_assessment, name='wizard-initial-assessment-launch'),
     path('wizard-layout/', wizard_layout.wizard_layout, name='wizard-layout'),
-    path('wizard-layout/<str:kind>/<int:learner_id>/', wizard_layout.wizard_layout, name='wizard-layout-learner'),
     path('wizard-layout/publish/', wizard_layout.publish_wizard_layout, name='wizard-layout-publish'),
     path('wizard-layout/versions/', wizard_layout.wizard_layout_versions, name='wizard-layout-versions'),
+    path('wizard-layout/versions/<int:version>/', wizard_layout.wizard_layout_version, name='wizard-layout-version'),
     path('wizard-layout/assignments/', wizard_layout.assign_wizard_layout, name='wizard-layout-assignments'),
+    path('wizard-layout/<str:kind>/<int:learner_id>/', wizard_layout.wizard_layout, name='wizard-layout-learner'),
     # Files on the builder's custom upload fields (Azure-backed, path in the field's own column)
     path('wizard/<str:kind>/<int:learner_id>/custom-uploads/<str:field_key>/', wizard_custom_uploads.custom_uploads, name='wizard-custom-uploads'),
     path('wizard/<str:kind>/<int:learner_id>/custom-uploads/<str:field_key>/<uuid:file_id>/', wizard_custom_uploads.delete_custom_upload, name='wizard-custom-upload-delete'),

@@ -26,6 +26,39 @@ function stable(pdf: jsPDF) {
 }
 
 describe('original document output and versioned rendering', () => {
+  it('renders an available Training Plan R3 with its revised wording and partial fresh signatures', () => {
+    const value = payloadFor('training-plan', true);
+    value.template.legacyEquivalent = false;
+    value.data.documentRevision = { number: 3, signatureMethod: 'sign-again' };
+    value.data.fullySigned = false;
+    value.data.signatures.provider = { signed: true, name: 'R3 Provider Only', signedAt: '2030-01-02T10:00:00Z' };
+    value.data.signatures.apprentice = { signed: false, name: '', signedAt: null };
+    value.data.signatures.employer = { signed: false, name: '', signedAt: null };
+    const before = structuredClone(value);
+    const pdf = renderTrainingPlanPdf(value.data as any);
+    expect(pdf.output()).toContain('R3 Provider Only');
+    expect(pdf.output()).toContain('Approved changed wording for SYNTHETIC Learner.');
+    expect(pdf.output('blob').type).toBe('application/pdf');
+    expect(value).toEqual(before);
+  });
+  it.each(['apprenticeship-agreement', 'ilr', 'training-plan', 'written-agreement'] as const)('%s signed legacy snapshot keeps the original renderer, values and signature marks', key => {
+    const { data } = payloadFor(key);
+    const mark = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAAAyCAIAAABUA0cyAAAB2UlEQVR4nO2a247DIAxE41X//5eptKgRSgKYq53RnIcqahNiPIxx2koI4SC4/FkHQNZCgcGhwOBQYHAoMDgUGBwKDA4FBocCg0OBwaHA4FBgcCgwOJ/uK0UkHvD3KEAHn+pejglUiaZ3MQWOlo3qxleaGL/JatJYfhymyH8A5mH4Eji1b+Q8VmbKSUIlUddJSH4d/LrNWFw+AqxYZ9I0w7t99Z+m55yY5Fdu6moiXx1Mlb7w+p+Dc4hkF02aWauqKHnvFiJfFEMuksdLChkrjNAwpSaDPp52GcHEN5K56YainSo08S7ldTnZwQVremhkJL+kFhWVDVtSxXLKWza57X7yoz8GHdxaUUXh0SlFxUOf0ebgvmnfBZg11TOD+lRKSwXu2Ixdibq2yUrLXczUxNJXbpFym5yo1b1ErgxGObgJ2ml0RF+df0fZ11vw/maY1E4u6pXe5OBI6t2RRHQMcjlTGktujDy96hVm7RHY8BuAiY8uYaCPGx/ElsrSHhe47B7Dp9Iq2773MHPwFPt2t6PmyQ3WAXjfg1vxIy0SHw+7L6XFdzBdu1XgnfaltEtBaBRJAf7xHRwKDA4FBocCg0OBwaHA4FBgcCgwOBQYHAoMDgUGhwIf2HwBUvYjiNlMxu4AAAAASUVORK5CYII=';
+    data.particulars.apprenticeName = 'Saved original learner';
+    data.learnerDetails.givenNames = 'Saved original'; data.learnerDetails.familyName = 'learner';
+    data.programme.apprenticeName = 'Saved original learner';
+    for (const party of Object.keys(data.signatures)) {
+      data.signatures[party] = { ...data.signatures[party], signed: true, name: 'Saved historical signer', signedAt: '2030-01-02T10:00:00Z' };
+      data.marks[party] = mark;
+    }
+    data.documentRevision = { number: 1, signatureMethod: 'original' };
+    const before = structuredClone(data);
+    const output = stable(render(key, data));
+    expect(output).toBe(stable(render(key, { ...data, template: undefined })));
+    expect(output).toContain('Saved historical signer');
+    expect(output).toContain('/Subtype /Image');
+    expect(data).toEqual(before);
+  });
   it.each(keys)('%s unchanged publication exactly retains the original PDF', (key) => {
     const { data } = payloadFor(key);
     expect(stable(render(key, data))).toBe(stable(render(key, { ...data, template: undefined })));

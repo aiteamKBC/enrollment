@@ -17,8 +17,23 @@ const swap = <T,>(list: T[], from: number, to: number): T[] => {
 };
 
 export function moveStep(layout: WizardLayout, slug: string, delta: -1 | 1): WizardLayout {
-  const i = layout.steps.findIndex((s) => s.slug === slug);
-  return i === -1 ? layout : { ...layout, steps: swap(layout.steps, i, i + delta) };
+  const shown = layout.steps.map((step, index) => ({ step, index })).filter(({ step }) => !step.hidden);
+  const position = shown.findIndex(({ step }) => step.slug === slug);
+  const target = shown[position + delta];
+  return position < 0 || !target ? layout : { ...layout, steps: swap(layout.steps, shown[position].index, target.index) };
+}
+
+export function canRemoveStep(layout: WizardLayout, slug: string): boolean {
+  return slug !== 'ilr-details' && slug !== 'skills-radar'
+    && !(slug === 'programme-suitability' && layout.programmeSuitability?.enabled);
+}
+
+export function removeStep(layout: WizardLayout, slug: string): WizardLayout {
+  return canRemoveStep(layout, slug) ? updateStep(layout, slug, { hidden: true }) : layout;
+}
+
+export function restoreStep(layout: WizardLayout, slug: string): WizardLayout {
+  return updateStep(layout, slug, { hidden: false });
 }
 
 export function updateStep(layout: WizardLayout, slug: string, patch: Partial<LayoutStep>): WizardLayout {

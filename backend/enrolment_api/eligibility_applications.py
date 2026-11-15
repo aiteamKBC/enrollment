@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 LIST_COLUMNS = (
     "id", "first_name", "surname", "work_email", "submitted_at", "employer_name",
     "employer_postcode", "main_workplace_postcode", "workplace_arrangement",
-    "assessment_status", "assessment_reason", "review_status", "review_version",
+    "assessment_status", "assessment_reason",
 )
 DETAIL_COLUMNS = tuple(dict.fromkeys(
     LIST_COLUMNS + form.COLUMNS + form.LOCATION_COLUMNS + form.WORKPLACE_COLUMNS
     + ("layout_version", "eligible", "ineligible_reason")
 ))
-STATUSES = (form.PENDING_ASSESSMENT, form.PROVISIONAL_ELIGIBLE, form.NOT_ELIGIBLE, "legacy", "all", "approved", "rejected", "more_evidence_required")
+STATUSES = (form.PENDING_ASSESSMENT, form.PROVISIONAL_ELIGIBLE, form.NOT_ELIGIBLE, "legacy", "all")
 STATUS_SQL = "to_jsonb(a)->>'assessment_status'"
 UNAVAILABLE = "Eligibility applications could not be loaded. Please try again."
 
@@ -74,14 +74,9 @@ def eligibility_applications(request):
     clauses, params = [], []
     if status == "legacy":
         clauses.append(f"{STATUS_SQL} IS NULL")
-    elif status in ("approved", "rejected", "more_evidence_required"):
-        clauses.append("to_jsonb(a)->>'review_status' = %s")
-        params.append(status)
     elif status != "all":
         clauses.append(f"{STATUS_SQL} = %s")
         params.append(status)
-        if status == form.PENDING_ASSESSMENT:
-            clauses.append("COALESCE(to_jsonb(a)->>'review_status', '') NOT IN ('approved', 'rejected')")
     if search:
         # Literal, case-insensitive substring search: % and _ are not wildcards.
         clauses.append("strpos(lower(concat_ws(' ', a.first_name, a.surname, a.work_email, "

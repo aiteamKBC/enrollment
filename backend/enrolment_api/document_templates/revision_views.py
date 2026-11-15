@@ -154,6 +154,8 @@ def sign_revision(request, pk, identifier):
         revision = document_revision(request, pk, identifier, lock=True)
         if revision is None: return error('Not found.', 404)
         if revision.state != 'finalized' or revision.signature_method != 'sign-again': raise TemplateError('This copy does not request new signatures.')
+        if Revision.objects.filter(issue_id=revision.issue_id, state='finalized', number__gt=revision.number).exists():
+            raise TemplateError('This historical document is locked. Sign the latest issued revision instead.')
         current = revisions.payload(revision); key = revision.issue.document_key
         if revisions.independently_signed(key, current): raise TemplateError('This fully signed revision is locked.')
         account = getattr(request, 'login_account', None)

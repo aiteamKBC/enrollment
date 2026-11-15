@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '@/pages/users/components/Modal';
+import { DatePickerField } from '@/components/feature/DatePickerField';
 import { naiveLocalFromUtc } from "./createCalendarForm.helpers";
 import { getCalendarTimeZone, zonedNaiveToUtcIso } from '../module-builder/moduleAuthoringData';
 import { calendarAction, type ActionReview, type ActionResult } from './calendarActions';
@@ -214,7 +215,10 @@ export function CalendarActionDialog({ target, onClose, onChanged }: {
             const changed = changedDrafts.includes(draft);
             return <div key={row.session_number} className={`grid gap-2 rounded-lg border p-3 sm:grid-cols-[80px_1fr_130px] ${changed ? 'border-primary-300 bg-primary-50' : ''}`}>
               <strong className="text-sm">Session {draft.sessionNumber}{changed && <span className="block text-[11px] font-bold text-primary-700">Changed</span>}</strong>
-              <input aria-label={`Session ${draft.sessionNumber} date and time`} type="datetime-local" value={draft.localStart} onChange={event => setDrafts(current => current.map((item, i) => i === index ? { ...item, localStart: event.target.value } : item))} className="rounded border px-2 py-1 text-sm" />
+              <div className="flex min-w-0 flex-wrap gap-2">
+                <DatePickerField label={`Session ${draft.sessionNumber} date`} hideLabel value={draft.localStart.split('T')[0]} onChange={value => setDrafts(current => current.map((item, i) => i === index ? { ...item, localStart: `${value}T${item.localStart.split('T')[1] || '00:00'}` } : item))} className="min-w-36 flex-1" />
+                <input aria-label={`Session ${draft.sessionNumber} time`} type="time" value={draft.localStart.split('T')[1]?.slice(0, 5) || ''} onChange={event => setDrafts(current => current.map((item, i) => i === index ? { ...item, localStart: `${item.localStart.split('T')[0]}T${event.target.value}` } : item))} className="rounded border px-2 py-1 text-sm" />
+              </div>
               <label className="text-xs">Minutes<input aria-label={`Session ${draft.sessionNumber} duration`} type="number" min={15} max={1440} value={draft.durationMinutes} onChange={event => setDrafts(current => current.map((item, i) => i === index ? { ...item, durationMinutes: Number(event.target.value) } : item))} className="w-full rounded border px-2 py-1 text-sm" /></label>
             </div>;
           })}

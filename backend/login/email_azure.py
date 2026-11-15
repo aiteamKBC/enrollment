@@ -480,7 +480,20 @@ def _optional_move_box():
                     </table>"""
 
 
-def invitation_message(*, display_name, link, expires_days, booking_owner=None, booking_link=None):
+def generic_invitation_intro_html():
+    """Content for account invitations unrelated to public eligibility."""
+    paragraph = f'<p style="margin:0 0 10px;font-size:15px;line-height:1.6;color:{_LEARNER_TEXT};">'
+    return (
+        f'{paragraph}{{{{greeting}}}}</p>'
+        f'{paragraph}{escape(_INVITE_READY)}</p>'
+        f'{paragraph}{{{{start_text}}}}</p>'
+        f'{paragraph}{escape(_INVITE_PURPOSE)}</p>'
+        f'{_optional_move_box()}'
+        f'{_benefits_box()}'
+    )
+
+
+def invitation_message(*, display_name, link, expires_days, booking_owner=None, booking_link=None, intro_html=None):
     """The account invitation. ``booking_owner``/``booking_link`` add the
     one-to-one LMS introduction as a second step; both are needed, so a
     half-known case owner simply leaves it out.
@@ -492,7 +505,7 @@ def invitation_message(*, display_name, link, expires_days, booking_owner=None, 
     subject = f"Your {_BRAND} account — set your password"
     booking = bool(booking_owner and booking_link)
     start = _INVITE_START_WITH_BOOKING if booking else _INVITE_START
-    paragraph = f'<p style="margin:0 0 10px;font-size:15px;line-height:1.6;color:{_LEARNER_TEXT};">'
+    intro = (intro_html or generic_invitation_intro_html()).replace("{{greeting}}", escape(greeting)).replace("{{start_text}}", escape(start))
     safe_link = escape(link, quote=True)
     steps = _invitation_step(
         1 if booking else None, "Set your password",
@@ -545,12 +558,7 @@ def invitation_message(*, display_name, link, expires_days, booking_owner=None, 
             </tr>
             <tr>
               <td style="padding:28px 32px 20px;">
-                {paragraph}{escape(greeting)}</p>
-                {paragraph}{escape(_INVITE_READY)}</p>
-                {paragraph}{escape(start)}</p>
-                {paragraph}{escape(_INVITE_PURPOSE)}</p>
-                {_optional_move_box()}
-                {_benefits_box()}
+                {intro}
               </td>
             </tr>{steps}
             <tr>
@@ -577,19 +585,31 @@ def invitation_message(*, display_name, link, expires_days, booking_owner=None, 
     </table>
   </body>
 </html>"""
-    text = (
-        f"{greeting}\n{_INVITE_READY}\n{start}\n{_INVITE_PURPOSE}\n"
-        f"{_OPTIONAL_MOVE_TITLE}\n{_OPTIONAL_MOVE}\n"
-        f"{_PLATFORM_BENEFITS_TITLE.upper()}\n"
-        + "".join(f"✓ {title}\n{detail}\n" for title, detail in _PLATFORM_BENEFITS)
-        + f"\n{'Step 1 - ' if booking else ''}Set your password:\n{link}\n"
-        f"This link can be used once and expires in {expires_days} days.\n"
-    )
-    if booking:
-        text += (
-            f"\nStep 2 - Book a one-to-one LMS introduction with your case owner, {booking_owner}:\n"
-            f"{booking_link}\n"
+    if intro_html:
+        import re
+        from html import unescape
+        from django.utils.html import strip_tags
+
+        readable = re.sub(r"(?i)</(?:p|div|tr|table|h[1-6])>|<br\s*/?>", "\n", intro)
+        text = unescape(strip_tags(readable)).strip() + (
+            f"\n\nSet your password:\n{link}\nThis link can be used once and expires in {expires_days} days.\n"
         )
+        if booking:
+            text += f"\nBook your LMS introduction with {booking_owner}:\n{booking_link}\n"
+    else:
+        text = (
+            f"{greeting}\n{_INVITE_READY}\n{start}\n{_INVITE_PURPOSE}\n"
+            f"{_OPTIONAL_MOVE_TITLE}\n{_OPTIONAL_MOVE}\n"
+            f"{_PLATFORM_BENEFITS_TITLE.upper()}\n"
+            + "".join(f"✓ {title}\n{detail}\n" for title, detail in _PLATFORM_BENEFITS)
+            + f"\n{'Step 1 - ' if booking else ''}Set your password:\n{link}\n"
+            f"This link can be used once and expires in {expires_days} days.\n"
+        )
+        if booking:
+            text += (
+                f"\nStep 2 - Book a one-to-one LMS introduction with your case owner, {booking_owner}:\n"
+                f"{booking_link}\n"
+            )
     return subject, html, text
 
 

@@ -9,6 +9,8 @@ import { AppIcon } from '@/components/feature/AppIcon';
 import { POLICY_DOCS_KBC } from '@/mocks/enrolment-console';
 import { WIZARD_STEPS, type WizardDraft } from '../../types';
 import { missingForStep } from '../validation';
+import { LearnerEnrolmentVisualContext } from '@/features/learner-enrolment/enrolmentPresentation';
+import { StepErrorsContext } from '../stepErrors.helpers';
 
 const wizard = vi.hoisted(() => ({ acknowledged: {} as Record<string, boolean>, setSection: vi.fn() }));
 vi.mock("../WizardContext.helpers", () => ({
@@ -28,6 +30,45 @@ beforeEach(() => {
 });
 
 describe('Policies step', () => {
+  const learner = (show = false) => <LearnerEnrolmentVisualContext.Provider value={true}><StepErrorsContext.Provider value={{ show, missing: show ? missing(wizard.acknowledged) : [] }}><Policies /></StepErrorsContext.Provider></LearnerEnrolmentVisualContext.Provider>;
+
+  it('keeps every learner policy name, URL, order and acknowledgement statement unchanged', () => {
+    render(learner());
+    expect(screen.getByRole('heading', { name: 'Documents' })).toBeInTheDocument();
+    const links = screen.getAllByRole('link');
+    expect(links.map(link => link.textContent)).toEqual(POLICY_DOCS_KBC.map(doc => doc.label));
+    links.forEach((link, index) => {
+      expect(link).toHaveAttribute('href', POLICY_DOCS_KBC[index].url);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+    expect(screen.getAllByRole('checkbox', { name: 'I have read and understood this document' })).toHaveLength(POLICY_DOCS_KBC.length);
+    expect(screen.getAllByRole('checkbox').every(box => !(box as HTMLInputElement).checked)).toBe(true);
+    expect(wizard.setSection).not.toHaveBeenCalled();
+  });
+
+  it('preserves saved ticks, updates only the selected document, and derives the learner counter from real values', async () => {
+    const [first, second, third] = POLICY_DOCS_KBC;
+    wizard.acknowledged = { [first.id]: true, [second.id]: true };
+    const view = render(learner());
+    expect(screen.getByText(`2 of ${POLICY_DOCS_KBC.length} acknowledged`)).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox').filter(box => (box as HTMLInputElement).checked)).toHaveLength(2);
+    const row = screen.getByRole('link', { name: third.label }).parentElement!;
+    await userEvent.click(within(row).getByRole('checkbox'));
+    expect(wizard.setSection).toHaveBeenCalledWith('policies', { acknowledged: { [first.id]: true, [second.id]: true, [third.id]: true } });
+    wizard.acknowledged = Object.fromEntries(POLICY_DOCS_KBC.map(doc => [doc.id, true]));
+    view.rerender(learner());
+    expect(screen.getByText(`${POLICY_DOCS_KBC.length} of ${POLICY_DOCS_KBC.length} acknowledged`)).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox').every(box => (box as HTMLInputElement).checked)).toBe(true);
+  });
+
+  it('retains validation highlights only on outstanding learner acknowledgements', () => {
+    wizard.acknowledged = { [POLICY_DOCS_KBC[0].id]: true };
+    render(learner(true));
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes[0]).not.toHaveAttribute('aria-invalid');
+    boxes.slice(1).forEach(box => expect(box).toHaveAttribute('aria-invalid', 'true'));
+  });
   it('lists every KBC policy, opening each from storage in a new tab', () => {
     render(<Policies />);
 
