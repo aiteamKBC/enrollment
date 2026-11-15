@@ -1,4 +1,5 @@
 export type DocumentKey = 'apprenticeship-agreement' | 'ilr' | 'training-plan' | 'written-agreement' | 'review-eligibility' | 'review-rpl' | 'review-health-safety' | 'review-uln';
+export type DynamicDocumentKey = 'suitability-rpl-report';
 export type ProgrammeId = 'PCP_L6' | 'MM_L6' | 'ME_L4' | 'APM_L4';
 import type { CustomFieldType, LayoutCondition } from '@/pages/users/wizard/layout/types';
 export interface DocumentQuestion {
@@ -38,8 +39,9 @@ export interface IssuedTemplate extends TemplateVersion {
   fields: Record<string, string | number | boolean | null>; issueId?: string; legacy?: boolean;
 }
 export interface TemplateListItem {
-  templateId: string; documentKey: DocumentKey; title: string; category: 'Compliance' | 'Review'; programmes: ProgrammeId[];
+  templateId: string; documentKey: DocumentKey | DynamicDocumentKey; title: string; fullTitle?: string; category: 'Compliance' | 'Review'; programmes: ProgrammeId[];
   publishedVersion: TemplateVersion | null; draft: { revision: number; updatedAt: string; updatedBy: string } | null; updatedAt: string | null;
+  dynamic?: boolean;
 }
 export interface TemplateIndex { results: TemplateListItem[]; programmes: Record<ProgrammeId, string>; setupRequired: boolean }
 export interface TemplateDetail { published: TemplateVersion | null; draft: DocumentTemplate | null; revision: number; baseVersion: string; setupRequired?: boolean }

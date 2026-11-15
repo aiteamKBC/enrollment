@@ -50,11 +50,12 @@ const reviews = vi.hoisted(() => ({ fetchOnboardingReviewSlots: vi.fn(), issueOn
 vi.mock('@/api/reviewForm', async (original) => ({ ...(await original<typeof import('@/api/reviewForm')>()), ...reviews }));
 vi.mock('@/api/coach', () => ({ fetchLearnerCoach: vi.fn(async () => { throw new Error('not active'); }), updateLearnerCoach: vi.fn() }));
 vi.mock('@/api/staffUsers', () => ({ fetchCoachOptions: vi.fn(async () => []) }));
-const rplApi = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn(), generate: vi.fn() }));
+const rplApi = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn(), generate: vi.fn(), issued: vi.fn(async () => ({ documents: [] })) }));
 vi.mock('@/api/suitabilityRplReport', () => ({
   fetchSuitabilityRplReport: rplApi.fetch,
   saveSuitabilityRplReport: rplApi.save,
   generateSuitabilityRplJustification: rplApi.generate,
+  fetchSuitabilityRplIssuedDocuments: rplApi.issued,
 }));
 
 import BoardPage from '../BoardPage';
@@ -163,7 +164,7 @@ describe('the enrolment board', () => {
     expect(screen.getByText(/Loading report evidence/)).toBeVisible();
     expect(screen.queryByText('The report evidence is unavailable.')).not.toBeInTheDocument();
     resolveReport({ report: null, aiEnabled: false, history: [], sourceVersions: {}, context: { key: 'synthetic', programmeId: 'ME-L4', programmeName: 'Marketing Executive Level 4', enrolmentReference: 'SYN-20', practicalStartDate: '2026-09-01' }, evidence: { learner: { id: '20', name: 'Sam Example', reference: 'SYN-20', employer: '', jobTitle: '', responsibilities: [] }, programme: { id: 'ME-L4', name: 'Marketing Executive Level 4', level: '4', startDate: '' }, programmeUnderstanding: [], programmeSuitability: { status: 'available', responses: [] }, skillsRadar: { status: 'available', scaleMaximum: 9, catalogueVersion: '', items: [] }, evidence: { cv: { status: 'not_provided', experience: '', documents: [] }, qualifications: { status: 'not_provided', items: [], documents: [] }, plr: { status: 'not_available', message: 'Not available' } }, trainingPlan: { available: false, source: 'authoritative_training_plan', plannedHours: null, modules: [], message: '' }, limitations: [], capturedAt: '' } });
-    await waitFor(() => expect(screen.getByText('Learner and programme evidence')).toBeVisible());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Suitability assessment' })).toBeVisible());
     expect(screen.queryByText('The report evidence is unavailable.')).not.toBeInTheDocument();
   });
 
@@ -222,9 +223,8 @@ describe('the enrolment board', () => {
     expect(heading).toBeVisible();
     expect(heading).toHaveClass('text-white');
     expect(rplApi.fetch).toHaveBeenCalledWith('apprenticeship', '20', expect.any(AbortSignal));
-    expect(screen.getByText('Marketing Assistant')).toBeVisible();
-    expect(screen.getByText('Not available - integration not implemented')).toBeVisible();
-    expect(screen.getByText(/Section 08 includes assessor, learner and employer \/ line manager/)).toBeVisible();
+    expect(screen.queryByText('Learner and programme evidence')).not.toBeInTheDocument();
+    expect(screen.getByText(/Section 06 includes assessor, learner and employer \/ line manager/)).toBeVisible();
     expect(screen.getAllByText(/If an AI draft is not acceptable, edit or replace it first/)).toHaveLength(2);
     cleanup();
 

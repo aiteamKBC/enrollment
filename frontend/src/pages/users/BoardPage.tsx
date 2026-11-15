@@ -69,6 +69,7 @@ import { downloadReviewPdf } from '@/pages/learner/onboarding/reviews/reviewDocu
 import { REVIEW_QUESTION_LABELS } from '@/pages/learner/onboarding/reviews/questions';
 import type { LearnerKind } from '@/api/extendedIlr';
 import { SuitabilityRplReportTab } from './suitability-rpl/SuitabilityRplReportTab';
+import { fetchSuitabilityRplIssuedDocuments, type SuitabilityRplIssuedDocument } from '@/api/suitabilityRplReport';
 import type { EnrolmentBoard, FsBlock } from './types';
 import { competenceMeta } from '@/mocks/enrolment-console';
 import {
@@ -1209,12 +1210,16 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
   const [signing, setSigning] = useState<ReviewFormResponse | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [issueRetry, setIssueRetry] = useState<OnboardingReviewSlot | null>(null);
+  const [rplDocuments, setRplDocuments] = useState<SuitabilityRplIssuedDocument[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     fetchOnboardingReviewSlots(kind, learnerId)
       .then((r) => !cancelled && setReviews(r.reviews))
       .catch((e: Error) => !cancelled && setErr(e.message));
+    fetchSuitabilityRplIssuedDocuments(kind, learnerId)
+      .then((r) => !cancelled && setRplDocuments(r.documents))
+      .catch(() => { if (!cancelled) setRplDocuments([]); });
     return () => { cancelled = true; };
   }, [kind, learnerId, reload]);
 
@@ -1251,6 +1256,10 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
     <>
       {adminPreview.dialog}
       <p className="text-[11px] font-semibold text-foreground-500 uppercase tracking-wider mb-2">{programme || 'Programme Name'}</p>
+      {rplDocuments.map((document) => <div key={document.issueId} className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-foreground-100 px-3 py-2">
+        <span className="text-[12px] text-foreground-700 inline-flex flex-wrap items-center gap-2"><i className="ri-file-pdf-line text-red-500" /><span>Suitability &amp; RPL Report</span><span className="text-[11px] text-foreground-400">Version {document.reportVersion} · Issued {document.issuedAt ? new Date(document.issuedAt).toLocaleDateString('en-GB') : '—'}</span><span className="text-[10px] font-semibold text-primary-700">{document.fullySigned ? 'fully signed' : 'awaiting signatures'}</span></span>
+        <span className="flex flex-wrap items-center gap-2"><button type="button" className={btnSecondary} onClick={() => window.open(document.pdfUrl, '_blank', 'noopener,noreferrer')}>Preview</button><a className={btnSecondary} href={document.pdfUrl} download="Suitability-RPL-Report.pdf">Download</a>{document.signingEnabled && !document.signatures.admin.signed && <ActionLink label="Sign" icon="ri-pen-nib-line" onClick={() => navigate(`/users/${learnerId}?tab=suitability-rpl`)} />}</span>
+      </div>)}
       {err && <p role="alert" className="text-[12px] text-red-600 mb-2"><i className="ri-error-warning-line mr-1" />{err}{issueRetry && <button type="button" className={`${btnSecondary} ml-2`} disabled={Boolean(busy)} onClick={() => { void issue(issueRetry); }}>Retry issuing document</button>}</p>}
       {reviews === null && !err && <p className="text-[12px] text-foreground-400 py-2"><i className="ri-loader-4-line animate-spin mr-1.5" />Loading reviews…</p>}
       {reviews !== null && reviews.length === 0 && <EmptyState text="No enrolment reviews for this learner" />}

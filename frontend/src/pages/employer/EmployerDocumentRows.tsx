@@ -34,6 +34,7 @@ export function SignModal({
   onClose,
   onSign,
   onSaveReviewAnswers,
+  onPreviewDocument,
 }: {
   item: SignableItem;
   employerName: string;
@@ -41,13 +42,20 @@ export function SignModal({
   onClose: () => void;
   onSign: (name: string, signature: string) => Promise<void>;
   onSaveReviewAnswers?: (answers: Record<string, unknown>) => Promise<any>;
+  onPreviewDocument?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [previewed, setPreviewed] = useState(false);
   const hasReviewForm = item.kind === 'review' && Boolean(item.reviewInstanceId || item.migratedForm || reviewDefinition?.template);
 
   const submit = async (signature: string) => {
     if (busy) return;
+    if (item.kind === 'suitability-rpl-report' && (!consent || !previewed)) {
+      setErr('Preview the exact issued PDF and confirm consent before signing.');
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
@@ -75,6 +83,10 @@ export function SignModal({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          {item.kind === 'suitability-rpl-report' && <>
+            <button type="button" onClick={() => { onPreviewDocument?.(); setPreviewed(true); }} className="rounded-lg border border-primary-200 px-3 py-1.5 text-[12px] font-medium text-primary-700"><i className="ri-eye-line mr-1" />Preview exact issued PDF</button>
+            <label className="flex items-start gap-2 text-[12px] text-foreground-700"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} disabled={!previewed || busy} className="mt-0.5" />I have reviewed this exact report version and consent to signing it.</label>
+          </>}
           {reviewDefinition?.template ? <LearnerReviewInstanceForm definition={reviewDefinition} viewerRole="employer" onSaveAnswers={onSaveReviewAnswers} /> : null}
           <SignaturePad
             signatoryName={employerName}

@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import hashlib
+import base64
+import binascii
 import json
+import re
 import uuid
 from decimal import Decimal, InvalidOperation
 
@@ -20,18 +23,273 @@ from enrolment_api.wizard_steps import LEVEL_SCORES
 from learner_api.models import EnrolmentUser
 from learner_api.training_plan_document import derive_content
 from login.permissions import require_role
+from login.permissions import login_required
+from enrolment_api import auth as enrolment_auth
+from enrolment_api.document_templates.models import IssuedTemplate, RenderHistory
+from enrolment_api.document_templates import service as document_service
 
 from .configuration import PROGRAMMES as SUITABILITY_PROGRAMMES
-from .models import Assessment, SuitabilityCvExtraction, SuitabilityRplReduction, SuitabilityRplReport
+from .models import Assessment, SuitabilityCvExtraction, SuitabilityRplDocumentSignature, SuitabilityRplReduction, SuitabilityRplReport
 from .cv_extraction import CvExtractionError, extract_approved_cv
+from .server_pdf import render_finalised_report
 
 MAX_TEXT = 20_000
 QUESTION_ONE = 'What is your understanding of the programme you are applying for?'
 QUESTION_TWO = 'How will this programme help you in your career development/aspirations, and/or with your progression?'
+RPL_ANALYSIS_OUTCOMES = {
+    'no-relevant-prior-learning',
+    'potential-whole-module-reduction',
+    'relevant-partial-no-exemption',
+    'insufficient-evidence',
+}
 
 
 class ReportInputError(ValueError):
     pass
+
+
+REPORT_DOCUMENT_KEY = 'suitability-rpl-report'
+REPORT_SIGNATURE_ROLES = ['admin', 'learner', 'employer']
+SIGNATURE_MAX_CHARS = 400_000
+SIGNATURE_CONSENT_VERSION = 'suitability-rpl-sign-v1'
+
+
+def _read_pdf_payload(request):
+    if len(request.body) > 16 * 1024 * 1024:
+        raise ReportInputError('The report PDF is too large.')
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise ReportInputError('Provide a valid JSON object.') from exc
+    if not isinstance(data, dict):
+        raise ReportInputError('Provide a JSON object.')
+    encoded = data.get('pdf')
+    if not isinstance(encoded, str) or len(encoded) > 16 * 1024 * 1024:
+        raise ReportInputError('Provide a valid report PDF.')
+    try:
+        pdf = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ReportInputError('Provide a valid report PDF.') from exc
+    if not pdf.startswith(b'%PDF-') or b'%%EOF' not in pdf[-2048:]:
+        raise ReportInputError('Provide a valid report PDF.')
+    return data, encoded, pdf
+
+
+def _read_issue_request(request):
+    """Read issuance metadata; PDF bytes are deliberately never trusted."""
+    if len(request.body) > 16 * 1024 * 1024:
+        raise ReportInputError('The report issuance request is too large.')
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise ReportInputError('Provide a valid JSON object.') from exc
+    if not isinstance(data, dict):
+        raise ReportInputError('Provide a JSON object.')
+    return data
+
+
+def _signature_issue(learner_id, issue_id):
+    issue = IssuedTemplate.objects.filter(
+        pk=issue_id, document_key=REPORT_DOCUMENT_KEY, learner_id=learner_id,
+    ).first()
+    if issue is None:
+        return None, None
+    artifact = RenderHistory.objects.filter(
+        issue=issue, payload__kind='suitability-rpl-issued-pdf-v1',
+    ).first()
+    return issue, artifact
+
+
+def _signature_caller(request, learner_id, role):
+    account = getattr(request, 'login_account', None)
+    if account is None or not account.is_active:
+        return None
+    if role == SuitabilityRplDocumentSignature.ROLE_ADMIN:
+        if account.role == 'admin':
+            return account
+        if account.role == 'staff':
+            from learner_api.constants import ACCESS_ENROLMENT, ACCESS_SUPER_ADMIN
+            accesses = enrolment_auth._accesses_of(account)
+            return account if accesses & {ACCESS_ENROLMENT, ACCESS_SUPER_ADMIN} else None
+        return None
+    if role == SuitabilityRplDocumentSignature.ROLE_LEARNER:
+        return account if account.role == 'learner' and account.subject_type == 'learner' and account.subject_id == learner_id else None
+    if role == SuitabilityRplDocumentSignature.ROLE_EMPLOYER:
+        return account if account.role == 'employer' and account.subject_type == 'employer' and enrolment_auth._employs(account, learner_id) else None
+    return None
+
+
+def _signature_status(issue, artifact):
+    if issue is None or artifact is None:
+        return None
+    rows = list(SuitabilityRplDocumentSignature.objects.filter(issued_document_id=issue.pk).order_by('signer_role'))
+    signed = {row.signer_role: {
+        'signed': True,
+        'name': row.signer_name,
+        'signedAt': row.signed_at.isoformat() if row.signed_at else None,
+        'method': row.signature_method,
+    } for row in rows}
+    return {
+        'issueId': str(issue.pk),
+        'reportId': artifact.payload.get('reportId'),
+        'reportVersion': artifact.payload.get('reportVersion'),
+        'reportRevision': artifact.payload.get('reportRevision'),
+        'pdfSha256': artifact.payload.get('sha256'),
+        'requiredRoles': REPORT_SIGNATURE_ROLES,
+        'signatures': {role: signed.get(role, {'signed': False, 'name': '', 'signedAt': None, 'method': ''}) for role in REPORT_SIGNATURE_ROLES},
+        'fullySigned': all(role in signed for role in REPORT_SIGNATURE_ROLES),
+        'pdfUrl': f'/enrolment_api/document-templates/learners/{issue.learner_id}/issued/{issue.pk}/pdf/',
+        'signingEnabled': issue.template_snapshot.get('pdfTrust') == 'server-rendered-v1',
+        'signingStatus': issue.template_snapshot.get('signingStatus', 'unknown'),
+    }
+
+
+@login_required
+def suitability_rpl_issued_documents(request, kind, learner_id):
+    """List immutable issued report versions visible to the current party.
+
+    This is deliberately read-only and returns envelope metadata only.  The
+    PDF endpoint remains the sole way to retrieve the stored bytes, and the
+    report/evidence APIs remain staff-only.
+    """
+    if request.method != 'GET' or kind not in {'apprenticeship', 'commercial'}:
+        return JsonResponse({'error': 'Not found.'}, status=404)
+    account = getattr(request, 'login_account', None)
+    if account is None or not account.is_active:
+        return JsonResponse({'error': 'Authentication required.'}, status=401)
+    if account.role == 'learner' and not (account.subject_type == 'learner' and account.subject_id == learner_id):
+        return JsonResponse({'error': 'Not found.'}, status=404)
+    if account.role == 'employer' and not enrolment_auth._employs(account, learner_id):
+        return JsonResponse({'error': 'Not found.'}, status=404)
+    if account.role in {'staff', 'admin'} and _signature_caller(request, learner_id, SuitabilityRplDocumentSignature.ROLE_ADMIN) is None:
+        return JsonResponse({'error': 'You do not have permission to view this document.'}, status=403)
+    issues = []
+    for issue in IssuedTemplate.objects.filter(
+        document_key=REPORT_DOCUMENT_KEY, learner_kind=kind, learner_id=learner_id,
+    ).order_by('-issued_at'):
+        artifact = RenderHistory.objects.filter(issue=issue, payload__kind='suitability-rpl-issued-pdf-v1').first()
+        status = _signature_status(issue, artifact)
+        if status is None:
+            continue
+        issues.append({
+            'issueId': status['issueId'],
+            'title': 'Suitability & RPL Report',
+            'issuedAt': issue.issued_at.isoformat() if issue.issued_at else None,
+            'reportId': status['reportId'],
+            'reportVersion': status['reportVersion'],
+            'reportRevision': status['reportRevision'],
+            'pdfSha256': status['pdfSha256'],
+            'pdfUrl': status['pdfUrl'],
+            'requiredRoles': status['requiredRoles'],
+            'signatures': status['signatures'],
+            'fullySigned': status['fullySigned'],
+            'signingEnabled': status['signingEnabled'],
+            'signingStatus': status['signingStatus'],
+        })
+    return JsonResponse({'documents': issues})
+
+
+def _normalise_suitability_narrative(value):
+    text = _s(value).replace('\r\n', '\n').replace('\r', '\n')
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'[ \t]*\n[ \t]*', '\n', text)
+    return re.sub(r'\n{3,}', '\n\n', text).strip()
+
+
+def _narrative_diagnostics(text, finish_reason=None, usage=None):
+    paragraphs = [part.strip() for part in re.split(r'\n\s*\n+', text) if part.strip()]
+    usage_dict = usage if isinstance(usage, dict) else {}
+    total_tokens = usage_dict.get('total_tokens', 'unknown')
+    reason = finish_reason or 'unknown'
+    return f'(paragraphs={len(paragraphs)}, length={len(text)}, finish_reason={reason}, total_tokens={total_tokens})'
+
+
+def _validate_suitability_narrative(value):
+    """Reject drafts that are technically valid JSON but not report-ready.
+
+    The provider can return ``finish_reason=stop`` after producing an otherwise
+    incomplete string.  Suitability drafts are shown to an assessor, so keep
+    malformed or internally-oriented text out of the persisted report.
+    """
+    text = _normalise_suitability_narrative(value)
+    if not text:
+        raise ReportInputError('The AI service returned an empty suitability draft.')
+    if '\ufffd' in text:
+        raise ReportInputError('The AI service returned invalid replacement characters.')
+    if len(text) > MAX_TEXT:
+        raise ReportInputError('The AI service returned an oversized suitability draft.')
+    if re.search(r'\b(?:programmeSpecification|learnerEvidence|programmeUnderstanding|'
+                 r'selectedProgrammeSpecification|skillsRadarSummary|cvEvidence|'
+                 r'sourceSnapshot|metadata)\b', text, re.IGNORECASE):
+        raise ReportInputError('The AI service returned technical or internal field names.')
+    if re.search(r'\b(?:json|placeholder|workflow|technical details?|internal field|'
+                 r'assessor must (?:review|approve)|approval instructions?)\b', text, re.IGNORECASE):
+        raise ReportInputError('The AI service returned internal workflow commentary.')
+    if re.search(r'(?:\be\.g\.|for example|such as|including)\s*[,;:]?\s*$', text, re.IGNORECASE):
+        raise ReportInputError('The AI service returned an unfinished suitability narrative.')
+    if text[-1] not in '.!?\u201d\u2019"\')\u005d}':
+        raise ReportInputError('The AI service returned an unfinished suitability narrative.')
+    paragraphs = [part.strip() for part in re.split(r'\n\s*\n+', text) if part.strip()]
+    if not 1 <= len(paragraphs) <= 3:
+        raise ReportInputError('The AI service returned a suitability draft with an invalid paragraph structure.')
+    if sum(len(re.findall(r'[.!?](?:\s|$)', paragraph)) for paragraph in paragraphs) < 1:
+        raise ReportInputError('The AI service returned an incomplete suitability narrative.')
+    return text
+
+
+def _validate_rpl_narrative(value, report, payload):
+    """Keep RPL drafts report-ready and aligned with the recorded decision."""
+    text = _normalise_suitability_narrative(value)
+    if not text:
+        raise ReportInputError('The AI service returned an empty RPL draft.')
+    if '\ufffd' in text:
+        raise ReportInputError('The AI service returned invalid replacement characters.')
+    if len(text) > MAX_TEXT:
+        raise ReportInputError('The AI service returned an oversized RPL draft.')
+    if re.search(r'\b(?:json|metadata|sourceSnapshot|rplAiMetadata|cvEvidence|'
+                 r'learnerEvidence|trainingPlan|reductions?\s+array|internal field|'
+                 r'workflow|prompt|artificial intelligence|\bAI\b)\b', text, re.IGNORECASE):
+        raise ReportInputError('The AI service returned technical or internal workflow language.')
+    if text[-1] not in '.!?\u201d\u2019"\')\u005d}':
+        raise ReportInputError('The AI service returned an unfinished RPL narrative.')
+    paragraphs = [part.strip() for part in re.split(r'\n\s*\n+', text) if part.strip()]
+    if not 1 <= len(paragraphs) <= 3:
+        raise ReportInputError('The AI service returned an RPL draft with an invalid paragraph structure.')
+    if sum(len(re.findall(r'[.!?](?:\s|$)', paragraph)) for paragraph in paragraphs) < 1:
+        raise ReportInputError('The AI service returned an incomplete RPL narrative.')
+
+    relevant = getattr(report, 'relevant_prior_learning', None)
+    justified = getattr(report, 'reduction_justified', None)
+    lowered = text.casefold()
+    if relevant is False and justified is False:
+        if re.search(r'\b(?:approved|authorised|granted|confirmed)\s+(?:a\s+|an\s+|the\s+)?'
+                     r'(?:module\s+)?(?:reduction|exemption|credit)\b|'
+                     r'\b(?:modules?|hours?)\s+were\s+reduced\b|'
+                     r'\b(?:a|an|the)\s+(?:module\s+)?reduction\s+is\s+'
+                     r'(?:approved|justified|authorised)\b', lowered):
+            raise ReportInputError('The RPL draft contradicts the recorded no-reduction decision.')
+
+    modules = ((payload.get('trainingPlan') or {}).get('modules') or []) if isinstance(payload, dict) else []
+    authoritative_ksbs = {
+        _s(code)
+        for module in modules
+        if isinstance(module, dict)
+        for code in (module.get('ksbCodes') or [])
+        if _s(code)
+    }
+    mentioned_codes = {code.casefold() for code in re.findall(r'\b[KSBI]\d+[A-Z]?\b', text, re.IGNORECASE)}
+    if mentioned_codes - {code.casefold() for code in authoritative_ksbs}:
+        raise ReportInputError('The RPL draft mentions KSB codes without an authoritative mapping.')
+    if not authoritative_ksbs and re.search(r'\b(?:mapped|covered)\s+KSBs?\b', lowered):
+        raise ReportInputError('The RPL draft claims KSB mappings that are not available.')
+    employer_evidence = payload.get('employerEvidence') if isinstance(payload, dict) else None
+    if not employer_evidence and re.search(
+        r'\b(?:the\s+)?employer\s+(?:agreed|confirmed|approved|signed|endorsed|verified)\b|'
+        r'\bemployer\s+(?:discussion|agreement|sign[- ]off)\s+(?:confirmed|recorded|completed)\b',
+        lowered,
+    ):
+        raise ReportInputError('The RPL draft claims employer evidence that is not recorded.')
+    return text
 
 
 def _s(value):
@@ -119,7 +377,13 @@ def _suitability_evidence(assessment):
         (
             {
                 key: item.get(key)
-                for key in ('id', 'title', 'summary', 'description', 'pathway', 'level', 'responsibilities')
+                for key in (
+                    'id', 'title', 'summary', 'description', 'pathway', 'level', 'responsibilities',
+                    # Preserve authoritative outcomes when a published
+                    # programme definition supplies them.  Older layouts do
+                    # not contain these keys and remain unchanged.
+                    'outcomes', 'ksbMappings', 'knowledge', 'skills', 'behaviours', 'behaviors',
+                )
                 if key in item
             }
             for item in programme_definitions
@@ -732,11 +996,210 @@ def suitability_rpl_report(request, kind, learner_id):
         return JsonResponse({'error': 'The Suitability & RPL report store is unavailable.'}, status=503)
 
 
+@require_role('admin')
+@csrf_protect
+def issue_suitability_rpl_report(request, kind, learner_id):
+    """Store one immutable, server-rendered PDF for a finalised report revision.
+
+    Browser-generated bytes remain preview-only.  The issued artifact is built
+    from the frozen report snapshot in Django and is therefore the only PDF
+    eligible for electronic signatures.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    learner = _learner(kind, learner_id)
+    if learner is None:
+        return JsonResponse({'error': 'Learner not found.'}, status=404)
+    try:
+        data = _read_issue_request(request)
+        report_id = data.get('reportId')
+        try:
+            report_id = int(report_id)
+        except (TypeError, ValueError) as exc:
+            raise ReportInputError('Provide the finalised report id.') from exc
+        report = SuitabilityRplReport.objects.prefetch_related('reductions').filter(
+            pk=report_id, learner_kind=kind, learner_id=learner_id,
+        ).first()
+        if report is None:
+            return JsonResponse({'error': 'Report not found.'}, status=404)
+        if report.status != SuitabilityRplReport.STATUS_FINALISED:
+            return JsonResponse({'error': 'Only a finalised report can be issued.'}, status=409)
+        if data.get('reportRevision') != report.revision or data.get('reportVersion') != report.report_version:
+            return JsonResponse({'error': 'The report changed before issuance. Reload the finalised report and retry.'}, status=409)
+        if not report.suitability_reviewed_at or not report.rpl_reviewed_at:
+            return JsonResponse({'error': 'Both approved justifications are required before issuance.'}, status=409)
+        try:
+            pdf = render_finalised_report(report)
+        except Exception as exc:
+            raise DatabaseError('The trusted report PDF could not be generated. No document was issued.') from exc
+        sha256 = hashlib.sha256(pdf).hexdigest()
+        encoded = base64.b64encode(pdf).decode()
+        source_id = f'report-{report.pk}-v{report.report_version}-r{report.revision}-server-v1'
+        snapshot = {
+            'dynamic': True,
+            'documentKey': REPORT_DOCUMENT_KEY,
+            'title': 'Suitability & Recognition of Prior Learning Report',
+            'reportId': str(report.pk),
+            'reportReference': report.report_reference,
+            'reportVersion': report.report_version,
+            'reportRevision': report.revision,
+            'reportSnapshotHash': report.source_snapshot_hash,
+            'pdfSha256': sha256,
+            'signatureRoles': REPORT_SIGNATURE_ROLES,
+            'signingStatus': 'pending',
+            'pdfTrust': 'server-rendered-v1',
+            'rendererVersion': 'suitability-rpl-server-v1',
+            'originalPdfVersion': 3,
+        }
+        with transaction.atomic(using=document_service.database()):
+            existing = IssuedTemplate.objects.filter(document_key=REPORT_DOCUMENT_KEY, source_id=source_id).first()
+            if existing is not None:
+                stored = RenderHistory.objects.filter(issue=existing, payload__kind='suitability-rpl-issued-pdf-v1').first()
+                if stored is None or stored.payload.get('sha256') != sha256:
+                    return JsonResponse({'error': 'This report revision is already issued and immutable.'}, status=409)
+                return JsonResponse({'issued': True, 'issueId': str(existing.pk), 'sha256': sha256, 'alreadyIssued': True, 'signingEnabled': True})
+            issue = IssuedTemplate.objects.create(
+                document_key=REPORT_DOCUMENT_KEY,
+                source_id=source_id,
+                learner_kind=kind,
+                learner_id=learner_id,
+                version=None,
+                template_snapshot=snapshot,
+                field_values={},
+                review_snapshot={'reportId': str(report.pk), 'reportRevision': report.revision, 'reportSnapshotHash': report.source_snapshot_hash},
+            )
+            RenderHistory.objects.create(
+                issue=issue,
+                fingerprint=document_service.digest({'kind': 'suitability-rpl-issued-pdf-v1', 'sha256': sha256, 'sourceId': source_id}),
+                payload={
+                    'kind': 'suitability-rpl-issued-pdf-v1',
+                    'pdf': encoded,
+                    'sha256': sha256,
+                    'reportId': str(report.pk),
+                    'reportVersion': report.report_version,
+                    'reportRevision': report.revision,
+                    'reportSnapshotHash': report.source_snapshot_hash,
+                },
+                recorded_by=document_service.actor(request),
+            )
+        return JsonResponse({'issued': True, 'issueId': str(issue.pk), 'sha256': sha256, 'alreadyIssued': False, 'signingEnabled': True}, status=201)
+    except ReportInputError as exc:
+        return JsonResponse({'error': str(exc)}, status=400)
+    except DatabaseError:
+        return JsonResponse({'error': 'The Suitability & RPL document store is unavailable.'}, status=503)
+
+
+@login_required
+@csrf_protect
+def suitability_rpl_signatures(request, kind, learner_id, issue_id):
+    """Read the signing envelope or record one authenticated party signature."""
+    if kind not in {'apprenticeship', 'commercial'}:
+        return JsonResponse({'error': 'Not found.'}, status=404)
+    issue, artifact = _signature_issue(learner_id, issue_id)
+    if issue is None or artifact is None or issue.learner_kind != kind:
+        return JsonResponse({'error': 'Not found.'}, status=404)
+    account = getattr(request, 'login_account', None)
+    if account is None:
+        return JsonResponse({'error': 'Authentication required.'}, status=401)
+    if account.role == 'learner' and account.subject_id != learner_id:
+        return JsonResponse({'error': 'Not found.'}, status=404)
+    if account.role == 'employer' and not enrolment_auth._employs(account, learner_id):
+        return JsonResponse({'error': 'Not found.'}, status=404)
+    if account.role not in {'admin', 'staff', 'learner', 'employer'}:
+        return JsonResponse({'error': 'You do not have permission to sign this document.'}, status=403)
+    if account.role == 'staff' and _signature_caller(request, learner_id, SuitabilityRplDocumentSignature.ROLE_ADMIN) is None:
+        return JsonResponse({'error': 'You do not have permission to sign this document.'}, status=403)
+    if request.method == 'GET':
+        return JsonResponse({'status': _signature_status(issue, artifact)})
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Provide a valid JSON object.'}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'error': 'Provide a JSON object.'}, status=400)
+    role = data.get('role')
+    expected_role = {
+        'admin': SuitabilityRplDocumentSignature.ROLE_ADMIN,
+        'staff': SuitabilityRplDocumentSignature.ROLE_ADMIN,
+        'learner': SuitabilityRplDocumentSignature.ROLE_LEARNER,
+        'employer': SuitabilityRplDocumentSignature.ROLE_EMPLOYER,
+    }.get(account.role)
+    if role != expected_role or _signature_caller(request, learner_id, role) is None:
+        return JsonResponse({'error': 'You cannot sign this document as that party.'}, status=403)
+    if issue.template_snapshot.get('pdfTrust') != 'server-rendered-v1':
+        return JsonResponse({'error': 'Electronic signing is disabled until this PDF has been verified by the server renderer.'}, status=409)
+    signature = data.get('signature')
+    name = data.get('name')
+    consent_text = data.get('consentText')
+    if not isinstance(signature, str) or not signature.startswith('data:image/') or len(signature) > SIGNATURE_MAX_CHARS:
+        return JsonResponse({'error': 'Provide a supported signature image.'}, status=400)
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 200:
+        return JsonResponse({'error': 'Provide the signatory name.'}, status=400)
+    if data.get('consent') is not True or not isinstance(consent_text, str) or not consent_text.strip():
+        return JsonResponse({'error': 'Confirm consent before signing.'}, status=400)
+    snapshot = issue.template_snapshot if isinstance(issue.template_snapshot, dict) else {}
+    if artifact.payload.get('sha256') != snapshot.get('pdfSha256'):
+        return JsonResponse({'error': 'The issued PDF integrity binding is invalid.'}, status=409)
+    for key in ('reportId', 'reportVersion', 'reportRevision'):
+        if str(artifact.payload.get(key)) != str(snapshot.get(key)):
+            return JsonResponse({'error': 'The issued report version binding is invalid.'}, status=409)
+    try:
+        bound_report_id = int(artifact.payload['reportId'])
+        bound_report_version = int(artifact.payload['reportVersion'])
+        bound_report_revision = int(artifact.payload['reportRevision'])
+    except (KeyError, TypeError, ValueError):
+        return JsonResponse({'error': 'The issued report version binding is invalid.'}, status=409)
+    now = timezone.now()
+    try:
+        with transaction.atomic():
+            if SuitabilityRplDocumentSignature.objects.filter(issued_document_id=issue.pk, signer_role=role).exists():
+                return JsonResponse({'error': 'This party has already signed this issued report version.'}, status=409)
+            SuitabilityRplDocumentSignature.objects.create(
+                issued_document_id=issue.pk,
+                document_key=REPORT_DOCUMENT_KEY,
+                learner_kind=kind,
+                learner_id=learner_id,
+                report_id=bound_report_id,
+                report_version=bound_report_version,
+                report_revision=bound_report_revision,
+                pdf_sha256=artifact.payload['sha256'],
+                signer_role=role,
+                login_account_id=int(account.id),
+                signer_subject_type=account.subject_type,
+                signer_subject_id=int(account.subject_id),
+                signer_name=name.strip(),
+                signature_method='drawn',
+                signature=signature,
+                consent_version=SIGNATURE_CONSENT_VERSION,
+                consent_text=consent_text.strip(),
+                consented_at=now,
+                signed_at=now,
+                ip_address=(request.META.get('REMOTE_ADDR') or '')[:255],
+                user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:1000],
+                audit_metadata={'issuedDocumentId': str(issue.pk), 'pdfSha256': artifact.payload['sha256']},
+            )
+    except DatabaseError:
+        return JsonResponse({'error': 'Could not record the signature. Retry without changing the issued document.'}, status=503)
+    return JsonResponse({'status': _signature_status(issue, artifact)}, status=201)
+
+
 def _ai_input(report, draft_type):
     snapshot = report.source_snapshot or {}
     if draft_type == 'suitability':
         learner = snapshot.get('learner') if isinstance(snapshot.get('learner'), dict) else {}
         qualifications = ((snapshot.get('evidence') or {}).get('qualifications') or {})
+        suitability = snapshot.get('programmeSuitability')
+        suitability = suitability if isinstance(suitability, dict) else {}
+        # The AI explains the selected current programme only.  Historical
+        # recommendation/outcome fields remain in the frozen snapshot but are
+        # not learner evidence for this narrative and can invite unsupported
+        # progression claims.
+        suitability = {
+            key: value for key, value in suitability.items()
+            if key not in {'recommendedProgramme', 'outcome', 'review'}
+        }
         return {
             'programme': snapshot.get('programme', {}),
             # Deliberately omit the learner's name, reference, employer and all
@@ -746,9 +1209,13 @@ def _ai_input(report, draft_type):
                 'responsibilities': learner.get('responsibilities', []),
             },
             'programmeUnderstanding': snapshot.get('programmeUnderstanding', []),
-            'programmeSuitability': snapshot.get('programmeSuitability', {}),
+            'programmeSuitability': suitability,
             'skillsRadarSummary': [
-                {'code': item.get('code'), 'level': item.get('level'), 'score': item.get('score')}
+                {
+                    key: item.get(key)
+                    for key in ('code', 'kind', 'level', 'score', 'description', 'moduleKey')
+                    if key in item
+                }
                 for item in (snapshot.get('skillsRadar') or {}).get('items', [])
             ],
             'qualifications': {
@@ -813,6 +1280,345 @@ def _ai_input(report, draft_type):
     }
 
 
+def _rpl_analysis_payload(report):
+    """Build the private, evidence-only payload for pre-decision RPL analysis.
+
+    This deliberately does not include the saved RPL decision or reductions: the
+    analysis is advisory and must assess the evidence before the assessor records
+    an outcome.  CV text is included only in this private server-to-AI payload;
+    the returned recommendation is validated and never contains that text.
+    """
+    snapshot = report.source_snapshot if isinstance(report.source_snapshot, dict) else {}
+    evidence = snapshot.get('evidence') if isinstance(snapshot.get('evidence'), dict) else {}
+    cv = evidence.get('cv') if isinstance(evidence.get('cv'), dict) else {}
+    qualifications = evidence.get('qualifications') if isinstance(evidence.get('qualifications'), dict) else {}
+    skills = snapshot.get('skillsRadar') if isinstance(snapshot.get('skillsRadar'), dict) else {}
+    training = snapshot.get('trainingPlan') if isinstance(snapshot.get('trainingPlan'), dict) else {}
+    modules = []
+    for item in training.get('modules') or []:
+        if not isinstance(item, dict):
+            continue
+        modules.append({
+            'moduleId': _s(item.get('moduleId')),
+            'moduleName': _s(item.get('title') or item.get('moduleTitle') or item.get('moduleName')),
+            'plannedHours': item.get('plannedHours'),
+            'content': _s(item.get('content') or item.get('description')),
+            'authoritativeKsbMappings': [
+                mapping for mapping in (item.get('authoritativeKsbMappings') or item.get('ksbMappings') or [])
+                if isinstance(mapping, dict)
+            ],
+        })
+
+    # The frozen snapshot carries the authoritative module ids/hours. Enrich it
+    # with live curriculum content and mappings for analysis only; no learner or
+    # report data is changed by this read.
+    try:
+        from curriculum_api.models import ModuleAuthoringKsbMapping, ModuleAuthoringModule
+
+        module_ids = [item['moduleId'] for item in modules if item['moduleId']]
+        live_modules = {
+            row.module_catalogue_id: row
+            for row in ModuleAuthoringModule.objects.filter(module_catalogue_id__in=module_ids)
+        }
+        mappings = {}
+        mapping_codes = {}
+        for row in ModuleAuthoringKsbMapping.objects.filter(
+            module_catalogue_id__in=module_ids, deleted_at__isnull=True,
+        ).order_by('module_catalogue_id', 'ksb_code', 'id'):
+            code = _s(row.ksb_code)
+            if not code or code in mapping_codes.setdefault(row.module_catalogue_id, set()):
+                continue
+            mapping_codes[row.module_catalogue_id].add(code)
+            mappings.setdefault(row.module_catalogue_id, []).append({
+                'code': code,
+                'description': _s(row.ksb_description),
+                'source': _s(row.source_type),
+            })
+        for item in modules:
+            row = live_modules.get(item['moduleId'])
+            if row is not None:
+                item['moduleName'] = _s(row.title) or item['moduleName']
+                item['content'] = _s(row.description) or item['content']
+            item['authoritativeKsbMappings'] = mappings.get(item['moduleId'], [])
+    except Exception:
+        # A curriculum projection may be unavailable in an older environment.
+        # The recommendation must then expose the limitation, never fabricate it.
+        pass
+
+    private_cv = ''
+    extraction_warning = ''
+    if cv.get('status') == 'provided' and not getattr(report, 'cv_extraction_acknowledged', False):
+        try:
+            private_cv = _private_cv_text(report, cv)
+        except ReportInputError as exc:
+            extraction_warning = str(exc)
+    elif cv.get('status') == 'provided':
+        extraction_warning = 'The assessor acknowledged that the approved CV could not be used.'
+
+    # Evidence references are deliberately namespaced and deterministic. They
+    # are identifiers for the evidence catalogue sent in this private request,
+    # not KSB codes, module ids, labels, or excerpts from the CV.
+    evidence_references = []
+
+    def add_reference(reference_id, source, label):
+        if reference_id and not any(item['id'] == reference_id for item in evidence_references):
+            evidence_references.append({'id': reference_id, 'source': source, 'label': label})
+
+    learner = snapshot.get('learner') if isinstance(snapshot.get('learner'), dict) else {}
+    if _s(learner.get('jobTitle')):
+        add_reference('evidence.learner.job-title', 'learner_record', 'Saved job title')
+    for index, responsibility in enumerate(learner.get('responsibilities') or [], start=1):
+        if _s(responsibility):
+            add_reference(f'evidence.learner.responsibility.{index}', 'learner_record', f'Saved responsibility {index}')
+    for index, answer in enumerate(snapshot.get('programmeUnderstanding') or [], start=1):
+        if answer:
+            add_reference(f'evidence.programme-understanding.{index}', 'programme_understanding', f'Saved programme understanding response {index}')
+    for index, item in enumerate(skills.get('items') or [], start=1):
+        if isinstance(item, dict) and (_s(item.get('code')) or _s(item.get('description'))):
+            add_reference(f'evidence.skills-radar.{index}', 'skills_radar', f'Saved Skills Radar item {index}')
+    for index, item in enumerate(qualifications.get('items') or [], start=1):
+        if item:
+            add_reference(f'evidence.qualification.{index}', 'qualification_record', f'Saved qualification record {index}')
+    if cv.get('status') == 'provided':
+        add_reference('evidence.cv.approved', 'approved_cv_extraction', 'Approved CV extraction')
+    if evidence.get('plr'):
+        add_reference('evidence.plr.status', 'plr_record', 'Recorded prior learning status')
+    for item in modules:
+        module_id = _s(item.get('moduleId'))
+        if module_id:
+            add_reference(f'evidence.training-plan.module.{module_id}', 'training_plan', f'Saved Training Plan module {module_id}')
+
+    return {
+        'programme': snapshot.get('programme', {}),
+        'learnerEvidence': {
+            'jobTitle': ((snapshot.get('learner') or {}).get('jobTitle') if isinstance(snapshot.get('learner'), dict) else ''),
+            'responsibilities': ((snapshot.get('learner') or {}).get('responsibilities', []) if isinstance(snapshot.get('learner'), dict) else []),
+        },
+        'programmeUnderstanding': snapshot.get('programmeUnderstanding', []),
+        'skillsRadar': {
+            'catalogueVersion': skills.get('catalogueVersion'),
+            'cataloguePinned': skills.get('cataloguePinned'),
+            'summary': skills.get('summary', []),
+            'items': [
+                {key: item.get(key) for key in ('code', 'kind', 'level', 'description', 'moduleKey', 'score') if key in item}
+                for item in (skills.get('items') or []) if isinstance(item, dict)
+            ],
+        },
+        'qualifications': {'status': qualifications.get('status'), 'items': qualifications.get('items', [])},
+        'plr': evidence.get('plr') or {'status': 'not_available'},
+        'trainingPlan': {
+            'available': training.get('available'),
+            'plannedHours': training.get('plannedHours'),
+            'modules': [
+                {
+                    **item,
+                    # Make the authority boundary explicit to the model. Skills
+                    # Radar codes are evidence, not module mappings.
+                    'authoritativeKsbMappingStatus': 'available' if item.get('authoritativeKsbMappings') else 'not_available',
+                    'authoritativeKsbCodes': [_s(mapping.get('code')) for mapping in item.get('authoritativeKsbMappings', []) if _s(mapping.get('code'))],
+                }
+                for item in modules
+            ],
+        },
+        'privateCvText': private_cv,
+        'extractionWarning': extraction_warning,
+        'evidenceReferences': evidence_references,
+        'evidenceVersion': {
+            'sourceSnapshotHash': report.source_snapshot_hash,
+            'documentId': report.cv_source_document_id,
+            'container': report.cv_source_container,
+            'blobName': report.cv_source_blob_name,
+            'sha256': report.cv_source_blob_hash,
+            'extractorVersion': report.cv_extractor_version,
+        },
+    }
+
+
+def _analysis_strings(value):
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ReportInputError('The AI recommendation returned an invalid evidence list.')
+    values = [_s(item) for item in value if _s(item)]
+    if any(len(item) > 2_000 for item in values):
+        raise ReportInputError('The AI recommendation contains oversized evidence text.')
+    return values
+
+
+def _analysis_evidence_refs(value, allowed_ids):
+    if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+        raise ReportInputError('The AI recommendation returned an invalid evidence list.')
+    refs = []
+    for item in value:
+        evidence_id = _s(item.get('evidenceId'))
+        detail = _s(item.get('detail'))
+        safe_id = evidence_id[:120] if evidence_id else '<missing>'
+        if not evidence_id or evidence_id not in allowed_ids:
+            raise ReportInputError(f'The AI recommendation returned an unsupported evidence reference ID: {safe_id}.')
+        if not detail or len(detail) > 2_000:
+            raise ReportInputError('The AI recommendation returned an invalid evidence reference detail.')
+        refs.append({'evidenceId': evidence_id, 'detail': detail})
+    return refs
+
+
+def _validate_rpl_analysis(result, payload):
+    if not isinstance(result, dict):
+        raise ReportInputError('The AI recommendation must be a JSON object.')
+    outcome = _s(result.get('overallOutcome'))
+    if outcome not in RPL_ANALYSIS_OUTCOMES:
+        raise ReportInputError('The AI recommendation returned an unknown RPL outcome.')
+    reasoning = _s(result.get('reasoning'))
+    if not reasoning or len(reasoning) > 8_000:
+        raise ReportInputError('The AI recommendation returned invalid overall reasoning.')
+    modules = result.get('modules')
+    if not isinstance(modules, list):
+        raise ReportInputError('The AI recommendation must include one analysis per Training Plan module.')
+    expected = {item.get('moduleId') for item in (payload.get('trainingPlan') or {}).get('modules', []) if item.get('moduleId')}
+    allowed_evidence_ids = {
+        _s(reference.get('id'))
+        for reference in (payload.get('evidenceReferences') or [])
+        if isinstance(reference, dict) and _s(reference.get('id'))
+    }
+    seen = set()
+    clean_modules = []
+    private_text = _s(payload.get('privateCvText'))
+    for item in modules:
+        if not isinstance(item, dict):
+            raise ReportInputError('Each module recommendation must be an object.')
+        module_id = _s(item.get('moduleId'))
+        if not module_id or module_id in seen or module_id not in expected:
+            raise ReportInputError('The AI recommendation must use the authoritative Training Plan module IDs.')
+        seen.add(module_id)
+        candidate = item.get('wholeModuleReductionRecommended')
+        if not isinstance(candidate, bool):
+            raise ReportInputError(
+                f'Module {module_id} needs a boolean whole-module reduction recommendation; '
+                f'received {type(candidate).__name__}.'
+            )
+        evidence_sufficiency = _s(item.get('evidenceSufficiency'))
+        if evidence_sufficiency not in {'sufficient', 'partial', 'insufficient', 'needs-review'}:
+            raise ReportInputError('Each module recommendation needs an explicit evidence sufficiency status.')
+        evidence = _analysis_evidence_refs(item.get('supportingEvidence'), allowed_evidence_ids)
+        missing = _analysis_strings(item.get('missingEvidence'))
+        explanation = _s(item.get('explanation'))
+        if not explanation or len(explanation) > 4_000:
+            raise ReportInputError('Each module recommendation needs a clear explanation.')
+        authoritative = next((m for m in (payload.get('trainingPlan') or {}).get('modules', []) if m.get('moduleId') == module_id), {})
+        authoritative_mappings = [
+            {
+                'code': _s(mapping.get('code')),
+                'description': _s(mapping.get('description')),
+                'source': _s(mapping.get('source')),
+            }
+            for mapping in (authoritative.get('authoritativeKsbMappings') or [])
+            if isinstance(mapping, dict) and _s(mapping.get('code'))
+        ]
+        # KSB relationships are authoritative curriculum data. They are never
+        # accepted from, or compared against, model-generated fields.
+        if candidate and (evidence_sufficiency != 'sufficient' or not authoritative_mappings or not evidence or missing):
+            raise ReportInputError('A whole-module candidate requires complete mapped evidence with no unresolved gaps.')
+        clean_item = {
+            'moduleId': module_id,
+            'moduleName': _s(authoritative.get('moduleName')),
+            'plannedHours': authoritative.get('plannedHours'),
+            'wholeModuleReductionRecommended': candidate,
+            'evidenceSufficiency': evidence_sufficiency,
+            'supportingEvidence': evidence,
+            'authoritativeKsbMappings': authoritative_mappings,
+            'missingEvidence': missing,
+            'explanation': explanation,
+        }
+        clean_modules.append(clean_item)
+    if seen != expected:
+        raise ReportInputError('The AI recommendation did not analyse every authoritative Training Plan module.')
+    if outcome == 'potential-whole-module-reduction' and not any(item['wholeModuleReductionRecommended'] for item in clean_modules):
+        raise ReportInputError('The AI outcome requires at least one complete-module candidate.')
+    if outcome != 'potential-whole-module-reduction' and any(item['wholeModuleReductionRecommended'] for item in clean_modules):
+        raise ReportInputError('The AI recommendation cannot suggest a whole-module removal for this outcome.')
+    serialised = json.dumps({'reasoning': reasoning, 'modules': clean_modules}, ensure_ascii=False)
+    if private_text:
+        fragments = [private_text]
+        fragments.extend(part.strip() for part in re.split(r'[\n.!?]+', private_text) if len(part.strip()) >= 32)
+        if any(fragment and fragment in serialised for fragment in fragments):
+            raise ReportInputError('The AI recommendation exposed raw private CV text.')
+    return {'overallOutcome': outcome, 'reasoning': reasoning, 'modules': clean_modules,
+            'evidenceGaps': _analysis_strings(result.get('evidenceGaps', [])),
+            'warnings': _analysis_strings(result.get('warnings', []))}
+
+
+def generate_rpl_evidence_analysis(report):
+    if not getattr(settings, 'SUITABILITY_RPL_AI_ENABLED', False):
+        raise ReportInputError('AI drafting is disabled for this environment.')
+    api_key = getattr(settings, 'SUITABILITY_RPL_AI_API_KEY', '') or getattr(settings, 'OPENAI_API_KEY', '')
+    if not api_key:
+        raise ReportInputError('The approved AI service is not configured.')
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise ReportInputError('The approved AI client is unavailable.') from exc
+    payload = _rpl_analysis_payload(report)
+    system = (
+        'Analyse the supplied apprenticeship RPL evidence independently before an assessor records a decision. '
+        'Return JSON with exactly: overallOutcome, reasoning, modules, evidenceGaps, warnings. '
+        'overallOutcome must be one of no-relevant-prior-learning, potential-whole-module-reduction, '
+        'relevant-partial-no-exemption, insufficient-evidence. '
+        'Analyse every authoritative Training Plan module. Return each module with exactly these fields: moduleId, '
+        'wholeModuleReductionRecommended (a strict JSON boolean), evidenceSufficiency (one of sufficient, partial, insufficient, needs-review), '
+        'supportingEvidence, missingEvidence, and explanation. Never omit or null the boolean. '
+        'moduleId is only an exact selector copied from the authoritative input. Do not output moduleName, plannedHours, or ksbMappings; '
+        'the server attaches those authoritative values after validation. '
+        'Use this JSON shape for each module: {"moduleId":"authoritative-id",'
+        '"wholeModuleReductionRecommended":false,"evidenceSufficiency":"needs-review",'
+        '"supportingEvidence":[],"missingEvidence":["verification needed"],'
+        '"explanation":"complete-module assessment"}. '
+        'Use each module\'s authoritativeKsbMappings/authoritativeKsbCodes only as analysis context; never return KSB codes or mapping objects. '
+        'Skills Radar codes and moduleKey values are learner evidence only and are never authoritative module mappings. '
+        'Use partial, insufficient, or needs-review when authoritative mappings are unavailable; never invent or reproduce a replacement mapping. '
+        'wholeModuleReductionRecommended may be true only when the supplied verified evidence '
+        'covers the complete module outcomes and every supplied authoritative KSB mapping, with no missing evidence. '
+        'Never recommend removing a module because of partial topic coverage, a job title, self-assessment scores, or a generic qualification. '
+        'Distinguish reported experience from demonstrated competence. Missing PLR, employer agreement, KSB mappings or verification is a gap, '
+        'not proof that prior learning is absent. Never invent evidence, mappings, hours, costs or employer agreement. '
+        'The evidenceReferences array is the canonical allowlist for supportingEvidence. Each supportingEvidence item must be exactly '
+        '{"evidenceId":"<exact id from evidenceReferences>","detail":"short explanation"}. Use only those exact namespaced IDs. '
+        'Evidence IDs are distinct from KSB codes and Training Plan module IDs; never use labels, KSB codes, module IDs, or CV excerpts as evidenceId. '
+        'An empty supportingEvidence list is valid when evidence is missing, partial, or needs review. Never invent or substitute an ID. '
+        'Never return raw CV text, private document content, JSON field names, or workflow instructions. '
+        'Keep the overall reasoning concise at approximately 20–40 words, preferably one or two short sentences. Mention only the main evidence-based reason; this is a writing guideline, not a hard limit. '
+        'Keep each module explanation concise for internal review; it is not shown in the compact assessor panel. '
+        'The recommendation is advisory only and must not select or save the assessor decision.'
+    )
+    request = {
+        'model': getattr(settings, 'OPENAI_MODEL', 'gpt-4.1-mini'),
+        'messages': [
+            {'role': 'system', 'content': system},
+            {'role': 'user', 'content': f'Evidence for analysis:\n{json.dumps(payload, ensure_ascii=False)}'},
+        ],
+        'response_format': {'type': 'json_object'},
+        'max_completion_tokens': 4096,
+    }
+    if request['model'].lower().startswith('gpt-5'):
+        request['reasoning_effort'] = 'minimal'
+    response = OpenAI(api_key=api_key, base_url=getattr(settings, 'SUITABILITY_RPL_AI_BASE_URL', '') or None).chat.completions.create(**request)
+    choice = response.choices[0] if response.choices else None
+    finish_reason = getattr(choice, 'finish_reason', None) if choice else None
+    usage = response.usage.model_dump() if getattr(response, 'usage', None) else None
+    if finish_reason not in (None, 'stop'):
+        raise ReportInputError(f'The AI recommendation did not finish safely. {_narrative_diagnostics("", finish_reason, usage)}')
+    content = _s(choice.message.content if choice else '')
+    try:
+        result = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise ReportInputError('The AI service returned an invalid RPL recommendation.') from exc
+    recommendation = _validate_rpl_analysis(result, payload)
+    metadata = {
+        'provider': getattr(settings, 'SUITABILITY_RPL_AI_PROVIDER', 'openai'),
+        'model': request['model'], 'generatedAt': timezone.now().isoformat(),
+        'sourceSnapshotHash': report.source_snapshot_hash,
+        'cvEvidenceVersion': payload.get('evidenceVersion'), 'usage': usage,
+        'finishReason': finish_reason,
+    }
+    return recommendation, metadata
+
+
 def _private_cv_text(report, cv):
     """Resolve only the exact frozen CV source; never expose it in snapshots/API."""
     sources = cv.get('sourceDocuments') if isinstance(cv, dict) else []
@@ -822,7 +1628,13 @@ def _private_cv_text(report, cv):
     document_id = _s(source.get('id'))
     if not document_id:
         return ''
-    source = sources[0] if isinstance(sources[0], dict) else {}
+    # Frozen report snapshots use the privacy-safe normalized ``kind`` field,
+    # while the extraction service consumes the upload manifest's ``docKind``.
+    # Restore that vocabulary at this boundary without changing the snapshot
+    # or broadening which documents the extractor accepts.
+    source = dict(source)
+    if not source.get('docKind') and source.get('kind'):
+        source['docKind'] = source['kind']
     try:
         current = extract_approved_cv(report.learner_kind, report.learner_id, source)
     except CvExtractionError as exc:
@@ -861,21 +1673,55 @@ def generate_ai_justification(report, draft_type):
     except ImportError as exc:
         raise ReportInputError('The approved AI client is unavailable.') from exc
     payload = _ai_input(report, draft_type)
-    system = (
-        'Draft a professional, report-ready UK apprenticeship assessment narrative. '
-        'Use only the supplied JSON and write directly about the evidence and recorded decision. '
-        'Do not include internal workflow instructions, approval instructions, prompts, metadata, or technical details. '
-        'Do not invent facts, infer verified learning from a job title or self-assessment, '
-        'make a decision, change modules, change hours, calculate prices, or treat unavailable PLR as evidence of no prior learning. '
-        'If the supplied evidence is insufficient, say so clearly and identify what cannot be substantiated. '
-        'For suitability, explain the evidence-based alignment between the role, responsibilities, selected answers, and programme requirements. '
-        'For RPL without reduction, explain why the supplied evidence does not substantiate exemption or reduction against the relevant modules and KSBs. '
-        'For approved reductions, connect only the supplied CV, qualification, and work evidence to the affected modules and mapped KSBs, and explain the recorded reduction without changing it. '
-        'Return JSON with one key: justification.'
-    )
-    purpose = ('Explain why the selected programme is suitable using the supplied role, responsibilities, answers, and programme requirements.'
-               if draft_type == 'suitability' else
-               'Explain the assessor-entered RPL decision and training adjustment exactly as supplied.')
+    if draft_type == 'suitability':
+        system = (
+            'Draft a concise, professional UK apprenticeship programme suitability justification. '
+            'Use only the supplied evidence and write directly about the learner in complete sentences. '
+            'Aim for approximately 150-200 words in two coherent paragraphs; if evidence is limited, stay concise rather than padding the narrative. '
+            'Prioritise the learner-specific saved job title, responsibilities, Programme Understanding answers, selected Programme Suitability answers, '
+            'and qualifications only where specific verified details are supplied. Explain two or three specific connections between demonstrated responsibilities '
+            'or selected answers and the selected ME_L4 requirements. Ground the conclusion in the saved learner evidence, not in the programme description alone. '
+            'Explain why the apprenticeship would develop significant new occupational knowledge, skills and behaviours only where authoritative standard outcomes '
+            'and supporting learner evidence are supplied; if those mappings or evidence are absent, identify that limitation for assessor review rather than claiming coverage. '
+            'Do not repeat the full programme specification, produce a list, infer responsibilities or achievements, or make generic or exaggerated claims. '
+            'Do not claim KSB coverage unless authoritative mappings and supporting learner evidence are explicitly supplied. '
+            'Treat missing, empty, or placeholder-like information as insufficient evidence and say only what cannot be substantiated. '
+            'Discuss programme suitability only. Do not mention exemptions, prior-learning reductions, training hours, duration, funding, costs, or any other RPL decision. '
+            'Keep the selected programme distinct from any recommended future programme. Do not claim employer discussion, agreement or sign-off unless it is explicitly recorded in the supplied evidence. '
+            'Do not claim DfE compliance or audit approval. Never mention AI, JSON, technical fields, prompts, or internal workflow instructions. '
+            'Do not invent facts. Return JSON with one key: justification.'
+        )
+    else:
+        system = (
+            'Draft a professional, report-ready UK apprenticeship assessment narrative. '
+            'Use only the supplied evidence and write directly about the learner and the assessor-recorded decision, with complete sentences and a clear conclusion. '
+            'Aim for approximately 150-200 words in one or two coherent paragraphs. '
+            'Do not include internal workflow instructions, approval instructions, prompts, metadata, field names, JSON, or technical details. '
+            'Do not invent facts, infer verified learning from a job title or self-assessment, make a decision, change modules, change hours, calculate prices, '
+            'or treat unavailable PLR as evidence of no prior learning. '
+            'Treat missing, empty, or placeholder-like learner information as an evidence limitation and flag only genuine gaps or contradictions. '
+            'For No Relevant Prior Learning, distinguish the recorded label from the evidence conclusion: say No Relevant Prior Learning identified only when the supplied verified evidence supports that conclusion; otherwise say that the evidence is insufficient to justify a reduction. '
+            'Distinguish reported experience or self-assessment from demonstrated occupational competence. Use specific supplied qualification details, Skills Radar results, module names, and the authoritative planned hours where available, without calling a source verified unless the evidence says so. '
+            'Assess evidence against the saved Training Plan and occupational-standard outcomes only where authoritative mappings are supplied. If module KSB mappings, PLR, employer discussion or other mandatory evidence are absent, flag the deficiency for assessor review and never treat the absence as proof that prior learning does not exist. '
+            'Explain why the full standard Training Plan remains unchanged, including its total hours when supplied. '
+            'For RPL without reduction, explain why the supplied evidence does not substantiate exemption or reduction against the relevant modules and available KSB evidence. '
+            'For approved reductions, connect only the supplied CV, qualification, and work evidence to the affected modules and mapped KSBs, '
+            'explain the recorded reduction for each affected module without changing it, and do not invent employer agreement, competence, hours or financial values. '
+            'Never refer to arrays, JSON, fields, or internal data structures, and do not claim DfE compliance or audit approval. '
+            'Return JSON with one key: justification.'
+        )
+    if draft_type == 'suitability':
+        purpose = ('Explain why the selected ME_L4 programme is suitable using the learner\'s saved role, responsibilities, '
+                   'Programme Understanding answers, selected Programme Suitability answers, qualifications, and only the most relevant programme requirements.')
+    elif report.relevant_prior_learning is False and report.reduction_justified is False:
+        plan = payload.get('trainingPlan') if isinstance(payload.get('trainingPlan'), dict) else {}
+        module_names = ', '.join(_s(item.get('title')) for item in plan.get('modules', []) if isinstance(item, dict) and _s(item.get('title')))
+        purpose = (f'The assessor recorded No Relevant Prior Learning. Explain why the supplied verified evidence does not establish a justified '
+                   f'module-specific exemption or training reduction, while preserving the full standard Training Plan of {plan.get("plannedHours")} planned hours. '
+                   f'Connect the evidence to these saved modules where supported: {module_names or "the saved modules"}. '
+                   'State genuine evidence limitations without treating unavailable PLR or missing KSB mappings as proof that prior learning does not exist.')
+    else:
+        purpose = 'Explain the assessor-entered RPL decision and training adjustment exactly as supplied, without changing modules, hours, or costs.'
     model = getattr(settings, 'OPENAI_MODEL', 'gpt-4.1-mini')
     base_url = getattr(settings, 'SUITABILITY_RPL_AI_BASE_URL', '') or None
     request = {
@@ -890,6 +1736,11 @@ def generate_ai_justification(report, draft_type):
     if model.lower().startswith('gpt-5'):
         request['reasoning_effort'] = 'minimal'
     response = OpenAI(api_key=api_key, base_url=base_url).chat.completions.create(**request)
+    finish_reason = getattr(response.choices[0], 'finish_reason', None) if response.choices else None
+    usage = response.usage.model_dump() if getattr(response, 'usage', None) else None
+    if finish_reason not in (None, 'stop'):
+        diagnostics = _narrative_diagnostics('', finish_reason, usage)
+        raise ReportInputError(f'The AI service did not finish the draft safely. {diagnostics}')
     content = _s(response.choices[0].message.content if response.choices else '')
     try:
         result = json.loads(content)
@@ -900,9 +1751,19 @@ def generate_ai_justification(report, draft_type):
         raise ReportInputError('The AI service returned an empty or oversized draft.')
     if '\ufffd' in justification:
         raise ReportInputError('The AI service returned invalid replacement characters.')
+    if draft_type == 'suitability':
+        try:
+            justification = _validate_suitability_narrative(justification)
+        except ReportInputError as exc:
+            diagnostics = _narrative_diagnostics(_normalise_suitability_narrative(justification), finish_reason, usage)
+            raise ReportInputError(f'{exc} {diagnostics}') from exc
+    else:
+        try:
+            justification = _validate_rpl_narrative(justification, report, payload)
+        except ReportInputError as exc:
+            diagnostics = _narrative_diagnostics(_normalise_suitability_narrative(justification), finish_reason, usage)
+            raise ReportInputError(f'{exc} {diagnostics}') from exc
     version = payload.get('cvEvidence', {}).get('evidenceVersion', {}) if draft_type == 'rpl' else {}
-    usage = response.usage.model_dump() if getattr(response, 'usage', None) else None
-    finish_reason = getattr(response.choices[0], 'finish_reason', None) if response.choices else None
     return justification, {'provider': getattr(settings, 'SUITABILITY_RPL_AI_PROVIDER', 'openai'), 'model': model, 'generatedAt': timezone.now().isoformat(),
                            'inputHash': _json_hash(payload), 'cvEvidenceVersion': version,
                            'usage': usage, 'finishReason': finish_reason, 'generatedText': justification}
@@ -941,3 +1802,27 @@ def suitability_rpl_ai(request, kind, learner_id, draft_type):
         return JsonResponse({'error': str(exc)}, status=503 if 'disabled' in str(exc) or 'configured' in str(exc) else 400)
     except DatabaseError:
         return JsonResponse({'error': 'The report draft could not be updated.'}, status=503)
+
+
+@require_role('admin')
+@csrf_protect
+def suitability_rpl_analysis(request, kind, learner_id):
+    """Return an unsaved, assessor-review-only RPL evidence analysis."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    learner = _learner(kind, learner_id)
+    if learner is None:
+        return JsonResponse({'error': 'Learner not found.'}, status=404)
+    context = _context(learner, kind, _programme_assessment(learner_id))
+    try:
+        report = SuitabilityRplReport.objects.prefetch_related('reductions').filter(
+            learner_kind=kind, learner_id=learner_id, context_key=context['key'], status=SuitabilityRplReport.STATUS_DRAFT,
+        ).first()
+        if report is None:
+            raise ReportInputError('Save the report draft before analysing RPL evidence.')
+        recommendation, metadata = generate_rpl_evidence_analysis(report)
+        return JsonResponse({'recommendation': recommendation, 'metadata': metadata})
+    except ReportInputError as exc:
+        return JsonResponse({'error': str(exc)}, status=503 if 'disabled' in str(exc) or 'configured' in str(exc) else 400)
+    except DatabaseError:
+        return JsonResponse({'error': 'The RPL evidence analysis could not be completed.'}, status=503)

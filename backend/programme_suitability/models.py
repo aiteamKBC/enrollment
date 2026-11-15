@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.db.models import Q
 
@@ -186,3 +188,58 @@ class SuitabilityCvExtraction(models.Model):
         db_table = 'suitability_cv_extractions'
         constraints = [models.UniqueConstraint(fields=('learner_kind', 'learner_id', 'source_document_id', 'source_blob_hash'), name='unique_suitability_cv_source')]
         indexes = [models.Index(fields=('learner_kind', 'learner_id', 'source_document_id'), name='suit_cv_learner_doc_idx')]
+
+
+class SuitabilityRplDocumentSignature(models.Model):
+    """One immutable signer record for one issued Suitability/RPL PDF.
+
+    ``issued_document_id`` is the UUID of the existing immutable
+    ``Document_Template_Issues`` row. It is intentionally stored as a value,
+    rather than a Django FK, because that table is managed outside Django
+    migrations and lives in the ``enrolment`` schema.
+    """
+
+    ROLE_ADMIN = 'admin'
+    ROLE_LEARNER = 'learner'
+    ROLE_EMPLOYER = 'employer'
+    ROLE_CHOICES = (
+        (ROLE_ADMIN, 'Admin / assessor'),
+        (ROLE_LEARNER, 'Learner'),
+        (ROLE_EMPLOYER, 'Employer / line manager'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    issued_document_id = models.UUIDField()
+    document_key = models.CharField(max_length=64, default='suitability-rpl-report')
+    learner_kind = models.CharField(max_length=20)
+    learner_id = models.BigIntegerField()
+    report_id = models.BigIntegerField()
+    report_version = models.PositiveIntegerField()
+    report_revision = models.PositiveIntegerField()
+    pdf_sha256 = models.CharField(max_length=64)
+    signer_role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    login_account_id = models.BigIntegerField()
+    signer_subject_type = models.CharField(max_length=20)
+    signer_subject_id = models.BigIntegerField()
+    signer_name = models.CharField(max_length=200)
+    signature_method = models.CharField(max_length=32, default='drawn')
+    signature = models.TextField()
+    consent_version = models.CharField(max_length=40, default='suitability-rpl-sign-v1')
+    consent_text = models.TextField()
+    consented_at = models.DateTimeField()
+    signed_at = models.DateTimeField()
+    ip_address = models.TextField(blank=True)
+    user_agent = models.TextField(blank=True)
+    audit_metadata = models.JSONField(default=dict)
+
+    class Meta:
+        db_table = 'suitability_rpl_document_signatures'
+        constraints = [
+            models.UniqueConstraint(
+                fields=('issued_document_id', 'signer_role'),
+                name='unique_suit_rpl_issue_signature_role',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=('learner_kind', 'learner_id', 'issued_document_id'), name='suit_rpl_sig_issue_idx'),
+        ]

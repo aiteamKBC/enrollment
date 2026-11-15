@@ -120,6 +120,7 @@ export interface SuitabilityRplReport {
   cvExtractionAcknowledged: boolean;
   cvExtractionAcknowledgedBy: string | null;
   cvExtractionAcknowledgedAt: string | null;
+  cvEvidenceVersion: { documentId: string; container: string; blobName: string; sha256: string; extractorVersion: string };
   sourceSnapshot: SuitabilityRplEvidence;
   sourceVersions: Record<string, unknown>;
   sourceSnapshotHash: string;
@@ -157,14 +158,95 @@ export interface SuitabilityRplSavePayload {
   finalise: boolean;
 }
 
+export type RplAnalysisOutcome =
+  | 'no-relevant-prior-learning'
+  | 'potential-whole-module-reduction'
+  | 'relevant-partial-no-exemption'
+  | 'insufficient-evidence';
+
+export interface RplAnalysisModuleRecommendation {
+  moduleId: string;
+  moduleName: string;
+  plannedHours: number | null;
+  wholeModuleReductionRecommended: boolean;
+  evidenceSufficiency: 'sufficient' | 'partial' | 'insufficient' | 'needs-review';
+  supportingEvidence: Array<{ evidenceId: string; detail: string }>;
+  authoritativeKsbMappings: Array<{ code: string; description: string; source: string }>;
+  missingEvidence: string[];
+  explanation: string;
+}
+
+export interface RplAnalysisRecommendation {
+  overallOutcome: RplAnalysisOutcome;
+  reasoning: string;
+  modules: RplAnalysisModuleRecommendation[];
+  evidenceGaps: string[];
+  warnings: string[];
+}
+
+export interface RplAnalysisMetadata {
+  provider: string;
+  model: string;
+  generatedAt: string;
+  sourceSnapshotHash: string;
+  cvEvidenceVersion: { documentId: string; container: string; blobName: string; sha256: string; extractorVersion: string };
+  usage?: Record<string, unknown> | null;
+  finishReason?: string | null;
+}
+
+export interface SuitabilityRplSignatureStatus {
+  issueId: string;
+  reportId: string;
+  reportVersion: number;
+  reportRevision: number;
+  pdfSha256: string;
+  requiredRoles: Array<'admin' | 'learner' | 'employer'>;
+  signatures: Record<'admin' | 'learner' | 'employer', {
+    signed: boolean;
+    name: string;
+    signedAt: string | null;
+    method: string;
+  }>;
+  fullySigned: boolean;
+  pdfUrl: string;
+  signingEnabled: boolean;
+  signingStatus: string;
+}
+
+export interface SuitabilityRplIssuedDocument {
+  issueId: string;
+  title: string;
+  issuedAt: string | null;
+  reportId: string;
+  reportVersion: number;
+  reportRevision: number;
+  pdfSha256: string;
+  pdfUrl: string;
+  requiredRoles: Array<'admin' | 'learner' | 'employer'>;
+  signatures: SuitabilityRplSignatureStatus['signatures'];
+  fullySigned: boolean;
+  signingEnabled: boolean;
+  signingStatus: string;
+}
+
 const base = (kind: LearnerKind, learnerId: string) =>
   `/enrolment_api/programme-suitability/${kind}/${learnerId}/suitability-rpl/`;
+
+export class SuitabilityRplRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'SuitabilityRplRequestError';
+    this.status = status;
+  }
+}
 
 async function readJson<T>(response: Response): Promise<T> {
   const text = await response.text();
   let data: { error?: string } | null = null;
   try { data = JSON.parse(text) as { error?: string }; } catch { data = null; }
-  if (!response.ok) throw new Error(data?.error || `The report request failed (${response.status}).`);
+  if (!response.ok) throw new SuitabilityRplRequestError(data?.error || `The report request failed (${response.status}).`, response.status);
   if (!data || typeof data !== 'object') throw new Error('The report service returned an invalid response.');
   return data as T;
 }
@@ -195,4 +277,61 @@ export async function generateSuitabilityRplJustification(
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
     body: '{}',
   }));
+}
+
+export async function analyseSuitabilityRplEvidence(kind: LearnerKind, learnerId: string) {
+  const { csrfToken } = await prefetchAssessmentSecurity();
+  return readJson<{ recommendation: RplAnalysisRecommendation; metadata: RplAnalysisMetadata }>(await fetch(`${base(kind, learnerId)}ai/rpl-analysis/`, {
+    method: 'POST', credentials: 'include', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+    body: '{}',
+  }));
+}
+
+export async function issueSuitabilityRplReport(
+  kind: LearnerKind,
+  learnerId: string,
+  payload: { reportId: string; reportVersion: number; reportRevision: number },
+) {
+  const { csrfToken } = await prefetchAssessmentSecurity();
+  return readJson<{ issued: boolean; issueId: string; sha256: string; alreadyIssued: boolean; signingEnabled: boolean }>(await fetch(`${base(kind, learnerId)}issue/`, {
+    method: 'POST', credentials: 'include', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+    body: JSON.stringify(payload),
+  }));
+}
+
+export async function fetchSuitabilityRplSignatures(
+  kind: LearnerKind,
+  learnerId: string,
+  issueId: string,
+) {
+  return readJson<{ status: SuitabilityRplSignatureStatus }>(await fetch(
+    `${base(kind, learnerId)}issued/${issueId}/signatures/`,
+    { credentials: 'include', cache: 'no-store' },
+  ));
+}
+
+export async function fetchSuitabilityRplIssuedDocuments(kind: LearnerKind, learnerId: string) {
+  return readJson<{ documents: SuitabilityRplIssuedDocument[] }>(await fetch(
+    `${base(kind, learnerId)}issued/`,
+    { credentials: 'include', cache: 'no-store' },
+  ));
+}
+
+export async function signSuitabilityRplReport(
+  kind: LearnerKind,
+  learnerId: string,
+  issueId: string,
+  payload: { role: 'admin' | 'learner' | 'employer'; name: string; signature: string; consent: true; consentText: string },
+) {
+  const { csrfToken } = await prefetchAssessmentSecurity();
+  return readJson<{ status: SuitabilityRplSignatureStatus }>(await fetch(
+    `${base(kind, learnerId)}issued/${issueId}/signatures/`,
+    {
+      method: 'POST', credentials: 'include', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify(payload),
+    },
+  ));
 }

@@ -6,13 +6,22 @@ import {
 import type { LearnerKind } from '@/api/learnerDetail';
 import {
   fetchSuitabilityRplReport,
+  fetchSuitabilityRplIssuedDocuments,
+  signSuitabilityRplReport,
+  analyseSuitabilityRplEvidence,
   generateSuitabilityRplJustification,
+  issueSuitabilityRplReport,
   saveSuitabilityRplReport,
+  SuitabilityRplRequestError,
   type SuitabilityRplEvidence,
   type SuitabilityRplReduction,
   type SuitabilityRplReport,
   type SuitabilityRplSavePayload,
+  type RplAnalysisRecommendation,
+  type RplAnalysisMetadata,
+  type SuitabilityRplIssuedDocument,
 } from '@/api/suitabilityRplReport';
+import { SignaturePad } from '@/pages/users/wizard/steps/SignaturePad';
 import {
   buildSuitabilityRplReportPdf,
   loadSuitabilityRplReportAssets,
@@ -63,6 +72,19 @@ function decisionOf(form: FormState): Decision {
   return form.reductionJustified ? 'relevant-with-reduction' : 'legacy-relevant-no-reduction';
 }
 
+function simpleRplOutcome(outcome: RplAnalysisRecommendation['overallOutcome']) {
+  if (outcome === 'no-relevant-prior-learning') return 'No relevant prior learning';
+  if (outcome === 'insufficient-evidence') return 'Further review required';
+  return 'Relevant prior learning';
+}
+
+function shortRplReason(value: string) {
+  const sentences = value.replace(/\s+/g, ' ').trim().match(/[^.!?]+[.!?]+/g);
+  const concise = (sentences || [value.trim()]).slice(0, 2).join(' ').trim();
+  const words = concise.split(/\s+/).filter(Boolean);
+  return words.length <= 40 ? concise : `${words.slice(0, 40).join(' ').replace(/[,:;]$/, '')}…`;
+}
+
 function radarSummary(evidence: SuitabilityRplEvidence) {
   if (evidence.skillsRadar.summary?.length) {
     const saved = new Map(evidence.skillsRadar.summary.map((group) => [group.label, group]));
@@ -107,6 +129,11 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [issuedDocuments, setIssuedDocuments] = useState<SuitabilityRplIssuedDocument[]>([]);
+  const [signingIssue, setSigningIssue] = useState<SuitabilityRplIssuedDocument | null>(null);
+  const [signConsent, setSignConsent] = useState(false);
+  const [signPreviewed, setSignPreviewed] = useState(false);
+  const [rplAnalysis, setRplAnalysis] = useState<{ recommendation: RplAnalysisRecommendation; metadata: RplAnalysisMetadata } | null>(null);
   const loadSequence = useRef(0);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -121,6 +148,10 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       setForm(formFromReport(state.report));
       setAiEnabled(state.aiEnabled);
       setHistoryCount(state.history.length);
+      setRplAnalysis(null);
+      if (state.report?.status === 'finalised') {
+        try { setIssuedDocuments((await fetchSuitabilityRplIssuedDocuments(kind, learnerId)).documents); } catch { setIssuedDocuments([]); }
+      } else setIssuedDocuments([]);
     } catch (cause) {
       if (sequence === loadSequence.current && !(cause instanceof DOMException && cause.name === 'AbortError')) {
         setError(cause instanceof Error ? cause.message : 'Could not load the report.');
@@ -145,6 +176,10 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   const selectedIds = useMemo(() => new Set(form.reductions.map((row) => row.moduleId)), [form.reductions]);
   const totalReduction = form.reductions.reduce((sum, row) => sum + (Number(row.reducedHours) || 0), 0);
   const adjustedHours = evidence?.trainingPlan.plannedHours == null ? null : evidence.trainingPlan.plannedHours - totalReduction;
+  const analysisStale = !!rplAnalysis && !!report && (
+    rplAnalysis.metadata.sourceSnapshotHash !== report.sourceSnapshotHash
+    || (!!rplAnalysis.metadata.cvEvidenceVersion.sha256 && rplAnalysis.metadata.cvEvidenceVersion.sha256 !== report.cvEvidenceVersion.sha256)
+  );
 
   const setDecision = (next: Decision) => {
     if (locked) return;
@@ -174,6 +209,22 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       setAiEnabled(result.aiEnabled);
       setNotice(finalise ? 'Report finalised. The approved snapshot is now locked.' : 'Draft saved.');
     } catch (cause) {
+      if (finalise && cause instanceof SuitabilityRplRequestError && [502, 503, 504].includes(cause.status)) {
+        try {
+          const state = await fetchSuitabilityRplReport(kind, learnerId);
+          if (state.report?.status === 'finalised') {
+            setEvidence(state.report.sourceSnapshot || state.evidence);
+            setReport(state.report);
+            setForm(formFromReport(state.report));
+            setAiEnabled(state.aiEnabled);
+            setHistoryCount(state.history.length);
+            setNotice('Report finalised. The approved snapshot is now locked.');
+            return;
+          }
+        } catch {
+          // Keep the original gateway error when the confirmation request also fails.
+        }
+      }
       setError(cause instanceof Error ? cause.message : 'Could not save the report.');
     } finally {
       setWorking(null);
@@ -198,6 +249,28 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       setNotice('AI draft added. Edit it as needed, then explicitly mark it reviewed.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not generate the AI draft.');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const analyseRpl = async () => {
+    setWorking('rpl-analysis');
+    setError('');
+    setNotice('');
+    try {
+      let saved = report;
+      if (!saved) {
+        const result = await saveSuitabilityRplReport(kind, learnerId, { ...form, revision: 0, finalise: false });
+        saved = result.report;
+        setReport(saved);
+        setEvidence(saved.sourceSnapshot);
+      }
+      const result = await analyseSuitabilityRplEvidence(kind, learnerId);
+      setRplAnalysis(result);
+      setNotice('AI recommendation ready. Review the evidence and record the assessor decision separately.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not analyse the RPL evidence.');
     } finally {
       setWorking(null);
     }
@@ -263,7 +336,17 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
         noReductionReason: form.noReductionReason,
         justification: form.rplJustification,
         reviewed: form.rplReviewed,
-        rows: form.reductions.map((row) => ({ area: row.moduleTitle, ksb: row.ksbCodes.join(', '), evidence: row.evidence, hours: row.reducedHours })),
+        rows: form.reductions.map((row) => ({
+          area: row.moduleTitle,
+          ksb: row.ksbCodes.join(', '),
+          plannedHours: row.plannedHours,
+          reducedHours: row.reducedHours,
+          adjustedHours: typeof row.plannedHours === 'number' && typeof row.reducedHours === 'number'
+            ? row.plannedHours - row.reducedHours
+            : undefined,
+          evidence: row.evidence,
+          hours: row.reducedHours,
+        })),
         originalHours: evidence.trainingPlan.plannedHours ?? '',
         reductionHours: totalReduction || '',
         adjustedHours: adjustedHours ?? '',
@@ -297,6 +380,43 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
     } finally { setWorking(null); }
   };
 
+  const issue = async () => {
+    if (!report || report.status !== 'finalised') return;
+    setWorking('issue');
+    setError('');
+    setNotice('');
+    try {
+      const result = await issueSuitabilityRplReport(kind, learnerId, {
+        reportId: report.id,
+        reportVersion: report.reportVersion,
+        reportRevision: report.revision,
+      });
+      setNotice(result.alreadyIssued
+        ? 'This finalised report is already issued and immutable. The trusted server PDF is available for electronic signing.'
+        : 'Finalised report issued as an immutable trusted server PDF. It is ready for electronic signing.');
+      setIssuedDocuments((await fetchSuitabilityRplIssuedDocuments(kind, learnerId)).documents);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not issue the finalised report.');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const signAdmin = async (signature: string) => {
+    if (!signingIssue || !signConsent || !signPreviewed) return;
+    setWorking('sign-admin');
+    try {
+      await signSuitabilityRplReport(kind, learnerId, signingIssue.issueId, {
+        role: 'admin', name: 'Assessor', signature, consent: true,
+        consentText: 'I have reviewed the exact issued Suitability & RPL Report PDF and consent to signing this immutable version.',
+      });
+      setSigningIssue(null); setSignConsent(false); setSignPreviewed(false);
+      setIssuedDocuments((await fetchSuitabilityRplIssuedDocuments(kind, learnerId)).documents);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save the assessor signature.');
+    } finally { setWorking(null); }
+  };
+
   if (loading) return <div className={`${panel} flex min-h-52 items-center justify-center gap-3 p-8 text-sm text-foreground-500`}><Loader2 className="animate-spin" size={18} />Loading report evidence…</div>;
   if (!evidence) return <ErrorMessage>{error || 'The report evidence is unavailable.'}</ErrorMessage>;
 
@@ -319,6 +439,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
           <div className="flex flex-wrap gap-2">
             <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 disabled:opacity-50" onClick={preview} disabled={!!working}><FileSearch size={16} />Preview PDF</button>
             <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2.5 text-sm font-semibold text-primary-900 hover:bg-primary-50 disabled:opacity-50" onClick={download} disabled={!!working}><Download size={16} />Download draft</button>
+            {locked && <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-primary-500 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-primary-400 disabled:opacity-50" onClick={issue} disabled={!!working}><FileCheck2 size={16} />{working === 'issue' ? 'Issuing…' : 'Issue finalised report'}</button>}
           </div>
         </div>
       </section>
@@ -326,6 +447,14 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       {error && <ErrorMessage>{error}</ErrorMessage>}
       {cvNeedsAttention && <section className={`${panel} border-amber-200 bg-amber-50 p-5`} aria-labelledby="cv-extraction-status"><p className={label}>CV evidence requires attention</p><h3 id="cv-extraction-status" className="mt-1 font-heading text-lg font-semibold text-amber-950">CV extraction: {cvExtractionStatus}</h3>{!locked && <><label className="mt-3 block"><span className={label}>Assessor acknowledgement reason</span><textarea className={`${input} min-h-20`} value={form.cvExtractionAcknowledgementReason || ''} onChange={(event) => setForm((current) => ({ ...current, cvExtractionAcknowledgementReason: event.target.value }))} /></label><label className="mt-3 flex items-start gap-3 text-sm text-amber-950"><input type="checkbox" className="mt-0.5" checked={!!form.cvExtractionAcknowledged} onChange={(event) => setForm((current) => ({ ...current, cvExtractionAcknowledged: event.target.checked }))} /><span>I acknowledge this CV cannot be used and approve proceeding with other evidence.</span></label></>}</section>}
       {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}
+      {locked && issuedDocuments.length > 0 && <section className={`${panel} p-5`} aria-label="Issued Suitability and RPL Report signing">
+        {(() => { const current = issuedDocuments[0]; return <>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><p className={label}>Issued document</p><h3 className="mt-1 font-heading text-lg font-semibold">Suitability &amp; RPL Report</h3><p className="mt-1 text-xs text-foreground-500">Version {current.reportVersion} · Revision {current.reportRevision} · Issued {current.issuedAt ? new Date(current.issuedAt).toLocaleDateString('en-GB') : '—'}</p></div><span className="rounded-full bg-primary-50 px-2.5 py-1 text-[10px] font-semibold text-primary-800">{current.fullySigned ? 'Fully signed' : 'Awaiting signatures'}</span></div>
+          <div className="mt-3 flex flex-wrap gap-4 text-xs"><span>Assessor {current.signatures.admin.signed ? '✓' : 'pending'}</span><span>Learner {current.signatures.learner.signed ? '✓' : 'pending'}</span><span>Employer {current.signatures.employer.signed ? '✓' : 'pending'}</span></div>
+          <div className="mt-4 flex flex-wrap gap-2"><button type="button" className={secondaryButton} onClick={() => { window.open(current.pdfUrl, '_blank', 'noopener,noreferrer'); setSignPreviewed(true); }}><FileSearch size={15} />Preview issued PDF</button><a className={secondaryButton} href={current.pdfUrl} download="Suitability-RPL-Report.pdf"><Download size={15} />Download</a>{current.signingEnabled && !current.signatures.admin.signed && <button type="button" className={primaryButton} onClick={() => { setSigningIssue(current); setSignConsent(false); setSignPreviewed(false); }}><FileCheck2 size={15} />Sign as assessor</button>}</div>
+          {signingIssue && signingIssue.issueId === current.issueId && <div className="mt-4 space-y-3 rounded-xl border border-foreground-200 bg-background-100 p-4"><button type="button" className={secondaryButton} onClick={() => { window.open(current.pdfUrl, '_blank', 'noopener,noreferrer'); setSignPreviewed(true); }}><FileSearch size={15} />Preview exact issued PDF</button><label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={signConsent} disabled={!signPreviewed || working === 'sign-admin'} onChange={event => setSignConsent(event.target.checked)} className="mt-0.5" />I have reviewed this exact report version and consent to signing it.</label><SignaturePad signatoryName="Assessor" onCommit={signAdmin} onCancel={() => setSigningIssue(null)} /></div>}
+        </>; })()}
+      </section>}
       {locked && <div className="flex items-start gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900"><LockKeyhole className="mt-0.5 shrink-0" size={17} /><span>This finalised report is read-only. Its evidence snapshot and approved assessment will not change when learner or programme data changes.</span></div>}
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -342,6 +471,26 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
 
         <section className={`${panel} p-5`}>
           <div className="flex items-start justify-between gap-4"><div><p className={label}>Prior learning decision</p><h3 className="mt-1 font-heading text-lg font-semibold">RPL assessment</h3></div><FileCheck2 className="text-primary-600" size={22} /></div>
+          <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50/70 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><p className={label}>Advisory evidence review</p><p className="mt-1 text-sm font-semibold text-primary-950">AI Recommendation — Assessor Review Required</p></div>
+              <button type="button" className={secondaryButton} disabled={locked || !aiEnabled || !!working} title={aiEnabled ? 'Analyse the current evidence before recording the decision' : 'AI drafting is disabled in this environment'} onClick={() => void analyseRpl()}><FileSearch size={15} />{working === 'rpl-analysis' ? 'Analysing…' : 'Analyse RPL Evidence with AI'}</button>
+            </div>
+            {!aiEnabled && <p className="mt-2 text-xs text-foreground-500">AI recommendations are disabled by default. The assessor decision remains available manually.</p>}
+          </div>
+          {rplAnalysis && <div className={"mt-3 rounded-xl border p-4 text-sm " + (analysisStale ? "border-amber-200 bg-amber-50 text-amber-950" : "border-foreground-200 bg-background-100 text-foreground-800")}>
+            {analysisStale ? <p className="font-semibold">This recommendation is out of date because the evidence version changed. Run the analysis again.</p> : <>
+              <p className={label}>Suggested prior learning outcome</p>
+              <p className="mt-1 text-base font-semibold text-primary-950">{simpleRplOutcome(rplAnalysis.recommendation.overallOutcome)}</p>
+              <p className="mt-3 leading-6">{shortRplReason(rplAnalysis.recommendation.reasoning)}</p>
+              <p className={label + " mt-4"}>Modules recommended for removal</p>
+              {rplAnalysis.recommendation.modules.filter((item) => item.wholeModuleReductionRecommended).length === 0 ? (
+                <p className="mt-1 text-sm">No module reductions recommended</p>
+              ) : (
+                <ul className="mt-2 list-disc space-y-1 pl-5">{rplAnalysis.recommendation.modules.filter((item) => item.wholeModuleReductionRecommended).map((item) => <li key={item.moduleId} className="font-semibold text-primary-950">{item.moduleName}</li>)}</ul>
+              )}
+            </>}
+          </div>}
           <fieldset className="mt-5 space-y-2" disabled={locked}>
             <legend className={label}>Assessment outcome</legend>
             {[
@@ -351,10 +500,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
           </fieldset>
           {decision === 'legacy-relevant-no-reduction' && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">This historical report used the previous “relevant prior learning, no reduction” outcome. It is preserved unchanged; choose one of the two current outcomes to reassess this draft.</p>}
           {decision === 'none' && <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-950"><strong>Full standard Training Plan</strong><p className="mt-1 text-xs text-primary-800">All authoritative modules remain included. Planned hours, duration and programme cost are unchanged.</p></div>}
-        </section>
-      </div>
-
-      {decision === 'relevant-with-reduction' && <section className={`${panel} p-5`}>
+          {decision === 'relevant-with-reduction' && <div className="mt-5 border-t border-foreground-200 pt-5">
         <div className="flex flex-wrap items-end justify-between gap-4"><div><p className={label}>Authoritative source only</p><h3 className="mt-1 font-heading text-lg font-semibold">Training Plan module reductions</h3><p className="mt-1 text-sm text-foreground-500">This records the assessment only. It does not change the Training Plan or funding calculations.</p></div><label><span className={label}>Add module</span><select aria-label="Add Training Plan module" className={`${input} min-w-64`} disabled={locked || !evidence.trainingPlan.available} value="" onChange={(event) => addModule(event.target.value)}><option value="">Select a saved module…</option>{modules.filter((module) => !selectedIds.has(module.moduleId)).map((module) => <option key={module.moduleId} value={module.moduleId}>{module.title} · {module.plannedHours ?? 'Not available'} hours</option>)}</select></label></div>
         {!evidence.trainingPlan.available && <ErrorMessage>{evidence.trainingPlan.message}</ErrorMessage>}
         <div className="mt-4 space-y-3">{form.reductions.map((row, index) => {
@@ -363,7 +509,9 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
         })}{!form.reductions.length && <div className="rounded-xl border border-dashed border-foreground-300 px-4 py-8 text-center text-sm text-foreground-500"><Plus className="mx-auto mb-2" size={19} />Select one or more modules from the saved Training Plan.</div>}</div>
         <div className="mt-4 grid gap-2 sm:grid-cols-3">{[['Original hours', evidence.trainingPlan.plannedHours ?? 'Not available'], ['Approved reduction', totalReduction], ['Remaining hours', adjustedHours ?? 'Not available']].map(([heading, value]) => <div key={heading} className="rounded-xl bg-primary-50 p-3"><p className={label}>{heading}</p><p className="mt-1 text-lg font-semibold text-primary-900">{value}</p></div>)}</div>
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"><strong>Programme cost</strong><p className="mt-1">Authorised pricing/funding rules and the original agreed price are not available in this evidence snapshot. Cost adjustment remains pending authorised assessment; no proportional reduction is calculated here.</p></div>
-      </section>}
+          </div>}
+        </section>
+      </div>
 
       <section className={`${panel} p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className={label}>Editable narrative · admin decision remains separate</p><h3 className="mt-1 font-heading text-lg font-semibold">RPL justification</h3></div><button type="button" className={secondaryButton} disabled={locked || !aiEnabled || !report || decision === 'undecided' || !!working} title={aiEnabled ? '' : 'AI drafting is disabled in this environment'} onClick={() => generate('rpl')}><Sparkles size={15} />{working === 'ai-rpl' ? 'Drafting…' : 'Generate AI draft'}</button></div>
@@ -372,7 +520,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       </section>
 
       <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-foreground-200 bg-white/95 p-3 shadow-xl backdrop-blur">
-        <p className="flex items-center gap-2 text-xs text-foreground-500"><FileCheck2 size={15} />Section 08 includes assessor, learner and employer / line manager signature placeholders.</p>
+        <p className="flex items-center gap-2 text-xs text-foreground-500"><FileCheck2 size={15} />Section 06 includes assessor, learner and employer / line manager signature placeholders.</p>
         <div className="flex flex-wrap gap-2"><button type="button" className={secondaryButton} disabled={!!working} onClick={() => load()}><RefreshCw size={15} />Reload</button>{!locked && <><button type="button" className={secondaryButton} disabled={!!working} onClick={() => save(false)}><Save size={15} />{working === 'save' ? 'Saving…' : 'Save draft'}</button><button type="button" className={primaryButton} disabled={!!working} onClick={() => save(true)}><CheckCircle2 size={16} />{working === 'finalise' ? 'Finalising…' : 'Finalise report'}</button></>}</div>
       </div>
     </div>

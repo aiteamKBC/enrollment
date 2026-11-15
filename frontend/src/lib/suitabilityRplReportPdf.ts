@@ -14,7 +14,7 @@ const PURPLE_LINE = [225, 211, 238] as const;
 const PURPLE_WASH = [245, 238, 250] as const;
 const INK = [29, 25, 32] as const;
 const MUTED = [83, 76, 88] as const;
-const SECTION_NUMBERS = ['01', '02', '03', '04', '05', '06', '07', '08'] as const; // taste-skill-ignore: approved document labels
+const SECTION_NUMBERS = ['01', '02', '03', '04', '05', '06'] as const; // taste-skill-ignore: approved document labels
 
 export const PROGRAMME_UNDERSTANDING_QUESTIONS = [
   'What is your understanding of the programme you are applying for?',
@@ -36,9 +36,7 @@ export const SUITABILITY_RPL_SECTION_TITLES = [
   'Programme Understanding',
   'Programme Suitability Assessment',
   'Skills Radar Assessment',
-  'CV, Qualifications & PLR Evidence',
   'Recognition of Prior Learning Assessment',
-  'Final Assessment & Recommendation',
   'Declarations & Signatures',
 ] as const;
 
@@ -84,7 +82,15 @@ export interface SuitabilityRplReportData {
     noReductionReason?: string;
     justification?: string;
     reviewed?: boolean;
-    rows?: Array<{ area?: string; ksb?: string; evidence?: string; hours?: string | number }>;
+    rows?: Array<{
+      area?: string;
+      ksb?: string;
+      evidence?: string;
+      hours?: string | number;
+      plannedHours?: string | number;
+      reducedHours?: string | number;
+      adjustedHours?: string | number;
+    }>;
     originalHours?: string | number;
     reductionHours?: string | number;
     adjustedHours?: string | number;
@@ -104,6 +110,18 @@ export interface SuitabilityRplReportAssets {
 
 function value(input: unknown): string {
   return input == null ? '' : String(input);
+}
+
+function numericValue(input: unknown): number | null {
+  if (input == null || input === '') return null;
+  const parsed = Number(input);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hoursText(input: unknown): string {
+  const parsed = numericValue(input);
+  if (parsed == null) return '';
+  return Number.isInteger(parsed) ? String(parsed) : parsed.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function excerpt(input: unknown, maximum: number): string {
@@ -341,25 +359,6 @@ function radar(doc: jsPDF, cx: number, cy: number, radius: number, groups: Radar
   }
 }
 
-function evidenceCard(doc: jsPDF, y: number, height: number, title: string, code: string, choices: string[], prompt: string, detail = '') {
-  box(doc, MARGIN, y, CONTENT_WIDTH, height);
-  doc.setFillColor(...PURPLE);
-  doc.roundedRect(MARGIN, y, 1.5, height, 0.7, 0.7, 'F');
-  label(doc, title, MARGIN + 6, y + 7, 8.6);
-  rightLabel(doc, code, PAGE_WIDTH - MARGIN - 5, y + 7, 6.7);
-  const normalized = detail.toLowerCase();
-  choices.forEach((choice, index) => checkbox(
-    doc,
-    MARGIN + 6 + (index * 39),
-    y + 10.5,
-    choice,
-    Boolean(detail) && normalized.startsWith(choice.toLowerCase()),
-  ));
-  body(doc, prompt, MARGIN + 6, y + 22, CONTENT_WIDTH - 12, 7.1);
-  if (detail) body(doc, detail, MARGIN + 6, y + 28, CONTENT_WIDTH - 12, 7.2, MUTED);
-  else blankLine(doc, MARGIN + 6, y + height - 5.5, CONTENT_WIDTH - 12);
-}
-
 function signatureCard(doc: jsPDF, x: number, y: number, width: number, title: string, declaration: string) {
   box(doc, x, y, width, 65);
   doc.setFillColor(...PURPLE_WASH);
@@ -521,7 +520,7 @@ function secondPage(doc: jsPDF, data: SuitabilityRplReportData) {
     if (index < summary.length - 1) blankLine(doc, 109, y + 12.5, 81);
   });
 
-  let evidenceHeadingY = 137;
+
   if ((data.skillsRadar?.length || 0) > 0) {
     label(doc, 'COMPLETE SAVED SCORE TABLE', MARGIN, 135, 6.8, PURPLE_DARK);
     autoTable(doc, {
@@ -537,154 +536,125 @@ function secondPage(doc: jsPDF, data: SuitabilityRplReportData) {
         if (pageNumber > 1) runningHeader(doc, 'SKILLS RADAR — SAVED SCORE CONTINUATION', data.status);
       },
     });
-    const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-    doc.addPage('a4', 'portrait');
-    runningHeader(doc, 'CV, QUALIFICATIONS AND PLR EVIDENCE', data.status);
-    evidenceHeadingY = 43;
   }
-  sectionHeading(doc, 5, SUITABILITY_RPL_SECTION_TITLES[4], 'EVIDENCE REVIEW', evidenceHeadingY);
-  const firstCardY = evidenceHeadingY + 7;
-  evidenceCard(doc, firstCardY, 35, 'Curriculum Vitae (CV)', 'A / CV', ['Provided', 'Not provided', 'Not available'], 'Relevant job experience and responsibilities:', data.evidence?.cv);
-  evidenceCard(doc, firstCardY + 38, 35, 'Qualifications', 'B / QUALIFICATIONS', ['Provided', 'Not provided', 'Not available'], 'Relevant qualification, level and prior coverage:', data.evidence?.qualifications);
-  evidenceCard(doc, firstCardY + 76, 45, 'Personal Learning Record (PLR)', 'C / PLR', ['Available', 'Not available'], 'Relevant prior achievement and learning evidence:', data.evidence?.plr);
 }
 
 function thirdPage(doc: jsPDF, data: SuitabilityRplReportData) {
-  runningHeader(doc, 'RECOGNITION OF PRIOR LEARNING - ADMIN DECISION', data.status);
-  sectionHeading(doc, 6, SUITABILITY_RPL_SECTION_TITLES[5], 'ADMIN DECISION', 43);
+  const rpl = data.rpl ?? {};
+  const fullProgramme = rpl.relevantPriorLearning === false;
+  const reductionApproved = rpl.relevantPriorLearning === true && rpl.reductionJustified === true;
+  const legacyNoReduction = rpl.relevantPriorLearning === true && rpl.reductionJustified === false;
+  const decisionLabel = fullProgramme
+    ? 'No Relevant Prior Learning - Full Standard Training Plan'
+    : reductionApproved
+      ? 'Relevant Prior Learning - Training Reduction Approved'
+      : legacyNoReduction
+        ? 'Relevant Prior Learning - No Training Reduction Approved'
+        : 'RPL decision not recorded';
 
-  box(doc, MARGIN, 51, CONTENT_WIDTH, 24, PURPLE_WASH);
-  body(doc, 'The assessor records whether verified prior learning overlaps with the programme requirements and whether a reduction in planned training is justified.', MARGIN + 5, 60, CONTENT_WIDTH - 10, 8.1, INK, 1.42);
+  runningHeader(doc, 'RECOGNITION OF PRIOR LEARNING - ASSESSOR DECISION', data.status);
+  sectionHeading(doc, 5, SUITABILITY_RPL_SECTION_TITLES[4], 'ASSESSOR DECISION', 43);
 
-  box(doc, MARGIN, 79, CONTENT_WIDTH, 25);
-  label(doc, 'RPL DECISION', MARGIN + 5, 86, 6.8);
-  checkbox(doc, MARGIN + 5, 91, 'No relevant prior learning', data.rpl?.relevantPriorLearning === false, 45);
-  checkbox(doc, MARGIN + 69, 91, 'Relevant, no reduction', data.rpl?.relevantPriorLearning === true && data.rpl?.reductionJustified === false, 42);
-  checkbox(doc, MARGIN + 130, 91, 'Reduction justified', data.rpl?.reductionJustified === true, 37);
+  let contentY = 51;
+  box(doc, MARGIN, contentY, CONTENT_WIDTH, 30, PURPLE_WASH);
+  label(doc, 'ASSESSOR-RECORDED DECISION', MARGIN + 5, contentY + 8, 6.8, PURPLE_DARK);
+  body(doc, decisionLabel, MARGIN + 5, contentY + 18, CONTENT_WIDTH - 10, 9.2, INK);
+  contentY += 39;
 
-  box(doc, MARGIN, 109, CONTENT_WIDTH, 33);
-  label(doc, 'ASSESSOR EVIDENCE REVIEW', MARGIN + 5, 116, 7);
-  body(doc, 'The decision must be based on verified evidence; PLR being unavailable is not evidence that prior learning is absent.', MARGIN + 5, 124, CONTENT_WIDTH - 10, 7.1, MUTED);
-  if (data.rpl?.evidenceReview) body(doc, excerpt(data.rpl.evidenceReview, 310), MARGIN + 5, 134, CONTENT_WIDTH - 10, 7.2);
-  else {
-    blankLine(doc, MARGIN + 5, 135, CONTENT_WIDTH - 10);
-  }
-
-  box(doc, MARGIN, 147, CONTENT_WIDTH, 40);
-  pill(doc, 'NO REDUCTION', MARGIN + 4.5, 151.5, 32);
-  label(doc, 'Reason for retaining the full programme', MARGIN + 40, 157, 8.3);
-  body(doc, 'Required when no training reduction is justified.', MARGIN + 5, 166, CONTENT_WIDTH - 10, 7.2, MUTED);
-  if (data.rpl?.noReductionReason) body(doc, excerpt(data.rpl.noReductionReason, 360), MARGIN + 5, 175, CONTENT_WIDTH - 10, 7.2);
-  else {
-    blankLine(doc, MARGIN + 5, 177, CONTENT_WIDTH - 10);
-    blankLine(doc, MARGIN + 5, 182, CONTENT_WIDTH - 10);
-  }
-
-  const rplRows = data.rpl?.rows ?? [];
-  const showReductionTable = data.rpl?.reductionJustified === true || data.rpl?.reductionJustified == null;
-  let contentY = 193;
-  if (showReductionTable) {
-    label(doc, 'MODULE-LEVEL PRIOR LEARNING AND REDUCTION', MARGIN, contentY, 7, PURPLE_DARK);
-    autoTable(doc, {
-      startY: contentY + 4,
-      margin: { left: MARGIN, right: MARGIN, top: 36, bottom: 22 },
-      head: [['MODULE / AREA', 'KSB LINK', 'VERIFIED EVIDENCE', 'HOURS']],
-      body: rplRows.length ? rplRows.map((row) => [value(row.area), value(row.ksb), value(row.evidence), value(row.hours)]) : [['', '', '', ''], ['', '', '', ''], ['', '', '', '']],
-      theme: 'grid',
-      styles: { font: 'helvetica', fontSize: 6.5, cellPadding: 1.8, minCellHeight: 9, lineColor: [...PURPLE_LINE], lineWidth: 0.25, textColor: [...INK], overflow: 'linebreak' },
-      headStyles: { fillColor: [...PURPLE_WASH], textColor: [...PURPLE_DARK], fontStyle: 'bold' },
-      columnStyles: { 0: { cellWidth: 52 }, 1: { cellWidth: 28 }, 2: { cellWidth: 76 }, 3: { cellWidth: 24, halign: 'center' } },
-      willDrawPage: ({ pageNumber }) => {
-        if (pageNumber > 1) runningHeader(doc, 'RPL MODULE REDUCTIONS — CONTINUATION', data.status);
-      },
-    });
-    contentY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
-  }
-
-  const hourCards = [
-    ['ORIGINAL HOURS', data.rpl?.originalHours],
-    ['REDUCTION', data.rpl?.reductionHours],
-    ['ADJUSTED HOURS', data.rpl?.adjustedHours],
-  ] as const;
-  if (contentY > 251) {
-    doc.addPage('a4', 'portrait');
-    runningHeader(doc, 'RPL ASSESSMENT — HOURS AND JUSTIFICATION', data.status);
-    contentY = 41;
-  }
-  const cardWidth = 53;
-  hourCards.forEach(([heading, hours], index) => {
-    const x = MARGIN + 5 + (index * (cardWidth + 5.5));
-    box(doc, x, contentY, cardWidth, 19);
-    label(doc, heading, x + 3.5, contentY + 6, 6.2);
-    if (hours != null && value(hours)) body(doc, `${value(hours)} hours`, x + 3.5, contentY + 14, cardWidth - 7, 7.2);
-    else blankLine(doc, x + 3.5, contentY + 15, cardWidth - 7);
-  });
-  contentY += 25;
-  body(doc, 'Recorded reductions do not automatically modify the authoritative Training Plan or funding calculations.', MARGIN + 5, contentY, CONTENT_WIDTH - 10, 6.9, MUTED);
-  contentY += 8;
-  const finalRplJustification = data.rpl?.reviewed ? value(data.rpl.justification).trim() : '';
+  const finalRplJustification = rpl.reviewed ? value(rpl.justification).trim() : '';
   if (finalRplJustification) {
-    if (contentY > 235) {
-      doc.addPage('a4', 'portrait');
-      runningHeader(doc, 'RPL JUSTIFICATION — CONTINUATION', data.status);
-      contentY = 41;
-    }
-    autoTable(doc, {
-      startY: contentY,
-      margin: { left: MARGIN, right: MARGIN, top: 36, bottom: 22 },
-      body: [[finalRplJustification]],
-      theme: 'grid',
-      styles: { font: 'helvetica', fontSize: 7.2, cellPadding: 3, lineColor: [...PURPLE_LINE], lineWidth: 0.3, textColor: [...INK], overflow: 'linebreak' },
-      headStyles: { fillColor: [...PURPLE_WASH], textColor: [...PURPLE_DARK], fontStyle: 'bold' },
-      willDrawPage: ({ pageNumber }) => {
-        if (pageNumber > 1) runningHeader(doc, 'RPL JUSTIFICATION — CONTINUATION', data.status);
-      },
-    });
-  }
-}
-
-function fourthPage(doc: jsPDF, data: SuitabilityRplReportData) {
-  runningHeader(doc, 'ASSESSMENT CONCLUSION AND SIGN-OFF', data.status);
-  sectionHeading(doc, 7, SUITABILITY_RPL_SECTION_TITLES[6], 'FINAL ASSESSMENT', 43);
-
-  box(doc, MARGIN, 51, CONTENT_WIDTH, 21);
-  label(doc, 'SUITABILITY OUTCOME', MARGIN + 5, 58, 6.7);
-  checkbox(doc, MARGIN + 5, 62, 'Suitable', data.finalAssessment?.outcome === 'suitable');
-  checkbox(doc, MARGIN + 60, 62, 'Further assessment required', data.finalAssessment?.outcome === 'further_assessment', 75);
-
-  box(doc, MARGIN, 77, CONTENT_WIDTH, 40);
-  label(doc, 'ASSESSMENT RATIONALE', MARGIN + 5, 85, 7.2);
-  body(doc, 'Evidence-based explanation for programme suitability and the recorded prior learning outcome.', MARGIN + 5, 94, CONTENT_WIDTH - 10, 7.3, MUTED);
-  if (data.finalAssessment?.rationale) body(doc, excerpt(data.finalAssessment.rationale, 360), MARGIN + 5, 104, CONTENT_WIDTH - 10, 7.2);
-  else {
-    blankLine(doc, MARGIN + 5, 105, CONTENT_WIDTH - 10);
-    blankLine(doc, MARGIN + 5, 112, CONTENT_WIDTH - 10);
+    const lines = doc.splitTextToSize(finalRplJustification, CONTENT_WIDTH - 10);
+    const height = Math.max(32, Math.min(68, 17 + (lines.length * 4.2)));
+    box(doc, MARGIN, contentY, CONTENT_WIDTH, height);
+    label(doc, 'RPL ASSESSMENT JUSTIFICATION', MARGIN + 5, contentY + 8, 7.2, PURPLE_DARK);
+    body(doc, finalRplJustification, MARGIN + 5, contentY + 17, CONTENT_WIDTH - 10, 7.5, INK, 1.35);
+    contentY += height + 8;
   }
 
-  box(doc, MARGIN, 122, CONTENT_WIDTH, 32, PURPLE_WASH);
-  label(doc, 'FINAL TRAINING RECOMMENDATION', MARGIN + 5, 130, 7.2);
-  checkbox(doc, MARGIN + 5, 135, 'Full programme', data.rpl?.reductionJustified === false);
-  checkbox(doc, MARGIN + 73, 135, 'Adjusted training plan', data.rpl?.reductionJustified === true);
-  body(doc, 'The recorded training plan and programme hours must match the assessor-approved decision.', MARGIN + 5, 148, CONTENT_WIDTH - 10, 7, MUTED);
+  if (fullProgramme || legacyNoReduction) {
+    box(doc, MARGIN, contentY, CONTENT_WIDTH, 42, PURPLE_WASH);
+    label(doc, 'TRAINING PLAN ADJUSTMENT', MARGIN + 5, contentY + 8, 6.8, PURPLE_DARK);
+    label(doc, 'FULL STANDARD TRAINING PLAN', MARGIN + 5, contentY + 18, 9);
+    const original = hoursText(rpl.originalHours);
+    if (original) body(doc, `Original planned hours: ${original} hours`, MARGIN + 5, contentY + 28, CONTENT_WIDTH - 10, 7.7);
+    body(doc, legacyNoReduction ? 'Historical decision retained with no training reduction approved.' : 'No training reduction approved.', MARGIN + 5, contentY + 36, CONTENT_WIDTH - 10, 7.2, MUTED);
+    return;
+  }
 
-  box(doc, MARGIN, 159, CONTENT_WIDTH, 26);
-  label(doc, 'DOCUMENT CONTROL', MARGIN + 5, 167, 7.2);
-  const controls = [
-    ['REPORT REFERENCE', data.finalAssessment?.reportReference],
-    ['VERSION', data.finalAssessment?.version],
-    ['APPROVAL DATE', data.finalAssessment?.approvalDate],
+  if (!reductionApproved) {
+    box(doc, MARGIN, contentY, CONTENT_WIDTH, 30, PURPLE_WASH);
+    label(doc, 'TRAINING PLAN ADJUSTMENT', MARGIN + 5, contentY + 8, 6.8, PURPLE_DARK);
+    body(doc, 'No training adjustment is recorded for this report.', MARGIN + 5, contentY + 20, CONTENT_WIDTH - 10, 7.7, MUTED);
+    return;
+  }
+
+  const original = hoursText(rpl.originalHours);
+  const reduction = hoursText(rpl.reductionHours);
+  const adjusted = hoursText(rpl.adjustedHours);
+  const cards = [
+    ['ORIGINAL PLANNED HOURS', original],
+    ['APPROVED REDUCTION', reduction],
+    ['ADJUSTED TRAINING HOURS', adjusted],
   ] as const;
-  controls.forEach(([heading, controlValue], index) => {
-    const x = MARGIN + 5 + (index * 60);
-    label(doc, heading, x, 174, 6.1);
-    if (controlValue) body(doc, controlValue, x, 180.5, 50, 6.8);
-    else blankLine(doc, x, 181, 52);
+  const cardWidth = 53;
+  cards.forEach(([heading, hours], index) => {
+    const x = MARGIN + 5 + (index * (cardWidth + 5.5));
+    box(doc, x, contentY, cardWidth, 23, PURPLE_WASH);
+    label(doc, heading, x + 3.5, contentY + 7, 5.9, PURPLE_DARK);
+    if (hours) body(doc, `${hours} hours`, x + 3.5, contentY + 17, cardWidth - 7, 7.5);
   });
+  contentY += 31;
 
-  sectionHeading(doc, 8, SUITABILITY_RPL_SECTION_TITLES[7], 'ASSESSOR + LEARNER + EMPLOYER', 197);
-  signatureCard(doc, MARGIN, 204, 57.5, 'ASSESSOR / ADMIN', 'I have reviewed the evidence and approve the recorded assessment and training recommendation.');
-  signatureCard(doc, 76.25, 204, 57.5, 'LEARNER', 'The assessment and its outcome have been discussed with me, and I acknowledge this record.');
-  signatureCard(doc, 137.5, 204, 57.5, 'EMPLOYER / LINE MANAGER', 'I have discussed the assessment and support the recorded programme recommendation.');
+  const rows = (rpl.rows ?? []).filter((row) => {
+    const reduced = numericValue(row.reducedHours ?? row.hours);
+    return reduced != null && reduced > 0;
+  });
+  if (!rows.length) {
+    box(doc, MARGIN, contentY, CONTENT_WIDTH, 27);
+    label(doc, 'MODULE-LEVEL REDUCTIONS', MARGIN + 5, contentY + 8, 7, PURPLE_DARK);
+    body(doc, 'No affected modules are recorded in this approved reduction.', MARGIN + 5, contentY + 19, CONTENT_WIDTH - 10, 7.5, MUTED);
+    return;
+  }
+
+  const hasKsbMappings = rows.some((row) => value(row.ksb).trim());
+  const head = hasKsbMappings
+    ? [['MODULE', 'ORIGINAL HOURS', 'APPROVED REDUCTION', 'ADJUSTED HOURS', 'MAPPED KSBs']]
+    : [['MODULE', 'ORIGINAL HOURS', 'APPROVED REDUCTION', 'ADJUSTED HOURS']];
+  const bodyRows = rows.map((row) => {
+    const planned = numericValue(row.plannedHours);
+    const reduced = numericValue(row.reducedHours ?? row.hours);
+    const adjustedValue = numericValue(row.adjustedHours) ?? (planned != null && reduced != null ? planned - reduced : null);
+    const cells = [
+      value(row.area),
+      hoursText(planned),
+      hoursText(reduced),
+      hoursText(adjustedValue),
+    ];
+    return hasKsbMappings ? [...cells, value(row.ksb).trim()] : cells;
+  });
+  label(doc, 'MODULE-LEVEL REDUCTIONS', MARGIN, contentY, 7, PURPLE_DARK);
+  autoTable(doc, {
+    startY: contentY + 4,
+    margin: { left: MARGIN, right: MARGIN, top: 36, bottom: 22 },
+    head,
+    body: bodyRows,
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 6.8, cellPadding: 2.1, minCellHeight: 10, lineColor: [...PURPLE_LINE], lineWidth: 0.25, textColor: [...INK], overflow: 'linebreak', valign: 'middle' },
+    headStyles: { fillColor: [...PURPLE_WASH], textColor: [...PURPLE_DARK], fontStyle: 'bold', fontSize: 6.2 },
+    columnStyles: hasKsbMappings
+      ? { 0: { cellWidth: 42 }, 1: { cellWidth: 29, halign: 'center' }, 2: { cellWidth: 32, halign: 'center' }, 3: { cellWidth: 30, halign: 'center' }, 4: { cellWidth: 47 } }
+      : { 0: { cellWidth: 66 }, 1: { cellWidth: 36, halign: 'center' }, 2: { cellWidth: 39, halign: 'center' }, 3: { cellWidth: 39, halign: 'center' } },
+    willDrawPage: ({ pageNumber }) => {
+      if (pageNumber > 1) runningHeader(doc, 'RPL MODULE REDUCTIONS - CONTINUATION', data.status);
+    },
+  });
+}
+function fourthPage(doc: jsPDF, data: SuitabilityRplReportData) {
+  runningHeader(doc, 'DECLARATIONS AND SIGN-OFF', data.status);
+  sectionHeading(doc, 6, SUITABILITY_RPL_SECTION_TITLES[5], 'ASSESSOR + LEARNER + EMPLOYER', 43);
+  signatureCard(doc, MARGIN, 55, 57.5, 'ASSESSOR / ADMIN', 'I have reviewed the evidence and approve the recorded assessment and training recommendation.');
+  signatureCard(doc, 76.25, 55, 57.5, 'LEARNER', 'The assessment and its outcome have been discussed with me, and I acknowledge this record.');
+  signatureCard(doc, 137.5, 55, 57.5, 'EMPLOYER / LINE MANAGER', 'I have discussed the assessment and support the recorded programme recommendation.');
 }
 
 function addNarrativeContinuations(doc: jsPDF, data: SuitabilityRplReportData) {
@@ -693,15 +663,6 @@ function addNarrativeContinuations(doc: jsPDF, data: SuitabilityRplReportData) {
       const item = understandingAt(data, index);
       return item.answer.length > (index === 0 ? 260 : 300) ? [item.question, item.answer] : null;
     }),
-    data.rpl?.evidenceReview && data.rpl.evidenceReview.length > 310
-      ? ['Assessor evidence review', data.rpl.evidenceReview]
-      : null,
-    data.rpl?.noReductionReason && data.rpl.noReductionReason.length > 360
-      ? ['Reason for retaining the full programme', data.rpl.noReductionReason]
-      : null,
-    data.finalAssessment?.rationale && data.finalAssessment.rationale.length > 360
-      ? ['Final assessor summary', data.finalAssessment.rationale]
-      : null,
   ].filter((item): item is string[] => Boolean(item));
   if (!blocks.length) return;
   doc.addPage('a4', 'portrait');

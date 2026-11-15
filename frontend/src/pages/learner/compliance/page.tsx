@@ -51,6 +51,7 @@ import {
 } from '@/lib/writtenAgreementPdf';
 import { DocumentCard, Field } from './DocumentCard';
 import { RowsSkeleton } from '@/components/feature/Skeletons';
+import { SuitabilityRplIssuedCard } from '@/features/compliance-documents/SuitabilityRplIssuedCard';
 
 // ============================================================================
 // Compliance documents — the learner's statutory paperwork.
@@ -421,6 +422,7 @@ export default function LearnerCompliancePage() {
             />
             </DocumentSignatureTarget>
             {written && <LearnerDocumentRevisions learnerId={String(id)} documentKey="written-agreement" sourceId={written.id} />}
+            <SuitabilityRplIssuedCard kind={kind} learnerId={String(id)} signatoryName={agreementName || writtenData?.learner.name || ''} />
           </>
         )}
       </div>

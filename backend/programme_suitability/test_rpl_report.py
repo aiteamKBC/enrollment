@@ -7,17 +7,22 @@ from unittest.mock import MagicMock, patch
 
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
-from .models import SuitabilityRplReport
+from .models import SuitabilityCvExtraction, SuitabilityRplReport
 from .rpl_report import (
     ReportInputError,
     _context,
     _cv_evidence,
     _ai_input,
     _programme_metadata,
+    _private_cv_text,
+    _rpl_analysis_payload,
+    _validate_rpl_analysis,
     _save_report,
     _skills_radar,
     build_source_snapshot,
     generate_ai_justification,
+    generate_rpl_evidence_analysis,
+    suitability_rpl_analysis,
     suitability_rpl_report,
 )
 
@@ -180,6 +185,25 @@ class SuitabilityRplPermissionAndAiTests(TestCase):
         response = suitability_rpl_report(self.factory.get('/report/'), 'apprenticeship', 41)
         self.assertEqual(response.status_code, 403)
 
+    def test_rpl_analysis_accepts_valid_reason_over_40_words_without_http_400(self):
+        long_reason = ' '.join(['Verified evidence requires assessor review.'] * 11)
+        report = SimpleNamespace(source_snapshot_hash='snapshot-a')
+        recommendation = {
+            'overallOutcome': 'insufficient-evidence', 'reasoning': long_reason,
+            'modules': [], 'evidenceGaps': [], 'warnings': [],
+        }
+        with patch('login.permissions.authenticate_request', return_value=self.admin), \
+             patch('programme_suitability.rpl_report._learner', return_value=SimpleNamespace(pk=41)), \
+             patch('programme_suitability.rpl_report._context', return_value={'key': 'context-a'}), \
+             patch('programme_suitability.rpl_report.SuitabilityRplReport.objects') as manager, \
+             patch('programme_suitability.rpl_report.generate_rpl_evidence_analysis', return_value=(recommendation, {'sourceSnapshotHash': 'snapshot-a'})):
+            manager.prefetch_related.return_value.filter.return_value.first.return_value = report
+            request = self.factory.post('/analysis/', data='{}', content_type='application/json')
+            request._dont_enforce_csrf_checks = True
+            response = suitability_rpl_analysis(request, 'apprenticeship', 41)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(json.loads(response.content)['recommendation']['reasoning'], long_reason)
+
     @override_settings(SUITABILITY_RPL_AI_ENABLED=False, OPENAI_API_KEY='')
     def test_ai_is_disabled_by_default_without_network_call(self):
         report = SuitabilityRplReport(source_snapshot=source_snapshot())
@@ -189,19 +213,118 @@ class SuitabilityRplPermissionAndAiTests(TestCase):
     @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
     @patch('openai.OpenAI')
     def test_ai_output_is_a_draft_only_and_uses_synthetic_input(self, openai_client):
-        message = SimpleNamespace(content=json.dumps({'justification': 'Synthetic editable draft.'}))
+        message = SimpleNamespace(content=json.dumps({'justification': (
+            'The saved role evidence aligns with the selected programme requirements. '
+            'The recorded answers provide a suitable basis for assessor review.\n\n'
+            'The draft remains editable and is grounded only in the supplied evidence.'
+        )}))
         openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
-            choices=[SimpleNamespace(message=message)],
+            choices=[SimpleNamespace(message=message, finish_reason='stop')],
         )
         report = SuitabilityRplReport(source_snapshot=source_snapshot())
         text, metadata = generate_ai_justification(report, 'suitability')
-        self.assertEqual(text, 'Synthetic editable draft.')
+        self.assertIn('saved role evidence', text)
         self.assertEqual(metadata['provider'], 'openai')
         sent = openai_client.return_value.chat.completions.create.call_args.kwargs['messages'][0]['content']
         self.assertIn('Do not invent facts', sent)
+        self.assertIn('150-200 words in two coherent paragraphs', sent)
+        self.assertIn('selected Programme Suitability answers', sent)
+        self.assertIn('Do not repeat the full programme specification', sent)
+        self.assertIn('significant new occupational knowledge, skills and behaviours', sent)
+        self.assertIn('authoritative standard outcomes', sent)
+        self.assertIn('Do not claim employer discussion, agreement or sign-off', sent)
+        self.assertIn('Discuss programme suitability only', sent)
+        self.assertNotIn('RPL', text)
+        self.assertNotIn('exemption', text)
         evidence_payload = openai_client.return_value.chat.completions.create.call_args.kwargs['messages'][1]['content']
         self.assertNotIn('Synthetic Learner', evidence_payload)
         self.assertIn('Project Officer', evidence_payload)
+
+    @patch('programme_suitability.rpl_report.extract_approved_cv')
+    def test_private_cv_text_restores_normalised_snapshot_document_kind(self, extract_mock):
+        extraction = SimpleNamespace(source_blob_hash='a' * 64, source_container='evidence-approved', source_blob_name='1601/cv.pdf', extractor_version='cv-text-v1', extracted_text='PRIVATE')
+        extract_mock.return_value = extraction
+        SuitabilityCvExtraction.objects.create(
+            learner_kind='apprenticeship', learner_id=1601,
+            source_document_id='cv-1', source_container='evidence-approved',
+            source_blob_name='1601/cv.pdf', source_blob_hash='a' * 64,
+            extractor_version='cv-text-v1', status='ready', extracted_text='PRIVATE',
+        )
+        report = SuitabilityRplReport(
+            learner_kind='apprenticeship', learner_id=1601,
+            cv_source_document_id='', cv_source_blob_hash='',
+        )
+        text = _private_cv_text(report, {'sourceDocuments': [{
+            'id': 'cv-1', 'kind': 'cv', 'container': 'evidence-approved',
+            'blobName': '1601/cv.pdf', 'filename': 'cv.pdf',
+        }]})
+        self.assertEqual(text, 'PRIVATE')
+        self.assertEqual(extract_mock.call_args.args[2]['docKind'], 'cv')
+
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    @patch('openai.OpenAI')
+    def test_suitability_ai_rejects_unfinished_report_narrative(self, openai_client):
+        message = SimpleNamespace(content=json.dumps({'justification': (
+            'The saved evidence supports the selected programme.\n\n'
+            'The learner responsibilities are described in the supplied answers, for example,'
+        )}))
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=message, finish_reason='stop')],
+        )
+        report = SuitabilityRplReport(source_snapshot=source_snapshot())
+        with self.assertRaisesMessage(ReportInputError, 'unfinished'):
+            generate_ai_justification(report, 'suitability')
+
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    @patch('openai.OpenAI')
+    def test_suitability_ai_accepts_complete_single_paragraph_after_normalisation(self, openai_client):
+        message = SimpleNamespace(content=json.dumps({'justification': (
+            'The saved role and selected answers provide evidence of alignment with the ME_L4 programme.\r\n'
+            'The narrative is complete and suitable for assessor review.'
+        )}))
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=message, finish_reason='stop')],
+            usage=SimpleNamespace(model_dump=lambda: {'prompt_tokens': 10, 'completion_tokens': 12, 'total_tokens': 22}),
+        )
+        report = SuitabilityRplReport(source_snapshot=source_snapshot())
+        text, metadata = generate_ai_justification(report, 'suitability')
+        self.assertEqual(text, 'The saved role and selected answers provide evidence of alignment with the ME_L4 programme.\nThe narrative is complete and suitable for assessor review.')
+        self.assertEqual(metadata['usage']['total_tokens'], 22)
+
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    @patch('openai.OpenAI')
+    def test_suitability_ai_validation_error_contains_safe_diagnostics(self, openai_client):
+        message = SimpleNamespace(content=json.dumps({'justification': 'The draft ends with an unfinished comma,'}))
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=message, finish_reason='stop')],
+            usage=SimpleNamespace(model_dump=lambda: {'prompt_tokens': 10, 'completion_tokens': 12, 'total_tokens': 22}),
+        )
+        report = SuitabilityRplReport(source_snapshot=source_snapshot())
+        with self.assertRaisesMessage(ReportInputError, 'paragraphs=1') as captured:
+            generate_ai_justification(report, 'suitability')
+        self.assertIn('length=', str(captured.exception))
+        self.assertIn('finish_reason=stop', str(captured.exception))
+        self.assertIn('total_tokens=22', str(captured.exception))
+
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    @patch('openai.OpenAI')
+    def test_suitability_ai_rejects_internal_fields_and_non_stop_completion(self, openai_client):
+        message = SimpleNamespace(content=json.dumps({'justification': (
+            'The programmeSpecification supports the selected pathway.\n\n'
+            'The supplied evidence is sufficient for review.'
+        )}))
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=message, finish_reason='length')],
+        )
+        report = SuitabilityRplReport(source_snapshot=source_snapshot())
+        with self.assertRaisesMessage(ReportInputError, 'did not finish'):
+            generate_ai_justification(report, 'suitability')
+
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=message, finish_reason='stop')],
+        )
+        with self.assertRaisesMessage(ReportInputError, 'technical or internal'):
+            generate_ai_justification(report, 'suitability')
 
     @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
     @patch('openai.OpenAI')
@@ -260,11 +383,101 @@ class SuitabilityRplPermissionAndAiTests(TestCase):
         self.assertIn('Not available - integration not implemented', sent)
         self.assertIn('Do not invent facts', openai_client.return_value.chat.completions.create.call_args.kwargs['messages'][0]['content'])
 
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    @patch('openai.OpenAI')
+    def test_no_prior_learning_prompt_requires_full_plan_and_supported_evidence(self, openai_client):
+        narrative = (
+            'The saved CV describes general marketing work and the verified qualification evidence records a Level 3 Diploma, '
+            'but neither source demonstrates equivalent prior learning against a specific module. The Skills Radar results provide '
+            'self-assessment context only and do not establish an exemption from the saved modules.\n\n'
+            'The assessor-recorded decision therefore retains the full standard Training Plan of 120 planned hours across '
+            'Authoritative module A and Authoritative module B. No reduction is approved because the available evidence does not '
+            'show a verified module-level overlap; the original plan remains unchanged while any further evidence can be reviewed.'
+        )
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps({'justification': narrative})), finish_reason='stop')],
+        )
+        snapshot = source_snapshot()
+        snapshot['evidence'] = {
+            'cv': {'status': 'provided', 'experience': 'General marketing work.'},
+            'qualifications': {'status': 'provided', 'items': [{'label': 'Highest qualification', 'value': 'Level 3 Diploma'}]},
+            'plr': {'status': 'not_available', 'message': 'Not available - integration not implemented'},
+        }
+        report = SimpleNamespace(
+            source_snapshot=snapshot, relevant_prior_learning=False, reduction_justified=False,
+            assessor_evidence_review='', no_reduction_reason='Retain the full programme.',
+            reductions=SimpleNamespace(all=lambda: []), cv_extraction_acknowledged=True,
+        )
+        text, _metadata = generate_ai_justification(report, 'rpl')
+        self.assertIn('120 planned hours', text)
+        sent_system = openai_client.return_value.chat.completions.create.call_args.kwargs['messages'][0]['content']
+        sent_user = openai_client.return_value.chat.completions.create.call_args.kwargs['messages'][1]['content']
+        self.assertIn('reported experience or self-assessment', sent_system)
+        self.assertIn('No Relevant Prior Learning identified only when', sent_system)
+        self.assertIn('reported experience or self-assessment from demonstrated occupational competence', sent_system)
+        self.assertIn('employer discussion', sent_system)
+        self.assertIn('No Relevant Prior Learning', sent_user)
+        self.assertIn('Authoritative module A', sent_user)
+
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    @patch('openai.OpenAI')
+    def test_rpl_validation_rejects_unrecorded_employer_claim(self, openai_client):
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps({
+                'justification': 'The employer confirmed that the learner already meets the module outcomes, so no reduction is required.'
+            })), finish_reason='stop')],
+        )
+        report = SimpleNamespace(
+            source_snapshot=source_snapshot(), relevant_prior_learning=False, reduction_justified=False,
+            assessor_evidence_review='', no_reduction_reason='Retain the full programme.',
+            reductions=SimpleNamespace(all=lambda: []), cv_extraction_acknowledged=True,
+        )
+        with self.assertRaisesMessage(ReportInputError, 'employer evidence'):
+            generate_ai_justification(report, 'rpl')
+
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    @patch('openai.OpenAI')
+    def test_no_prior_learning_rpl_validation_rejects_contradictions_and_internal_terms(self, openai_client):
+        report = SimpleNamespace(
+            source_snapshot=source_snapshot(), relevant_prior_learning=False, reduction_justified=False,
+            assessor_evidence_review='', no_reduction_reason='Retain the full programme.',
+            reductions=SimpleNamespace(all=lambda: []), cv_extraction_acknowledged=True,
+        )
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps({'justification': 'A module reduction is approved for the learner.'})), finish_reason='stop')],
+        )
+        with self.assertRaisesMessage(ReportInputError, 'contradicts'):
+            generate_ai_justification(report, 'rpl')
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps({'justification': 'The reductions array confirms K999 is mapped to the module.'})), finish_reason='stop')],
+        )
+        with self.assertRaisesMessage(ReportInputError, 'technical or internal'):
+            generate_ai_justification(report, 'rpl')
+
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    @patch('openai.OpenAI')
+    def test_no_prior_learning_rpl_validation_rejects_unmapped_ksb_codes(self, openai_client):
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps({'justification': 'The supplied evidence does not establish K999 against the saved module.'})), finish_reason='stop')],
+        )
+        report = SimpleNamespace(
+            source_snapshot=source_snapshot(), relevant_prior_learning=False, reduction_justified=False,
+            assessor_evidence_review='', no_reduction_reason='Retain the full programme.',
+            reductions=SimpleNamespace(all=lambda: []), cv_extraction_acknowledged=True,
+        )
+        with self.assertRaisesMessage(ReportInputError, 'KSB codes'):
+            generate_ai_justification(report, 'rpl')
+
     def test_ai_payloads_preserve_suitability_groups_and_programme_specification(self):
         snapshot = source_snapshot()
         snapshot['programmeSuitability'] = {
             'pathway': 'marketing', 'selectedProgramme': 'MM_L6',
-            'selectedProgrammeSpecification': {'id': 'MM_L6', 'title': 'Marketing Manager Level 6', 'summary': 'Synthetic summary'},
+            'selectedProgrammeSpecification': {
+                'id': 'MM_L6', 'title': 'Marketing Manager Level 6', 'summary': 'Synthetic summary',
+                'outcomes': ['Synthetic authoritative outcome'],
+                'ksbMappings': [{'code': 'K1', 'moduleId': 'module-a'}],
+            },
+            'recommendedProgramme': 'ME_L4', 'outcome': 'suitable',
             'responses': [{'group': 'Marketing Strategy', 'question': 'Which responsibilities apply?',
                            'answers': ['I lead strategy'], 'selectedOptions': [{'id': 'a', 'label': 'I lead strategy'}]}],
         }
@@ -274,6 +487,273 @@ class SuitabilityRplPermissionAndAiTests(TestCase):
         self.assertEqual(payload['programmeUnderstanding'][1]['answer'], 'Progression')
         self.assertEqual(payload['programmeSuitability']['responses'][0]['selectedOptions'][0]['label'], 'I lead strategy')
         self.assertEqual(payload['programmeSuitability']['selectedProgrammeSpecification']['id'], 'MM_L6')
+        self.assertEqual(
+            payload['programmeSuitability']['selectedProgrammeSpecification']['outcomes'],
+            ['Synthetic authoritative outcome'],
+        )
+        self.assertEqual(
+            payload['programmeSuitability']['selectedProgrammeSpecification']['ksbMappings'],
+            [{'code': 'K1', 'moduleId': 'module-a'}],
+        )
+        self.assertNotIn('recommendedProgramme', payload['programmeSuitability'])
+        self.assertNotIn('outcome', payload['programmeSuitability'])
+
+
+class RplEvidenceAnalysisTests(SimpleTestCase):
+    def analysis_payload(self, *, mappings=True):
+        return {
+            'programme': {'id': 'ME_L4', 'name': 'Marketing Executive Level 4'},
+            'learnerEvidence': {'jobTitle': 'Marketing Executive', 'responsibilities': ['Plans campaigns.']},
+            'programmeUnderstanding': [],
+            'skillsRadar': {'catalogueVersion': 'catalogue-v1', 'cataloguePinned': True, 'items': [
+                {'code': 'K1', 'kind': 'Knowledge', 'description': 'Planning', 'moduleKey': 'module-a', 'score': 7},
+            ]},
+            'qualifications': {'status': 'provided', 'items': [{'label': 'Level 3 Diploma', 'value': 'Marketing'}]},
+            'plr': {'status': 'not_available'},
+            'trainingPlan': {'available': True, 'plannedHours': 70, 'modules': [{
+                'moduleId': 'module-a', 'moduleName': 'Campaign planning', 'plannedHours': 70,
+                'content': 'Plan and evaluate campaigns.',
+                'authoritativeKsbMappings': [{'code': 'K1', 'description': 'Planning', 'source': 'occupational-standard'}] if mappings else [],
+            }]},
+            'privateCvText': '',
+            'extractionWarning': '',
+            'evidenceVersion': {'sourceSnapshotHash': 'snapshot-a', 'documentId': 'cv-a', 'sha256': 'a' * 64, 'extractorVersion': 'cv-text-v1'},
+            'evidenceReferences': [
+                {'id': 'evidence.skills-radar.1', 'source': 'skills_radar', 'label': 'Saved Skills Radar item 1'},
+                {'id': 'evidence.qualification.1', 'source': 'qualification_record', 'label': 'Saved qualification record 1'},
+                {'id': 'evidence.cv.approved', 'source': 'approved_cv_extraction', 'label': 'Approved CV extraction'},
+                {'id': 'evidence.training-plan.module.module-a', 'source': 'training_plan', 'label': 'Saved Training Plan module module-a'},
+            ],
+        }
+
+    def test_no_relevant_prior_learning_recommends_no_whole_module_removal(self):
+        payload = self.analysis_payload()
+        result = _validate_rpl_analysis({
+            'overallOutcome': 'no-relevant-prior-learning',
+            'reasoning': 'The available evidence does not demonstrate complete coverage of the module.',
+            'modules': [{
+                'moduleId': 'module-a', 'moduleName': 'Campaign planning', 'wholeModuleReductionRecommended': False, 'evidenceSufficiency': 'partial',
+                'supportingEvidence': [{'evidenceId': 'evidence.skills-radar.1', 'detail': 'Self-assessment only.'}],
+                'missingEvidence': ['Independent competence evidence is required.'],
+                'explanation': 'The module remains required because complete outcomes are not evidenced.',
+            }],
+            'evidenceGaps': ['PLR check not recorded.'], 'warnings': [],
+        }, payload)
+        self.assertFalse(result['modules'][0]['wholeModuleReductionRecommended'])
+
+    def test_supporting_evidence_must_use_an_allowed_canonical_id(self):
+        payload = self.analysis_payload()
+        base = {
+            'moduleId': 'module-a', 'moduleName': 'Campaign planning',
+            'wholeModuleReductionRecommended': False, 'evidenceSufficiency': 'needs-review',
+            'missingEvidence': ['Independent verification is required.'],
+            'explanation': 'Further review is required before any complete-module decision.',
+        }
+        for reference in (
+            {'evidenceId': 'Skills Radar', 'detail': 'A descriptive label is not an evidence ID.'},
+            {'evidenceId': 'evidence.skills-radar.NOT_REAL', 'detail': 'This ID is not in the evidence catalogue.'},
+            {'source': 'Skills Radar', 'reference': 'K1', 'detail': 'The legacy shape is not accepted.'},
+        ):
+            with self.assertRaisesMessage(ReportInputError, 'unsupported evidence reference ID'):
+                _validate_rpl_analysis({
+                    'overallOutcome': 'insufficient-evidence',
+                    'reasoning': 'The evidence requires assessor review.',
+                    'modules': [{**base, 'supportingEvidence': [reference]}],
+                    'evidenceGaps': [], 'warnings': [],
+                }, payload)
+
+    def test_empty_supporting_evidence_is_valid_when_review_is_required(self):
+        payload = self.analysis_payload()
+        result = _validate_rpl_analysis({
+            'overallOutcome': 'insufficient-evidence',
+            'reasoning': 'The available evidence is insufficient for a complete-module recommendation.',
+            'modules': [{
+                'moduleId': 'module-a', 'moduleName': 'Campaign planning',
+                'wholeModuleReductionRecommended': False, 'evidenceSufficiency': 'needs-review',
+                'supportingEvidence': [],
+                'missingEvidence': ['Independent verification is required.'],
+                'explanation': 'No complete-module recommendation can be made yet.',
+            }],
+            'evidenceGaps': ['Evidence verification is required.'], 'warnings': [],
+        }, payload)
+        self.assertEqual(result['modules'][0]['supportingEvidence'], [])
+
+    def test_valid_overlong_overall_reason_is_accepted(self):
+        payload = self.analysis_payload()
+        long_reason = ' '.join(['Evidence requires assessor review.'] * 11)
+        result = _validate_rpl_analysis({
+            'overallOutcome': 'insufficient-evidence',
+            'reasoning': long_reason,
+            'modules': [{
+                'moduleId': 'module-a', 'wholeModuleReductionRecommended': False,
+                'evidenceSufficiency': 'needs-review', 'supportingEvidence': [],
+                'missingEvidence': ['Independent verification is required.'],
+                'explanation': 'Further review is required before any complete-module decision.',
+            }],
+            'evidenceGaps': [], 'warnings': [],
+        }, payload)
+        self.assertEqual(result['reasoning'], long_reason)
+
+    def test_module_recommendation_requires_canonical_boolean_field(self):
+        payload = self.analysis_payload()
+        base = {
+            'moduleId': 'module-a', 'moduleName': 'Campaign planning',
+            'supportingEvidence': [],
+            'missingEvidence': ['Independent competence evidence is required.'],
+            'explanation': 'Further review is required before any complete-module decision.',
+            'evidenceSufficiency': 'needs-review',
+        }
+        with self.assertRaisesMessage(ReportInputError, 'Module module-a needs a boolean whole-module reduction recommendation; received NoneType.'):
+            _validate_rpl_analysis({
+                'overallOutcome': 'insufficient-evidence', 'reasoning': 'Review required.',
+                'modules': [{**base, 'wholeModuleReductionRecommended': None}],
+                'evidenceGaps': [], 'warnings': [],
+            }, payload)
+        with self.assertRaisesMessage(ReportInputError, 'Module module-a needs a boolean whole-module reduction recommendation; received str.'):
+            _validate_rpl_analysis({
+                'overallOutcome': 'insufficient-evidence', 'reasoning': 'Review required.',
+                'modules': [{**base, 'wholeModuleReductionRecommended': 'false'}],
+                'evidenceGaps': [], 'warnings': [],
+            }, payload)
+        with self.assertRaisesMessage(ReportInputError, 'Module module-a needs a boolean whole-module reduction recommendation; received NoneType.'):
+            _validate_rpl_analysis({
+                'overallOutcome': 'insufficient-evidence', 'reasoning': 'Review required.',
+                'modules': [{**base, 'wholeModuleCandidate': False}],
+                'evidenceGaps': [], 'warnings': [],
+            }, payload)
+
+    def test_all_authoritative_modules_are_returned_with_sufficiency_status(self):
+        payload = self.analysis_payload(mappings=False)
+        payload['trainingPlan']['modules'] = [
+            {'moduleId': 'martech', 'moduleName': 'Martech', 'plannedHours': 105.75, 'authoritativeKsbMappings': []},
+            {'moduleId': 'social-media', 'moduleName': 'Social Media', 'plannedHours': 103, 'authoritativeKsbMappings': []},
+            {'moduleId': 'marketing-impact', 'moduleName': 'Marketing Impact and Planning', 'plannedHours': 159.5,
+             'authoritativeKsbMappings': [{'code': 'K3', 'description': 'Authoritative planning outcome', 'source': 'occupational-standard'}]},
+        ]
+        modules = [{
+            'moduleId': item['moduleId'], 'moduleName': item['moduleName'],
+            'wholeModuleReductionRecommended': False, 'evidenceSufficiency': 'insufficient',
+            'supportingEvidence': [],
+            'missingEvidence': ['Authoritative outcome verification is required.'],
+            'explanation': 'The evidence is insufficient to recommend removal of the complete module.',
+        } for item in payload['trainingPlan']['modules']]
+        result = _validate_rpl_analysis({
+            'overallOutcome': 'insufficient-evidence',
+            'reasoning': 'The available evidence requires assessor review.',
+            'modules': modules, 'evidenceGaps': ['KSB mappings are incomplete.'], 'warnings': [],
+        }, payload)
+        self.assertEqual({item['moduleId'] for item in result['modules']}, {'martech', 'social-media', 'marketing-impact'})
+        self.assertTrue(all(item['evidenceSufficiency'] == 'insufficient' for item in result['modules']))
+        self.assertEqual(
+            next(item['authoritativeKsbMappings'] for item in result['modules'] if item['moduleId'] == 'marketing-impact'),
+            [{'code': 'K3', 'description': 'Authoritative planning outcome', 'source': 'occupational-standard'}],
+        )
+        self.assertTrue(all(item['authoritativeKsbMappings'] == [] for item in result['modules'] if item['moduleId'] != 'marketing-impact'))
+
+    @patch('openai.OpenAI')
+    @override_settings(SUITABILITY_RPL_AI_ENABLED=True, OPENAI_API_KEY='synthetic-key', OPENAI_MODEL='synthetic-model')
+    def test_verified_whole_module_candidate_is_structured_and_provenance_bound(self, openai_client):
+        payload = self.analysis_payload()
+        result = {
+            'overallOutcome': 'potential-whole-module-reduction',
+            'reasoning': 'Independent evidence covers the complete saved module outcomes.',
+            'modules': [{
+                'moduleId': 'module-a', 'moduleName': 'Model invented name', 'plannedHours': 999,
+                'wholeModuleReductionRecommended': True, 'evidenceSufficiency': 'sufficient',
+                'supportingEvidence': [{'evidenceId': 'evidence.qualification.1', 'detail': 'Verified module coverage.'}],
+                'missingEvidence': [], 'explanation': 'The verified evidence covers the complete module outcomes.',
+            }], 'evidenceGaps': [], 'warnings': [],
+        }
+        openai_client.return_value.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(result)), finish_reason='stop')],
+            usage=None,
+        )
+        report = SimpleNamespace(source_snapshot={
+            'programme': payload['programme'], 'learner': payload['learnerEvidence'], 'programmeUnderstanding': [],
+            'skillsRadar': payload['skillsRadar'], 'evidence': {
+                'cv': {'status': 'not_provided'}, 'qualifications': payload['qualifications'], 'plr': payload['plr'],
+            }, 'trainingPlan': payload['trainingPlan'],
+        }, source_snapshot_hash='snapshot-a', cv_source_document_id='cv-a', cv_source_container='approved',
+            cv_source_blob_name='cv-a.pdf', cv_source_blob_hash='a' * 64, cv_extractor_version='cv-text-v1',
+            cv_extraction_acknowledged=False)
+        recommendation, metadata = generate_rpl_evidence_analysis(report)
+        self.assertTrue(recommendation['modules'][0]['wholeModuleReductionRecommended'])
+        self.assertEqual(recommendation['modules'][0]['moduleName'], 'Campaign planning')
+        self.assertEqual(recommendation['modules'][0]['plannedHours'], 70)
+        self.assertEqual(recommendation['modules'][0]['authoritativeKsbMappings'], payload['trainingPlan']['modules'][0]['authoritativeKsbMappings'])
+        self.assertNotIn('ksbMappings', recommendation['modules'][0])
+        self.assertEqual(metadata['sourceSnapshotHash'], 'snapshot-a')
+        self.assertEqual(metadata['cvEvidenceVersion']['sha256'], 'a' * 64)
+        prompt = openai_client.return_value.chat.completions.create.call_args.kwargs['messages'][0]['content']
+        self.assertIn('complete module outcomes', prompt)
+        self.assertIn('wholeModuleReductionRecommended', prompt)
+        self.assertIn('evidenceSufficiency', prompt)
+        sent_payload = json.loads(openai_client.return_value.chat.completions.create.call_args.kwargs['messages'][1]['content'].split('Evidence for analysis:\n', 1)[1])
+        sent_module = sent_payload['trainingPlan']['modules'][0]
+        self.assertEqual(sent_module['authoritativeKsbCodes'], ['K1'])
+        self.assertNotIn('ksbMappings', sent_module)
+        evidence_ids = {item['id'] for item in sent_payload['evidenceReferences']}
+        self.assertIn('evidence.skills-radar.1', evidence_ids)
+        self.assertIn('evidence.qualification.1', evidence_ids)
+        self.assertIn('evidence.plr.status', evidence_ids)
+        self.assertIn('evidence.training-plan.module.module-a', evidence_ids)
+        self.assertNotIn('K1', evidence_ids)
+
+    def test_partial_prior_learning_cannot_be_presented_as_whole_module_candidate(self):
+        payload = self.analysis_payload()
+        with self.assertRaisesMessage(ReportInputError, 'complete mapped evidence'):
+            _validate_rpl_analysis({
+                'overallOutcome': 'potential-whole-module-reduction', 'reasoning': 'Some topics overlap.',
+                'modules': [{
+                    'moduleId': 'module-a', 'moduleName': 'Campaign planning', 'wholeModuleReductionRecommended': True, 'evidenceSufficiency': 'partial',
+                    'supportingEvidence': [{'evidenceId': 'evidence.cv.approved', 'detail': 'Some campaign work.'}],
+                    'missingEvidence': ['Complete outcome verification is missing.'], 'explanation': 'Partial overlap only.',
+                }], 'evidenceGaps': [], 'warnings': [],
+            }, payload)
+
+    def test_missing_ksb_mappings_force_review_instead_of_module_removal(self):
+        payload = self.analysis_payload(mappings=False)
+        with self.assertRaisesMessage(ReportInputError, 'complete mapped evidence'):
+            _validate_rpl_analysis({
+                'overallOutcome': 'potential-whole-module-reduction', 'reasoning': 'A module may be removable.',
+                'modules': [{
+                    'moduleId': 'module-a', 'moduleName': 'Campaign planning', 'wholeModuleReductionRecommended': True, 'evidenceSufficiency': 'sufficient',
+                    'supportingEvidence': [{'evidenceId': 'evidence.qualification.1', 'detail': 'Verified.'}],
+                    'missingEvidence': [], 'explanation': 'No mappings were supplied.',
+                }], 'evidenceGaps': [], 'warnings': [],
+            }, payload)
+
+    def test_model_ksb_mappings_are_ignored_and_authority_is_attached_server_side(self):
+        payload = self.analysis_payload(mappings=False)
+        result = _validate_rpl_analysis({
+            'overallOutcome': 'insufficient-evidence',
+            'reasoning': 'The evidence needs assessor review.',
+            'modules': [{
+                'moduleId': 'module-a', 'moduleName': 'Campaign planning',
+                'wholeModuleReductionRecommended': False, 'evidenceSufficiency': 'needs-review',
+                'supportingEvidence': [{'evidenceId': 'evidence.skills-radar.1', 'detail': 'Self-assessed only.'}],
+                # A legacy/malicious model field must never influence the result.
+                'ksbMappings': [{'code': 'K999', 'description': 'Invented', 'source': 'model'}],
+                'missingEvidence': ['Authoritative module mapping is unavailable.'],
+                'explanation': 'The Skills Radar evidence is not enough to recommend removal.',
+            }],
+            'evidenceGaps': ['Module KSB mappings are unavailable.'], 'warnings': [],
+        }, payload)
+        self.assertEqual(result['modules'][0]['authoritativeKsbMappings'], [])
+        self.assertNotIn('ksbMappings', result['modules'][0])
+
+    def test_raw_private_cv_text_is_rejected_from_recommendation(self):
+        payload = self.analysis_payload()
+        payload['privateCvText'] = 'Distinctive synthetic CV secret and experience statement.'
+        with self.assertRaisesMessage(ReportInputError, 'raw private CV text'):
+            _validate_rpl_analysis({
+                'overallOutcome': 'insufficient-evidence', 'reasoning': 'Distinctive synthetic CV secret and experience statement.',
+                'modules': [{
+                    'moduleId': 'module-a', 'moduleName': 'Campaign planning', 'wholeModuleReductionRecommended': False, 'evidenceSufficiency': 'insufficient',
+                    'supportingEvidence': [],
+                    'missingEvidence': ['Independent verification is missing.'], 'explanation': 'Review required.',
+                }], 'evidenceGaps': [], 'warnings': [],
+            }, payload)
 
 
 class SuitabilityRplEvidenceMappingTests(SimpleTestCase):

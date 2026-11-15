@@ -474,6 +474,51 @@ def _document_signing_rows_for(keys):
             "learnerSignedName": _s(learner_sig_name),
             "learnerSignedAt": _iso(learner_sig_at),
         })
+
+    # Suitability & RPL reports are dynamic, immutable issued PDFs.  They do
+    # not live in Enrolment_Documents, so project their existing signature
+    # envelope into this same employer document queue.  The learner ownership
+    # query above is the authorisation boundary; no client-supplied learner is
+    # trusted here.
+    try:
+        from programme_suitability.rpl_report import REPORT_DOCUMENT_KEY, _signature_status
+        from enrolment_api.document_templates.models import IssuedTemplate, RenderHistory
+        for key in keys:
+            kind, learner_id = key
+            issues = IssuedTemplate.objects.filter(
+                document_key=REPORT_DOCUMENT_KEY,
+                learner_kind=kind,
+                learner_id=learner_id,
+            ).order_by('-issued_at')
+            for issue in issues:
+                artifact = RenderHistory.objects.filter(issue=issue, payload__kind='suitability-rpl-issued-pdf-v1').first()
+                status = _signature_status(issue, artifact)
+                if not status:
+                    continue
+                employer_sig = status['signatures']['employer']
+                out[key].append({
+                    'kind': 'suitability-rpl-report',
+                    'id': status['issueId'],
+                    'docType': REPORT_DOCUMENT_KEY,
+                    'label': 'Suitability & RPL Report',
+                    'generatedAt': _iso(issue.issued_at),
+                    'signable': bool(status['signingEnabled'] and not employer_sig['signed']),
+                    'signed': bool(employer_sig['signed']),
+                    'signedName': _s(employer_sig.get('name')),
+                    'signedAt': employer_sig.get('signedAt'),
+                    'parties': ['provider', 'learner', 'employer'],
+                    'learnerSigned': bool(status['signatures']['learner']['signed']),
+                    'learnerSignedName': _s(status['signatures']['learner'].get('name')),
+                    'learnerSignedAt': status['signatures']['learner'].get('signedAt'),
+                    'providerSigned': bool(status['signatures']['admin']['signed']),
+                    'providerSignedName': _s(status['signatures']['admin'].get('name')),
+                    'providerSignedAt': status['signatures']['admin'].get('signedAt'),
+                    'reportVersion': status['reportVersion'],
+                    'reportRevision': status['reportRevision'],
+                    'pdfSha256': status['pdfSha256'],
+                })
+    except DatabaseError:
+        logger.exception("_document_signing_rows_for: suitability report lookup failed for %s", keys)
     return out
 
 
@@ -1317,7 +1362,18 @@ def employer_document_preview(request, employer_id, kind, learner_id, document_k
         "written-agreement": (WrittenAgreement, written_agreement_json),
     }
     try:
-        if document_kind in snapshots:
+        if document_kind == "suitability-rpl-report":
+            from enrolment_api.document_templates.models import IssuedTemplate, RenderHistory
+            from programme_suitability.rpl_report import REPORT_DOCUMENT_KEY
+            issue = IssuedTemplate.objects.filter(
+                pk=document_id, document_key=REPORT_DOCUMENT_KEY,
+                learner_kind=kind, learner_id=learner.pk,
+            ).first()
+            artifact = RenderHistory.objects.filter(issue=issue, payload__kind='suitability-rpl-issued-pdf-v1').first() if issue else None
+            if issue is None or artifact is None or issue.template_snapshot.get('pdfTrust') != 'server-rendered-v1':
+                return _error("Document not found.", 404)
+            payload = {"kind": document_kind, "url": f"/enrolment_api/document-templates/learners/{learner.pk}/issued/{issue.pk}/pdf/"}
+        elif document_kind in snapshots:
             model, serialize = snapshots[document_kind]
             document = model.objects.filter(
                 pk=document_id, learner_id=learner.pk, learner_kind=kind, status=model.STATUS_ACTIVE,

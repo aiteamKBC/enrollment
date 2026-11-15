@@ -62,6 +62,56 @@ class RplHttpIntegrationTests(SuitabilityAuthFixtureMixin, TestCase):
         SuitabilityCvExtraction.objects.all().delete()
         self.assertEqual(self.admin_client.get(URL).json()['evidence']['evidence']['cv']['extractionStatus'], 'pending')
 
+    @patch('openai.OpenAI')
+    @patch('programme_suitability.rpl_report._rpl_analysis_payload')
+    def test_rpl_analysis_endpoint_returns_advisory_modules_without_changing_decision(self, analysis_payload, openai):
+        saved = self.save_draft()
+        analysis_payload.return_value = {
+            'programme': {'id': 'PM-L5'}, 'learnerEvidence': {}, 'programmeUnderstanding': [],
+            'skillsRadar': {}, 'qualifications': {}, 'plr': {'status': 'not_available'},
+            'trainingPlan': {'available': True, 'plannedHours': 120, 'modules': [
+                {'moduleId': 'module-a', 'moduleName': 'Authoritative module A', 'plannedHours': 70, 'content': '', 'authoritativeKsbMappings': []},
+                {'moduleId': 'module-b', 'moduleName': 'Authoritative module B', 'plannedHours': 50, 'content': '', 'authoritativeKsbMappings': []},
+            ]},
+            'privateCvText': '', 'extractionWarning': '', 'evidenceReferences': [],
+            'evidenceVersion': {'sourceSnapshotHash': SuitabilityRplReport.objects.get(pk=saved['id']).source_snapshot_hash, 'documentId': '', 'container': '', 'blobName': '', 'sha256': '', 'extractorVersion': ''},
+        }
+        recommendation = {
+            'overallOutcome': 'insufficient-evidence',
+            'reasoning': 'The supplied evidence requires assessor review before any whole-module decision.',
+            'modules': [{
+                'moduleId': 'module-a', 'moduleName': 'Authoritative module A', 'wholeModuleReductionRecommended': False, 'evidenceSufficiency': 'insufficient',
+                'supportingEvidence': [], 'authoritativeKsbMappings': [],
+                'missingEvidence': ['Independent outcome verification is missing.'],
+                'explanation': 'Partial or self-assessed evidence cannot support removal of the complete module.',
+            }, {
+                'moduleId': 'module-b', 'moduleName': 'Authoritative module B', 'wholeModuleReductionRecommended': False, 'evidenceSufficiency': 'insufficient',
+                'supportingEvidence': [], 'authoritativeKsbMappings': [],
+                'missingEvidence': ['Independent outcome verification is missing.'],
+                'explanation': 'No complete-module exemption is supported by the supplied evidence.',
+            }],
+            'evidenceGaps': ['PLR is not recorded.'], 'warnings': [],
+        }
+        openai.return_value.chat.completions.create.return_value = type('R', (), {
+            'choices': [type('C', (), {'message': type('M', (), {'content': json.dumps(recommendation)})(), 'finish_reason': 'stop'})()],
+            'usage': None,
+        })()
+        with patch('django.conf.settings.SUITABILITY_RPL_AI_ENABLED', True), patch('django.conf.settings.OPENAI_API_KEY', 'synthetic'):
+            response = self.admin_client.post(URL + 'ai/rpl-analysis/', data='{}', content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body['recommendation']['overallOutcome'], 'insufficient-evidence')
+        self.assertEqual(body['metadata']['sourceSnapshotHash'], SuitabilityRplReport.objects.get(pk=saved['id']).source_snapshot_hash)
+        current = SuitabilityRplReport.objects.get(pk=saved['id'])
+        self.assertFalse(current.relevant_prior_learning)
+        self.assertFalse(current.reduction_justified)
+        self.assertNotIn('PRIVATE-ANALYSIS-CV', json.dumps(body))
+
+    def test_rpl_analysis_endpoint_remains_admin_only(self):
+        self.assertEqual(self.staff_client.post(URL + 'ai/rpl-analysis/', data='{}', content_type='application/json').status_code, 403)
+        from django.test import Client
+        self.assertEqual(Client().post(URL + 'ai/rpl-analysis/', data='{}', content_type='application/json').status_code, 401)
+
     def test_private_secret_absent_from_snapshot_and_report_response(self):
         self.ready_extraction()
         body = json.dumps(self.admin_client.get(URL).json())

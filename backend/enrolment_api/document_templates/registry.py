@@ -14,6 +14,14 @@ PROGRAMMES = {'PCP_L6': 'Project Controls Professional Level 6', 'MM_L6': 'Marke
               'ME_L4': 'Marketing Executive Level 4', 'APM_L4': 'Associate Project Manager Level 4'}
 REVIEW_KEYS = {'eligibility-review': 'review-eligibility', 'workspace': 'review-rpl',
                'training-plan': 'review-health-safety', 'uln-privacy': 'review-uln'}
+DYNAMIC_DOCUMENTS = {
+    'suitability-rpl-report': {
+        'title': 'Suitability & RPL Report',
+        'fullTitle': 'Suitability & Recognition of Prior Learning Report',
+        'category': 'Review',
+        'programmes': [],
+    },
+}
 TOKEN = re.compile(r'\{\{([A-Za-z0-9_.-]+)\}\}')
 IDENTIFIER = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$')
 MAX_BYTES = 1024 * 1024

@@ -14,7 +14,7 @@ from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
 from .models import IssuedTemplate, RenderHistory, TemplateDraft, TemplateVersion
-from .registry import PROGRAMMES, TOKEN, TemplateError, digest, legacy_equivalent, seed, seeds, validate
+from .registry import DYNAMIC_DOCUMENTS, PROGRAMMES, TOKEN, TemplateError, digest, legacy_equivalent, seed, seeds, validate
 
 logger = logging.getLogger(__name__)
 _READY = False
@@ -92,6 +92,13 @@ def index():
                        'category': content['category'], 'programmes': content['programmes'], 'publishedVersion': published,
                        'draft': {'revision': draft.revision, 'updatedAt': draft.updated_at.isoformat(), 'updatedBy': draft.updated_by} if dirty else None,
                        'updatedAt': draft.updated_at.isoformat() if dirty else published['publishedAt'] if published else None})
+    # Learner-specific reports own their snapshot/PDF lifecycle. Catalogue the
+    # report for discovery, but keep it out of the static template editor.
+    for identifier, document in DYNAMIC_DOCUMENTS.items():
+        result.append({'templateId': identifier, 'documentKey': identifier, 'title': document['title'],
+                       'fullTitle': document['fullTitle'], 'category': document['category'],
+                       'programmes': document['programmes'], 'publishedVersion': None,
+                       'draft': None, 'updatedAt': None, 'dynamic': True})
     return {'results': result, 'programmes': PROGRAMMES, 'setupRequired': not available}
 
 

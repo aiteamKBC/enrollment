@@ -14,15 +14,13 @@ describe('Suitability & RPL blank report PDF', () => {
     ]);
   });
 
-  it('contains all eight approved report sections', () => {
+  it('contains the six approved report sections after removing evidence and final assessment sections', () => {
     expect(SUITABILITY_RPL_SECTION_TITLES).toEqual([
       'Learner & Programme Details',
       'Programme Understanding',
       'Programme Suitability Assessment',
       'Skills Radar Assessment',
-      'CV, Qualifications & PLR Evidence',
       'Recognition of Prior Learning Assessment',
-      'Final Assessment & Recommendation',
       'Declarations & Signatures',
     ]);
   });
@@ -46,6 +44,80 @@ describe('Suitability & RPL blank report PDF', () => {
     expect(commands).toContain('CATEGORY');
     expect(commands).toContain('AVERAGE / 9');
     expect((commands.match(/N\/A/g) || []).length).toBe(3);
+    expect(commands).not.toContain('Final Assessment & Recommendation');
+    expect(commands).not.toContain('SUITABILITY OUTCOME');
+    expect(commands).not.toContain('ASSESSMENT RATIONALE');
+    expect(commands).not.toContain('FINAL TRAINING RECOMMENDATION');
+    expect(commands).not.toContain('DOCUMENT CONTROL');
+    expect(commands).not.toContain('CV, Qualifications & PLR Evidence');
+    expect(commands).not.toContain('Curriculum Vitae (CV)');
+    expect(commands).not.toContain('Personal Learning Record (PLR)');
+    expect(commands).not.toContain('CV, QUALIFICATIONS AND PLR EVIDENCE');
+    expect(commands).toContain('Declarations & Signatures');
+  });
+
+  it('omits final assessment content even when legacy values are supplied', () => {
+    const document = buildSuitabilityRplReportPdf({
+      status: 'finalised',
+      finalAssessment: {
+        outcome: 'suitable',
+        rationale: 'Legacy final rationale must remain internal to the report record.',
+        reportReference: 'LEGACY-REF',
+        version: '7',
+        approvalDate: '05 November 2026',
+      },
+    });
+    const commands = (document.internal.pages as unknown as string[][]).flat().join('\n');
+    expect(commands).not.toContain('Legacy final rationale must remain internal to the report record.');
+    expect(commands).not.toContain('SUITABILITY OUTCOME');
+    expect(commands).not.toContain('ASSESSMENT RATIONALE');
+    expect(commands).not.toContain('FINAL TRAINING RECOMMENDATION');
+    expect(commands).not.toContain('DOCUMENT CONTROL');
+    expect(commands).not.toContain('LEGACY-REF');
+  });
+
+  it('renders the saved full-programme decision without an empty reduction table', () => {
+    const document = buildSuitabilityRplReportPdf({
+      status: 'draft',
+      rpl: {
+        relevantPriorLearning: false,
+        reductionJustified: false,
+        originalHours: 368.25,
+        justification: 'The supplied evidence does not substantiate an exemption from the standard Training Plan.',
+        reviewed: true,
+        rows: [],
+      },
+    });
+    const commands = (document.internal.pages as unknown as string[][]).flat().join('\n');
+    expect(commands).toContain('No Relevant Prior Learning - Full Standard Training Plan');
+    expect(commands).toContain('Original planned hours: 368.25 hours');
+    expect(commands).toContain('No training reduction approved.');
+    expect(commands).toContain('RPL ASSESSMENT JUSTIFICATION');
+    expect(commands).not.toContain('MODULE-LEVEL REDUCTIONS');
+    expect(commands).not.toContain('KSB LINK');
+    expect(commands).not.toContain('VERIFIED EVIDENCE');
+  });
+
+  it('preserves historical no-reduction decisions without reinterpreting them', () => {
+    const document = buildSuitabilityRplReportPdf({
+      status: 'finalised',
+      rpl: {
+        relevantPriorLearning: true,
+        reductionJustified: false,
+        originalHours: 120,
+        evidenceReview: 'Historical evidence review must remain internal.',
+        noReductionReason: 'Historical reason must remain internal.',
+        justification: 'Historical approved RPL justification.',
+        reviewed: true,
+      },
+    });
+    const commands = (document.internal.pages as unknown as string[][]).flat().join('\n');
+    expect(commands).toContain('Relevant Prior Learning - No Training Reduction Approved');
+    expect(commands).toContain('Historical decision retained with no training reduction approved.');
+    expect(commands).toContain('Historical approved RPL justification.');
+    expect(commands).not.toContain('Historical evidence review must remain internal.');
+    expect(commands).not.toContain('Historical reason must remain internal.');
+    expect((commands.match(/Historical approved RPL justification\./g) || []).length).toBe(1);
   });
 
   it('renders populated no-reduction and multi-module reduction scenarios without clipping rows', () => {
@@ -82,8 +154,13 @@ describe('Suitability & RPL blank report PDF', () => {
     expect(noReduction.getNumberOfPages()).toBeGreaterThanOrEqual(4);
     const noReductionCommands = (noReduction.internal.pages as unknown as string[][]).flat().join('\n');
     expect(noReductionCommands).toContain('Synthetic reviewed RPL justification.');
+    expect(noReductionCommands).toContain('Relevant Prior Learning - No Training Reduction Approved');
+    expect(noReductionCommands).not.toContain('MODULE-LEVEL REDUCTIONS');
     expect(noReductionCommands).not.toContain('ASSESSOR-REVIEWED RPL JUSTIFICATION');
     expect(noReductionCommands).toContain('EMPLOYER / LINE MANAGER');
+    expect(noReductionCommands).not.toContain('Curriculum Vitae (CV)');
+    expect(noReductionCommands).not.toContain('Personal Learning Record (PLR)');
+    expect(noReductionCommands).not.toContain('CV, QUALIFICATIONS AND PLR EVIDENCE');
     expect(noReductionCommands).toContain('Knowledge');
     expect(noReductionCommands).toContain('Skills');
     expect(noReductionCommands).toContain('Behaviours');
@@ -113,16 +190,33 @@ describe('Suitability & RPL blank report PDF', () => {
     const unapprovedCommands = (unapproved.internal.pages as unknown as string[][]).flat().join('\n');
     expect(unapprovedCommands).not.toContain('Unapproved draft must stay out of the final PDF.');
 
+    const unapprovedRpl = buildSuitabilityRplReportPdf({ ...base, rpl: {
+      relevantPriorLearning: false,
+      reductionJustified: false,
+      justification: 'Unapproved RPL draft must stay out of the final PDF.',
+      reviewed: false,
+    } });
+    const unapprovedRplCommands = (unapprovedRpl.internal.pages as unknown as string[][]).flat().join('\n');
+    expect(unapprovedRplCommands).not.toContain('Unapproved RPL draft must stay out of the final PDF.');
+
     const reduced = buildSuitabilityRplReportPdf({ ...base, rpl: {
       relevantPriorLearning: true, reductionJustified: true,
       evidenceReview: 'Verified evidence was reviewed.', justification: 'Synthetic reduction justification.', reviewed: true,
       rows: Array.from({ length: 12 }, (_, index) => ({
         area: `Authoritative module ${index + 1}`, ksb: `K${index + 1}`,
-        evidence: 'Synthetic certificate and professional discussion.', hours: index + 1,
+        plannedHours: (index + 1) * 10, reducedHours: index + 1,
+        adjustedHours: (index + 1) * 9, evidence: 'Synthetic certificate and professional discussion.', hours: index + 1,
       })),
       originalHours: 500, reductionHours: 78, adjustedHours: 422,
     } });
     expect(reduced.getNumberOfPages()).toBeGreaterThan(noReduction.getNumberOfPages());
+    const reducedCommands = (reduced.internal.pages as unknown as string[][]).flat().join('\n');
+    expect(reducedCommands).toContain('Relevant Prior Learning - Training Reduction Approved');
+    expect(reducedCommands).toContain('ORIGINAL HOURS');
+    expect(reducedCommands).toContain('APPROVED REDUCTION');
+    expect(reducedCommands).toContain('ADJUSTED HOURS');
+    expect(reducedCommands).toContain('MAPPED KSBs');
+    expect(reducedCommands).not.toContain('VERIFIED EVIDENCE');
     for (let page = 1; page <= reduced.getNumberOfPages(); page += 1) {
       reduced.setPage(page);
       expect(reduced.internal.pageSize.getHeight()).toBeCloseTo(297, 1);
