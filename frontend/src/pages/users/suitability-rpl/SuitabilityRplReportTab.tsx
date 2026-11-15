@@ -20,8 +20,10 @@ import {
   type RplAnalysisRecommendation,
   type RplAnalysisMetadata,
   type SuitabilityRplIssuedDocument,
+  type SuitabilityRplState,
 } from '@/api/suitabilityRplReport';
 import { SignaturePad } from '@/pages/users/wizard/steps/SignaturePad';
+import { reportIssueButtonLabel, shouldShowDraftDownload } from './reportActions';
 import {
   buildSuitabilityRplReportPdf,
   loadSuitabilityRplReportAssets,
@@ -125,6 +127,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   const [form, setForm] = useState<FormState>(initialForm);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
+  const [history, setHistory] = useState<SuitabilityRplState['history']>([]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -148,6 +151,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       setForm(formFromReport(state.report));
       setAiEnabled(state.aiEnabled);
       setHistoryCount(state.history.length);
+      setHistory(state.history);
       setRplAnalysis(null);
       if (state.report?.status === 'finalised') {
         try { setIssuedDocuments((await fetchSuitabilityRplIssuedDocuments(kind, learnerId)).documents); } catch { setIssuedDocuments([]); }
@@ -168,6 +172,16 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   }, [load]);
 
   const locked = report?.status === 'finalised';
+  const issued = !!report && issuedDocuments.some((document) =>
+    document.reportId === report.id
+    && document.reportVersion === report.reportVersion
+    && document.reportRevision === report.revision
+  );
+  const currentIssued = report ? issuedDocuments.find((document) =>
+    document.reportId === report.id
+    && document.reportVersion === report.reportVersion
+    && document.reportRevision === report.revision
+  ) : undefined;
   const decision = decisionOf(form);
   const cvStatus = evidence?.evidence.cv.status || 'not_provided';
   const cvExtractionStatus = evidence?.evidence.cv.extractionStatus || (cvStatus === 'provided' ? 'pending' : 'not_provided');
@@ -229,6 +243,19 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
     } finally {
       setWorking(null);
     }
+  };
+
+  const createAmendedVersion = async () => {
+    if (!report || report.status !== 'finalised' || working) return;
+    const amendmentReason = window.prompt('Why is an amended version required?')?.trim();
+    if (!amendmentReason) return;
+    setWorking('amend'); setError(''); setNotice('');
+    try {
+      const result = await saveSuitabilityRplReport(kind, learnerId, { ...form, revision: 0, newVersion: true, amendmentReason, finalise: false });
+      setReport(result.report); setEvidence(result.report.sourceSnapshot); setForm(formFromReport(result.report));
+      setAiEnabled(result.aiEnabled); setNotice(`Version ${result.report.reportVersion} created as an editable draft.`); setIssuedDocuments([]);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create the amended version.'); }
+    finally { setWorking(null); }
   };
 
   const generate = async (type: 'suitability' | 'rpl') => {
@@ -362,6 +389,10 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   }, [adjustedHours, evidence, form, learnerName, report, totalReduction]);
 
   const preview = async () => {
+    if (currentIssued) {
+      window.open(currentIssued.pdfUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
     setWorking('preview');
     try {
       const pdf = await makePdf();
@@ -381,7 +412,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   };
 
   const issue = async () => {
-    if (!report || report.status !== 'finalised') return;
+    if (!report || report.status !== 'finalised' || issued || working) return;
     setWorking('issue');
     setError('');
     setNotice('');
@@ -438,8 +469,9 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 disabled:opacity-50" onClick={preview} disabled={!!working}><FileSearch size={16} />Preview PDF</button>
-            <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2.5 text-sm font-semibold text-primary-900 hover:bg-primary-50 disabled:opacity-50" onClick={download} disabled={!!working}><Download size={16} />Download draft</button>
-            {locked && <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-primary-500 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-primary-400 disabled:opacity-50" onClick={issue} disabled={!!working}><FileCheck2 size={16} />{working === 'issue' ? 'Issuing…' : 'Issue finalised report'}</button>}
+            {shouldShowDraftDownload(report?.status || null) && <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2.5 text-sm font-semibold text-primary-900 hover:bg-primary-50 disabled:opacity-50" onClick={download} disabled={!!working}><Download size={16} />Download draft</button>}
+            {locked && <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-primary-500 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-primary-400 disabled:opacity-50" onClick={issue} disabled={!!working || issued}><FileCheck2 size={16} />{reportIssueButtonLabel(locked, issued, working === 'issue')}</button>}
+            {locked && <button type="button" className={secondaryButton} onClick={() => void createAmendedVersion()} disabled={!!working}><Plus size={16} />Create Amended Version</button>}
           </div>
         </div>
       </section>
@@ -455,6 +487,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
           {signingIssue && signingIssue.issueId === current.issueId && <div className="mt-4 space-y-3 rounded-xl border border-foreground-200 bg-background-100 p-4"><button type="button" className={secondaryButton} onClick={() => { window.open(current.pdfUrl, '_blank', 'noopener,noreferrer'); setSignPreviewed(true); }}><FileSearch size={15} />Preview exact issued PDF</button><label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={signConsent} disabled={!signPreviewed || working === 'sign-admin'} onChange={event => setSignConsent(event.target.checked)} className="mt-0.5" />I have reviewed this exact report version and consent to signing it.</label><SignaturePad signatoryName="Assessor" onCommit={signAdmin} onCancel={() => setSigningIssue(null)} /></div>}
         </>; })()}
       </section>}
+      {history.length > 1 && <section className={`${panel} p-5`} aria-label="Suitability and RPL report version history"><p className={label}>Version history</p><div className="mt-3 space-y-2">{history.map((item) => { const document = issuedDocuments.find((candidate) => candidate.reportId === item.id || candidate.reportVersion === item.reportVersion); return <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground-200 bg-white p-3 text-sm"><div><strong>Version {item.reportVersion}</strong><span className="ml-2 text-foreground-500">{item.status === 'finalised' ? 'Finalised' : 'Draft'}</span>{item.amendmentReason && <p className="mt-1 text-xs text-foreground-500">{item.amendmentReason}</p>}</div>{document && <a className={secondaryButton} href={document.pdfUrl} target="_blank" rel="noreferrer"><FileSearch size={14} />View issued PDF</a>}</div>; })}</div></section>}
       {locked && <div className="flex items-start gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900"><LockKeyhole className="mt-0.5 shrink-0" size={17} /><span>This finalised report is read-only. Its evidence snapshot and approved assessment will not change when learner or programme data changes.</span></div>}
 
       <div className="grid gap-4 xl:grid-cols-2">
