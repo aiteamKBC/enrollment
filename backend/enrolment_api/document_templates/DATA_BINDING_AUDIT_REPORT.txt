@@ -64,9 +64,9 @@ Confirmed defects corrected
 5. Missing employment fields: Training/Written job title and Training employment
    start date now use WizardIlrLearnerDetails.job_title/employment_start_date for
    this learner. Other employment facts with no proven source remain blank.
-6. Written Agreement employer postcode: resolve Employer.post_code through
-   EnrolmentUser.employer_id when the linked employer supplies the printed
-   address. Extended ILR postcode/address remain fallbacks without that address.
+6. Written Agreement employer postcode: resolve the linked Organisation.post_code
+   through EnrolmentUser.employer_id and the employer's single organisation link.
+   Extended ILR postcode/address remain fallbacks without that organisation.
    A deliberately different wizard postcode in the tests proves that the printed
    employer address and postcode do not get mixed.
 7. ILR ULN/address fallback and assessed attainment: retain the existing assessed

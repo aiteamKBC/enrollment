@@ -51,6 +51,13 @@ def _organisation_of(employer):
     return Organisation.objects.filter(pk=int(ids[0])).first()
 
 
+def organisation_for_learner(learner):
+    """Resolve the learner's company through their assigned manager, if unambiguous."""
+    employer_id = getattr(learner, "employer_id", None)
+    employer = Employer.objects.filter(pk=employer_id).first() if employer_id else None
+    return _organisation_of(employer) if employer is not None else None
+
+
 def employer_details_for(learner):
     details = dict.fromkeys(FIELDS, "")
     employer = Employer.objects.filter(pk=learner.employer_id).first() if learner.employer_id else None

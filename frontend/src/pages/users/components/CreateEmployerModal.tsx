@@ -7,7 +7,6 @@ import {
   type EmployerRow,
   type OrganisationRow,
 } from '@/api/employers';
-import { COUNTRY_OPTIONS, DEFAULT_COUNTRY } from '@/lib/countries';
 import { Modal } from './Modal';
 import { inputClass, btnPrimary, btnSecondary } from './ui';
 
@@ -23,7 +22,7 @@ import { inputClass, btnPrimary, btnSecondary } from './ui';
 // and rejects an id that doesn't exist.
 // ============================================================================
 
-type FieldType = 'text' | 'email' | 'tel' | 'select' | 'radio';
+type FieldType = 'text' | 'email' | 'tel' | 'radio';
 
 interface FieldDef {
   name: keyof FormState;
@@ -46,12 +45,6 @@ interface FormState {
   gender: string;
   email: string;
   mobile: string;
-  postCode: string;
-  address1: string;
-  address2: string;
-  townCity: string;
-  county: string;
-  country: string;
 }
 
 const GENDER_OPTIONS = ['Male', 'Female'];
@@ -64,29 +57,15 @@ const SECTIONS: SectionDef[] = [
       { name: 'firstName', label: 'First name', type: 'text', required: true, placeholder: 'firstname' },
       { name: 'surname', label: 'Surname', type: 'text', required: true, placeholder: 'lastname' },
       { name: 'gender', label: 'Gender', type: 'radio', options: GENDER_OPTIONS },
-      // Required: the invitation is sent on save, and an employer with no
-      // address cannot be given one — see the Invitation section below.
+      // Required: the invitation needs this email address.
       { name: 'email', label: 'Email', type: 'email', required: true, placeholder: 'you@youremail.com' },
       { name: 'mobile', label: 'Mobile', type: 'tel', placeholder: 'NNN NNNN NNNN or +NNN NNN NNN NNNN' },
-    ],
-  },
-  {
-    title: 'Address',
-    icon: 'ri-map-pin-line',
-    fields: [
-      { name: 'postCode', label: 'Postcode', type: 'text' },
-      { name: 'address1', label: 'Address 1', type: 'text' },
-      { name: 'address2', label: 'Address 2', type: 'text' },
-      { name: 'townCity', label: 'Town/City', type: 'text' },
-      { name: 'county', label: 'County', type: 'text' },
-      { name: 'country', label: 'Country', type: 'select', options: COUNTRY_OPTIONS },
     ],
   },
 ];
 
 const EMPTY: FormState = {
   firstName: '', surname: '', gender: '', email: '', mobile: '',
-  postCode: '', address1: '', address2: '', townCity: '', county: '', country: DEFAULT_COUNTRY,
 };
 
 /**
@@ -228,12 +207,6 @@ function initialValues(row: EmployerRow): FormState {
     gender: row.gender ?? '',
     email: row.email ?? '',
     mobile: row.mobile ?? '',
-    postCode: row.postCode ?? '',
-    address1: row.address1 ?? '',
-    address2: row.address2 ?? '',
-    townCity: row.townCity ?? '',
-    county: row.county ?? '',
-    country: row.country ?? DEFAULT_COUNTRY,
   };
 }
 
@@ -393,16 +366,6 @@ export function CreateEmployerModal({
                 </label>
               ))}
             </div>
-          ) : field.type === 'select' ? (
-            <select
-              id={`ce-${field.name}`}
-              value={value}
-              onChange={(e) => set(field.name, e.target.value)}
-              className={`${inputClass} cursor-pointer`}
-            >
-              <option value="">--Select--</option>
-              {field.options?.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
           ) : (
             <input
               id={`ce-${field.name}`}
@@ -459,7 +422,7 @@ export function CreateEmployerModal({
           </header>
           <div className="p-4">
             <p className="text-[12px] text-foreground-500 mb-2.5">
-              The organisation(s) this employer belongs to. Create organisation profiles from the Create menu to add to this list.
+              The organisation(s) this employer belongs to. Company address details come from the organisation profile when exactly one is linked. Create organisation profiles from the Create menu to add to this list.
             </p>
             <EmployerGroupPicker selected={groups} onToggle={toggleGroup} />
           </div>
@@ -467,7 +430,7 @@ export function CreateEmployerModal({
 
         {/* Invitation — create only, and always sent. On edit the person already
             has an account, and re-inviting is a deliberate action from the
-            account list, not a side effect of correcting their address. */}
+            account list, not a side effect of editing their profile. */}
         {!editing && (
           <section className="rounded-xl border border-foreground-200/70 overflow-hidden">
             <header className="flex items-center gap-2 px-4 py-2.5 bg-background-100/70 border-b border-foreground-200/60">

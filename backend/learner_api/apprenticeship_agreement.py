@@ -6,7 +6,8 @@ apprenticeship runs, and the planned off-the-job training hours, and is signed
 by those two parties only — the training provider does not sign it (note 6).
 
 Everything on the form is derived from our own records rather than typed twice:
-  * apprentice name, employer name and address -> the learner's record
+  * apprentice name, employer name             -> the learner's record
+  * employer address                            -> linked organisation, then learner's record
   * start / end dates                          -> the learner's own dates (the
     group delivery window is no longer stored on curriculum.groups)
   * planned off-the-job hours                  -> the learning plan total, the
@@ -65,32 +66,26 @@ def _float(value):
 # Deriving the particulars
 # ---------------------------------------------------------------------------
 def _employer_address(learner):
-    """The place of work block: the learner's own value, else their employer's."""
+    """Use the linked organisation address, then the learner's recorded address."""
     direct = _s(getattr(learner, "employer_address", ""))
-    if direct:
+    try:
+        from enrolment_api.ilr_employer_details import organisation_for_learner
+
+        organisation = organisation_for_learner(learner)
+    except DatabaseError:
+        logger.exception("_employer_address: organisation lookup failed")
+        return direct
+    if organisation is None:
         return direct
 
-    employer_id = getattr(learner, "employer_id", None)
-    if not employer_id:
-        return ""
-    try:
-        from .models import Employer
-
-        employer = Employer.objects.filter(pk=employer_id).first()
-    except DatabaseError:
-        logger.exception("_employer_address: employer lookup failed")
-        return ""
-    if employer is None:
-        return ""
-
     parts = [
-        _s(getattr(employer, "address_1", "")),
-        _s(getattr(employer, "address_2", "")),
-        _s(getattr(employer, "town_city", "")),
-        _s(getattr(employer, "county", "")),
-        _s(getattr(employer, "post_code", "")),
+        _s(getattr(organisation, "address_1", "")),
+        _s(getattr(organisation, "address_2", "")),
+        _s(getattr(organisation, "city_town", "")),
+        _s(getattr(organisation, "county", "")),
+        _s(getattr(organisation, "post_code", "")),
     ]
-    return "\n".join(p for p in parts if p)
+    return "\n".join(p for p in parts if p) or direct
 
 
 def _plan_modules(learner):

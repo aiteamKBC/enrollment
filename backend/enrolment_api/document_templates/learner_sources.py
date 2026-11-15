@@ -64,11 +64,10 @@ def employment_details(learner):
 
 
 def employer_postcode(learner, employer_answers):
-    # Match the same assigned employer whose address _employer_address prints.
-    # The wizard answer remains a fallback when there is no assigned address.
-    from learner_api.models import Employer
-    identifier = getattr(learner, 'employer_id', None)
-    employer = Employer.objects.filter(pk=identifier).first() if identifier else None
-    if employer and any(_s(getattr(employer, key, '')) for key in ('address_1','address_2','town_city','county','post_code')):
-        return _s(employer.post_code)
+    # The contact's personal address is not the employing company's address.
+    from enrolment_api.ilr_employer_details import organisation_for_learner
+
+    organisation = organisation_for_learner(learner)
+    if organisation is not None:
+        return _s(organisation.post_code)
     return _s(employer_answers.get('postcode'))
