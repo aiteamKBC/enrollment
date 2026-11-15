@@ -1,16 +1,4 @@
-/**
- * The staff creation form's two variants.
- *
- * One component serves both because they differ only by a position, an access
- * grant and some wording — every field, validation rule and invitation-outcome
- * branch is shared. These tests pin the differences, since they are the whole
- * reason the variant exists, plus the shared validation that a future third
- * variant must not break.
- *
- * The load-bearing assertion is that the tutor variant grants access on save.
- * Without it a tutor is created with no grant and can only ever land on
- * /access-required — an account that looks created and is quietly useless.
- */
+/** Staff creation must grant exactly the roles selected by the administrator. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -49,74 +37,69 @@ async function fillRequired(user: ReturnType<typeof userEvent.setup>, email = 'a
 }
 
 const save = () => screen.getByRole('button', { name: /Create/ });
+const openRoles = async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByText('Select roles'));
 
-describe('CreateStaffModal — tutor variant', () => {
-  it('grants tutor access on save, so the account is usable immediately', async () => {
+describe('CreateStaffModal — roles', () => {
+  it('grants both coach and tutor access from one form', async () => {
     const user = userEvent.setup();
-    render(<CreateStaffModal variant="tutor" onClose={vi.fn()} onCreated={vi.fn()} />);
+    render(<CreateStaffModal onClose={vi.fn()} onCreated={vi.fn()} />);
     await fillRequired(user);
+    await openRoles(user);
+    await user.click(screen.getByRole('checkbox', { name: 'Coach' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Tutor' }));
     await user.click(save());
 
     expect(createStaffUser).toHaveBeenCalledTimes(1);
     expect(createStaffUser.mock.calls[0][0]).toMatchObject({
       username: 'Ada Lovelace',
       email: 'ada@kbc.test',
-      position: 'Tutor',
-      access: 'tutor',
+      position: 'Admin',
+      accesses: ['coach', 'tutor'],
     });
   });
 
-  it('says the account is a Tutor and where it will land', () => {
-    render(<CreateStaffModal variant="tutor" onClose={vi.fn()} onCreated={vi.fn()} />);
-    expect(screen.getByText('Tutor')).toBeTruthy();
-    expect(screen.getByText(/Tutor workspace/)).toBeTruthy();
-  });
-
-  it('reports the outcome as a tutor, and closes', async () => {
+  it('reports the selected role and closes', async () => {
     const onClose = vi.fn();
     const onCreated = vi.fn();
     const user = userEvent.setup();
-    render(<CreateStaffModal variant="tutor" onClose={onClose} onCreated={onCreated} />);
+    render(<CreateStaffModal onClose={onClose} onCreated={onCreated} />);
     await fillRequired(user);
+    await openRoles(user);
+    await user.click(screen.getByRole('checkbox', { name: 'Tutor' }));
     await user.click(save());
 
     expect(toastSuccess).toHaveBeenCalledWith(
-      'Tutor created and invited',
+      'Staff member created and invited',
       expect.stringContaining('Ada Lovelace'),
     );
     expect(onCreated).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
-});
-
-describe('CreateStaffModal — admin variant', () => {
-  it('sends the Admin position and grants nothing', async () => {
-    // Deliberate: 'Admin' is a job title, and what the account may reach is
-    // chosen on the Accounts page. Granting here would hand out unasked access.
+  it('grants Super Admin exclusively, even after Coach was selected', async () => {
     const user = userEvent.setup();
-    render(<CreateStaffModal variant="admin" onClose={vi.fn()} onCreated={vi.fn()} />);
+    render(<CreateStaffModal onClose={vi.fn()} onCreated={vi.fn()} />);
     await fillRequired(user);
+    await openRoles(user);
+    await user.click(screen.getByRole('checkbox', { name: 'Coach' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Super Admin' }));
     await user.click(save());
 
     const payload = createStaffUser.mock.calls[0][0];
     expect(payload.position).toBe('Admin');
-    expect(payload.access).toBeUndefined();
-  });
-
-  it('does not promise a landing page it cannot know', () => {
-    render(<CreateStaffModal variant="admin" onClose={vi.fn()} onCreated={vi.fn()} />);
-    expect(screen.queryByText(/will land in/)).toBeNull();
+    expect(payload.accesses).toEqual(['super-admin']);
   });
 });
 
 describe('CreateStaffModal — shared validation', () => {
   it('refuses a mismatched email confirmation without calling the API', async () => {
     const user = userEvent.setup();
-    render(<CreateStaffModal variant="tutor" onClose={vi.fn()} onCreated={vi.fn()} />);
+    render(<CreateStaffModal onClose={vi.fn()} onCreated={vi.fn()} />);
     await user.type(screen.getByLabelText(/^First name/), 'Ada');
     await user.type(screen.getByLabelText(/^Surname/), 'Lovelace');
     await user.type(screen.getByLabelText(/^Email/), 'ada@kbc.test');
     await user.type(screen.getByLabelText(/^Confirm email/), 'aba@kbc.test');
+    await openRoles(user);
+    await user.click(screen.getByRole('checkbox', { name: 'Tutor' }));
     await user.click(save());
 
     expect(createStaffUser).not.toHaveBeenCalled();
@@ -127,11 +110,13 @@ describe('CreateStaffModal — shared validation', () => {
     // Addresses are not case-sensitive in practice; capitalisation is not the
     // typo the second field is there to catch.
     const user = userEvent.setup();
-    render(<CreateStaffModal variant="tutor" onClose={vi.fn()} onCreated={vi.fn()} />);
+    render(<CreateStaffModal onClose={vi.fn()} onCreated={vi.fn()} />);
     await user.type(screen.getByLabelText(/^First name/), 'Ada');
     await user.type(screen.getByLabelText(/^Surname/), 'Lovelace');
     await user.type(screen.getByLabelText(/^Email/), 'ada@kbc.test');
     await user.type(screen.getByLabelText(/^Confirm email/), 'Ada@KBC.test');
+    await openRoles(user);
+    await user.click(screen.getByRole('checkbox', { name: 'Coach' }));
     await user.click(save());
 
     expect(createStaffUser).toHaveBeenCalledTimes(1);
@@ -139,11 +124,21 @@ describe('CreateStaffModal — shared validation', () => {
 
   it('names the missing required fields rather than failing silently', async () => {
     const user = userEvent.setup();
-    render(<CreateStaffModal variant="tutor" onClose={vi.fn()} onCreated={vi.fn()} />);
+    render(<CreateStaffModal onClose={vi.fn()} onCreated={vi.fn()} />);
     await user.click(save());
 
     expect(createStaffUser).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledWith('Missing details', expect.stringContaining('First name'));
+  });
+
+  it('requires at least one role', async () => {
+    const user = userEvent.setup();
+    render(<CreateStaffModal onClose={vi.fn()} onCreated={vi.fn()} />);
+    await fillRequired(user);
+    await user.click(save());
+
+    expect(createStaffUser).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith('Roles required', expect.any(String));
   });
 
   it('still reports the record as created when the invitation email fails', async () => {
@@ -154,11 +149,13 @@ describe('CreateStaffModal — shared validation', () => {
       invitation: { invited: true, emailSent: false, error: 'SMTP refused' },
     });
     const user = userEvent.setup();
-    render(<CreateStaffModal variant="tutor" onClose={vi.fn()} onCreated={vi.fn()} />);
+    render(<CreateStaffModal onClose={vi.fn()} onCreated={vi.fn()} />);
     await fillRequired(user);
+    await openRoles(user);
+    await user.click(screen.getByRole('checkbox', { name: 'Tutor' }));
     await user.click(save());
 
-    expect(toastSuccess).toHaveBeenCalledWith('Tutor created', expect.stringContaining('Tutor'));
+    expect(toastSuccess).toHaveBeenCalledWith('Staff member created', expect.stringContaining('Tutor'));
     expect(toastError).toHaveBeenCalledWith('Invitation email not sent', 'SMTP refused');
   });
 });

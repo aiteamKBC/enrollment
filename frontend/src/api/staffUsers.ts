@@ -26,19 +26,10 @@ export const POSITION_OPTIONS = [
 ];
 
 /**
- * The position the Create admin form sends. It does not ask: access is the thing
- * that decides anything, and it is granted separately from the Accounts page.
+ * The position the staff creation form sends. Access grants are selected in
+ * that form and determine the account's permissions.
  */
 export const ADMIN_POSITION = 'Admin';
-
-/**
- * The position the Create tutor form sends.
- *
- * Unlike the admin form, that one grants `access: 'tutor'` at the same time —
- * a tutor created without a grant lands on /access-required, so leaving it to a
- * second step would mean every tutor is broken until somebody notices.
- */
-export const TUTOR_POSITION = 'Tutor';
 
 /** Supported access grants. Mirrors ACCESS_CHOICES in learner_api/constants.py. */
 export type StaffAccess = 'enrolment' | 'curriculum' | 'coach' | 'tutor' | 'record-monitor' | 'advanced-admin' | 'super-admin' | 'support';
@@ -128,7 +119,7 @@ export interface CreateStaffUserInput {
   email: string;
   /** Required — one of POSITION_OPTIONS. */
   position: string;
-  /** One of ACCESS_OPTIONS. Omitted on create; granted from the Accounts page. */
+  /** One of ACCESS_OPTIONS; can be used as the primary grant. */
   /** The PRIMARY grant — where this account lands at sign-in. */
   access?: StaffAccess;
   /** Every grant the account holds, including the primary. Omit to leave the

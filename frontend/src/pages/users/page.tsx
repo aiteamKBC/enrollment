@@ -199,7 +199,6 @@ export default function UsersListPage() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [createAdminOpen, setCreateAdminOpen] = useState(false);
-  const [createTutorOpen, setCreateTutorOpen] = useState(false);
   const [createEmployerOpen, setCreateEmployerOpen] = useState(false);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
   const createRef = useRef<HTMLDivElement>(null);
@@ -528,8 +527,7 @@ export default function UsersListPage() {
                   className="fixed z-[200] w-56 rounded-xl border border-foreground-200 bg-background-50 py-1.5 shadow-xl"
                 >
                   <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateModalOpen(true); }}><AppIcon className="ri-user-add-line mr-2 text-foreground-400" />Create user</button>
-                  <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateAdminOpen(true); }}><AppIcon className="ri-shield-user-line mr-2 text-foreground-400" />Create admin</button>
-                  <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateTutorOpen(true); }}><AppIcon className="ri-presentation-line mr-2 text-foreground-400" />Create tutor</button>
+                  {isAdmin && <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateAdminOpen(true); }}><AppIcon className="ri-shield-user-line mr-2 text-foreground-400" />Create admin</button>}
                   <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateEmployerOpen(true); }}><AppIcon className="ri-briefcase-line mr-2 text-foreground-400" />Create employer profile</button>
                   <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateOrgOpen(true); }}><AppIcon className="ri-building-line mr-2 text-foreground-400" />Create organisation profile</button>
                 </div>,
@@ -855,8 +853,7 @@ export default function UsersListPage() {
       {createModalOpen && <CreateUserModal onClose={() => setCreateModalOpen(false)} onCreated={load} />}
       {importModalOpen && <ImportLearnersModal onClose={() => setImportModalOpen(false)} onImported={applyLearnerImport} />}
       {bulkOpen && <BulkAttendanceModeModal rows={rows} onClose={() => { setBulkOpen(false); loadAttendanceModes(); }} />}
-      {createAdminOpen && <CreateStaffModal variant="admin" onClose={() => setCreateAdminOpen(false)} onCreated={load} />}
-      {createTutorOpen && <CreateStaffModal variant="tutor" onClose={() => setCreateTutorOpen(false)} onCreated={load} />}
+      {createAdminOpen && <CreateStaffModal onClose={() => setCreateAdminOpen(false)} onCreated={load} />}
       {editStaff && <EditStaffModal row={editStaff} onClose={() => setEditStaff(null)} onSaved={applyStaffUpdate} />}
       {/* The create form again, in edit mode — one form per record, so the
           fields cannot drift apart between adding a learner and correcting one. */}

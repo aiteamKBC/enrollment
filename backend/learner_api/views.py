@@ -53,7 +53,7 @@ from login.services import sync_account
 #: any of them has to be pushed to that copy — see login.identity.ensure_account.
 ACCOUNT_IDENTITY_FIELDS = ("email", "username", "preferred_name")
 #: The same for a staff row, where the role follows position and access.
-STAFF_IDENTITY_FIELDS = ("email", "username", "preferred_name", "position", "access")
+STAFF_IDENTITY_FIELDS = ("email", "username", "preferred_name", "position", "access", "access_extra")
 from .constants import (
     ACCESS_SUPER_ADMIN,
     STATUS_CHOICES,
@@ -1172,6 +1172,13 @@ def staff_users(request):
         except ValidationError as exc:
             return _error(str(exc), 400)
 
+        # Staff may add a colleague, but granting any access (especially
+        # super-admin) is reserved for an authenticated administrator.
+        if "access" in fields or "access_extra" in fields:
+            actor = getattr(request, "login_account", None)
+            if actor is None or actor.role != "admin":
+                return _error("Only an administrator can grant account access.", 403)
+
         # As on the learner form: creating a colleague invites them, and the
         # column records that rather than a choice — see enrolment_users.
         fields["invite_to_platform"] = True
@@ -1217,7 +1224,7 @@ def staff_user_detail(request, pk):
         # row, so without this a curriculum- or coach-access user could PATCH
         # their own record to access='super-admin' and take the whole platform —
         # the escalation this mechanism exists to prevent.
-        if "access" in fields:
+        if "access" in fields or "access_extra" in fields:
             actor = getattr(request, "login_account", None)
             if actor is None or actor.role != "admin":
                 return _error(
@@ -1233,7 +1240,7 @@ def staff_user_detail(request, pk):
                 # Access recorded, so refusing every self-change would leave them
                 # permanently unable to record the access they already exercise.
                 # It grants nothing new either way — they are already an admin.
-                if fields["access"] != ACCESS_SUPER_ADMIN:
+                if (fields.get("access", user.access) or "").strip().lower() != ACCESS_SUPER_ADMIN:
                     return _error(
                         "You cannot reduce your own access. Ask another administrator.",
                         400,
