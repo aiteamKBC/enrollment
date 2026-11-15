@@ -94,6 +94,8 @@ export interface SuitabilityRplReport {
   reportReference: string;
   reportVersion: number;
   revision: number;
+  parentReportId?: string | null;
+  amendmentReason?: string;
   learnerKind: LearnerKind;
   learnerId: string;
   contextKey: string;
@@ -135,13 +137,14 @@ export interface SuitabilityRplState {
   evidence: SuitabilityRplEvidence;
   sourceVersions: Record<string, unknown>;
   context: { key: string; programmeId: string; programmeName: string; enrolmentReference: string; practicalStartDate: string };
-  history: Array<{ id: string; reportReference: string; programmeName: string; status: string; finalisedAt: string | null }>;
+  history: Array<{ id: string; reportReference: string; programmeName: string; status: string; reportVersion: number; amendmentReason: string; parentReportId: string | null; finalisedAt: string | null }>;
   aiEnabled: boolean;
 }
 
 export interface SuitabilityRplSavePayload {
   revision: number;
   newVersion?: boolean;
+  amendmentReason?: string;
   relevantPriorLearning: boolean | null;
   reductionJustified: boolean | null;
   assessorEvidenceReview: string;

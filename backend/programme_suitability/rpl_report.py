@@ -683,6 +683,8 @@ def _report_json(report):
     return {
         'id': str(report.pk), 'status': report.status, 'reportReference': report.report_reference,
         'reportVersion': report.report_version, 'revision': report.revision,
+        'parentReportId': str(report.parent_report_id) if report.parent_report_id else None,
+        'amendmentReason': report.amendment_reason,
         'learnerKind': report.learner_kind, 'learnerId': str(report.learner_id),
         'contextKey': report.context_key, 'programmeId': report.programme_id,
         'programmeName': report.programme_name, 'enrolmentReference': report.enrolment_reference,
@@ -859,6 +861,8 @@ def _save_report(request, learner, kind, context, assessment, data):
                 raise ReportInputError(
                     'This report is finalised and immutable. Start a new report version explicitly to reassess it.'
                 )
+            if finalised is not None and not _text(data, 'amendmentReason'):
+                raise ReportInputError('Provide an amendment reason before creating a new report version.')
             snapshot, versions = build_source_snapshot(learner, kind, assessment, context)
             report = SuitabilityRplReport(
                 learner_kind=kind, learner_id=learner.pk, context_key=context['key'],
@@ -867,8 +871,12 @@ def _save_report(request, learner, kind, context, assessment, data):
                 report_reference=f'RPL-{learner.pk}-{uuid.uuid4().hex[:8].upper()}',
                 report_version=(finalised.report_version + 1) if finalised is not None else 1,
                 source_snapshot=snapshot, source_versions=versions, source_snapshot_hash=_json_hash(snapshot),
-                created_by=_actor_id(request), revision=0,
+                created_by=_actor_id(request), revision=0, parent_report=finalised,
+                amendment_reason=_text(data, 'amendmentReason'),
             )
+            if finalised is not None:
+                for field in ('relevant_prior_learning', 'reduction_justified', 'assessor_evidence_review', 'no_reduction_reason', 'suitability_outcome', 'final_summary', 'suitability_justification', 'rpl_justification'):
+                    setattr(report, field, getattr(finalised, field))
         elif data.get('revision') != report.revision:
             raise ReportInputError('This report changed in another session. Reload before saving.')
 
@@ -923,13 +931,16 @@ def _save_report(request, learner, kind, context, assessment, data):
             report.cv_extraction_acknowledged_by = None
             report.cv_extraction_acknowledged_at = None
             report.cv_extraction_acknowledgement_reason = ''
+        amendment_draft = report.parent_report_id is not None and report.revision == 0
+        if amendment_draft:
+            data = {**data, 'suitabilityReviewed': False, 'rplReviewed': False}
         _review_state(report, data, 'suitability', suitability_changed, request)
         _review_state(report, data, 'rpl', rpl_changed, request)
         if decision_changed:
             report.rpl_reviewed_by = None
             report.rpl_reviewed_by_name = ''
             report.rpl_reviewed_at = None
-        if data.get('rplReviewed') is True and (report.source_snapshot.get('evidence', {}).get('cv', {}).get('status') == 'provided') and not report.cv_extraction_acknowledged:
+        if report.status == SuitabilityRplReport.STATUS_DRAFT and report.parent_report_id is None and data.get('rplReviewed') is True and (report.source_snapshot.get('evidence', {}).get('cv', {}).get('status') == 'provided') and not report.cv_extraction_acknowledged:
             _private_cv_text(report, report.source_snapshot['evidence']['cv'])
             version = (report.rpl_ai_metadata or {}).get('cvEvidenceVersion', {})
             if not version.get('sha256') or version.get('sha256') != report.cv_source_blob_hash or version.get('documentId') != report.cv_source_document_id:
@@ -981,11 +992,14 @@ def suitability_rpl_report(request, kind, learner_id):
         else:
             snapshot, versions = build_source_snapshot(learner, kind, assessment, context)
         history = list(SuitabilityRplReport.objects.filter(learner_kind=kind, learner_id=learner_id)
-                       .values('id', 'report_reference', 'programme_name', 'status', 'finalised_at').order_by('-updated_at')[:20])
+                       .values('id', 'report_reference', 'programme_name', 'status', 'report_version', 'amendment_reason', 'parent_report_id', 'finalised_at').order_by('-report_version', '-updated_at')[:20])
         for item in history:
             item['id'] = str(item['id'])
             item['reportReference'] = item.pop('report_reference')
             item['programmeName'] = item.pop('programme_name')
+            item['reportVersion'] = item.pop('report_version')
+            item['amendmentReason'] = item.pop('amendment_reason')
+            item['parentReportId'] = str(item.pop('parent_report_id')) if item.get('parent_report_id') else None
             item['finalisedAt'] = item.pop('finalised_at').isoformat() if item['finalised_at'] else None
         return JsonResponse({'report': _report_json(report), 'evidence': snapshot, 'sourceVersions': versions,
                              'context': context, 'history': history,
