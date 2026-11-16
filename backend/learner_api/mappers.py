@@ -174,7 +174,37 @@ def _fs_block(assessments, exemption):
         evidence = _as_list(ex.get("evidence"))
     elif isinstance(exemption, bool):
         exempt = exemption
-    return {"assessments": _as_list(assessments), "exempt": exempt, "evidence": evidence}
+    status = str(ex.get("status") or ("EXEMPT" if exempt else "NOT_EXEMPT")).upper() if ex else ("EXEMPT" if exempt else "NOT_EXEMPT")
+    if status not in {"EXEMPT", "NOT_EXEMPT", "OPT_OUT"}: status = "NOT_EXEMPT"
+    return {"assessments": _as_list(assessments), "exempt": status == "EXEMPT", "status": status, "evidence": evidence}
+
+
+def _bksb_assessment_rows(user):
+    """Project completed BKSB rows into the board's existing FS assessment shape."""
+    try:
+        from enrolment_api.models import BksbInitialAssessment
+        kind = _s(getattr(user, "learner_type", None)) or "apprenticeship"
+        rows = BksbInitialAssessment.objects.filter(
+            learner_kind=kind, learner_id=user.pk, status="completed"
+        ).only("subject", "course_name", "result", "level", "assessment_date")
+    except Exception:
+        # The board must remain available if the additive BKSB table has not
+        # been provisioned in an older environment.
+        return {"english": [], "maths": []}
+    output = {"english": [], "maths": []}
+    for row in rows:
+        subject = _s(row.subject).lower()
+        if subject not in output or not (row.result or row.level or row.assessment_date):
+            continue
+        output[subject].append({
+            "id": f"bksb-{row.pk}",
+            "name": _s(row.course_name) or subject.title(),
+            "level": _s(row.level) or _s(row.result) or "",
+            "result": _s(row.result),
+            "date": row.assessment_date.isoformat() if row.assessment_date else "",
+            "status": "Completed",
+        })
+    return output
 
 
 def _split_enrolled(value):
@@ -269,6 +299,9 @@ def to_board(u):
     enrolled_at, enrolled_by = _split_enrolled(u.enrolled_time_and_user)
     saved_signature_value, saved_signature_date = saved_signature(u.id)
     employer_name, employer_id = _employer_label(u)
+    bksb = _bksb_assessment_rows(u)
+    english_assessments = bksb["english"] or _as_list(u.english_assessments)
+    maths_assessments = bksb["maths"] or _as_list(u.maths_assessments)
     board = {
         "user": {
             "id": str(u.id),
@@ -344,8 +377,8 @@ def to_board(u):
         "aims": _as_list(u.aims_qualifications),
         "previousProgrammes": [],
         "functionalSkills": {
-            "english": _fs_block(u.english_assessments, u.english_exemption),
-            "maths": _fs_block(u.maths_assessments, u.maths_exemption),
+            "english": _fs_block(english_assessments, u.english_exemption),
+            "maths": _fs_block(maths_assessments, u.maths_exemption),
             "ict": _fs_block(u.ict_assessments, u.ict_exemption),
         },
         "managedJobs": _as_list(_maybe_json(u.managed_jobs)),

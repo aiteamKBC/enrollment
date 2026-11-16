@@ -23,7 +23,7 @@ from pathlib import Path
 import uuid
 
 from django.conf import settings
-from django.db import DatabaseError, connections
+from django.db import DatabaseError, connections, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -509,7 +509,7 @@ def delete_evidence(request, kind, pk, file_id):
     try:
         with _conn().cursor() as cur:
             cur.execute(
-                'select blob_name, container, section_ref, progress_entry_id '
+                'select blob_name, container, section_ref, progress_entry_id, status '
                 'from "Learner"."evidence_files" '
                 "where id = %s and learner_kind = %s and learner_id = %s",
                 [str(file_id), kind, str(pk)],
@@ -521,7 +521,7 @@ def delete_evidence(request, kind, pk, file_id):
 
     if not row:
         return _error("Evidence not found.", 404)
-    blob_name, container, section_ref, progress_entry_id = row
+    blob_name, container, section_ref, progress_entry_id, target_status = row
 
     if _is_submitted_for_marking(kind, pk, section_ref):
         return _error(
@@ -530,34 +530,70 @@ def delete_evidence(request, kind, pk, file_id):
             409,
         )
 
-    # Blob first: a delete that removed the row but left the blob would strand
-    # a file nothing points at any more. A blob that has already gone is not a
-    # failure — the row still has to go.
-    if azure_configured() and blob_name and container:
+    def remove_row():
+        # Blob first: a delete that removed the row but left the blob would
+        # strand a file nothing points at any more. A blob that has already
+        # gone is not a failure — the row still has to go.
+        if azure_configured() and blob_name and container:
+            try:
+                delete_blob(container, blob_name)
+            except Exception as exc:  # already deleted / SDK / network
+                logger.warning("Evidence blob delete failed for %s/%s: %s", container, blob_name, exc)
+
         try:
-            delete_blob(container, blob_name)
-        except Exception as exc:  # already deleted / SDK / network
-            logger.warning("Evidence blob delete failed for %s/%s: %s", container, blob_name, exc)
+            with _conn().cursor() as cur:
+                cur.execute(
+                    'delete from "Learner"."evidence_files" '
+                    "where id = %s and learner_kind = %s and learner_id = %s "
+                    "returning " + EVIDENCE_AUDIT_SQL,
+                    [str(file_id), kind, str(pk)],
+                )
+                # Read from what the delete returned: that is the only moment
+                # the row still exists, and a trail entry for a deletion that
+                # cannot say what was deleted is the one that most needed to.
+                _record_evidence_file(cur.fetchone(), deleted=True)
+                # Approved uploads are also indexed in "Learner"."Evidence" by
+                # blob name; drop that entry too rather than leave it pointing
+                # at a blob that no longer exists.
+                if blob_name:
+                    cur.execute('delete from "Learner"."Evidence" where "Azure_id" = %s', [blob_name])
+        except DatabaseError as exc:
+            logger.warning("Could not delete evidence row: %s", exc)
+            return _error("Could not remove the evidence record.", 502)
 
-    try:
-        with _conn().cursor() as cur:
-            cur.execute(
-                'delete from "Learner"."evidence_files" '
-                "where id = %s and learner_kind = %s and learner_id = %s "
-                "returning " + EVIDENCE_AUDIT_SQL,
-                [str(file_id), kind, str(pk)],
-            )
-            # Read from what the delete returned: that is the only moment the
-            # row still exists, and a trail entry for a deletion that cannot say
-            # what was deleted is the one entry that most needed to.
-            _record_evidence_file(cur.fetchone(), deleted=True)
-            # Approved uploads are also indexed in "Learner"."Evidence" by blob
-            # name (see _record_approved_evidence); drop that entry too rather
-            # than leave it pointing at a blob that no longer exists.
-            if blob_name:
-                cur.execute('delete from "Learner"."Evidence" where "Azure_id" = %s', [blob_name])
-    except DatabaseError as exc:
-        logger.warning("Could not delete evidence row: %s", exc)
-        return _error("Could not remove the evidence record.", 502)
+        return JsonResponse({"id": str(file_id), "deleted": True})
 
-    return JsonResponse({"id": str(file_id), "deleted": True})
+    # Functional Skills statuses require at least one approved subject-specific
+    # file while EXEMPT or OPT_OUT is active. The approved rows are locked in the
+    # same transaction as the delete, so two concurrent deletes cannot both
+    # remove the final required file.
+    if section_ref in {"functional-skills:english", "functional-skills:maths"} and target_status == "approved":
+        subject = section_ref.rsplit(":", 1)[-1]
+        try:
+            with transaction.atomic(using="enrolment"):
+                from .models import EnrolmentUser
+                user = (
+                    EnrolmentUser.all_learners.using("enrolment")
+                    .select_for_update()
+                    .filter(pk=pk)
+                    .first()
+                )
+                raw = getattr(user, f"{subject}_exemption", None) if user else None
+                raw = raw if isinstance(raw, dict) else ({"exempt": bool(raw)} if isinstance(raw, bool) else {})
+                status = str(raw.get("status") or ("EXEMPT" if raw.get("exempt") else "NOT_EXEMPT")).upper()
+                if status in {"EXEMPT", "OPT_OUT"}:
+                    with _conn().cursor() as cur:
+                        cur.execute(
+                            'select id from "Learner"."evidence_files" '
+                            'where learner_kind = %s and learner_id = %s and section_ref = %s and status = %s '
+                            'for update',
+                            [kind, str(pk), section_ref, "approved"],
+                        )
+                        if len(cur.fetchall()) <= 1:
+                            return _error("At least one approved evidence file is required while this status is active.", 409)
+                return remove_row()
+        except DatabaseError as exc:
+            logger.warning("Could not validate Functional Skills evidence deletion: %s", exc)
+            return _error("Could not validate evidence deletion.", 502)
+
+    return remove_row()

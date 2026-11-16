@@ -8,7 +8,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
-import { fetchEnrolmentBoard, updateEnrolmentUser, deleteEnrolmentUser, finishEnrolment, PROGRAMME_STATUS_OPTIONS } from '@/api/enrolmentUsers';
+import { fetchEnrolmentBoard, updateEnrolmentUser, finishEnrolment, PROGRAMME_STATUS_OPTIONS, updateFunctionalSkillsStatus, type FunctionalSkillsStatus } from '@/api/enrolmentUsers';
 import { fetchCommercialBoard } from '@/api/commercialUsers';
 import { fetchEnrolmentDocuments, getEnrolmentDocumentUrl, uploadEnrolmentDocument, DOC_SIGNING_PARTIES, type EnrolmentDocument, type EnrolmentDocType } from '@/api/enrolmentDocuments';
 import { fetchAgreement, issueAgreement, type Agreement } from '@/api/apprenticeshipAgreement';
@@ -70,12 +70,14 @@ import { REVIEW_QUESTION_LABELS } from '@/pages/learner/onboarding/reviews/quest
 import type { LearnerKind } from '@/api/extendedIlr';
 import { SuitabilityRplReportTab } from './suitability-rpl/SuitabilityRplReportTab';
 import { fetchSuitabilityRplIssuedDocuments, type SuitabilityRplIssuedDocument } from '@/api/suitabilityRplReport';
+import { fetchEvidence, uploadEvidence, getEvidenceDownloadUrl, deleteEvidence, type EvidenceRecord } from '@/api/evidence';
+import { formatSystemTimestamp } from '@/lib/format';
 import type { EnrolmentBoard, FsBlock } from './types';
 import { competenceMeta } from '@/mocks/enrolment-console';
 import {
-  AlertTriangle, Award, Briefcase, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, FileCheck2, Flag,
-  FolderOpen, GraduationCap, History, LayoutGrid, ListChecks, MessageSquareText, Network, PenLine, Search,
-  ShieldCheck, Target, Trash2, Upload, UserX, Users, Wand2, Wrench, type LucideIcon,
+  Award, Briefcase, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, FileCheck2, Flag,
+  FolderOpen, GraduationCap, History, LayoutGrid, ListChecks, Network, PenLine, Search,
+  Check, Eye, FileText, Loader2, ShieldCheck, Target, Trash2, Upload, Users, Wand2, Wrench, X, type LucideIcon,
 } from 'lucide-react';
 import { Table, EmptyState, ActionLink, StatusBadge, Pagination, btnSecondary } from './components/ui';
 
@@ -460,47 +462,138 @@ function FinishEnrolment({ learnerId, status, onFinished }: { learnerId: string;
   );
 }
 
-/**
- * One Functional Skills subject, read-only. These come from columns an older
- * import filled in; nothing in the LMS writes them now, so there is nothing to
- * edit here — the exemption switch and file controls that used to sit on this
- * card only changed what the screen showed.
- */
-function FunctionalSkill({ subject, block }: { subject: string; block: FsBlock }) {
+/** One Functional Skills subject: BKSB results, exemption status, and evidence. */
+function FunctionalSkill({ subject, block, learnerId, kind }: { subject: string; block: FsBlock; learnerId: string; kind: LearnerKind }) {
+  const persistedStatus = block.status || (block.exempt ? 'EXEMPT' : 'NOT_EXEMPT');
+  const [savedStatus, setSavedStatus] = useState<FunctionalSkillsStatus>(persistedStatus);
+  const [draftStatus, setDraftStatus] = useState<FunctionalSkillsStatus>(persistedStatus);
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [loadingFiles, setLoadingFiles] = useState(true);
+  const [files, setFiles] = useState<EvidenceRecord[]>([]);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const sectionRef = `functional-skills:${subject.toLowerCase()}`;
+  const statusRequiresEvidence = draftStatus === 'EXEMPT' || draftStatus === 'OPT_OUT';
+  const approvedFiles = files.filter((file) => file.status === 'approved');
+  const hasUnsavedStatus = draftStatus !== savedStatus;
+
+  useEffect(() => {
+    let active = true;
+    setLoadingFiles(true);
+    fetchEvidence(kind, learnerId, { sectionRef })
+      .then((next) => { if (active) setFiles(next); })
+      .catch(() => { if (active) setError('Could not load evidence.'); })
+      .finally(() => { if (active) setLoadingFiles(false); });
+    return () => { active = false; };
+  }, [kind, learnerId, sectionRef]);
+
+  useEffect(() => {
+    setSavedStatus(persistedStatus);
+    setDraftStatus(persistedStatus);
+    setError('');
+    setSuccess('');
+  }, [learnerId, subject, persistedStatus]);
+
+  const saveStatus = async () => {
+    setError('');
+    setSuccess('');
+    if (!hasUnsavedStatus) return;
+    if (statusRequiresEvidence && approvedFiles.length === 0) {
+      setError(files.length > 0
+        ? 'Evidence is still awaiting approval. Save this status after at least one file is approved.'
+        : 'Upload at least one approved evidence file before saving this status.');
+      return;
+    }
+    setSavingStatus(true);
+    try {
+      const evidenceIds = statusRequiresEvidence ? approvedFiles.map((file) => file.id) : [];
+      await updateFunctionalSkillsStatus(learnerId, subject.toLowerCase() as 'english' | 'maths', draftStatus, evidenceIds);
+      setSavedStatus(draftStatus);
+      setSuccess('Status saved.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save exemption status.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+  const onFile = async (file?: File) => {
+    if (!file) return;
+    setError('');
+    setSuccess('');
+    setUploading(true);
+    try {
+      await uploadEvidence(kind, learnerId, file, sectionRef);
+      setFiles(await fetchEvidence(kind, learnerId, { sectionRef }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  };
+  const onDelete = async (file: EvidenceRecord) => {
+    if ((savedStatus === 'EXEMPT' || savedStatus === 'OPT_OUT') && approvedFiles.length === 1 && file.status === 'approved') {
+      setError('Change the exemption status to Not Exempt or upload replacement evidence before deleting the last file.');
+      return;
+    }
+    if (!window.confirm(`Delete ${file.filename}?`)) return;
+    setError('');
+    setSuccess('');
+    setUploading(true);
+    try {
+      await deleteEvidence(kind, learnerId, file.id);
+      setFiles(await fetchEvidence(kind, learnerId, { sectionRef }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete evidence.');
+    } finally {
+      setUploading(false);
+    }
+  };
+  const formatDate = (value?: string | null) => value ? formatSystemTimestamp(value, { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
   return (
     <div className="rounded-xl border border-foreground-100 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[13px] font-semibold text-foreground-800">{subject}</p>
-        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${block.exempt ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-foreground-200 bg-background-100 text-foreground-500'}`}>
-          {block.exempt ? 'Exempt' : 'Not exempt'}
-        </span>
       </div>
       {block.assessments.length === 0 ? (
         <p className="mt-2 text-[12px] text-foreground-400">No assessments recorded</p>
       ) : (
-        <ul className="mt-2 space-y-1 text-[12px] text-foreground-700">
-          {block.assessments.map((a) => <li key={a.id}>{a.name} — {a.level} ({a.date})</li>)}
-        </ul>
-      )}
-      {block.evidence.length > 0 && (
-        <div className="mt-3 border-t border-foreground-100 pt-2">
-          <p className="text-[11px] text-foreground-400">Exemption evidence</p>
-          <ul className="mt-1 space-y-0.5 text-[12px]">
-            {block.evidence.map((d) => (
-              <li key={d.id}>
-                {d.url
-                  ? <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">{d.fileName ?? d.description}</a>
-                  : <span className="text-foreground-700">{d.fileName ?? d.description}</span>}
-              </li>
-            ))}
-          </ul>
+        <div className="mt-2 space-y-2">
+          {block.assessments.map((a) => <div key={a.id} className="rounded-lg bg-background-100 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-400">Assessment result</p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-[16px] font-semibold text-foreground-900">{a.level || a.result || '—'}</span>
+              {a.status && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{a.status}</span>}
+              <span className="text-[12px] text-foreground-500">Assessment date: {formatDate(a.date)}</span>
+            </div>
+          </div>)}
         </div>
       )}
+      <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Exemption status
+        <select aria-label="Exemption status" value={draftStatus} disabled={savingStatus} onChange={(e) => { setDraftStatus(e.target.value as FunctionalSkillsStatus); setError(''); setSuccess(''); }} className="mt-1 block rounded-lg border border-foreground-200 bg-background-50 px-2 py-1.5 text-[12px] normal-case tracking-normal text-foreground-800">
+          <option value="EXEMPT">Exempt</option><option value="NOT_EXEMPT">Not Exempt</option><option value="OPT_OUT">Opt out</option>
+        </select>
+      </label>
+      {hasUnsavedStatus && statusRequiresEvidence && approvedFiles.length === 0 && (
+        <p className="mt-2 text-[11px] text-amber-700">{files.length > 0 ? 'Evidence is awaiting approval before this status can be saved.' : 'Add approved evidence before saving this status.'}</p>
+      )}
+      <div className="mt-4 border-t border-foreground-100 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[12px] font-semibold text-foreground-800">Supporting evidence {files.length > 1 && <span className="font-normal text-foreground-500">({files.length} files)</span>}</p>
+          {(statusRequiresEvidence) && <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-primary-200 px-3 py-1.5 text-[12px] font-semibold text-primary-700"><Upload size={13} aria-hidden="true" />{uploading ? 'Uploading…' : 'Add file'}<input type="file" className="hidden" onChange={(e) => { void onFile(e.target.files?.[0]); e.currentTarget.value = ''; }} disabled={uploading || savingStatus} /></label>}
+        </div>
+        {loadingFiles ? <p className="mt-2 text-[12px] text-foreground-400">Loading evidence…</p> : files.length === 0 ? <p className="mt-2 text-[12px] text-foreground-400">No evidence uploaded</p> : <ul className="mt-2 space-y-2">{files.map((file) => <li key={file.id} className="flex items-start gap-2 rounded-lg bg-background-100 px-2.5 py-2 text-[12px]">
+          <FileText size={16} className="mt-0.5 shrink-0 text-primary-600" aria-hidden="true" />
+          <div className="min-w-0 flex-1"><p className="break-words font-medium text-foreground-800">{file.filename}</p><p className="text-[11px] text-foreground-500">Uploaded {formatDate(file.uploadedAt)}</p></div>
+          <div className="flex shrink-0 items-center gap-1"><button type="button" title="View evidence" aria-label={`View ${file.filename}`} className="rounded p-1 text-primary-600 hover:bg-primary-50" onClick={async () => { const url = await getEvidenceDownloadUrl(kind, learnerId, file.id); window.open(url, '_blank', 'noopener,noreferrer'); }}><Eye size={14} /></button><button type="button" title="Download evidence" aria-label={`Download ${file.filename}`} className="rounded p-1 text-primary-600 hover:bg-primary-50" onClick={async () => { const url = await getEvidenceDownloadUrl(kind, learnerId, file.id); const link = document.createElement('a'); link.href = url; link.download = file.filename; link.click(); }}><Download size={14} /></button>{file.canDelete !== false && <button type="button" title="Delete evidence" aria-label={`Delete ${file.filename}`} disabled={uploading || savingStatus} className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-50" onClick={() => void onDelete(file)}><Trash2 size={14} /></button>}</div>
+        </li>)}</ul>}
+      </div>
+      {hasUnsavedStatus && <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void saveStatus()} disabled={savingStatus || (statusRequiresEvidence && approvedFiles.length === 0)}>{savingStatus ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Check size={13} aria-hidden="true" />}Save changes</button><button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-foreground-200 px-3 py-1.5 text-[12px] font-semibold text-foreground-600 hover:bg-background-100" onClick={() => { setDraftStatus(savedStatus); setError(''); setSuccess(''); }} disabled={savingStatus}><X size={13} aria-hidden="true" />Cancel</button></div>}
+      {success && <p className="mt-2 text-[11px] text-emerald-700">{success}</p>}
+      {error && <p className="mt-2 text-[11px] text-red-700">{error}</p>}
     </div>
   );
 }
-
-const fsFilled = (block: FsBlock) => block.exempt || block.assessments.length > 0 || block.evidence.length > 0;
 
 /**
  * Generated compliance paperwork for this learner (Extended ILR today, the other
@@ -1586,52 +1679,6 @@ function BoardView({
   });
 
   /**
-   * Withdraw the learner from their programme.
-   *
-   * Destructive and outward-facing (it changes what the learner sees on their
-   * own landing page), so it confirms first and names the learner.
-   */
-  const [cancelling, setCancelling] = useState(false);
-  const cancelUser = async () => {
-    if (cancelling) return;
-    const ok = window.confirm(
-      `Withdraw ${board.user.name} from ${board.programme.name || 'their programme'}?\n\n` +
-      'Their programme status becomes "Withdrawn". You can set it back from the status picker at the top of this page.',
-    );
-    if (!ok) return;
-    setCancelling(true);
-    try {
-      await updateEnrolmentUser(userId, { programmeStatus: 'Withdrawn' });
-      success('Learner withdrawn', `${board.user.name} is now Withdrawn.`);
-      onReload();
-    } catch (e) {
-      error('Could not withdraw learner', e instanceof Error ? e.message : 'Unexpected error');
-    } finally {
-      setCancelling(false);
-    }
-  };
-
-  const [deleting, setDeleting] = useState(false);
-  const deleteUser = async () => {
-    if (deleting) return;
-    const ok = window.confirm(
-      `Delete ${board.user.name}'s user account?\n\n` +
-      'This permanently removes the enrolment record, login account and sign-in access, and the linked learner profile with its learning plan and progress. This action cannot be undone.',
-    );
-    if (!ok) return;
-    setDeleting(true);
-    try {
-      await deleteEnrolmentUser(userId);
-      success('User account deleted', `${board.user.name}'s account has been permanently deleted.`);
-      navigate('/users');
-    } catch (e) {
-      error('Could not delete user account', e instanceof Error ? e.message : 'Unexpected error');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  /**
    * Upload a signed compliance document.
    *
    * The store behind this is the compliance-document container, which is keyed
@@ -1682,10 +1729,9 @@ function BoardView({
   };
 
   const signature = board.contact.signatureUrl || board.contact.savedSignature;
-  const withdrawn = (board.programme.status || '').trim().toLowerCase() === 'withdrawn';
   // Older imports' data: shown only for the learners who have some.
   const fs = board.functionalSkills;
-  const hasFunctionalSkills = fsFilled(fs.english) || fsFilled(fs.maths) || fsFilled(fs.ict);
+  const hasFunctionalSkills = true;
   const hasSubscription = Boolean(board.subscription.startDate || board.subscription.endDate);
   const hasProgress = board.competencies.length > 0 || board.tracker.length > 0 || board.aims.length > 0
     || board.subProgrammes.length > 0 || board.managedJobs.length > 0 || hasFunctionalSkills || board.milestones.length > 0;
@@ -1813,24 +1859,12 @@ function BoardView({
                 </Card>
               )}
 
-              {board.notes.length > 0 && (
-                <Card title="In the learner's own words" icon={MessageSquareText} count={board.notes.length}>
-                  <ul className="space-y-3">
-                    {board.notes.map((n) => {
-                      // "Label: answer", as the enrolment wizard asked it.
-                      const at = n.text.indexOf(': ');
-                      const [label, text] = at > 0 ? [n.text.slice(0, at), n.text.slice(at + 2)] : ['', n.text];
-                      return (
-                        <li key={n.id} className="rounded-xl border border-foreground-100 p-3">
-                          {label && <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground-400">{label}</p>}
-                          <p className="mt-1 whitespace-pre-line text-[13px] text-foreground-800">{text}</p>
-                          <p className="mt-1.5 text-[11px] text-foreground-400">{[n.administrator, n.dateTime].filter(Boolean).join(' · ')}</p>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </Card>
-              )}
+              <Card title="Functional Skills" icon={Calculator}>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <FunctionalSkill subject="English" block={fs.english} learnerId={userId} kind={kind} />
+                  <FunctionalSkill subject="Maths" block={fs.maths} learnerId={userId} kind={kind} />
+                </div>
+              </Card>
 
               {hasSubscription && (
                 <Card title="Subscription" icon={CreditCard}>
@@ -1842,18 +1876,6 @@ function BoardView({
                 </Card>
               )}
 
-              <Card title="Danger zone" icon={AlertTriangle} className="border-red-200/70">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-[13px] text-foreground-600">
-                    <p><span className="font-semibold text-foreground-800">Withdraw</span> sets the programme status to Withdrawn; it can be set back from the status picker.</p>
-                    <p className="mt-1"><span className="font-semibold text-foreground-800">Delete</span> permanently removes the enrolment record, login and learner profile.</p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <CardButton icon={UserX} label={withdrawn ? 'Withdrawn' : cancelling ? 'Withdrawing…' : 'Withdraw from programme'} onClick={cancelUser} disabled={withdrawn || cancelling} danger />
-                    <CardButton icon={Trash2} label={deleting ? 'Deleting…' : 'Delete user account'} onClick={deleteUser} disabled={deleting} danger />
-                  </div>
-                </div>
-              </Card>
             </>
           )}
 
@@ -2008,16 +2030,6 @@ function BoardView({
                       </tr>
                     ))}
                   </Table>
-                </Card>
-              )}
-
-              {hasFunctionalSkills && (
-                <Card title="Functional Skills" icon={Calculator}>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                    {fsFilled(fs.english) && <FunctionalSkill subject="English" block={fs.english} />}
-                    {fsFilled(fs.maths) && <FunctionalSkill subject="Maths" block={fs.maths} />}
-                    {fsFilled(fs.ict) && <FunctionalSkill subject="ICT" block={fs.ict} />}
-                  </div>
                 </Card>
               )}
 
