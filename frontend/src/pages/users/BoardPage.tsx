@@ -63,7 +63,7 @@ async function downloadIlr(document: IlrDocument, learnerId: string) {
   const { givenNames, familyName } = document.learnerDetails;
   renderIlrPdf(document).save(ilrFilename([givenNames, familyName].filter(Boolean).join(' ')));
 }
-import { fetchOnboardingReviewSlots, fetchReviewForm, issuedLabel, issueOnboardingReview, type OnboardingReviewSlot, type ReviewFormResponse, type ReviewSignatures } from '@/api/reviewForm';
+import { fetchOnboardingReviewSlots, fetchReviewForm, issuedLabel, issueOnboardingReview, prepareOnboardingReview, type OnboardingReviewSlot, type ReviewFormResponse, type ReviewSignatures } from '@/api/reviewForm';
 import SignReviewModal from '@/pages/learner/onboarding/reviews/SignReviewModal';
 import { downloadReviewPdf } from '@/pages/learner/onboarding/reviews/reviewDocument';
 import { REVIEW_QUESTION_LABELS } from '@/pages/learner/onboarding/reviews/questions';
@@ -1241,8 +1241,10 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
     setErr(null);
     setIssueRetry(review);
     try {
-      setReviews((await issueOnboardingReview(kind, learnerId, review.type)).reviews);
+      const prepared = await prepareOnboardingReview(kind, learnerId, review.type);
+      setReviews(prepared.reviews);
       setIssueRetry(null);
+      navigate(`/users/${learnerId}/reviews/${encodeURIComponent(prepared.reviews.find(r => r.type === review.type)?.eventKey || '')}?admin=1`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not issue the review.');
       // Someone else may have issued it meanwhile: show what is there now.
@@ -1328,14 +1330,14 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
             <div key={r.type} className="flex items-center justify-between gap-3 px-3 py-2 border border-dashed border-foreground-200 rounded-lg">
               <span className="text-[12px] text-foreground-500 inline-flex items-center gap-1.5 min-w-0">
                 <i className="ri-file-add-line text-foreground-400 shrink-0" />
-                <span className="truncate">{r.label} not issued yet</span>
+                <span className="truncate">{r.label} {r.draft ? (r.completed ? 'ready to issue' : 'in preparation') : 'not issued yet'}</span>
               </span>
               <span className="flex flex-wrap items-center gap-2">
-                {adminPreview.button(REVIEW_DOCUMENT_KEYS[r.type])}
+                {r.draft && r.eventKey && <ActionLink label="Continue" icon="ri-edit-line" onClick={() => navigate(`/users/${learnerId}/reviews/${encodeURIComponent(r.eventKey!)}?admin=1`)} />}
               <ActionLink
-                label={busy === r.type ? 'Issuing…' : 'Issue review'}
+                label={busy === r.type ? (r.draft ? 'Issuing…' : 'Preparing…') : r.draft && r.completed ? 'Issue Review' : r.draft ? 'Continue' : 'Issue review'}
                 icon="ri-quill-pen-line"
-                onClick={() => { void issue(r); }}
+                onClick={() => { if (r.draft && r.completed) void issue(r); else if (!r.draft) void issue(r); else if (r.eventKey) navigate(`/users/${learnerId}/reviews/${encodeURIComponent(r.eventKey)}?admin=1`); }}
               />
               </span>
             </div>

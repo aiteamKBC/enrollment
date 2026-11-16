@@ -14,6 +14,16 @@ import { brandedPage, brandedPurplePainter } from './brandedPurplePdf';
 
 const latin = (value: unknown) => String(value ?? '').replace(/[\u2022\u25cf]/g, '-').replace(/[—–]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/…/g, '...').replace(/£/g, 'GBP ').replace(/€/g, 'EUR ').replace(/[Ā-\u{10FFFF}]/gu, '?');
 
+/** Configured Review question rows come from the template definition itself. */
+export function configuredReviewRows(template: IssuedTemplate, data: Record<string, any>, section: string, labels: Record<string, string>) {
+  const answer = data.answers?.[section] || {};
+  return Object.entries(labels).map(([key, label]) => {
+    const raw = answer[key];
+    const value = raw == null ? '' : typeof raw === 'boolean' ? raw ? 'Yes' : 'No' : Array.isArray(raw) ? raw.map(String).join(', ') : String(raw);
+    return [substitute(label, template), value];
+  });
+}
+
 /** Same jsPDF/print pipeline. Unchanged/legacy snapshots retain their original
  * renderer; edited structured versions use safe, paginated content blocks. */
 export function renderManagedDocument(template: IssuedTemplate | undefined, data: Record<string, any>, options: { reviewRows?: ReviewPrintRow[] } = {}): jsPDF | null {
@@ -96,6 +106,24 @@ export function renderManagedDocument(template: IssuedTemplate | undefined, data
       table(['Question', 'Answer'], Object.entries(labels).map(([key, label]) => [substitute(label, template), (template.bindingVersion??1)>=2 && typeof answer[key]==='boolean' ? answer[key]?'Yes':'No' : answer[key] ?? 'Not completed.']), false);
       return;
     }
+    // Current-design admin previews are driven by the configured template
+    // itself. They must not depend on learner-facing reviewRows, which are
+    // unavailable for a template/sample preview and previously caused whole
+    // question tables to disappear while leaving their headings visible.
+    if (branded && Object.keys(labels).length) {
+      const full = configuredReviewRows(template, data, section, labels);
+      const rows = options.reviewRows || [];
+      const sectionRows = rows.map((r, i) => r.kind === 'section' ? i : -1).filter((i) => i >= 0);
+      const start = sectionRows[index + 1], end = sectionRows[index + 2] ?? rows.length;
+      if (start != null) {
+        const configuredLabels = new Set(Object.values(labels));
+        for (const row of rows.slice(start + 1, end).filter(r => r.kind === 'text' || r.kind === 'note')) {
+          if (row.kind === 'note' || !configuredLabels.has(row.label || '')) full.push(row.kind === 'text' ? [substitute(row.label || '', template), row.value || ''] : [row.text || '', '']);
+        }
+      }
+      table(['Question', 'Answer'], full, false);
+      return;
+    }
     const rows = options.reviewRows || [];
     const sections = rows.map((r, i) => r.kind === 'section' ? i : -1).filter((i) => i >= 0);
     // buildRows starts with Learner Information, followed by the unchanged
@@ -103,19 +131,7 @@ export function renderManagedDocument(template: IssuedTemplate | undefined, data
     const start = sections[index + 1], end = sections[index + 2] ?? rows.length;
     if (start == null) return;
     const recorded = rows.slice(start + 1, end).filter(r => r.kind === 'text' || r.kind === 'note');
-    if (branded && Object.keys(labels).length) {
-      // A new unsigned document must still contain its configured questions.
-      // Existing formatted answers/notes win; missing manual answers stay blank.
-      const answer = data.answers?.[section] || {};
-      const configuredLabels = new Set(Object.values(labels));
-      const full = Object.entries(labels).map(([key,label]) => {
-        const raw=answer[key];
-        const value=raw==null?'':typeof raw==='boolean'?raw?'Yes':'No':Array.isArray(raw)?raw.map(String).join(', '):String(raw);
-        return [substitute(label,template),value];
-      });
-      for (const row of recorded) if (row.kind==='note'||!configuredLabels.has(row.label||'')) full.push(row.kind==='text' ? [substitute(row.label||'',template),row.value||''] : [row.text||'','']);
-      table(['Question','Answer'],full,false);
-    } else table(['Question', 'Answer'], recorded.map(r => r.kind === 'text' ? [substitute(r.label || '', template), r.value || ''] : [r.text || '', '']), false);
+    table(['Question', 'Answer'], recorded.map(r => r.kind === 'text' ? [substitute(r.label || '', template), r.value || ''] : [r.text || '', '']), false);
   };
   const renderFields = (fields: DocumentQuestion[]) => {
     let rows: string[][] = [];

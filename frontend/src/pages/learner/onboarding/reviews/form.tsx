@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { DatePickerField } from '@/components/feature/DatePickerField';
 import { roleNavMap } from '@/mocks/navigation';
@@ -7,6 +7,7 @@ import { useMyLearner } from '@/hooks/useMyLearner';
 import { ONBOARDING_NAV_ITEMS } from '@/hooks/useOnboardingRedirect';
 import {
   fetchReviewForm,
+  issueOnboardingReview,
   saveReviewForm,
   type FsAssessment,
   type PriorLearningItem,
@@ -377,8 +378,12 @@ function RecordTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
  * never blanks another's answers.
  */
 export default function ReviewFormPage() {
-  const { kind, id } = useMyLearner();
-  const { eventKey = '' } = useParams();
+  const own = useMyLearner();
+  const { eventKey = '', userId } = useParams();
+  const [search] = useSearchParams();
+  const adminMode = Boolean(userId && search.get('admin') === '1');
+  const kind = adminMode ? 'apprenticeship' : own.kind;
+  const id = adminMode ? userId! : own.id;
   const navigate = useNavigate();
 
   const [data, setData] = useState<ReviewFormResponse | null>(null);
@@ -449,9 +454,27 @@ export default function ReviewFormPage() {
       const res = await saveReviewForm(kind, id, eventKey, { answers: pending, finish: true });
       setData(res);
       setDirty({});
-      navigate('/learner/onboarding/reviews');
+      navigate(adminMode ? `/users/${id}?tab=documents` : '/learner/onboarding/reviews');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not finish this review.');
+    } finally {
+      setFinishing(false);
+    }
+  };
+
+  const issueReview = async () => {
+    if (!adminMode || !data || finishing) return;
+    setFinishing(true);
+    setError(null);
+    try {
+      const pending = Object.fromEntries(
+        (Object.keys(dirty) as ReviewSection[]).filter((s) => dirty[s]).map((s) => [s, answers[s]]),
+      ) as Partial<ReviewFormAnswers>;
+      await saveReviewForm(kind, id, eventKey, { answers: pending, finish: true });
+      await issueOnboardingReview(kind, id, data.reviewType as 'eligibility-review' | 'workspace' | 'training-plan' | 'uln-privacy');
+      navigate(`/users/${id}?tab=documents`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not issue this review.');
     } finally {
       setFinishing(false);
     }
@@ -925,9 +948,12 @@ export default function ReviewFormPage() {
 
             <div className="flex items-center justify-end gap-2 pt-1 pb-4">
               <button onClick={() => navigate('/learner/onboarding/reviews')} className={btnSecondary}>Save and Close</button>
-              <button onClick={finish} disabled={finishing} className={`${btnPrimary} ${finishing ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                {finishing ? <><i className="ri-loader-4-line animate-spin" />Finishing…</> : <><i className="ri-check-double-line" />Finish</>}
-              </button>
+              {adminMode && <button onClick={issueReview} disabled={finishing} className={`${btnPrimary} ${finishing ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                {finishing ? <><i className="ri-loader-4-line animate-spin" />Issuing…</> : <><i className="ri-send-plane-line" />Issue Review</>}
+              </button>}
+              {adminMode && <button onClick={finish} disabled={finishing} className={`${btnPrimary} ${finishing ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                {finishing ? <><i className="ri-loader-4-line animate-spin" />Saving…</> : <><i className="ri-save-line" />Save draft</>}
+              </button>}
             </div>
           </>
         )}

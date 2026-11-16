@@ -46,7 +46,7 @@ vi.mock('@/api/apprenticeshipAgreement', () => ({ fetchAgreement: vi.fn(async ()
 vi.mock('@/api/ilrDocument', () => ({ fetchIlrDocument: vi.fn(async () => null), issueIlrDocument: vi.fn(), signIlrDocument: vi.fn() }));
 vi.mock('@/api/trainingPlanDocument', () => ({ fetchTrainingPlanDocument: vi.fn(async () => null), issueTrainingPlanDocument: vi.fn(), signTrainingPlanDocument: vi.fn() }));
 vi.mock('@/api/writtenAgreement', () => ({ fetchWrittenAgreement: vi.fn(async () => null), issueWrittenAgreement: vi.fn(), signWrittenAgreement: vi.fn() }));
-const reviews = vi.hoisted(() => ({ fetchOnboardingReviewSlots: vi.fn(), issueOnboardingReview: vi.fn(), fetchReviewForm: vi.fn() }));
+const reviews = vi.hoisted(() => ({ fetchOnboardingReviewSlots: vi.fn(), prepareOnboardingReview: vi.fn(), issueOnboardingReview: vi.fn(), fetchReviewForm: vi.fn() }));
 vi.mock('@/api/reviewForm', async (original) => ({ ...(await original<typeof import('@/api/reviewForm')>()), ...reviews }));
 vi.mock('@/api/coach', () => ({ fetchLearnerCoach: vi.fn(async () => { throw new Error('not active'); }), updateLearnerCoach: vi.fn() }));
 vi.mock('@/api/staffUsers', () => ({ fetchCoachOptions: vi.fn(async () => []) }));
@@ -292,11 +292,11 @@ describe('the enrolment board', () => {
     expect(screen.getByRole('region', { name: 'Uploaded documents' })).toBeInTheDocument();
   });
 
-  it('issues an enrolment review from Review documents', async () => {
-    reviews.issueOnboardingReview.mockResolvedValue({
+  it('prepares an enrolment review without issuing it from Review documents', async () => {
+    reviews.prepareOnboardingReview.mockResolvedValue({
       programme: 'Marketing Executive Level 4', allIssued: false, allCompleted: false,
       reviews: [
-        { type: 'workspace', label: 'RPL And Experience', issued: true, issuedAt: '2026-10-15T13:32:00Z', eventKey: 'review:apprenticeship:20:workspace', started: false, completed: false, sectionsDone: 0, sectionsTotal: 4, signatures: SIGNATURES },
+        { type: 'workspace', label: 'RPL And Experience', issued: false, draft: true, eventKey: 'review:apprenticeship:20:workspace', started: false, completed: false, sectionsDone: 0, sectionsTotal: 4, signatures: SIGNATURES },
       ],
     });
     renderBoard('/users/20?tab=documents');
@@ -307,11 +307,8 @@ describe('the enrolment board', () => {
     expect(within(panel).getByText('Completed 15 Oct 2026, 14:05')).toBeInTheDocument();
     expect(within(panel).getAllByText(/^Completed /)).toHaveLength(1);
     fireEvent.click(within(panel).getByRole('button', { name: /Issue review/ }));
-    await waitFor(() => expect(reviews.issueOnboardingReview).toHaveBeenCalledWith('apprenticeship', '20', 'workspace'));
-    expect(await within(panel).findByText('issued')).toBeInTheDocument();
-    // When it was issued, in UK time (13:32 UTC is 14:32 BST).
-    expect(within(panel).getByText('Issued 15 Oct 2026, 14:32')).toBeInTheDocument();
-    expect(within(panel).queryByText('RPL And Experience not issued yet')).not.toBeInTheDocument();
+    await waitFor(() => expect(reviews.prepareOnboardingReview).toHaveBeenCalledWith('apprenticeship', '20', 'workspace'));
+    expect(reviews.prepareOnboardingReview).toHaveBeenCalledTimes(1);
     // Nothing to book: no dates, times or booking controls.
     expect(within(panel).queryByText(/book/i)).not.toBeInTheDocument();
   });

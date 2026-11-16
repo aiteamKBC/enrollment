@@ -1,4 +1,6 @@
 import type { PreviewResponse } from './types';
+import { renderManagedDocument } from './render';
+import { isBrandedPresentation } from './brandedPurpleTheme';
 
 /** Dispatch to the existing document generators, without issuing or signing. */
 export async function previewPdf(value: PreviewResponse): Promise<Blob> {
@@ -10,6 +12,14 @@ export async function previewPdf(value: PreviewResponse): Promise<Blob> {
     return response.blob();
   }
   const data = value.data;
+  // Review templates used to fall through to the learner-facing legacy
+  // summary renderer. Current-design payloads must use the same structured
+  // renderer as the purple editor and the working compliance documents.
+  if (isBrandedPresentation(value.template.presentationTheme) ||
+      ['lavender-v1', 'purple-reference-v2'].includes(value.template.content.designTheme || '')) {
+    const managed = renderManagedDocument(value.template, data);
+    if (managed) return managed.output('blob');
+  }
   switch (value.template.content.documentKey) {
     case 'apprenticeship-agreement': return (await import('@/lib/apprenticeshipAgreementPdf')).renderAgreementPdf(data as any).output('blob');
     case 'ilr': return (await import('@/lib/ilrDocumentPdf')).renderIlrPdf(data as any).output('blob');

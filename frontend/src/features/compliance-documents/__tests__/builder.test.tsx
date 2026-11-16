@@ -102,7 +102,7 @@ describe('admin document builder', () => {
     await userEvent.click(screen.getByRole('button', { name: category === 'Compliance' ? /Compliance Documents/ : /Reviews Documents/ }));
     await userEvent.click(screen.getByRole('button', { name: `Preview ${record.title}` }));
     await screen.findByRole('dialog', { name: 'Synthetic PDF viewer' });
-    expect(api.previewTemplate).toHaveBeenCalledWith(record.templateId, 0, undefined, record.publishedVersion!.id);
+    expect(api.previewTemplate).toHaveBeenCalledWith(record.templateId, 0, undefined, record.publishedVersion!.id, true);
     await userEvent.click(screen.getByRole('button', { name: 'Close preview' }));
     await userEvent.click(screen.getByRole('button', { name: `Version history for ${record.title}` }));
     await waitFor(() => expect(api.templateHistory).toHaveBeenCalledWith(record.templateId));
@@ -231,12 +231,12 @@ describe('admin document builder', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('existing learner identifier'); expect(api.previewTemplate).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('Existing learner ID'), { target: { value: '123' } });
     await user.click(screen.getByRole('button', { name: 'Preview saved draft' }));
-    await waitFor(() => expect(api.previewTemplate).toHaveBeenCalledWith('ilr', 1, 123, undefined));
+    await waitFor(() => expect(api.previewTemplate).toHaveBeenCalledWith('ilr', 1, 123, undefined, false));
   });
   it('opens historical versions without saving, publishing or issuing', async () => {
     const user = await editIlr(); await user.click(screen.getByRole('button', { name: 'Version history for Individual Learner Record' }));
     await user.click(await screen.findByRole('button', { name: 'Preview historical PDF' }));
-    await waitFor(() => expect(api.previewTemplate).toHaveBeenCalledWith('ilr', 0, undefined, 'ilr-version-1'));
+    await waitFor(() => expect(api.previewTemplate).toHaveBeenCalledWith('ilr', 0, undefined, 'ilr-version-1', false));
     expect(api.saveTemplate).not.toHaveBeenCalled(); expect(api.publishTemplate).not.toHaveBeenCalled();
   });
 });
