@@ -90,7 +90,6 @@ const GENDER_OPTIONS = opts(['Male', 'Female', 'Prefer not to say']);
 // The full country list, shared with the employer and organisation forms. Still
 // UK-first — see src/lib/countries.ts.
 const COUNTRY_OPTIONS = opts(ALL_COUNTRIES);
-const PROVIDER_OPTIONS = opts(['Kent Business College']);
 
 // The form, section by section, in Aptem's order. There is no Invitation
 // section: enrolling a learner always invites them, so the question was a way
@@ -110,15 +109,6 @@ const SECTIONS: SectionDef[] = [
       { name: 'phone', label: 'Mobile', type: 'tel', placeholder: 'NNN NNNN NNNN or +NNN NNN NNN NNNN' },
       { name: 'dob', label: 'Date of birth', type: 'date' },
       { name: 'niNumber', label: 'National Insurance number', type: 'text', placeholder: 'AB123456A' },
-    ],
-  },
-  {
-    title: 'Referral',
-    icon: 'ri-share-forward-line',
-    fields: [
-      { name: 'referrer', label: 'Referrer', type: 'text', placeholder: 'e.g. Jobcentre Plus' },
-      { name: 'referrerAddress', label: 'Referrer address', type: 'text' },
-      { name: 'referrerContact', label: 'Referrer contact', type: 'text' },
     ],
   },
   {
@@ -186,7 +176,6 @@ const SECTIONS: SectionDef[] = [
       // Required: the first session below is booked with this person, and a
       // learner cannot be enrolled without someone to hold it.
       { name: 'caseOwner', label: 'Case owner', type: 'select', lookup: 'caseOwner', required: true },
-      { name: 'learningProvider', label: 'Learning provider', type: 'select', options: PROVIDER_OPTIONS },
       { name: 'attendanceType', label: 'Attendance type', type: 'select', options: opts(ATTENDANCE_TYPE_OPTIONS) },
       // Picked from enrolment."Employers" — choosing one auto-fills the
       // organisation below it from that employer's Employer Group.
@@ -210,7 +199,6 @@ const SECTIONS: SectionDef[] = [
 
 // Type/Status aren't asked for here — they're stamped on submit.
 const INITIAL: Record<string, string> = {
-  learningProvider: 'Kent Business College',
   country: DEFAULT_COUNTRY,
 };
 
@@ -430,9 +418,6 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       preferredName: formData.preferredName,
       gender: formData.gender,
       niNumber: formData.niNumber,
-      referrer: formData.referrer,
-      referrerAddress: formData.referrerAddress,
-      referrerContact: formData.referrerContact,
       postcode: formData.postcode,
       addressLine1: formData.addressLine1,
       addressLine2: formData.addressLine2,
@@ -440,7 +425,6 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       county: formData.county,
       country: formData.country,
       caseOwner: formData.caseOwner,
-      learningProvider: formData.learningProvider,
       employerAddress: formData.employerAddress,
       mentor: formData.mentor,
       referenceNumber: formData.referenceNumber,

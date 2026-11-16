@@ -334,12 +334,8 @@ class EnrolmentUser(models.Model):
     title = models.TextField(db_column="Title", null=True, blank=True)
     preferred_name = models.TextField(db_column="Preferred_name", null=True, blank=True)
     gender = models.TextField(db_column="Gender", null=True, blank=True)
-    referrer = models.TextField(db_column="Referrer", null=True, blank=True)
-    referrer_address = models.TextField(db_column="Referrer_address", null=True, blank=True)
-    referrer_contact = models.TextField(db_column="Referrer_contact", null=True, blank=True)
     country = models.TextField(db_column="Country", null=True, blank=True)
     case_owner = models.TextField(db_column="Case_owner", null=True, blank=True)
-    learning_provider = models.TextField(db_column="Learning_provider", null=True, blank=True)
     mentor = models.TextField(db_column="Mentor", null=True, blank=True)
     reference_number = models.TextField(db_column="Reference_number", null=True, blank=True)
     extended_break = models.TextField(db_column="Extended_break", null=True, blank=True)
@@ -504,7 +500,6 @@ class StaffUser(models.Model):
     date_of_birth = models.TextField(db_column="Date_of_birth", null=True, blank=True)
     organization = models.TextField(db_column="Orgnization", null=True, blank=True)  # source spelling, as elsewhere
     case_owner = models.TextField(db_column="Case_owner", null=True, blank=True)
-    learning_provider = models.TextField(db_column="Learning_provider", null=True, blank=True)
     reference_number = models.TextField(db_column="Reference_number", null=True, blank=True)
 
     invite_to_platform = models.BooleanField(db_column="Invite_to_platform", null=True, blank=True)

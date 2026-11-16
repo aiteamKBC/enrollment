@@ -198,7 +198,7 @@ def derive_content(learner):
 
     # Each module with the weeks and components that deliver it, so the printed
     # plan lists actual teaching activities rather than just module names.
-    delivery_lead = _s(learner.learning_provider) or "Kent Business College"
+    delivery_lead = "Kent Business College"
     breakdown = _module_breakdown([_s(m.get("moduleId")) for m in modules])
     learning_plan = []
     for m in modules:

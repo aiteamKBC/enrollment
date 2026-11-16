@@ -121,7 +121,7 @@ def derive_content(learner):
         "employer": _s(learner.employer),
         "employerPostcode": employer_postcode(learner, employer_answers),
         "employerAddress": _employer_address(learner) or _s(employer_answers.get('address')),
-        "mainProvider": _s(learner.learning_provider) or MAIN_PROVIDER,
+        "mainProvider": MAIN_PROVIDER,
         "subcontracted": False,
     }
 

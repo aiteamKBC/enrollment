@@ -143,7 +143,6 @@ export interface CreateStaffUserInput {
   gender?: string;
   organization?: string;
   caseOwner?: string;
-  learningProvider?: string;
   referenceNumber?: string;
   allowCheckpoint?: boolean;
   allowConsole?: boolean;
@@ -165,7 +164,6 @@ export interface StaffUserRow extends UserListRow {
   gender: string;
   dob: string;
   caseOwner: string;
-  learningProvider: string;
   referenceNumber: string;
   // `invitation` is inherited from UserListRow — present on create, where an
   // invitation is always issued.

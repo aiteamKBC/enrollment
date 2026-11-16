@@ -380,12 +380,8 @@ APTEM_TEXT_FIELDS = {
     "title": "title",
     "preferredName": "preferred_name",
     "gender": "gender",
-    "referrer": "referrer",
-    "referrerAddress": "referrer_address",
-    "referrerContact": "referrer_contact",
     "country": "country",
     "caseOwner": "case_owner",
-    "learningProvider": "learning_provider",
     "mentor": "mentor",
     "referenceNumber": "reference_number",
     "extendedBreak": "extended_break",
@@ -857,7 +853,6 @@ STAFF_WRITABLE_FIELDS = {
     "gender": "gender",
     "organization": "organization",
     "caseOwner": "case_owner",
-    "learningProvider": "learning_provider",
     "referenceNumber": "reference_number",
 }
 
@@ -889,7 +884,6 @@ def to_staff_row(u):
         "dob": _s(u.date_of_birth),
         "organization": _s(u.organization),
         "caseOwner": _s(u.case_owner),
-        "learningProvider": _s(u.learning_provider),
         "referenceNumber": _s(u.reference_number),
         **{key: getattr(u, attr) for key, attr in APTEM_BOOL_FIELDS.items()},
     }
