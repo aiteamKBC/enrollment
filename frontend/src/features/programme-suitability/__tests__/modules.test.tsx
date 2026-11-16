@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { WizardContext, type WizardContextValue } from '@/pages/users/wizard/WizardContext.helpers';
 import type { WizardDraft } from '@/pages/users/types';
 import { ProgrammeModulesCard, ProgrammeModulesView } from '../modules/ProgrammeModulesCard';
-import { selectableModules, selectedModuleIds, type ProgrammeModuleSelection } from '../modules/configuration';
+import { selectableModules, selectedModuleIds, type ProgrammeModuleSelection, type HomeCohort } from '../modules/configuration';
 import type { AssessmentState, ProgrammeId } from '../types';
 import { fresh, result } from './fixtures';
 import { PCP_PATHWAYS, PROGRAMME_MODULES, modulesConfiguration } from './modulesFixtures';
@@ -19,10 +19,10 @@ function assessment(selected: ProgrammeId = 'PCP_L6', recommended: ProgrammeId =
     result: { ...result, outcome: `RECOMMENDED_${recommended}`, recommendedProgramme: recommended }, selectedProgramme: selected, completionStatus: 'SUBMITTED',
     confirmedAt: '2026-11-01T12:00:00Z', selectionStatus: 'SELECTION_CONFIRMED', selectionConfirmedAt: '2026-11-01T12:01:00Z' };
 }
-function Harness({ state = assessment(), saved, staff = false }: {
-  state?: AssessmentState; saved?: ProgrammeModuleSelection; staff?: boolean;
+function Harness({ state = assessment(), saved, staff = false, homeCohort }: {
+  state?: AssessmentState; saved?: ProgrammeModuleSelection; staff?: boolean; homeCohort?: HomeCohort;
 }) {
-  vi.mocked(getModules).mockResolvedValue({ configuration: structuredClone(modulesConfiguration), configurationVersion: 3, selectedProgramme: state.selectedProgramme || 'PCP_L6' });
+  vi.mocked(getModules).mockResolvedValue({ configuration: structuredClone(modulesConfiguration), configurationVersion: 3, selectedProgramme: state.selectedProgramme || 'PCP_L6', homeCohort });
   const [modules, setModules] = useState(saved);
   const value = { userId: '41', readOnly: staff, hydrated: true, saveModules: save,
     draft: { programmeModules: modules } as WizardDraft, suitability: { state },
@@ -149,4 +149,43 @@ it('supports a new arbitrary pathway identifier and local credit totals without 
   await userEvent.click(card.getByRole('checkbox', { name: 'Project Management Professional (PMP)' }));
   expect(card.getByText('Selected credits: 2')).toBeInTheDocument();
   expect(card.getByText('Target credits: 99')).toBeInTheDocument();
+});
+
+
+it.each([7, 11, 16, 20])('preserves the verbatim pinned cohort with the confirmed alternative programme (v%s)', async (version) => {
+  render(<Harness state={assessment('ME_L4', 'MM_L6')} homeCohort={{ status: 'resolved', programmeId: 'ME_L4',
+    cohortId: 'persisted-id', name: 'February 2027 - Group A', layoutVersion: version }} />);
+  const section = await screen.findByRole('region', { name: 'Programme Modules' });
+  const name = await within(section).findByText('February 2027 - Group A');
+  expect(name.closest('[data-timeline-row]')).toHaveAttribute('data-timeline-row', 'home');
+  expect(section).toHaveTextContent(PROGRAMME_MODULES.ME_L4.title);
+  expect(within(section).queryByText(PROGRAMME_MODULES.MM_L6.title)).toBeNull();
+  expect(save).not.toHaveBeenCalled();
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it.each(['missing', 'pending', 'different-programme', 'missing-id'])('shows Cohort pending for %s assignment metadata', async (caseName) => {
+  const home: HomeCohort = { status: caseName === 'pending' ? 'pending' : 'resolved',
+    programmeId: caseName === 'different-programme' ? 'MM_L6' : 'ME_L4',
+    cohortId: caseName === 'missing-id' ? null : 'actual-id', name: 'Untrusted name', layoutVersion: 11 };
+  render(<Harness state={assessment('ME_L4', 'MM_L6')} homeCohort={caseName === 'missing' ? undefined : home} />);
+  const section = await screen.findByRole('region', { name: 'Programme Modules' });
+  expect(await within(section).findByText('Cohort pending')).toBeVisible();
+  expect(within(section).queryByText('Untrusted name')).toBeNull();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it('does not add a learner cohort label to the shared administration preview', () => {
+  render(<ProgrammeModulesView configuration={modulesConfiguration} programmeId="ME_L4" />);
+  expect(screen.queryByText('Cohort pending')).toBeNull();
+});
+
+it('uses only saved modules from the active PCP pathway', () => {
+  const operational = PCP_PATHWAYS.find(path => path.id === 'operational')!;
+  const strategic = PCP_PATHWAYS.find(path => path.id === 'strategic')!;
+  const choice: ProgrammeModuleSelection = { programme: 'PCP_L6', pathway: 'operational',
+    modulesByPathway: { operational: ['pmp', 'ai-project-control', 'risk-apm', 'planning-control', 'pmi-sp'],
+      strategic: ['pmp', 'portfolio', 'pmi-pmo'] } };
+  expect(selectedModuleIds(choice, operational)).toEqual(choice.modulesByPathway.operational);
+  expect(selectedModuleIds(choice, strategic)).toEqual([]);
 });

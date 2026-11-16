@@ -1,7 +1,7 @@
 """Pure deterministic scoring. Decimal arithmetic and no external services."""
 from decimal import Decimal
 
-from .configuration import ConfigurationError, PATHWAYS, validate
+from .configuration import ConfigurationError, GENERAL_WEIGHTED_POLICY, PATHWAYS, validate
 from .selection import score_based_result
 
 
@@ -24,6 +24,7 @@ def calculate(configuration, pathway, responses, complete=False):
     missing = []
     breakdown = []
     rules = config["rules"]
+    legacy_critical = config.get("scoringPolicy") != GENERAL_WEIGHTED_POLICY
     for qid, q in questions.items():
         weight = Decimal(str(q["weight"]))
         selected = responses.get(qid)
@@ -53,7 +54,7 @@ def calculate(configuration, pathway, responses, complete=False):
         if contradictory:
             mixed += weight
         target = q.get("criticalProgramme")
-        if q["critical"] and target in points and not contradictory and any(
+        if legacy_critical and q["critical"] and target in points and not contradictory and any(
             allowed[aid]["affinities"].get(target, 0) >= rules["criticalStrength"] for aid in selected
         ):
             critical[target].append(qid)
@@ -85,7 +86,7 @@ def calculate(configuration, pathway, responses, complete=False):
             reasons.append("CLOSE_PROGRAMME_SCORES")
         if mixed and percentage(mixed) >= rules["mixedQuestionThreshold"]:
             reasons.append("CONTRADICTORY_RESPONSIBILITIES")
-        if next(p["level"] for p in programmes if p["id"] == winner) == 6 and len(critical[winner]) < rules["minimumCriticalIndicators"]:
+        if legacy_critical and next(p["level"] for p in programmes if p["id"] == winner) == 6 and len(critical[winner]) < rules["minimumCriticalIndicators"]:
             reasons.append("MISSING_CRITICAL_LEVEL_6_EVIDENCE")
         outcome = "FURTHER_REVIEW_REQUIRED" if reasons else f"RECOMMENDED_{winner}"
     recommended = winner if outcome.startswith("RECOMMENDED_") else None

@@ -12,7 +12,7 @@ from enrolment_api.auth import enrolment_login_required
 from enrolment_api.wizard_layout import CONN, _actor, read_current
 from learner_api.models import EnrolmentUser
 
-from .configuration import ConfigurationError, KEY, defaults, learner_configuration, validate
+from .configuration import publication_configuration, ConfigurationError, KEY, defaults, learner_configuration, validate
 from .models import Assessment
 from .programme_assignment import ProgrammeAssignmentError, sync_confirmed_programme_to_learner
 from .permissions import is_staff
@@ -102,7 +102,7 @@ def preview(request):
         return JsonResponse({"error": "Method not allowed."}, status=405)
     try:
         data = body(request)
-        config = validate(data.get("configuration"))
+        config = publication_configuration(data.get("configuration"))
         if data.get("validateOnly") is True:
             return JsonResponse({"valid": True})
         return JsonResponse(calculate(config, data.get("pathway"), data.get("responses", {})))

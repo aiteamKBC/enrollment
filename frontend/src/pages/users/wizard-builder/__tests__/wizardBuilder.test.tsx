@@ -144,13 +144,13 @@ describe('the builder page', () => {
     vi.spyOn(window, 'prompt').mockReturnValue('Renamed older version');
     renderBuilder();
     const versionSelect = await screen.findByRole('combobox', { name: 'Version to edit' });
-    await waitFor(() => expect(within(versionSelect).getByRole('option', { name: /version 6/ })).toBeInTheDocument());
-    await userEvent.selectOptions(versionSelect, '6');
+    await userEvent.click(versionSelect);
+    await userEvent.click(await screen.findByRole('option', { name: /v6/ }));
     await waitFor(() => expect(fetchWizardVersion).toHaveBeenCalledWith(6));
     await waitFor(() => expect(screen.getByText(/Published version 6/)).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'Rename version' }));
     await waitFor(() => expect(updateWizardVersion).toHaveBeenCalledWith(6, { name: 'Renamed older version' }));
-    expect(within(versionSelect).getByRole('option', { name: /version 6 · Renamed older version/ })).toBeInTheDocument();
+    await waitFor(() => expect(versionSelect).toHaveTextContent('Renamed older version'));
   });
 
   it('shows the renamed current default and hides archived versions until requested', async () => {
@@ -169,17 +169,24 @@ describe('the builder page', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderBuilder();
     const versionSelect = await screen.findByRole('combobox', { name: 'Version to edit' });
-    await waitFor(() => expect(within(versionSelect).getByRole('option', { name: /version 6/ })).toBeInTheDocument());
+    await userEvent.click(versionSelect);
+    expect(await screen.findByRole('option', { name: /v6/ })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
     const archivedCheckbox = screen.getByRole('checkbox', { name: 'Show archived versions' });
     expect(archivedCheckbox).not.toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: 'Rename version' }));
-    expect(within(versionSelect).getByRole('option', { name: /Current default · version 7 · November default/ })).toBeInTheDocument();
-    await userEvent.selectOptions(versionSelect, '6');
+    await waitFor(() => expect(versionSelect).toHaveTextContent('November default'));
+    await userEvent.click(versionSelect);
+    await userEvent.click(await screen.findByRole('option', { name: /v6/ }));
     await waitFor(() => expect(screen.getByText(/Published version 6/)).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'Archive version' }));
-    await waitFor(() => expect(within(versionSelect).queryByRole('option', { name: /version 6/ })).toBeNull());
+    await waitFor(() => expect(versionSelect).toHaveTextContent('Current default'));
+    await userEvent.click(versionSelect);
+    expect(screen.queryByRole('option', { name: /v6/ })).toBeNull();
+    await userEvent.keyboard('{Escape}');
     await userEvent.click(archivedCheckbox);
-    expect(within(versionSelect).getByRole('option', { name: /version 6 · Earlier \(archived\)/ })).toBeInTheDocument();
+    await userEvent.click(versionSelect);
+    expect(await screen.findByRole('option', { name: /v6.*Earlier \(archived\)/ })).toBeInTheDocument();
   });
 
   it('ignores an older version request after switching form type', async () => {
@@ -195,9 +202,10 @@ describe('the builder page', () => {
     ]);
     renderBuilder();
     const versionSelect = await screen.findByRole('combobox', { name: 'Version to edit' });
-    await waitFor(() => expect(within(versionSelect).getByRole('option', { name: /version 6/ })).toBeInTheDocument());
-    await userEvent.selectOptions(versionSelect, '6');
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Form type' }), 'commercial');
+    await userEvent.click(versionSelect);
+    await userEvent.click(await screen.findByRole('option', { name: /v6/ }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Form type' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Commercial' }));
     rejectOld?.(new Error('Unknown learner kind.'));
     await waitFor(() => expect(screen.getByText(/Published version 9/)).toBeInTheDocument());
     expect(screen.queryByText('Unknown learner kind.')).not.toBeInTheDocument();
@@ -223,10 +231,89 @@ describe('the builder page', () => {
     }));
   });
 
+  it.each(['Marketing Assessment', 'Project Controls Assessment'])('publishes inline weight and affinity edits for %s through the existing wizard handler', async (tab) => {
+    const layout = { ...defaultLayout(), programmeSuitability: structuredClone(configuration) };
+    fetchWizardLayout.mockResolvedValue({ layout, version: 7, updatedAt: '', updatedBy: 'Admin' });
+    renderBuilder(); await openStep('Programme Suitability & Modules');
+    await userEvent.click(screen.getByRole('tab', { name: tab }));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const original = configuration.questions[tab === 'Marketing Assessment' ? 0 : 1];
+    const programme = configuration.programmes.find((p) => p.pathway === original.pathway)!;
+    const weight = screen.getByLabelText('Question weight');
+    const answer = within(screen.getByRole('group', { name: 'Answer 1' }));
+    const affinity = answer.getByLabelText(`${programme.title} affinity (0–1)`);
+    await userEvent.clear(weight); await userEvent.type(weight, '22');
+    await userEvent.clear(affinity); await userEvent.type(affinity, '0.7');
+    expect(layout.programmeSuitability).toEqual(configuration);
+    expect(publishWizardLayout).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Publish the wizard?' })).getByRole('button', { name: /^Publish$/ }));
+    await waitFor(() => expect(publishWizardLayout).toHaveBeenCalledTimes(1));
+    const [published, version] = publishWizardLayout.mock.calls[0] as [WizardLayout, number];
+    const saved = published.programmeSuitability!.questions.find((q) => q.id === original.id)!;
+    expect(version).toBe(7);
+    expect(saved.weight).toBe(22);
+    expect(saved.answers[0]).toEqual({ ...original.answers[0], affinities: { ...original.answers[0].affinities, [programme.id]: 0.7 } });
+  });
+
+  it('publishes advanced settings through the existing version without changing question scoring or modules', async () => {
+    const layout = { ...defaultLayout(), programmeSuitability: structuredClone(configuration), programmeModules: structuredClone(modulesConfiguration) };
+    fetchWizardLayout.mockResolvedValue({ layout, version: 7, updatedAt: '', updatedBy: 'Admin' });
+    renderBuilder(); await openStep('Programme Suitability & Modules');
+    expect(screen.queryByRole('tab', { name: 'General Settings' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Scoring Rules' })).toBeNull();
+    await userEvent.click(screen.getByText('Advanced configuration'));
+    await userEvent.type(screen.getByLabelText('Learner introduction'), ' Updated');
+    const threshold = screen.getByLabelText('Minimum match index (0–100)');
+    await userEvent.clear(threshold); await userEvent.type(threshold, '70');
+    await userEvent.click(screen.getByText('Advanced programme associations'));
+    await userEvent.type(screen.getByLabelText('Marketing Executive: existing catalogue ID (optional reference)'), 'catalogue-42');
+    expect(layout.programmeSuitability).toEqual(configuration);
+    expect(publishWizardLayout).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Publish the wizard?' })).getByRole('button', { name: /^Publish$/ }));
+    await waitFor(() => expect(publishWizardLayout).toHaveBeenCalledTimes(1));
+    const [published, version] = publishWizardLayout.mock.calls[0] as [WizardLayout, number];
+    expect(version).toBe(7);
+    expect(published.programmeSuitability).toEqual({ ...configuration,
+      introduction: `${configuration.introduction} Updated`, rules: { ...configuration.rules, minimumScore: 70 },
+      programmes: configuration.programmes.map((p, index) => index === 0 ? { ...p, catalogueId: 'catalogue-42' } : p),
+    });
+    expect(published.programmeModules).toEqual(layout.programmeModules);
+  });
+
+  it.each(['Marketing Assessment', 'Project Controls Assessment'])('publishes soft removals in %s while retaining stable IDs and the original configuration', async (tab) => {
+    const layout = { ...defaultLayout(), programmeSuitability: structuredClone(configuration) };
+    fetchWizardLayout.mockResolvedValue({ layout, version: 7, updatedAt: '', updatedBy: 'Admin' });
+    renderBuilder(); await openStep('Programme Suitability & Modules');
+    await userEvent.click(screen.getByRole('tab', { name: tab }));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const original = configuration.questions[tab === 'Marketing Assessment' ? 0 : 1];
+    await userEvent.click(screen.getAllByRole('button', { name: 'Remove answer' })[0]);
+    expect(screen.queryByDisplayValue(original.answers[0].text)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Add question' }));
+    const addedId = screen.getByLabelText('Question title').closest('[id]')!.id;
+    expect(addedId).toContain('question-editor-');
+    await userEvent.click(within(screen.getByRole('region', { name: 'Question 2: New question' })).getByRole('button', { name: 'Remove question' }));
+    expect(screen.queryByDisplayValue('New question')).toBeNull();
+    expect(layout.programmeSuitability).toEqual(configuration);
+    await userEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Publish the wizard?' })).getByRole('button', { name: /^Publish$/ }));
+    await waitFor(() => expect(publishWizardLayout).toHaveBeenCalledTimes(1));
+    const [published, version] = publishWizardLayout.mock.calls[0] as [WizardLayout, number];
+    expect(version).toBe(7);
+    const saved = published.programmeSuitability!.questions.find((q) => q.id === original.id)!;
+    expect(saved.answers[0]).toEqual({ ...original.answers[0], active: false });
+    expect(saved.answers.slice(1)).toEqual(original.answers.slice(1));
+    expect(published.programmeSuitability!.questions.at(-1)).toMatchObject({ title: 'New question', active: false });
+  });
+
   it('publishes edited modules with the existing wizard version and preserves assessment configuration', async () => {
     const layout = { ...defaultLayout(), programmeSuitability: configuration, programmeModules: structuredClone(modulesConfiguration) };
     fetchWizardLayout.mockResolvedValue({ layout, version: 7, updatedAt: '', updatedBy: 'Admin' });
     renderBuilder(); await openStep('Programme Suitability & Modules');
+    await userEvent.click(screen.getByRole('tab', { name: 'Programme Modules' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Social Media' }));
     const row = within(screen.getByRole('group', { name: 'Edit module Social Media' }));
     const sessions = row.getByLabelText('Sessions');
     await userEvent.clear(sessions); await userEvent.type(sessions, '18');
@@ -251,7 +338,9 @@ describe('the builder page', () => {
     expect(screen.getByRole('button', { name: 'Remove Programme Suitability & Modules step' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
     await userEvent.click(screen.getByRole('tab', { name: 'Marketing Assessment' }));
-    expect(screen.getByDisplayValue('marketing responsibilities')).toBeInTheDocument();
+    expect(screen.getByText('1. marketing responsibilities')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByDisplayValue('marketing responsibilities')).toBeVisible();
     await openStep('CV/Job Description');
     expect(screen.queryByRole('region', { name: 'Programme Suitability Assessment configuration' })).toBeNull();
     expect(screen.getByText('Highest-level qualification')).toBeInTheDocument();

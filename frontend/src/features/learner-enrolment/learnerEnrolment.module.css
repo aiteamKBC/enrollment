@@ -48,9 +48,12 @@
 .heroContent p { margin: 0; color: white; font-size: 13px; line-height: 1.6; }
 /* This wrapper includes the hero and every step, within the shell's content
    column. The application sidebar and header keep their existing geometry. */
-.wizard { width: 100%; max-width: 1140px; margin-inline: auto; container: enrolment-layout / inline-size; }
+.wizard { width: 100%; max-width: 1480px; margin-inline: auto; container: enrolment-layout / inline-size; }
 .wizardLayout { align-items: stretch !important; gap: 18px !important; }
-.progressRail { width: 260px !important; }
+.progressRail { width: 240px !important; }
+@media (min-width: 1600px) {
+  .progressRail { width: 270px !important; }
+}
 .progressPanel { height: 100%; border-color: #e4d1fc !important; border-radius: 23px !important; background: linear-gradient(140deg, #fff, #fcf8ff) !important; box-shadow: 0 4px 13px #6e22ad1a !important; }
 .progressHeading { padding: 14px 18px !important; border-color: #eee0ff !important; }
 .progressHeading > div:first-child > span:first-child { color: #290853; font-size: 14px; font-weight: 800; text-transform: none; letter-spacing: -.2px; }

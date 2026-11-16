@@ -53,6 +53,19 @@ describe('admin document builder', () => {
     fireEvent.change(screen.getByLabelText('Search document templates'), { target: { value: 'ULN' } });
     expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(1);
   });
+  it('lists the dynamic Suitability & RPL report without exposing static template actions', async () => {
+    api.listTemplates.mockResolvedValueOnce({ ...indexFor(), results: [...indexFor().results, {
+      templateId: 'suitability-rpl-report', documentKey: 'suitability-rpl-report', title: 'Suitability & RPL Report',
+      fullTitle: 'Suitability & Recognition of Prior Learning Report', category: 'Review', programmes: [],
+      publishedVersion: null, draft: null, updatedAt: null, dynamic: true,
+    }] });
+    render(<Page />);
+    expect(await screen.findByText('Suitability & RPL Report')).toBeInTheDocument();
+    expect(screen.getByText('PDF: Suitability & Recognition of Prior Learning Report')).toBeInTheDocument();
+    expect(screen.getByText('Open from the learner’s Suitability & RPL Report tab')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Suitability & RPL Report' })).not.toBeInTheDocument();
+    expect(api.readTemplate).not.toHaveBeenCalled();
+  });
   it('saves a changed heading with optimistic revision and leaves publication explicit', async () => {
     const user = await editIlr();
     editHeading('Approved edited heading');

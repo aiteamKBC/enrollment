@@ -7,9 +7,10 @@ from unittest.mock import patch
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import include, path
 from coach_api.csrf import coach_csrf_token
+from learner_api.models import EnrolmentUser
 
 from enrolment_api.wizard_layout import LayoutError, normalize_layout
-from .configuration import KEY, ConfigurationError, defaults, learner_configuration, validate
+from .configuration import KEY, ConfigurationError, defaults, learner_configuration, publication_configuration, GENERAL_WEIGHTED_POLICY, validate
 from .models import Assessment
 from .scoring import calculate
 from . import views
@@ -26,9 +27,15 @@ def answers(config, pathway="marketing", indices=(1,)):
             for q in config["questions"] if q["active"] and q["pathway"] == pathway}
 
 
+def legacy_defaults():
+    config = defaults()
+    config.pop("scoringPolicy")
+    return config
+
+
 class ScoringTests(SimpleTestCase):
     def setUp(self):
-        self.config = defaults()
+        self.config = legacy_defaults()
 
     def test_seed_contains_18_questions_72_answers_and_four_stable_programmes(self):
         config = validate(self.config)
@@ -87,7 +94,7 @@ class ScoringTests(SimpleTestCase):
         self.assertEqual(result["recommendedProgramme"], "ME_L4")
         self.assertIn("SCORE_TIE_LEVEL_4_DEFAULT", result["recommendationFlags"])
 
-    def test_two_distinct_critical_indicators_required_for_level_six(self):
+    def test_legacy_critical_indicator_review_flag_remains_versioned(self):
         responses = answers(self.config, indices=(3,))
         responses["M03"] = []; responses["M06"] = []
         result = calculate(self.config, "marketing", responses)
@@ -128,7 +135,7 @@ class ScoringTests(SimpleTestCase):
 
     def test_bad_weights_and_rules_fail_validation_without_division_by_zero(self):
         for bad in [0, -1, float('inf'), float('nan'), True, "10"]:
-            config = defaults(); config["questions"][0]["weight"] = bad
+            config = legacy_defaults(); config["questions"][0]["weight"] = bad
             with self.subTest(weight=bad):
                 with self.assertRaises(ConfigurationError): calculate(config, "marketing", {})
         for q in self.config["questions"]: q["active"] = False
@@ -152,7 +159,7 @@ class ScoringTests(SimpleTestCase):
         for change in [lambda c: c["questions"][0].update(id="M02"),
                        lambda c: c["questions"][0]["answers"][0].update(affinities={"ME_L4": 1.1}),
                        lambda c: c["questions"][0].update(criticalProgramme="PCP_L6")]:
-            config = defaults(); change(config)
+            config = legacy_defaults(); change(config)
             with self.assertRaises(ConfigurationError): validate(config)
 
     def test_malformed_configuration_types_are_validation_errors(self):
@@ -160,9 +167,101 @@ class ScoringTests(SimpleTestCase):
                        lambda c: c["questions"][0].update(pathway=[]),
                        lambda c: c["questions"][0].update(criticalProgramme=[]),
                        lambda c: c.update(schemaVersion=True)]:
-            config = defaults(); change(config)
+            config = legacy_defaults(); change(config)
             with self.assertRaises(ConfigurationError): validate(config)
-        with self.assertRaises(ConfigurationError): calculate(defaults(), [], {})
+        with self.assertRaises(ConfigurationError): calculate(legacy_defaults(), [], {})
+
+
+class GeneralWeightedScoringTests(SimpleTestCase):
+    def test_published_soft_removals_exclude_questions_answers_and_weight_without_mutating_history(self):
+        for pathway in ("marketing", "project-controls"):
+            original = defaults()
+            historical_responses = answers(original, pathway, (3,))
+            historical_result = calculate(original, pathway, historical_responses, complete=True)
+            draft = copy.deepcopy(original)
+            questions = [q for q in draft["questions"] if q["pathway"] == pathway]
+            removed_question, remaining_question = questions[:2]
+            removed_question["active"] = False
+            remaining_question["answers"][3]["active"] = False
+            published = publication_configuration(draft)
+            public = learner_configuration(published)
+            self.assertNotIn(removed_question["id"], [q["id"] for q in public["questions"]])
+            visible = next(q for q in public["questions"] if q["id"] == remaining_question["id"])
+            removed_answer = remaining_question["answers"][3]
+            self.assertNotIn(removed_answer["id"], [a["id"] for a in visible["answers"]])
+            responses = {qid: aids for qid, aids in historical_responses.items() if qid != removed_question["id"]}
+            responses[remaining_question["id"]] = []
+            updated = calculate(published, pathway, responses, complete=True)
+            self.assertEqual(updated["availableWeight"], historical_result["availableWeight"] - removed_question["weight"])
+            self.assertNotIn(removed_question["id"], [row["questionId"] for row in updated["breakdown"]])
+            row = next(row for row in updated["breakdown"] if row["questionId"] == remaining_question["id"])
+            self.assertTrue(all(value == 0 for value in row["points"].values()))
+            with self.assertRaises(ConfigurationError):
+                calculate(published, pathway, {**responses, remaining_question["id"]: [removed_answer["id"]]})
+            with self.assertRaises(ConfigurationError):
+                calculate(published, pathway, {**responses, removed_question["id"]: historical_responses[removed_question["id"]]})
+            self.assertEqual(published["questions"], draft["questions"])
+            self.assertEqual(calculate(original, pathway, historical_responses, complete=True), historical_result)
+
+
+    def test_retired_fields_cannot_change_new_scores_recommendations_or_review_flags(self):
+        for pathway, high in [("marketing", "MM_L6"), ("project-controls", "PCP_L6")]:
+            config = defaults()
+            responses = answers(config, pathway, (3,))
+            baseline = calculate(config, pathway, responses, complete=True)
+            self.assertEqual(baseline["recommendedProgramme"], high)
+            self.assertEqual(baseline["admissionsReviewOutcome"], f"RECOMMENDED_{high}")
+            for question in config["questions"]:
+                question["critical"] = False
+                question["criticalProgramme"] = None
+            config["rules"].update(minimumCriticalIndicators=100, criticalStrength=1)
+            self.assertEqual(calculate(config, pathway, responses, complete=True), baseline)
+            for question in config["questions"]:
+                question.pop("critical")
+                question.pop("criticalProgramme")
+            config["rules"].pop("minimumCriticalIndicators")
+            config["rules"].pop("criticalStrength")
+            self.assertEqual(calculate(config, pathway, responses, complete=True), baseline)
+            self.assertTrue(all(not ids for ids in baseline["criticalIndicators"].values()))
+
+    def test_weighted_scores_coverage_and_general_review_conditions_stay_unchanged(self):
+        old = legacy_defaults()
+        new = publication_configuration(old)
+        for pathway in ("marketing", "project-controls"):
+            first = next(q for q in new["questions"] if q["pathway"] == pathway)
+            for responses in ({}, {first["id"]: [first["answers"][3]["id"]]},
+                              answers(new, pathway, (1,)), answers(new, pathway, (0, 1, 2, 3))):
+                original = calculate(old, pathway, responses)
+                updated = calculate(new, pathway, responses)
+                for key in ("scores", "coverage", "availableWeight", "evidenceCoverage", "missingRequired", "breakdown", "recommendedProgramme"):
+                    self.assertEqual(updated[key], original[key])
+                flags = [flag for flag in original["admissionsFlags"] if flag != "MISSING_CRITICAL_LEVEL_6_EVIDENCE"]
+                self.assertEqual(updated["admissionsFlags"], flags or ["CLEAR_RESPONSIBILITY_MATCH"])
+        self.assertIn("LOW_ASSESSMENT_COVERAGE", calculate(new, "marketing", {"M01": ["M01_D"]})["admissionsFlags"])
+        self.assertIn("CONTRADICTORY_RESPONSIBILITIES", calculate(new, "marketing", answers(new, indices=(0, 1, 2, 3)))["admissionsFlags"])
+        with self.assertRaises(ConfigurationError):
+            calculate(new, "marketing", {}, complete=True)
+
+    def test_publication_activates_new_policy_without_rewriting_previous_json(self):
+        old = legacy_defaults()
+        before = copy.deepcopy(old)
+        self.assertEqual(validate(old), before)
+        draft = {"steps": [{"slug": "programme-suitability", "label": "Programme Suitability", "builtin": True, "items": []}], KEY: old}
+        published, _ = normalize_layout(draft, None)
+        self.assertEqual(published[KEY]["scoringPolicy"], GENERAL_WEIGHTED_POLICY)
+        self.assertEqual({k: v for k, v in published[KEY].items() if k != "scoringPolicy"}, before)
+        self.assertEqual(old, before)
+        self.assertNotIn("scoringPolicy", old)
+        responses = answers(old, indices=(3,))
+        responses["M03"] = []; responses["M06"] = []
+        historical = calculate(old, "marketing", responses)
+        self.assertIn("MISSING_CRITICAL_LEVEL_6_EVIDENCE", historical["admissionsFlags"])
+        self.assertNotIn("MISSING_CRITICAL_LEVEL_6_EVIDENCE", calculate(published[KEY], "marketing", responses)["admissionsFlags"])
+        self.assertEqual(calculate(old, "marketing", responses), historical)
+        for value in ("unknown", True, {}, 3):
+            invalid = {**old, "scoringPolicy": value}
+            with self.assertRaises(ConfigurationError): validate(invalid)
+            with self.assertRaises(ConfigurationError): publication_configuration(invalid)
 
 
 class PublishingTests(SimpleTestCase):
@@ -190,7 +289,10 @@ class AssessmentApiTests(TestCase):
         self.config = defaults()
         self.staff = False
         self.auth = patch.dict(os.environ, {"ENROLMENT_API_REQUIRE_AUTH": "1"}); self.auth.start(); self.addCleanup(self.auth.stop)
-        self.learner = SimpleNamespace(pk=41, onboarding_status="Not started")
+        EnrolmentUser.all_learners.bulk_create([EnrolmentUser(id=41, username="Synthetic assessment learner",
+            email="assessment@example.test", learner_type="apprenticeship", programme_status="Onboarding",
+            status="FullUser", onboarding_status="Not started")])
+        self.learner = SimpleNamespace(pk=41, onboarding_status="Not started", learner_type="apprenticeship", programme_status="Onboarding")
         # These endpoint-policy tests isolate the cross-model assignment service;
         # test_programme_assignment exercises its real database and API integration.
         self.assignment = patch.object(views, "sync_confirmed_programme_to_learner", return_value={"status": "APPLIED"})
@@ -211,6 +313,50 @@ class AssessmentApiTests(TestCase):
         response = self.request({"revision": 0, "configurationVersion": 3, "pathway": "marketing", **extra})
         self.assertEqual(response.status_code, 200, response.content)
         return json.loads(response.content)
+
+    def test_old_assessment_snapshot_and_results_survive_policy_publication_and_reads(self):
+        self.config = legacy_defaults()
+        responses = answers(self.config, indices=(3,))
+        responses["M03"] = []; responses["M06"] = []
+        self.start(responses=responses, action="submit")
+        row = Assessment.objects.get()
+        before = copy.deepcopy({key: getattr(row, key) for key in ("configuration", "configuration_version", "responses", "result", "review", "review_status", "selected_programme", "revision")})
+        self.assertIn("MISSING_CRITICAL_LEVEL_6_EVIDENCE", before["result"]["admissionsFlags"])
+        self.config = publication_configuration(self.config)
+        fetched = json.loads(self.request(method="GET").content)
+        public_result = copy.deepcopy(before["result"])
+        public_result.pop("breakdown", None)  # Existing learner API omits staff-only diagnostics.
+        self.assertEqual(fetched["result"], public_result)
+        row.refresh_from_db()
+        self.assertEqual({key: getattr(row, key) for key in before}, before)
+
+    def test_in_progress_snapshot_keeps_legacy_rules_after_new_policy_publication(self):
+        self.config = legacy_defaults()
+        self.start()
+        self.config = publication_configuration(self.config)
+        responses = answers(self.config, indices=(3,))
+        responses["M03"] = []; responses["M06"] = []
+        submitted = self.request({"revision": 1, "responses": responses, "action": "submit"})
+        self.assertEqual(submitted.status_code, 200, submitted.content)
+        row = Assessment.objects.get()
+        self.assertNotIn("scoringPolicy", row.configuration)
+        self.assertIn("MISSING_CRITICAL_LEVEL_6_EVIDENCE", row.result["admissionsFlags"])
+
+    def test_draft_preview_uses_publication_policy_without_saving_or_mutating_legacy_draft(self):
+        config = legacy_defaults()
+        before = copy.deepcopy(config)
+        responses = answers(config, indices=(3,))
+        responses["M03"] = []; responses["M06"] = []
+        request = self.factory.post('/', data=json.dumps({"configuration": config, "pathway": "marketing", "responses": responses}), content_type="application/json")
+        request.login_account = SimpleNamespace(is_active=True, role="staff", subject_id=5, subject_type="staff")
+        request._dont_enforce_csrf_checks = True
+        response = views.preview(request)
+        self.assertEqual(response.status_code, 200, response.content)
+        expected = calculate(publication_configuration(config), "marketing", responses)
+        self.assertEqual(json.loads(response.content), expected)
+        self.assertNotIn("MISSING_CRITICAL_LEVEL_6_EVIDENCE", expected["admissionsFlags"])
+        self.assertEqual(config, before)
+        self.assertFalse(Assessment.objects.exists())
 
     def test_get_does_not_create_a_submission(self):
         response = self.request(method="GET")
@@ -389,6 +535,7 @@ class AssessmentApiTests(TestCase):
              patch.object(learner_views.EnrolmentUser.all_learners, "filter") as lookup, \
              patch.object(learner_views, "save_enrolment_fields") as save:
             lookup.return_value.first.return_value = self.learner
+            lookup.return_value.values.return_value.first.return_value = {"learner_type": "apprenticeship", "programme_status": "Onboarding"}
             response = learner_views.enrolment_user_detail(request, pk=41)
         self.assertEqual(response.status_code, 409, response.content)
         self.assertFalse(save.called)
@@ -664,13 +811,14 @@ class AssessmentApiTests(TestCase):
         self.assertIsNone(row.alternative_selection_reason)
         self.assertIsNone(row.selection_confirmed_at)
 
-    def test_critical_indicator_failure_is_internal_and_does_not_block_the_score_winner(self):
+    def test_retired_critical_indicator_failure_no_longer_triggers_review(self):
         responses = answers(self.config, indices=(3,))
         responses["M03"] = []; responses["M06"] = []
         submitted = self.start(responses=responses, action="submit")
         self.assertGreater(submitted["result"]["scores"]["MM_L6"], 60)
         self.assertEqual(submitted["result"]["outcome"], "RECOMMENDED_MM_L6")
-        self.assertEqual(submitted["result"]["admissionsReviewOutcome"], "FURTHER_REVIEW_REQUIRED")
+        self.assertEqual(submitted["result"]["admissionsReviewOutcome"], "RECOMMENDED_MM_L6")
+        self.assertNotIn("MISSING_CRITICAL_LEVEL_6_EVIDENCE", submitted["result"]["admissionsFlags"])
         self.assertEqual(submitted["result"]["recommendedProgramme"], "MM_L6")
         self.assertEqual(submitted["selectedProgramme"], "MM_L6")
         self.assertEqual(submitted["completionStatus"], "SUBMITTED")
@@ -723,8 +871,8 @@ class AssessmentApiTests(TestCase):
         self.assertEqual(submitted["result"]["scores"], {"ME_L4": 52.96, "MM_L6": 80.85})
         self.assertEqual(submitted["recommendedProgramme"], "MM_L6")
         self.assertEqual(submitted["selectedProgramme"], "MM_L6")
-        self.assertEqual(submitted["result"]["admissionsReviewOutcome"], "FURTHER_REVIEW_REQUIRED")
-        self.assertIn("MISSING_CRITICAL_LEVEL_6_EVIDENCE", submitted["result"]["admissionsFlags"])
+        self.assertEqual(submitted["result"]["admissionsReviewOutcome"], "RECOMMENDED_MM_L6")
+        self.assertNotIn("MISSING_CRITICAL_LEVEL_6_EVIDENCE", submitted["result"]["admissionsFlags"])
 
     def test_ties_use_level_four_for_both_pathways(self):
         for pathway, low in [("marketing", "ME_L4"), ("project-controls", "APM_L4")]:

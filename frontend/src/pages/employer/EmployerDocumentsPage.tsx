@@ -139,8 +139,9 @@ export default function EmployerDocumentsPage() {
 
               <EmployerDocumentsTable items={items} employerId={employerId} search={search} filter={filter}
                 opening={signingActions.opening} onSign={signingActions.startSigning} onShow={signingActions.openDocument} />
-              <div className="space-y-3">{items.filter((item) => item.learner.kind === 'apprenticeship' && item.kind !== 'document').map((item) => {
+              <div className="space-y-3">{items.filter((item) => item.learner.kind === 'apprenticeship' && item.kind !== 'document' && item.kind !== 'suitability-rpl-report').map((item) => {
                 if (item.kind === 'document') return null;
+                if (item.kind === 'suitability-rpl-report') return null;
                 const key = item.kind === 'review' ? REVIEW_DOCUMENT_KEYS[item.reviewType] : item.kind === 'agreement' ? 'apprenticeship-agreement' : item.kind;
                 return key ? <div key={`${item.learner.id}-${item.kind === 'review' ? item.eventKey : item.id}`}><p className="text-sm font-semibold">{item.learner.name} · {item.label}</p><LearnerDocumentRevisions learnerId={item.learner.id} documentKey={key} sourceId={item.kind === 'review' ? item.eventKey : item.id} /></div> : null;
               })}</div>
@@ -160,6 +161,7 @@ export default function EmployerDocumentsPage() {
           onClose={signingActions.closeSigning}
           onSign={signingActions.sign}
           onSaveReviewAnswers={signingActions.saveReviewAnswers}
+          onPreviewDocument={() => signingActions.openDocument(signingActions.signing!)}
         />
       )}
     </WorkspaceShell>

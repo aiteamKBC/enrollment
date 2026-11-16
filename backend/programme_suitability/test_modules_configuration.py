@@ -63,6 +63,10 @@ class ModulesConfigurationTests(SimpleTestCase):
 
 class ModulesVersionAndAccessTests(TestCase):
     def setUp(self):
+        from learner_api.models import EnrolmentUser
+        EnrolmentUser.all_learners.bulk_create([EnrolmentUser(id=41, username="Synthetic modules learner",
+            email="modules@example.test", learner_type="apprenticeship", programme_status="Onboarding",
+            status="FullUser", onboarding_status="Not started")])
         self.factory = RequestFactory()
         self.config = validate(legacy_defaults())
         now = timezone.now()

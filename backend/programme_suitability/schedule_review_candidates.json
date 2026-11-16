@@ -1,0 +1,269 @@
+{
+  "purpose": "Documented possible title aliases, displayed tentatively; not verified qualification equivalents or approvals. No offering IDs, dates or groups are configured here.",
+  "source": "module_mapping_review.json; Phase 8 unapproved review",
+  "programme_ids": {
+    "ME_L4": "PROG-ME-L4",
+    "MM_L6": "PROG-MM-L6",
+    "APM_L4": "PROG-20260907141619067932",
+    "PCP_L6": "PROG-PCP-L6"
+  },
+  "modules": [
+    {
+      "programme": "ME_L4",
+      "pathway": null,
+      "academic_id": "marketing-impact",
+      "academic_title": "Marketing Impact and Planning",
+      "titles": [
+        "G2-Juliane– Impact &amp;Planning",
+        "Impact& Planning",
+        "Marketing Impact and Planning"
+      ]
+    },
+    {
+      "programme": "ME_L4",
+      "pathway": null,
+      "academic_id": "social-media",
+      "academic_title": "Social Media",
+      "titles": [
+        "Social Media"
+      ]
+    },
+    {
+      "programme": "ME_L4",
+      "pathway": null,
+      "academic_id": "martech",
+      "academic_title": "Marketing Technology (MarTech)",
+      "titles": [
+        "Martech",
+        "Martech - Fri",
+        "Martech - Thur"
+      ]
+    },
+    {
+      "programme": "MM_L6",
+      "pathway": null,
+      "academic_id": "marketing-strategy",
+      "academic_title": "Marketing Strategy and Planning",
+      "titles": [
+        "Marketing Strategy&Planning"
+      ]
+    },
+    {
+      "programme": "MM_L6",
+      "pathway": null,
+      "academic_id": "customer-journey",
+      "academic_title": "Customer Journey Optimisation",
+      "titles": [
+        "Customer Journey Optimisation"
+      ]
+    },
+    {
+      "programme": "MM_L6",
+      "pathway": null,
+      "academic_id": "commercial-intelligence",
+      "academic_title": "Commercial Intelligence",
+      "titles": [
+        "Commercial Intelligence"
+      ]
+    },
+    {
+      "programme": "MM_L6",
+      "pathway": null,
+      "academic_id": "ai-marketing",
+      "academic_title": "AI in Marketing",
+      "titles": [
+        "AI In Marketing"
+      ]
+    },
+    {
+      "programme": "APM_L4",
+      "pathway": null,
+      "academic_id": "pmp",
+      "academic_title": "Project Management Professional",
+      "titles": []
+    },
+    {
+      "programme": "APM_L4",
+      "pathway": null,
+      "academic_id": "ai-project-management",
+      "academic_title": "AI in Project Management",
+      "titles": []
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "operational",
+      "academic_id": "pmp",
+      "academic_title": "Project Management Professional (PMP)",
+      "titles": [
+        "Project Management Professional",
+        "Ray-Project Management Professional-June 2026"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "operational",
+      "academic_id": "ai-project-control",
+      "academic_title": "AI in Project Management/Control",
+      "titles": [
+        "AI in Project Control"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "operational",
+      "academic_id": "risk-apm",
+      "academic_title": "Risk Management (APM)",
+      "titles": [
+        "Risk Management"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "operational",
+      "academic_id": "planning-control",
+      "academic_title": "Project Planning and Control (APMG Qualification)",
+      "titles": [
+        "PPC",
+        "Steve-Project Planning and Control(PPC)"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "operational",
+      "academic_id": "earned-value",
+      "academic_title": "Earned Value Management (EVM)",
+      "titles": [
+        "EVM",
+        "Steve-Earned Value Management(EVM)"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "operational",
+      "academic_id": "pmi-sp",
+      "academic_title": "PMI-SP",
+      "titles": [
+        "PMI-SP Scheduling Professional"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "strategic",
+      "academic_id": "pmp",
+      "academic_title": "Project Management Professional (PMP)",
+      "titles": [
+        "Project Management Professional",
+        "Ray-Project Management Professional-June 2026"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "strategic",
+      "academic_id": "ai-project-control",
+      "academic_title": "AI in Project Management/Control",
+      "titles": [
+        "AI in Project Control"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "strategic",
+      "academic_id": "risk-apm",
+      "academic_title": "Risk Management (APM)",
+      "titles": [
+        "Risk Management"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "strategic",
+      "academic_id": "pmi-pmo",
+      "academic_title": "PMI (PMO)",
+      "titles": [
+        "PMI PMO"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "strategic",
+      "academic_id": "portfolio",
+      "academic_title": "Portfolio Management (APMG)",
+      "titles": [
+        "Portfolio Management",
+        "Stephen-Portfolio Management"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "strategic",
+      "academic_id": "successful-programmes",
+      "academic_title": "Managing Successful Programmes",
+      "titles": [
+        "MSP",
+        "Managing Successful Programmes: Project Controls for Transformational Change"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "chartered",
+      "academic_id": "pmo-planning-control",
+      "academic_title": "Project Planning and Control",
+      "titles": [
+        "PPC",
+        "Steve-Project Planning and Control(PPC)"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "chartered",
+      "academic_id": "pmo-stakeholders",
+      "academic_title": "Stakeholder Engagement and Communication",
+      "titles": [
+        "Stakeholder Management & Reporting"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "chartered",
+      "academic_id": "pmo-risk-quality",
+      "academic_title": "Risk, Quality and Issue Management",
+      "titles": []
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "chartered",
+      "academic_id": "pmo-office",
+      "academic_title": "Project Management Office",
+      "titles": [
+        "Ray-Project Management Office(PMO)"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "chartered",
+      "academic_id": "ai-project-management",
+      "academic_title": "AI in Project Management",
+      "titles": []
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "chartered",
+      "academic_id": "portfolio",
+      "academic_title": "Portfolio Management (APMG)",
+      "titles": [
+        "Portfolio Management",
+        "Stephen-Portfolio Management"
+      ]
+    },
+    {
+      "programme": "PCP_L6",
+      "pathway": "chartered",
+      "academic_id": "earned-value",
+      "academic_title": "Earned Value Management (APMG)",
+      "titles": [
+        "EVM",
+        "Steve-Earned Value Management(EVM)"
+      ]
+    }
+  ]
+}
