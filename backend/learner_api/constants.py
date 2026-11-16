@@ -5,6 +5,9 @@ create form; the API validates against them so bad values can't be written even 
 a client bypasses the UI.
 """
 
+# This platform has one training provider; it is not a learner-specific choice.
+MAIN_PROVIDER = "Kent Business College"
+
 STATUS_CHOICES = [
     "FullUser",
     "Invited",

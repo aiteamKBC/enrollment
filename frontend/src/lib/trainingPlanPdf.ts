@@ -29,7 +29,6 @@ export interface TrainingPlanProgramme {
   apprenticeName?: string;
   programme?: string;
   standard?: string;
-  reference?: string;
   level?: string;
   startDate?: string;
   endDate?: string;
@@ -225,7 +224,6 @@ export function buildTrainingPlanPdf(
   heading('Apprenticeship Programme Details', 12);
   row('Programme:', programme.programme ?? '');
   row('Apprenticeship Standard/Framework Name:', programme.standard ?? '');
-  row('Apprenticeship Reference:', programme.reference ?? '');
   row('Apprenticeship Level:', programme.level ?? '');
   row('Start date of apprenticeship:', fmtDate(programme.startDate));
   row('End date of apprenticeship:', fmtDate(programme.endDate));

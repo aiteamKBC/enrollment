@@ -21,11 +21,11 @@ await page.screenshot({ path: '../private/screenshots/login.png', fullPage: true
 user = { id: 1, email: 'officer@example.invalid', displayName: 'Synthetic officer', role: 'admin', subjectType: 'staff', subjectId: 1, hasPassword: true, lastLoginAt: null, permissions: [], access: 'enrolment', accesses: ['enrolment'], accessHome: '/users', accessWorkspaces: [{ access: 'enrolment', home: '/users' }] };
 await page.goto('http://127.0.0.1:4179/users');
 await page.getByRole('navigation', { name: 'Enrolment navigation' }).waitFor();
-await page.getByRole('link', { name: 'Learners & contacts' }).waitFor();
+await page.getByRole('link', { name: 'Users', exact: true }).waitFor();
 await page.screenshot({ path: '../private/screenshots/users.png', fullPage: true });
 await page.setViewportSize({ width: 390, height: 844 });
 await page.getByRole('button', { name: 'Toggle navigation' }).click();
-if (!await page.getByRole('link', { name: 'Learners & contacts' }).isVisible()) throw new Error('Mobile navigation did not open.');
+if (!await page.getByRole('link', { name: 'Users', exact: true }).isVisible()) throw new Error('Mobile navigation did not open.');
 await page.screenshot({ path: '../private/screenshots/mobile.png', fullPage: true });
 await browser.close();
 if (failures.length) throw new Error(failures.join('\n'));

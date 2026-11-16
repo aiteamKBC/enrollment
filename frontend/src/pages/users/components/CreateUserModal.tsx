@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useToast } from "@/hooks/useToast.helpers";
 import { DatePickerField } from '@/components/feature/DatePickerField';
+import { SelectMenu } from '@/components/feature/SelectField';
 import { reviewHandoverMessage } from '@/api/reviewHandover';
 import { fetchProgrammes, fetchCohorts, fetchGroups } from '@/api/curriculum';
 import { fetchCaseOwners } from '@/api/staffUsers';
@@ -13,7 +14,7 @@ import {
   STATUS_OPTIONS,
   TYPE_OPTIONS,
 } from '@/api/enrolmentUsers';
-import { listEmployers, type EmployerRow } from '@/api/employers';
+import { listEmployers, listOrganisations, type EmployerRow, type OrganisationRow } from '@/api/employers';
 import { COUNTRY_OPTIONS as ALL_COUNTRIES, DEFAULT_COUNTRY } from '@/lib/countries';
 import type { UserListRow } from '../types';
 import { Modal } from './Modal';
@@ -68,14 +69,7 @@ interface FieldDef {
    * until its parent is chosen. `caseOwner` and `employer` are independent,
    * loaded once.
    */
-  lookup?: 'programme' | 'cohort' | 'group' | 'caseOwner' | 'employer';
-  /**
-   * This field's value is filled in from another field rather than typed. Shown
-   * read-only, since editing it would just be overwritten by the next change to
-   * its source — and a value that disagrees with the employer record would be
-   * worse than no value.
-   */
-  derivedFrom?: 'employer';
+  lookup?: 'programme' | 'cohort' | 'group' | 'caseOwner' | 'employer' | 'organisation';
 }
 
 interface SectionDef {
@@ -121,6 +115,7 @@ const SECTIONS: SectionDef[] = [
       { name: 'programme', label: 'Programme', type: 'select', lookup: 'programme' },
       { name: 'cohort', label: 'Cohort', type: 'select', lookup: 'cohort' },
       { name: 'group', label: 'Group', type: 'select', lookup: 'group' },
+      { name: 'attendanceType', label: 'Attendance type', type: 'select', options: opts(ATTENDANCE_TYPE_OPTIONS) },
     ],
   },
   {
@@ -176,23 +171,9 @@ const SECTIONS: SectionDef[] = [
       // Required: the first session below is booked with this person, and a
       // learner cannot be enrolled without someone to hold it.
       { name: 'caseOwner', label: 'Case owner', type: 'select', lookup: 'caseOwner', required: true },
-      { name: 'attendanceType', label: 'Attendance type', type: 'select', options: opts(ATTENDANCE_TYPE_OPTIONS) },
-      // Picked from enrolment."Employers" — choosing one auto-fills the
-      // organisation below it from that employer's Employer Group.
-      { name: 'employer', label: 'Employer', type: 'select', lookup: 'employer' },
-      { name: 'employerAddress', label: 'Employer address', type: 'text' },
-      { name: 'lineManager', label: 'Manager', type: 'text', placeholder: 'e.g. Jane Smith' },
+      { name: 'organisationId', label: 'Organisation', type: 'select', lookup: 'organisation' },
+      { name: 'employer', label: 'Manager', type: 'select', lookup: 'employer', hint: 'Optional. Only people linked to the selected organisation appear.' },
       { name: 'mentor', label: 'Mentor', type: 'text' },
-      {
-        name: 'organization',
-        label: 'Organisation',
-        type: 'text',
-        placeholder: 'e.g. Kent Business College',
-        derivedFrom: 'employer',
-        hint: 'Filled from the selected employer’s organisation.',
-      },
-      { name: 'referenceNumber', label: 'Reference number', type: 'text', placeholder: 'refnumber' },
-      { name: 'extendedBreak', label: 'Extended break', type: 'text' },
     ],
   },
 ];
@@ -225,9 +206,9 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   const { success, error, warning } = useToast();
   const phase: 'create' | 'edit' = editing ? 'edit' : 'create';
   const [formData, setFormData] = useState<Record<string, string>>(INITIAL);
-  // Commercial is the default kind on create. When editing, the record's own
+  // Apprenticeship is the default kind on create. When editing, the record's own
   // kind replaces it once the fields load.
-  const [kind, setKind] = useState<LearnerKind>('commercial');
+  const [kind, setKind] = useState<LearnerKind>('apprenticeship');
   const [submitting, setSubmitting] = useState(false);
   // Editing starts empty and fills in, so the form must say it is still loading
   // rather than presenting blank fields as though the learner had none.
@@ -242,9 +223,17 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   // Case owners come from Staff_users (positions Caseowner / Admin) — independent
   // of the programme cascade, so loaded once alongside programmes.
   const [caseOwners, setCaseOwners] = useState<string[]>([]);
-  // Whole employer records, not just names: picking one has to read its
-  // organisation to auto-fill the Organisation field below.
+  // Manager records are filtered by the selected organisation.
   const [employers, setEmployers] = useState<EmployerRow[]>([]);
+  const [organisations, setOrganisations] = useState<OrganisationRow[]>([]);
+  const organisationNameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const org of organisations) {
+      const name = org.name.trim().replace(/\s+/g, ' ').toLowerCase();
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return counts;
+  }, [organisations]);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [staffError, setStaffError] = useState<string | null>(null);
   const [employerError, setEmployerError] = useState<string | null>(null);
@@ -258,14 +247,16 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       // Picking a new programme/cohort invalidates the levels below it.
       if (name === 'programme') { next.cohort = ''; next.group = ''; }
       if (name === 'cohort') { next.group = ''; }
-      // The employer select carries the record's id (names repeat, ids don't),
-      // so the stored employer name and the derived organisation are both looked
-      // up from it. Clearing the employer clears the organisation with it, rather
-      // than stranding a company the chosen employer has nothing to do with.
+      if (name === 'organisationId') {
+        const picked = organisations.find((org) => org.id === value);
+        next.organization = picked?.name ?? '';
+        next.employerId = '';
+        next.employer = picked?.name ?? '';
+        next.lineManager = '';
+      }
       if (name === 'employerId') {
         const picked = employers.find((e) => e.id === value);
-        next.employer = picked?.name ?? '';
-        next.organization = picked ? picked.employerGroupNames.join(', ') : '';
+        next.lineManager = picked?.name ?? '';
       }
       return next;
     });
@@ -312,6 +303,9 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
     listEmployers()
       .then((res) => { if (!cancelled) setEmployers(res.results); })
       .catch((e: Error) => { if (!cancelled) setEmployerError(e.message); });
+    listOrganisations()
+      .then((res) => { if (!cancelled) setOrganisations(res.results); })
+      .catch((e: Error) => { if (!cancelled) setEmployerError(e.message); });
     return () => { cancelled = true; };
   }, []);
 
@@ -338,13 +332,8 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
     return () => { cancelled = true; };
   }, [programme, cohort]);
 
-  /**
-   * Options + disabled state for a database-backed field.
-   *
-   * `employer` is absent on purpose: its options are id/label pairs rather than
-   * plain strings, so renderField handles that select directly.
-   */
-  const lookupState = (level: Exclude<NonNullable<FieldDef['lookup']>, 'employer'>) => {
+  /** Options + disabled state for a database-backed programme/staff field. */
+  const lookupState = (level: Exclude<NonNullable<FieldDef['lookup']>, 'employer' | 'organisation'>) => {
     if (level === 'programme') return { values: programmes, disabled: false, waitingFor: '', empty: 'None available' };
     if (level === 'cohort') return { values: cohorts, disabled: !programme, waitingFor: 'programme', empty: 'None available' };
     if (level === 'group') return { values: groups, disabled: !cohort, waitingFor: 'cohort', empty: 'None available' };
@@ -360,6 +349,10 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (!editing && !formData.organisationId) {
+      error('Missing organisation', 'Choose the employing organisation before creating the learner.');
+      return;
+    }
     const missing = visibleFields(kind, phase).filter((f) => f.required && !formData[f.name]?.trim());
     if (missing.length > 0) {
       error('Missing details', `Please complete: ${missing.map((f) => f.label).join(', ')}`);
@@ -407,11 +400,10 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       cohort: formData.cohort,
       group: formData.group,
       employer: formData.employer,
-      // The employer's record id, alongside the display name above: the name is
-      // what listings show, this is what reaches the rest of that employer's
-      // data. Empty string -> null so "no employer" clears the reference rather
-      // than failing the unknown-id check.
+      // Company and manager are separate: the company comes from organisationId,
+      // and employerId identifies a person only when one is assigned.
       employerId: formData.employerId ? Number(formData.employerId) : null,
+      organisationId: formData.organisationId ? Number(formData.organisationId) : null,
       lineManager: formData.lineManager,
       organization: formData.organization,
       title: formData.title,
@@ -427,8 +419,6 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       caseOwner: formData.caseOwner,
       employerAddress: formData.employerAddress,
       mentor: formData.mentor,
-      referenceNumber: formData.referenceNumber,
-      extendedBreak: formData.extendedBreak,
       // Optional: "Select…" is sent as null, which clears it on edit and leaves
       // it unset on create.
       attendanceType: formData.attendanceType || null,
@@ -544,41 +534,46 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
           {field.required ? <span className="text-red-500 ml-0.5">*</span> : <span className="text-foreground-300 ml-1">(O)</span>}
         </label>
         <div className="min-w-0">
-          {field.lookup === 'employer' ? (
-            /* Keyed on the record id, not the name: two employers can share a
-               name, and picking the wrong record would auto-fill the wrong
-               organisation. `employer` itself still stores the name, which is
-               what the learner column holds. */
+          {field.lookup === 'organisation' ? (
+            <SelectMenu
+              id={`cu-${field.name}`}
+              ariaLabel={field.label}
+              value={formData.organisationId ?? ''}
+              onChange={(selected) => setField('organisationId', selected)}
+              options={organisations.map((org) => ({
+                value: org.id,
+                label: org.postCode && (organisationNameCounts.get(org.name.trim().replace(/\s+/g, ' ').toLowerCase()) ?? 0) > 1
+                  ? `${org.name} — ${org.postCode}` : org.name,
+              }))}
+              placeholder={employerError ? 'Could not load organisations' : 'Select organisation…'}
+              searchable
+              searchPlaceholder="Search organisations"
+              emptyMessage="No organisations match your search"
+              size="sm"
+              triggerClassName="!h-[38px] [&>span:first-of-type]:!text-[13px]"
+            />
+          ) : field.lookup === 'employer' ? (
+            /* Keyed on the manager record id; names can repeat. */
             <select
               id={`cu-${field.name}`}
               value={formData.employerId ?? ''}
+              disabled={!formData.organisationId}
               onChange={(e) => setField('employerId', e.target.value)}
               className={`${inputClass} cursor-pointer`}
             >
               <option value="">
-                {employerError
+                {!formData.organisationId ? 'Select organisation first…' : employerError
                   ? 'Could not load employers — see below'
-                  : employers.length === 0
-                    ? 'No employers — create an employer profile first'
+                  : employers.filter((e) => e.employerGroupIds.includes(formData.organisationId ?? '')).length === 0
+                    ? 'No managers linked to this organisation'
                     : 'Select…'}
               </option>
-              {employers.map((e) => (
+              {employers.filter((e) => e.employerGroupIds.includes(formData.organisationId ?? '')).map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.employerGroupNames.length ? `${e.name} — ${e.employerGroupNames.join(', ')}` : e.name}
                 </option>
               ))}
             </select>
-          ) : field.derivedFrom ? (
-            /* Read-only: it mirrors the employer's organisation, so a typed value
-               would be silently replaced on the next employer change. */
-            <input
-              id={`cu-${field.name}`}
-              type="text"
-              value={value}
-              readOnly
-              placeholder={formData.employerId ? '—' : 'Select an employer first…'}
-              className={`${inputClass} bg-background-100/60 text-foreground-600 cursor-not-allowed`}
-            />
           ) : field.lookup ? (
             (() => {
               const { values, disabled, waitingFor, empty } = lookupState(field.lookup);

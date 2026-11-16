@@ -82,8 +82,6 @@ FORM_COLUMNS = [
     ("Line_manager", "text"),
     ("Mentor", "text"),
     ("Orgnization", "text"),             # source spelling, kept for continuity
-    ("Reference_number", "text"),
-    ("Extended_break", "text"),
     # -- stamped by the form on submit rather than shown as a field --
     ("Type", "text"),                    # always 'User' from this form
     (" Status", "text"),                 # NB leading space; always 'FullUser'

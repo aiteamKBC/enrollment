@@ -16,7 +16,7 @@ from django.db import connection
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from learner_api import apprenticeship_agreement as aa, ilr_document as ilr, training_plan_document as tp, written_agreement as wa, review_form
-from learner_api.models import EnrolmentUser, Employer, RplReviewDetail, EnrolmentReview
+from learner_api.models import EnrolmentUser, Employer, Organisation, RplReviewDetail, EnrolmentReview
 from enrolment_api.models import WizardPersonalDetails, WizardIlrLearnerDetails, WizardPlr, WizardPlrRecord, WizardKsbAssessment, WizardSkillsRadar, ExtendedIlr
 from curriculum_api.models import ModuleAuthoringModule, ModuleAuthoringWeek, ModuleAuthoringComponent
 from . import service, preview, revisions
@@ -49,9 +49,14 @@ class LearnerBindingAuditTests(TestCase):
         if connection.vendor != 'sqlite' or connection.settings_dict['NAME'] != ':memory:':
             raise RuntimeError('Binding audit requires isolated in-memory SQLite.')
         with connection.schema_editor() as editor:
-            for model in (Employer, WizardPersonalDetails, WizardIlrLearnerDetails, WizardPlr, WizardPlrRecord,
+            for model in (Organisation, Employer, WizardPersonalDetails, WizardIlrLearnerDetails, WizardPlr, WizardPlrRecord,
                           WizardKsbAssessment, WizardSkillsRadar, RplReviewDetail,
                           ModuleAuthoringModule, ModuleAuthoringWeek, ModuleAuthoringComponent):
+                schema, table = model._meta.db_table.split('"."')
+                with connection.cursor() as cursor:
+                    cursor.execute(f"SELECT 1 FROM {schema}.sqlite_master WHERE type='table' AND name=%s", [table])
+                    if cursor.fetchone():
+                        continue
                 constraints=[f for f in model._meta.fields if getattr(f,'db_constraint',False)]
                 for field in constraints:field.db_constraint=False
                 try:editor.create_model(model)
@@ -91,7 +96,8 @@ class LearnerBindingAuditTests(TestCase):
         self.stack.enter_context(patch('learner_api.curriculum.ksb_profile_for_programme',side_effect=lambda programme:({'label':programme},[{'id':'K1','title':'Audited workplace knowledge','kind':'knowledge','theme':'Knowledge','codes':['K1']}])) )
         self.people=[]
         for tag, programme in [('A','ME_L4'),('B','APM_L4')]:
-            employer=Employer.objects.create(first_name=f'AUDIT_{tag}_EMPLOYER',surname='Contact',address_1=f'AUDIT_{tag}_WORKPLACE',post_code=f'{tag}1 1AA')
+            organisation=Organisation.objects.create(name=f'AUDIT_{tag}_COMPANY',address_1=f'AUDIT_{tag}_WORKPLACE',post_code=f'{tag}1 1AA')
+            employer=Employer.objects.create(first_name=f'AUDIT_{tag}_EMPLOYER',surname='Contact',employer_group_ids=[organisation.pk])
             learner=EnrolmentUser.all_learners.create(username=f'AUDIT_{tag}_LEARNER',email=f'{tag.lower()}@audit.invalid',phone_number=f'0700000000{1 if tag=="A" else 2}',
                 employer_id=employer.pk,employer=f'AUDIT_{tag}_COMPANY',line_manager=f'AUDIT_{tag}_MANAGER',
                 programme=PROGRAMMES[programme],cohort=f'AUDIT_{tag}_COHORT',group=f'AUDIT_{tag}_GROUP',

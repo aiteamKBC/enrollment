@@ -40,7 +40,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
     ...(!commercial ? [['/learner/onboarding', 'My enrolment'], ['/learner/onboarding/reviews', 'Reviews'], ['/learner/compliance-documents', 'Compliance documents']] : []),
     ['/learner/first-session', 'First learning session'], ['/lms?self=1', 'Continue to LMS'],
   ] : employer ? [[`/employers/${auth.account?.subjectId}/documents`, 'Documents to sign']] : [
-    ['/users', 'Learners & contacts'], ['/users/coach-directory', 'Coach directory'], ['/users/first-sessions', 'First-session bookings'],
+    ['/users', 'Users'], ['/users/coach-directory', 'Coach directory'], ['/users/first-sessions', 'First-session bookings'],
     ['/users/eligibility-applications', 'Eligibility applications'], ['/users/eligibility-builder', 'Eligibility form builder'], ['/users/wizard-builder', 'Enrolment form builder'],
     ...(auth.account?.role === 'admin' ? [['/admin/suitability-rpl-report', 'Report templates']] : []),
     ...((isAdmin || auth.account?.role === 'admin') ? [['/users/programme-structure', 'Programme Structure']] : []),

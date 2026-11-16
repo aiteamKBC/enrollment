@@ -59,11 +59,11 @@ function employerToRow(e: EmployerRow): DirectoryRow {
 
 const EMPTY_FILTER: UsersFilter = {
   userName: '', groups: [], email: '', statuses: [], type: 'all', programme: '', cohort: '',
-  programmeStatus: '', niNumber: '', caseOwner: 'any', referenceNumber: '', attendanceMode: '', page: 1, pageSize: PAGE_SIZE,
+  programmeStatus: '', niNumber: '', caseOwner: 'any', attendanceMode: '', page: 1, pageSize: PAGE_SIZE,
 };
 const DIRECTORY_QUERY_DEFAULTS = {
   search: '', summary: 'all', page: 1, name: '', email: '', groups: '', statuses: '',
-  type: 'all', programme: '', cohort: '', programmeStatus: '', caseOwner: 'any', reference: '', attendanceMode: '',
+  type: 'all', programme: '', cohort: '', programmeStatus: '', caseOwner: 'any', attendanceMode: '',
 };
 const encodeFilterList = (values?: string[]) => (values || []).join('~');
 const decodeFilterList = (value: string) => value ? value.split('~').filter(Boolean) : [];
@@ -187,9 +187,9 @@ export default function UsersListPage() {
     groups: decodeFilterList(String(query.groups)), statuses: decodeFilterList(String(query.statuses)),
     type: String(query.type) as UsersFilter['type'], programme: String(query.programme),
     cohort: String(query.cohort), programmeStatus: String(query.programmeStatus),
-    caseOwner: String(query.caseOwner), referenceNumber: String(query.reference),
+    caseOwner: String(query.caseOwner),
     attendanceMode: String(query.attendanceMode) as UsersFilter['attendanceMode'],
-  }), [query.attendanceMode, query.caseOwner, query.cohort, query.email, query.groups, query.name, query.programme, query.programmeStatus, query.reference, query.statuses, query.type]);
+  }), [query.attendanceMode, query.caseOwner, query.cohort, query.email, query.groups, query.name, query.programme, query.programmeStatus, query.statuses, query.type]);
   const [draft, setDraft] = useState<UsersFilter>(applied);
   const quickSearch = String(query.search);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -199,7 +199,6 @@ export default function UsersListPage() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [createAdminOpen, setCreateAdminOpen] = useState(false);
-  const [createTutorOpen, setCreateTutorOpen] = useState(false);
   const [createEmployerOpen, setCreateEmployerOpen] = useState(false);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
   const createRef = useRef<HTMLDivElement>(null);
@@ -426,7 +425,7 @@ export default function UsersListPage() {
     name: draft.userName || '', email: draft.email || '', groups: encodeFilterList(draft.groups),
     statuses: encodeFilterList(draft.statuses), type: draft.type || 'all', programme: draft.programme || '',
     cohort: draft.cohort || '', programmeStatus: draft.programmeStatus || '',
-    caseOwner: draft.caseOwner || 'any', reference: draft.referenceNumber || '',
+    caseOwner: draft.caseOwner || 'any',
     attendanceMode: draft.attendanceMode || '',
   }, { resetPage: true });
   const updateQuickSearch = (value: string) => setQueryValues({ search: value }, { resetPage: true });
@@ -528,8 +527,7 @@ export default function UsersListPage() {
                   className="fixed z-[200] w-56 rounded-xl border border-foreground-200 bg-background-50 py-1.5 shadow-xl"
                 >
                   <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateModalOpen(true); }}><AppIcon className="ri-user-add-line mr-2 text-foreground-400" />Create user</button>
-                  <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateAdminOpen(true); }}><AppIcon className="ri-shield-user-line mr-2 text-foreground-400" />Create admin</button>
-                  <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateTutorOpen(true); }}><AppIcon className="ri-presentation-line mr-2 text-foreground-400" />Create tutor</button>
+                  {isAdmin && <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateAdminOpen(true); }}><AppIcon className="ri-shield-user-line mr-2 text-foreground-400" />Create admin</button>}
                   <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateEmployerOpen(true); }}><AppIcon className="ri-briefcase-line mr-2 text-foreground-400" />Create employer profile</button>
                   <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateOrgOpen(true); }}><AppIcon className="ri-building-line mr-2 text-foreground-400" />Create organisation profile</button>
                 </div>,
@@ -595,7 +593,6 @@ export default function UsersListPage() {
             <SelectFilter label="Programme status" value={draft.programmeStatus ?? ''} onChange={(v) => set({ programmeStatus: v })} options={[{ value: '', label: '--All--' }, ...PROGRAMME_STATUS_OPTIONS.map((s) => ({ value: s, label: s }))]} />
             <TextFilter label="NI number" value={draft.niNumber ?? ''} onChange={(v) => set({ niNumber: v })} />
             <SelectFilter label="Case owner" value={draft.caseOwner ?? 'any'} onChange={(v) => set({ caseOwner: v })} options={[{ value: 'any', label: 'Any' }, ...caseOwnerOptions.map((c) => ({ value: c, label: c }))]} />
-            <TextFilter label="Reference number" value={draft.referenceNumber ?? ''} onChange={(v) => set({ referenceNumber: v })} />
             <SelectFilter label="Attendance mode" value={draft.attendanceMode ?? ''} onChange={(v) => set({ attendanceMode: v as UsersFilter['attendanceMode'] })} options={[{ value: '', label: '--All--' }, { value: 'live', label: 'Live Sessions' }, { value: 'lazy', label: 'Recorded' }]} />
           </div>
           <div className="mt-5 flex items-center justify-end gap-4 lg:col-span-4">
@@ -855,8 +852,7 @@ export default function UsersListPage() {
       {createModalOpen && <CreateUserModal onClose={() => setCreateModalOpen(false)} onCreated={load} />}
       {importModalOpen && <ImportLearnersModal onClose={() => setImportModalOpen(false)} onImported={applyLearnerImport} />}
       {bulkOpen && <BulkAttendanceModeModal rows={rows} onClose={() => { setBulkOpen(false); loadAttendanceModes(); }} />}
-      {createAdminOpen && <CreateStaffModal variant="admin" onClose={() => setCreateAdminOpen(false)} onCreated={load} />}
-      {createTutorOpen && <CreateStaffModal variant="tutor" onClose={() => setCreateTutorOpen(false)} onCreated={load} />}
+      {createAdminOpen && <CreateStaffModal onClose={() => setCreateAdminOpen(false)} onCreated={load} />}
       {editStaff && <EditStaffModal row={editStaff} onClose={() => setEditStaff(null)} onSaved={applyStaffUpdate} />}
       {/* The create form again, in edit mode — one form per record, so the
           fields cannot drift apart between adding a learner and correcting one. */}
