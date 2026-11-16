@@ -206,9 +206,9 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   const { success, error, warning } = useToast();
   const phase: 'create' | 'edit' = editing ? 'edit' : 'create';
   const [formData, setFormData] = useState<Record<string, string>>(INITIAL);
-  // Commercial is the default kind on create. When editing, the record's own
+  // Apprenticeship is the default kind on create. When editing, the record's own
   // kind replaces it once the fields load.
-  const [kind, setKind] = useState<LearnerKind>('commercial');
+  const [kind, setKind] = useState<LearnerKind>('apprenticeship');
   const [submitting, setSubmitting] = useState(false);
   // Editing starts empty and fills in, so the form must say it is still loading
   // rather than presenting blank fields as though the learner had none.
