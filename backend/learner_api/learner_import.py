@@ -45,13 +45,9 @@ COLUMNS = (
     ("First session date", "firstSessionDate"),
     ("First session time", "firstSessionTime"),
 )
-# Older downloaded templates may contain these columns. Accept their headings
-# but ignore their values; new templates no longer offer these retired fields.
+# Older downloaded templates may contain these retired fields. Accept their
+# headings but ignore their values; new templates no longer offer them.
 LEGACY_IGNORED_COLUMNS = (
-    ("Learning provider", "learningProvider"),
-    ("Referrer", "referrer"),
-    ("Referrer address", "referrerAddress"),
-    ("Referrer contact", "referrerContact"),
     ("Reference number", "referenceNumber"),
     ("Extended break", "extendedBreak"),
 )

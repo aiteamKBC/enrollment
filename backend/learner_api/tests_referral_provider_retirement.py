@@ -1,4 +1,4 @@
-"""Retired learner fields cannot be written, including by older import files."""
+"""Retired learner fields cannot be written or imported."""
 
 from io import BytesIO
 
@@ -8,9 +8,16 @@ from openpyxl import Workbook
 
 from .learner_import import COLUMNS, read_students
 from .mappers import write_fields, write_staff_fields
+from .models import EnrolmentUser, StaffUser
 
 
 class RetiredLearnerFieldsTests(SimpleTestCase):
+    def test_login_subject_models_do_not_select_retired_columns(self):
+        learner_columns = {field.column for field in EnrolmentUser._meta.concrete_fields}
+        staff_columns = {field.column for field in StaffUser._meta.concrete_fields}
+        self.assertFalse({"Referrer", "Referrer_address", "Referrer_contact", "Learning_provider"} & learner_columns)
+        self.assertNotIn("Learning_provider", staff_columns)
+
     def test_old_payload_fields_are_ignored(self):
         old_fields = {
             "referrer": "Old source",
@@ -23,7 +30,7 @@ class RetiredLearnerFieldsTests(SimpleTestCase):
         self.assertEqual(write_fields(old_fields), {})
         self.assertEqual(write_staff_fields({"learningProvider": "Another provider"}), {})
 
-    def test_old_import_headings_are_accepted_but_not_saved(self):
+    def test_retired_import_headings_are_rejected(self):
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "Students"
@@ -35,8 +42,10 @@ class RetiredLearnerFieldsTests(SimpleTestCase):
 
         students, errors = read_students(upload)
 
-        self.assertEqual(errors, [])
-        self.assertEqual(students, [(2, {"firstName": "New", "surname": "Learner", "email": "new@example.invalid", "caseOwner": "Coach", "firstSessionDate": "2030-01-01"})])
+        self.assertEqual(students, [])
+        self.assertEqual(len(errors), 4)
+        self.assertTrue(all("Unknown column" in issue["message"] for issue in errors))
         self.assertNotIn(("Learning provider", "learningProvider"), COLUMNS)
+        self.assertNotIn(("Referrer", "referrer"), COLUMNS)
         self.assertNotIn(("Reference number", "referenceNumber"), COLUMNS)
         self.assertNotIn(("Extended break", "extendedBreak"), COLUMNS)
