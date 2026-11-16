@@ -79,7 +79,7 @@ def register_enrolment_records():
             'learner_type', 'status', 'type', 'programme_status',
             'programme', 'cohort', 'group', 'target_programme', 'sub_programme',
             # who looks after them
-            'coach_name', 'coach_email', 'mentor', 'case_owner', 'learning_provider',
+            'coach_name', 'coach_email', 'mentor', 'case_owner',
             # who they work for
             'employer', 'employer_id', 'organization', 'line_manager',
             # the dates and hours the funding rests on
@@ -94,13 +94,11 @@ def register_enrolment_records():
             # below so the value is not
             'date_of_birth', 'phone_number', 'address', 'current_postcode',
             'national_insurance_number', 'legal_sex', 'gender', 'age',
-            'referrer', 'referrer_address', 'referrer_contact',
             'employer_address', 'contacts',
         ),
         redact=(
             'date_of_birth', 'phone_number', 'address', 'current_postcode',
             'national_insurance_number', 'legal_sex', 'gender', 'age',
-            'referrer', 'referrer_address', 'referrer_contact',
             'employer_address', 'contacts',
         ),
     )
@@ -131,7 +129,7 @@ def register_enrolment_records():
             # The permission level. The single most audit-worthy field in the
             # LMS: it is the answer to "who gave them that access, and when?".
             'access', 'access_extra',
-            'organization', 'case_owner', 'learning_provider', 'reference_number',
+            'organization', 'case_owner', 'reference_number',
             'invite_to_platform', 'allow_access_to_checkpoint',
             'allow_access_to_console', 'allow_access_to_classic',
             'created_at', 'updated_at',

@@ -64,10 +64,6 @@ FORM_COLUMNS = [
     ("Phone_number", "text"),
     ("Date_of_birth", "text"),
     ("National_insurance_number", "text"),
-    # -- referral --
-    ("Referrer", "text"),
-    ("Referrer_address", "text"),
-    ("Referrer_contact", "text"),
     # -- programme (live curriculum cascade) --
     ("Programme", "text"),
     ("Cohort", "text"),
@@ -81,7 +77,6 @@ FORM_COLUMNS = [
     ("Country", "text"),
     # -- delivery & employer --
     ("Case_owner", "text"),
-    ("Learning_provider", "text"),
     ("Employer", "text"),
     ("Employer_address", "text"),
     ("Line_manager", "text"),

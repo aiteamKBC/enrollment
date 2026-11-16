@@ -36,10 +36,9 @@ COLUMNS = (
     ("Title", "title"), ("Gender", "gender"), ("National Insurance number", "niNumber"),
     ("Postcode", "postcode"), ("Address 1", "addressLine1"), ("Address 2", "addressLine2"),
     ("Town/City", "townCity"), ("County", "county"), ("Country", "country"),
-    ("Learning provider", "learningProvider"), ("Manager", "lineManager"),
+    ("Manager", "lineManager"),
     ("Mentor", "mentor"), ("Reference number", "referenceNumber"),
-    ("Referrer", "referrer"), ("Referrer address", "referrerAddress"),
-    ("Referrer contact", "referrerContact"), ("Employer address", "employerAddress"),
+    ("Employer address", "employerAddress"),
     ("Extended break", "extendedBreak"),
     # The first session is booked as part of enrolment, with the case owner, so
     # an imported learner arrives with one exactly as a form-created learner
@@ -332,7 +331,6 @@ def validate_students(students, references):
         payload.update(username=" ".join(filter(None, [payload.get("firstName"), payload.get("surname")])),
                        email=email, learnerType="commercial", type="User", status="FullUser")
         payload.setdefault("country", "United Kingdom")
-        payload.setdefault("learningProvider", "Kent Business College")
         preview.append({"row": row_number, "name": payload["username"], "email": email,
                         **{field: payload.get(field, "") for field in ("programme", "cohort", "group")}})
         try:
@@ -382,7 +380,7 @@ def template_workbook(references):
         ("6", "Optional Employer ID and Case owner must match the Employers and Case owners sheets. Organisation follows the employer."),
         ("7", "Upload for preview, correct any listed errors, then import. If any row is invalid, no students are saved."),
         ("8", "Existing learner or platform-account emails and repeated emails are rejected. Existing records are never updated."),
-        ("9", "New students are commercial learners (Type User, subscription FullUser). Country defaults to United Kingdom and provider to Kent Business College."),
+        ("9", "New students are commercial learners (Type User, subscription FullUser). Country defaults to United Kingdom."),
         ("10", "Cohort dates and the case owner's coach details follow the normal Add user flow. Accounts are created without sending emails; send invitations from Accounts when ready."),
     ])
     workbook["Instructions"].column_dimensions["B"].width = 135

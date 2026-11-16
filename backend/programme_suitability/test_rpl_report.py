@@ -144,8 +144,12 @@ class SuitabilityRplPersistenceTests(TestCase):
         with self.assertRaisesMessage(ReportInputError, 'finalised and immutable'):
             self.save(self.context_a, base_payload(revision=finalised.revision))
 
-        version_two = self.save(self.context_a, base_payload(newVersion=True))
+        version_two = self.save(self.context_a, base_payload(newVersion=True, amendmentReason='Reassess the RPL decision after new evidence.'))
         self.assertEqual(version_two.report_version, 2)
+        self.assertEqual(version_two.parent_report_id, finalised.pk)
+        self.assertEqual(version_two.amendment_reason, 'Reassess the RPL decision after new evidence.')
+        self.assertIsNone(version_two.suitability_reviewed_at)
+        self.assertIsNone(version_two.rpl_reviewed_at)
         self.assertEqual(finalised.source_snapshot_hash, source_snapshot_hash(finalised))
 
     def test_editing_a_justification_clears_previous_approval_until_reapproved(self):

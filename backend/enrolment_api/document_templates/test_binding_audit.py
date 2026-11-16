@@ -93,7 +93,7 @@ class LearnerBindingAuditTests(TestCase):
         for tag, programme in [('A','ME_L4'),('B','APM_L4')]:
             employer=Employer.objects.create(first_name=f'AUDIT_{tag}_EMPLOYER',surname='Contact',address_1=f'AUDIT_{tag}_WORKPLACE',post_code=f'{tag}1 1AA')
             learner=EnrolmentUser.all_learners.create(username=f'AUDIT_{tag}_LEARNER',email=f'{tag.lower()}@audit.invalid',phone_number=f'0700000000{1 if tag=="A" else 2}',
-                employer_id=employer.pk,employer=f'AUDIT_{tag}_COMPANY',line_manager=f'AUDIT_{tag}_MANAGER',learning_provider=f'AUDIT_{tag}_PROVIDER',
+                employer_id=employer.pk,employer=f'AUDIT_{tag}_COMPANY',line_manager=f'AUDIT_{tag}_MANAGER',
                 programme=PROGRAMMES[programme],cohort=f'AUDIT_{tag}_COHORT',group=f'AUDIT_{tag}_GROUP',
                 start_date=date(2030,1,1),end_date=date(2033,1,1),learner_start_date='2030-02-01' if tag=='A' else '2031-03-01',
                 learner_end_date='2032-02-01' if tag=='A' else '2033-03-01',address_line_1=f'AUDIT_{tag}_HOME',address_line_2=f'AUDIT_{tag}_STREET',address_line_3=f'AUDIT_{tag}_TOWN',address_line_4=f'AUDIT_{tag}_COUNTY',current_postcode=f'{tag}2 2BB',national_insurance_number=f'{tag}{tag}123456C',

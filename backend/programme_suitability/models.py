@@ -78,6 +78,8 @@ class SuitabilityRplReport(models.Model):
     report_reference = models.CharField(max_length=100, unique=True)
     report_version = models.PositiveIntegerField(default=1)
     revision = models.PositiveIntegerField(default=1)
+    parent_report = models.ForeignKey('self', null=True, blank=True, on_delete=models.PROTECT, related_name='amended_versions')
+    amendment_reason = models.TextField(blank=True)
 
     relevant_prior_learning = models.BooleanField(null=True, blank=True)
     reduction_justified = models.BooleanField(null=True, blank=True)

@@ -16,7 +16,7 @@ import { inputClass, btnPrimary, btnSecondary } from './ui';
 // Staff_users columns the create form writes.
 //
 // Only changed fields are sent: a PATCH of every field would rewrite columns
-// this form doesn't show (case owner, learning provider, reference number)
+// this form doesn't show (case owner, reference number)
 // with whatever the row happened to load with.
 // ============================================================================
 
