@@ -26,7 +26,12 @@ const api = vi.hoisted(() => ({
   updateEnrolmentUser: vi.fn(),
   deleteEnrolmentUser: vi.fn(),
   finishEnrolment: vi.fn(),
+  updateFunctionalSkillsStatus: vi.fn(),
   uploadEnrolmentDocument: vi.fn(),
+  fetchEvidence: vi.fn(async () => []),
+  uploadEvidence: vi.fn(),
+  getEvidenceDownloadUrl: vi.fn(),
+  deleteEvidence: vi.fn(),
 }));
 vi.mock('@/api/enrolmentUsers', async (original) => ({
   ...(await original<typeof import('@/api/enrolmentUsers')>()),
@@ -34,8 +39,16 @@ vi.mock('@/api/enrolmentUsers', async (original) => ({
   updateEnrolmentUser: api.updateEnrolmentUser,
   deleteEnrolmentUser: api.deleteEnrolmentUser,
   finishEnrolment: api.finishEnrolment,
+  updateFunctionalSkillsStatus: api.updateFunctionalSkillsStatus,
 }));
 vi.mock('@/api/commercialUsers', () => ({ fetchCommercialBoard: api.fetchCommercialBoard }));
+vi.mock('@/api/evidence', async (original) => ({
+  ...(await original<typeof import('@/api/evidence')>()),
+  fetchEvidence: api.fetchEvidence,
+  uploadEvidence: api.uploadEvidence,
+  getEvidenceDownloadUrl: api.getEvidenceDownloadUrl,
+  deleteEvidence: api.deleteEvidence,
+}));
 vi.mock('@/api/enrolmentDocuments', async (original) => ({
   ...(await original<typeof import('@/api/enrolmentDocuments')>()),
   fetchEnrolmentDocuments: vi.fn(async () => []),
@@ -152,6 +165,7 @@ beforeEach(() => {
   });
   api.fetchEnrolmentBoard.mockResolvedValue(makeBoard());
   api.fetchCommercialBoard.mockResolvedValue(makeBoard());
+  api.fetchEvidence.mockResolvedValue([]);
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 
@@ -185,16 +199,34 @@ describe('the enrolment board', () => {
     renderBoard();
     expect(await screen.findByRole('heading', { name: 'Sam Example' })).toBeInTheDocument();
     expect(tab(/Overview/)).toHaveAttribute('aria-selected', 'true');
-    for (const name of ['Contact details', 'Programme', 'Contacts', "In the learner's own words", 'Danger zone']) {
+    for (const name of ['Contact details', 'Programme', 'Contacts', 'Functional Skills']) {
       expect(screen.getByRole('region', { name })).toBeInTheDocument();
     }
-    expect(screen.getByText('Marketing manager in two years')).toBeInTheDocument();
+    expect(screen.getByText('English')).toBeInTheDocument();
+    expect(screen.getByText('Maths')).toBeInTheDocument();
+    expect(screen.getAllByText('No assessments recorded')).toHaveLength(2);
     // Hard-coded, always-empty or dead: gone.
     for (const gone of [/Activity Summary/i, /Course progress/i, /Audit trail/i, /mandate/i, /add new note/i, /add contact/i, /Previous programmes/i, /Number of logins/i]) {
       expect(screen.queryByText(gone)).not.toBeInTheDocument();
     }
     // Subscription status alone is the learner's record status, not subscription data.
     expect(screen.queryByRole('region', { name: 'Subscription' })).not.toBeInTheDocument();
+  });
+
+  it('renders saved BKSB result levels and assessment dates in the Overview', async () => {
+    api.fetchEnrolmentBoard.mockResolvedValue(makeBoard({
+      functionalSkills: {
+        english: { assessments: [{ id: 'b1', name: 'English', level: 'Level 2', result: 'Pass', date: '2026-11-01', status: 'Completed' }], exempt: false, evidence: [] },
+        maths: { assessments: [{ id: 'b2', name: 'Maths', level: 'Level 2', result: 'Pass', date: '2026-11-01', status: 'Completed' }], exempt: false, evidence: [] },
+        ict: NO_FS,
+      },
+    }));
+    renderBoard();
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    expect(within(fs).getAllByText(/Level 2/)).toHaveLength(2);
+    expect(within(fs).getAllByText(/01\/11\/2026/)).toHaveLength(2);
+    expect(within(fs).getAllByText(/Completed/)).toHaveLength(2);
+    expect(within(fs).queryByText(/2026-11-01/)).not.toBeInTheDocument();
   });
 
   it('switches tabs from the keyboard and keeps the tab in the address', async () => {
@@ -249,14 +281,55 @@ describe('the enrolment board', () => {
     }));
     renderBoard('/users/20?tab=skills');
     expect(await screen.findByRole('region', { name: 'Milestones' })).toHaveTextContent('Gateway');
+    fireEvent.click(tab(/Overview/));
     const fs = screen.getByRole('region', { name: 'Functional Skills' });
     expect(within(fs).getByText('Maths')).toBeInTheDocument();
-    expect(within(fs).getByText('Exempt')).toBeInTheDocument();
-    // Only the subject with data; read-only, no switch to flip.
-    expect(within(fs).queryByText('English')).not.toBeInTheDocument();
-    expect(within(fs).queryByRole('button')).not.toBeInTheDocument();
-    fireEvent.click(tab(/Overview/));
+    expect(within(fs).getAllByText('Exempt').length).toBeGreaterThan(0);
+    expect(within(fs).getByText('English')).toBeInTheDocument();
+    expect(within(fs).getAllByRole('combobox', { name: 'Exemption status' })).toHaveLength(2);
     expect(screen.getByRole('region', { name: 'Subscription' })).toBeInTheDocument();
+  });
+
+  it('keeps status changes local until Save changes and restores them with Cancel', async () => {
+    renderBoard();
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    const statuses = within(fs).getAllByRole('combobox', { name: 'Exemption status' });
+    fireEvent.change(statuses[0], { target: { value: 'EXEMPT' } });
+    expect(api.updateFunctionalSkillsStatus).not.toHaveBeenCalled();
+    expect(within(fs).getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+    fireEvent.click(within(fs).getByRole('button', { name: 'Cancel' }));
+    expect(statuses[0]).toHaveValue('NOT_EXEMPT');
+    expect(within(fs).queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+  });
+
+  it('uploads draft evidence without automatically saving the selected status', async () => {
+    const evidence = { id: 'e6', filename: 'maths-certificate.pdf', contentType: 'application/pdf', sizeBytes: 10, status: 'approved', scanResult: 'clean', sectionRef: 'functional-skills:english', uploadedAt: '2026-11-03T12:00:00Z', trainingPlanDetails: null };
+    let englishFetches = 0;
+    api.fetchEvidence.mockImplementation(async (_kind, _id, opts) => opts?.sectionRef === 'functional-skills:english' && englishFetches++ > 0 ? [evidence] : []);
+    api.uploadEvidence.mockResolvedValue({ id: 'e6', status: 'approved', scanResult: 'clean', filename: evidence.filename, sectionRef: evidence.sectionRef });
+    renderBoard();
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    const status = within(fs).getAllByRole('combobox', { name: 'Exemption status' })[0];
+    fireEvent.change(status, { target: { value: 'EXEMPT' } });
+    const file = new File(['certificate'], evidence.filename, { type: 'application/pdf' });
+    fireEvent.change(within(fs).getByLabelText('Add file'), { target: { files: [file] } });
+    await waitFor(() => expect(api.uploadEvidence).toHaveBeenCalledWith('apprenticeship', '20', file, 'functional-skills:english'));
+    expect(api.updateFunctionalSkillsStatus).not.toHaveBeenCalled();
+    expect(await within(fs).findByText(evidence.filename)).toBeInTheDocument();
+    expect(within(fs).getByRole('button', { name: 'Save changes' })).toBeEnabled();
+  });
+
+  it('preserves the draft and keeps Save changes available when status saving fails', async () => {
+    api.updateFunctionalSkillsStatus.mockRejectedValue(new Error('Status service unavailable'));
+    api.fetchEnrolmentBoard.mockResolvedValueOnce(makeBoard({ functionalSkills: { english: { assessments: [], exempt: true, status: 'EXEMPT', evidence: [] }, maths: NO_FS, ict: NO_FS } }));
+    renderBoard();
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    const status = within(fs).getAllByRole('combobox', { name: 'Exemption status' })[0];
+    fireEvent.change(status, { target: { value: 'NOT_EXEMPT' } });
+    fireEvent.click(within(fs).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(within(fs).getByText('Status service unavailable')).toBeInTheDocument());
+    expect(status).toHaveValue('NOT_EXEMPT');
+    expect(within(fs).getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
   });
 
   it('has no Documents tab for a commercial learner', async () => {
@@ -316,25 +389,88 @@ describe('the enrolment board', () => {
     expect(within(panel).queryByText(/book/i)).not.toBeInTheDocument();
   });
 
-  it('withdraws the learner after confirming', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    api.updateEnrolmentUser.mockResolvedValue({});
+  it('does not render the removed destructive actions', async () => {
     renderBoard();
-    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw from programme' }));
-    await waitFor(() => expect(api.updateEnrolmentUser).toHaveBeenCalledWith('20', { programmeStatus: 'Withdrawn' }));
-    await waitFor(() => expect(api.fetchEnrolmentBoard).toHaveBeenCalledTimes(2));
+    await screen.findByRole('heading', { name: 'Sam Example' });
+    expect(screen.queryByRole('button', { name: 'Withdraw from programme' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete user account' })).not.toBeInTheDocument();
   });
 
-  it('deletes the account only after confirming, then returns to the directory', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
-    api.deleteEnrolmentUser.mockResolvedValue(undefined);
+  it('treats an empty Functional Skills evidence response as an empty state', async () => {
     renderBoard();
-    const del = await screen.findByRole('button', { name: 'Delete user account' });
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    expect(await within(fs).findAllByText('No evidence uploaded')).toHaveLength(2);
+    expect(within(fs).queryByText('Could not load evidence.')).not.toBeInTheDocument();
+    expect(within(fs).queryByText('+ Add file')).not.toBeInTheDocument();
+  });
+
+  it('loads English and Maths evidence independently', async () => {
+    const english = { id: 'e3', filename: 'english.pdf', contentType: 'application/pdf', sizeBytes: 10, status: 'approved', scanResult: 'clean', sectionRef: 'functional-skills:english', uploadedAt: '2026-11-01T12:00:00Z', trainingPlanDetails: null };
+    const maths = { id: 'e4', filename: 'maths.pdf', contentType: 'application/pdf', sizeBytes: 10, status: 'approved', scanResult: 'clean', sectionRef: 'functional-skills:maths', uploadedAt: '2026-11-02T12:00:00Z', trainingPlanDetails: null };
+    api.fetchEvidence.mockImplementation(async (_kind, _id, opts) => opts?.sectionRef === 'functional-skills:english' ? [english] : [maths]);
+    renderBoard();
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    expect(await within(fs).findByText('english.pdf')).toBeInTheDocument();
+    expect(await within(fs).findByText('maths.pdf')).toBeInTheDocument();
+    expect(api.fetchEvidence).toHaveBeenCalledWith('apprenticeship', '20', { sectionRef: 'functional-skills:english' });
+    expect(api.fetchEvidence).toHaveBeenCalledWith('apprenticeship', '20', { sectionRef: 'functional-skills:maths' });
+  });
+
+  it('keeps existing evidence visible when a status changes to Not Exempt', async () => {
+    const english = { id: 'e5', filename: 'certificate.pdf', contentType: 'application/pdf', sizeBytes: 10, status: 'approved', scanResult: 'clean', sectionRef: 'functional-skills:english', uploadedAt: '2026-11-01T12:00:00Z', trainingPlanDetails: null };
+    api.fetchEvidence.mockImplementation(async (_kind, _id, opts) => opts?.sectionRef === 'functional-skills:english' ? [english] : []);
+    api.fetchEnrolmentBoard.mockResolvedValueOnce(makeBoard({ functionalSkills: { english: { assessments: [], exempt: true, status: 'EXEMPT', evidence: [] }, maths: NO_FS, ict: NO_FS } }));
+    api.updateFunctionalSkillsStatus.mockResolvedValue({});
+    renderBoard();
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    await within(fs).findByText('certificate.pdf');
+    const statuses = within(fs).getAllByRole('combobox', { name: 'Exemption status' });
+    fireEvent.change(statuses[0], { target: { value: 'NOT_EXEMPT' } });
+    expect(api.updateFunctionalSkillsStatus).not.toHaveBeenCalled();
+    fireEvent.click(within(fs).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(api.updateFunctionalSkillsStatus).toHaveBeenCalledWith('20', 'english', 'NOT_EXEMPT', []));
+    expect(within(fs).getByText('certificate.pdf')).toBeInTheDocument();
+    expect(within(fs).getByText('No evidence uploaded')).toBeInTheDocument();
+    expect(within(fs).getByText('Status saved.')).toBeInTheDocument();
+    expect(api.fetchEnrolmentBoard).toHaveBeenCalledTimes(1);
+  });
+
+  it('confirms and refreshes after deleting evidence under Not Exempt', async () => {
+    const evidence = { id: 'e1', filename: 'maths.pdf', contentType: 'application/pdf', sizeBytes: 10, status: 'approved', scanResult: 'clean', sectionRef: 'functional-skills:maths', uploadedAt: '2026-11-01T12:00:00Z', trainingPlanDetails: null };
+    let deleted = false;
+    api.fetchEvidence.mockImplementation(async (_kind, _id, opts) => opts?.sectionRef === 'functional-skills:maths' && !deleted ? [evidence] : []);
+    api.deleteEvidence.mockImplementation(async () => { deleted = true; });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderBoard();
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    const del = (await within(fs).findAllByRole('button', { name: 'Delete maths.pdf' }))[0];
     fireEvent.click(del);
-    expect(api.deleteEnrolmentUser).not.toHaveBeenCalled();
+    await waitFor(() => expect(api.deleteEvidence).toHaveBeenCalledWith('apprenticeship', '20', 'e1'));
+    expect(window.confirm).toHaveBeenCalledWith('Delete maths.pdf?');
+    await waitFor(() => expect(within(fs).queryByText('maths.pdf')).not.toBeInTheDocument());
+  });
+
+  it('keeps the file visible when evidence deletion fails', async () => {
+    const evidence = { id: 'e7', filename: 'keep-me.pdf', contentType: 'application/pdf', sizeBytes: 10, status: 'approved', scanResult: 'clean', sectionRef: 'functional-skills:maths', uploadedAt: '2026-11-01T12:00:00Z', trainingPlanDetails: null };
+    api.fetchEvidence.mockImplementation(async (_kind, _id, opts) => opts?.sectionRef === 'functional-skills:maths' ? [evidence] : []);
+    api.deleteEvidence.mockRejectedValue(new Error('Delete failed'));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderBoard();
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    fireEvent.click((await within(fs).findAllByRole('button', { name: 'Delete keep-me.pdf' }))[0]);
+    await waitFor(() => expect(within(fs).getByText('Delete failed')).toBeInTheDocument());
+    expect(within(fs).getByText('keep-me.pdf')).toBeInTheDocument();
+  });
+
+  it('prevents deleting the last required evidence file', async () => {
+    const evidence = { id: 'e2', filename: 'english.pdf', contentType: 'application/pdf', sizeBytes: 10, status: 'approved', scanResult: 'clean', sectionRef: 'functional-skills:english', uploadedAt: '2026-11-01T12:00:00Z', trainingPlanDetails: null };
+    api.fetchEvidence.mockResolvedValue([evidence]);
+    api.fetchEnrolmentBoard.mockResolvedValueOnce(makeBoard({ functionalSkills: { english: { assessments: [], exempt: true, status: 'EXEMPT', evidence: [] }, maths: NO_FS, ict: NO_FS } }));
+    renderBoard('/users/20');
+    const fs = await screen.findByRole('region', { name: 'Functional Skills' });
+    const del = (await within(fs).findAllByRole('button', { name: 'Delete english.pdf' }))[0];
     fireEvent.click(del);
-    await waitFor(() => expect(api.deleteEnrolmentUser).toHaveBeenCalledWith('20'));
-    expect(await screen.findByText('Users directory')).toBeInTheDocument();
-    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(api.deleteEvidence).not.toHaveBeenCalled();
+    expect(within(fs).getByText(/Change the exemption status/)).toBeInTheDocument();
   });
 });

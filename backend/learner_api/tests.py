@@ -1,4 +1,5 @@
 import json
+import inspect
 from contextlib import nullcontext
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -64,7 +65,7 @@ from .learner_detail import (
     _week_target_rows,
 )
 from .learner_progression import ACTIVE_STATUS, READY_TO_ENROL_STATUS, _as_date, advance_learner
-from .mappers import to_learner_detail
+from .mappers import to_learner_detail, _fs_block, _bksb_assessment_rows
 from .models import LearnerProfile, _progress_entry_activity, _serialise_quiz_ref
 from .reflection_submissions import get_reflection_submission
 from .time_tracking import issue_tracking_session
@@ -78,6 +79,45 @@ from .teams_attendance import (
 class LearnerQuizReferenceTests(SimpleTestCase):
     def test_serialises_numeric_quiz_reference_without_breaking_text_ids(self):
         self.assertEqual(_serialise_quiz_ref("42"), 42)
+
+
+class FunctionalSkillsMappingTests(SimpleTestCase):
+    def test_functional_skills_evidence_routes_are_wired_into_enrolment_api(self):
+        from enrollment_service.learner_api_urls import urlpatterns
+
+        names = {pattern.name for pattern in urlpatterns if pattern.name}
+        self.assertTrue({
+            "learner-evidence-upload",
+            "learner-evidence-list",
+            "learner-evidence-download",
+            "learner-evidence-delete",
+        }.issubset(names))
+
+    def test_completed_bksb_rows_are_projected_for_each_subject(self):
+        row = SimpleNamespace(pk=7, subject="english", course_name="English", result="Pass", level="Level 2", assessment_date=date(2026, 11, 1))
+        maths = SimpleNamespace(pk=8, subject="maths", course_name="Maths", result="Pass", level="Level 2", assessment_date=date(2026, 11, 1))
+        user = SimpleNamespace(pk=42, learner_type="apprenticeship")
+        queryset = MagicMock()
+        queryset.only.return_value = [row, maths]
+        with patch("enrolment_api.models.BksbInitialAssessment.objects.filter", return_value=queryset):
+            result = _bksb_assessment_rows(user)
+        self.assertEqual(result["english"][0]["level"], "Level 2")
+        self.assertEqual(result["english"][0]["date"], "2026-11-01")
+        self.assertEqual(result["maths"][0]["date"], "2026-11-01")
+
+    def test_legacy_boolean_values_map_to_compatible_statuses(self):
+        self.assertEqual(_fs_block([], True), {"assessments": [], "exempt": True, "status": "EXEMPT", "evidence": []})
+        self.assertEqual(_fs_block([], False), {"assessments": [], "exempt": False, "status": "NOT_EXEMPT", "evidence": []})
+
+    def test_new_statuses_preserve_evidence_metadata_and_boolean_compatibility(self):
+        evidence = [{"id": "file-1", "fileName": "certificate.pdf"}]
+        self.assertEqual(_fs_block([], {"status": "OPT_OUT", "exempt": False, "evidence": evidence})["status"], "OPT_OUT")
+        self.assertEqual(_fs_block([], {"status": "OPT_OUT", "exempt": False, "evidence": evidence})["exempt"], False)
+        self.assertEqual(_fs_block([], {"status": "EXEMPT", "exempt": True, "evidence": evidence})["evidence"], evidence)
+
+    def test_invalid_or_missing_status_defaults_to_not_exempt(self):
+        self.assertEqual(_fs_block([], {"status": "bogus", "exempt": True})["status"], "NOT_EXEMPT")
+        self.assertEqual(_fs_block([], None)["status"], "NOT_EXEMPT")
         self.assertEqual(_serialise_quiz_ref("quiz-42"), "quiz-42")
         self.assertIsNone(_serialise_quiz_ref(None))
 
@@ -102,6 +142,164 @@ class LearnerQuizReferenceTests(SimpleTestCase):
         self.assertEqual(annotated[1]["expectedOtjh"], 0.5)
         self.assertEqual(week_rows[0]["otjh"], 2.0)
 
+
+class FunctionalSkillsEvidenceDeletionTests(SimpleTestCase):
+    """The Functional Skills DELETE guard is deliberately tested without a shared DB."""
+
+    def _invoke(
+        self,
+        *,
+        section_ref="functional-skills:english",
+        target_status="approved",
+        approved_count=1,
+        english_status="NOT_EXEMPT",
+        maths_status="NOT_EXEMPT",
+        row_exists=True,
+    ):
+        from . import evidence
+
+        tracker = SimpleNamespace(active=False, for_update_inside_atomic=False)
+
+        class Atomic:
+            def __enter__(self):
+                tracker.active = True
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                tracker.active = False
+                return False
+
+        connection = MagicMock()
+        cursor = MagicMock()
+        cursor.__enter__.return_value = cursor
+        connection.cursor.return_value = cursor
+
+        def execute(sql, params=None):
+            if "for update" in str(sql).lower():
+                tracker.for_update_inside_atomic = tracker.active
+
+        cursor.execute.side_effect = execute
+        cursor.fetchone.side_effect = [
+            ("blob", "evidence-approved", section_ref, None, target_status) if row_exists else None,
+            {"id": "audit-row"},
+        ]
+        cursor.fetchall.return_value = [("approved",)] * approved_count
+
+        user = SimpleNamespace(
+            english_exemption={"status": english_status},
+            maths_exemption={"status": maths_status},
+        )
+        request = RequestFactory().delete("/learner_api/evidence/apprenticeship/42/file/")
+        view = inspect.unwrap(evidence.delete_evidence)
+        with (
+            patch.object(evidence, "ensure_evidence_tables"),
+            patch.object(evidence, "_conn", return_value=connection),
+            patch.object(evidence, "_is_submitted_for_marking", return_value=False),
+            patch.object(evidence, "azure_configured", return_value=False),
+            patch.object(evidence, "_record_evidence_file"),
+            patch.object(evidence.transaction, "atomic", return_value=Atomic()),
+            patch("learner_api.models.EnrolmentUser") as enrolment_user,
+        ):
+            enrolment_user.all_learners.using.return_value.select_for_update.return_value.filter.return_value.first.return_value = user
+            response = view(request, "apprenticeship", 42, "file-id")
+        return response, cursor, tracker
+
+    def test_rejects_deleting_last_approved_evidence_for_saved_exempt(self):
+        response, _cursor, _tracker = self._invoke(english_status="EXEMPT")
+        self.assertEqual(response.status_code, 409)
+
+    def test_rejects_deleting_last_approved_evidence_for_saved_opt_out(self):
+        response, _cursor, _tracker = self._invoke(english_status="OPT_OUT")
+        self.assertEqual(response.status_code, 409)
+
+    def test_deleting_evidence_under_not_exempt_succeeds(self):
+        response, _cursor, _tracker = self._invoke(english_status="NOT_EXEMPT")
+        self.assertEqual(response.status_code, 200)
+
+    def test_deleting_one_of_multiple_approved_files_succeeds(self):
+        response, _cursor, _tracker = self._invoke(english_status="EXEMPT", approved_count=2)
+        self.assertEqual(response.status_code, 200)
+
+    def test_pending_or_rejected_file_can_be_deleted_when_approved_file_remains(self):
+        for target_status in ("pending", "rejected"):
+            response, _cursor, _tracker = self._invoke(
+                english_status="EXEMPT",
+                target_status=target_status,
+                approved_count=1,
+            )
+            self.assertEqual(response.status_code, 200)
+
+    def test_evidence_belonging_to_another_learner_cannot_be_deleted(self):
+        response, cursor, _tracker = self._invoke(row_exists=False)
+        self.assertEqual(response.status_code, 404)
+        delete_sql = " ".join(str(call.args[0]).lower() for call in cursor.execute.call_args_list)
+        self.assertNotIn("delete from", delete_sql)
+
+    def test_subject_status_is_read_from_the_stored_evidence_association(self):
+        english_response, _cursor, _tracker = self._invoke(
+            section_ref="functional-skills:english",
+            english_status="NOT_EXEMPT",
+            maths_status="EXEMPT",
+        )
+        maths_response, _cursor, _tracker = self._invoke(
+            section_ref="functional-skills:maths",
+            english_status="EXEMPT",
+            maths_status="NOT_EXEMPT",
+        )
+        self.assertEqual(english_response.status_code, 200)
+        self.assertEqual(maths_response.status_code, 200)
+
+    def test_last_file_lock_is_taken_inside_atomic_transaction(self):
+        response, cursor, tracker = self._invoke(english_status="EXEMPT")
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(tracker.for_update_inside_atomic)
+        self.assertTrue(any("for update" in str(call.args[0]).lower() for call in cursor.execute.call_args_list))
+
+
+class FunctionalSkillsStatusConcurrencyTests(SimpleTestCase):
+    def test_status_update_locks_learner_row_inside_atomic_transaction(self):
+        from . import views
+
+        tracker = SimpleNamespace(active=False, lock_seen_inside_atomic=False)
+
+        class Atomic:
+            def __enter__(self):
+                tracker.active = True
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                tracker.active = False
+                return False
+
+        user = SimpleNamespace(
+            learner_type="apprenticeship",
+            english_exemption={"status": "NOT_EXEMPT", "evidence": [{"id": "legacy-file"}]},
+            maths_exemption={"status": "NOT_EXEMPT", "evidence": []},
+            save=MagicMock(),
+        )
+        model = MagicMock()
+        model.all_learners.filter.return_value.first.return_value = user
+        locked_queryset = MagicMock()
+
+        def locked_first():
+            tracker.lock_seen_inside_atomic = tracker.active
+            return user
+
+        locked_queryset.first.side_effect = locked_first
+        model.all_learners.using.return_value.select_for_update.return_value.filter.return_value = locked_queryset
+        request = RequestFactory().patch(
+            "/learner_api/enrolment-users/42/functional-skills/",
+            data=json.dumps({"subject": "english", "status": "NOT_EXEMPT", "evidenceIds": []}),
+            content_type="application/json",
+        )
+        view = inspect.unwrap(views.functional_skills)
+        with patch.object(views, "EnrolmentUser", model), patch.object(views.transaction, "atomic", return_value=Atomic()):
+            response = view(request, 42)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(tracker.lock_seen_inside_atomic)
+        model.all_learners.using.return_value.select_for_update.assert_called_once_with()
+        user.save.assert_called_once_with(update_fields=["english_exemption"])
 
 class LearnerDetailPrefetchTests(SimpleTestCase):
     def test_progress_projection_reuses_loaded_history_and_nested_relations(self):

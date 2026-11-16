@@ -20,7 +20,7 @@ import json
 
 import logging
 
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, transaction, connections
 from django.db.models.functions import Lower, Trim
 from django.http import JsonResponse
 from django.utils import timezone
@@ -1126,6 +1126,88 @@ def enrolment_user_finish(request, pk):
         return _error("Could not create the learner record. Please try again.", 502)
 
     return JsonResponse(to_board(user))
+
+
+@csrf_exempt
+@staff_only(writes_only=True, allow_own_learner="pk")
+def functional_skills(request, pk):
+    """Read/update subject exemption status in the existing JSON columns."""
+    user = EnrolmentUser.all_learners.filter(pk=pk).first()
+    if user is None:
+        return _error("User not found.", 404)
+    subjects = {"english": "english_exemption", "maths": "maths_exemption"}
+    if request.method == "GET":
+        out = {}
+        for subject, field in subjects.items():
+            raw = getattr(user, field) or {}
+            raw = raw if isinstance(raw, dict) else ({"exempt": bool(raw)} if isinstance(raw, bool) else {})
+            status = str(raw.get("status") or ("EXEMPT" if raw.get("exempt") else "NOT_EXEMPT")).upper()
+            if status not in {"EXEMPT", "NOT_EXEMPT", "OPT_OUT"}: status = "NOT_EXEMPT"
+            out[subject] = {"status": status, "evidence": raw.get("evidence") or []}
+        return JsonResponse(out)
+    if request.method not in ("PATCH", "PUT"):
+        return _error("Method not allowed.", 405)
+    try:
+        payload = _parse_body(request)
+        subject = str(payload.get("subject") or "").lower()
+        status = str(payload.get("status") or "").upper()
+        if subject not in subjects or status not in {"EXEMPT", "NOT_EXEMPT", "OPT_OUT"}:
+            return _error("subject and a valid status are required.", 400)
+        with transaction.atomic(using="enrolment"):
+            # Serialize status changes with the DELETE guard. Without this row
+            # lock, a status update could validate a file while a concurrent
+            # delete removes it, leaving EXEMPT/OPT_OUT pointing at nothing.
+            user = (
+                EnrolmentUser.all_learners.using("enrolment")
+                .select_for_update()
+                .filter(pk=pk)
+                .first()
+            )
+            if user is None:
+                return _error("User not found.", 404)
+            field = subjects[subject]
+            raw = getattr(user, field) or {}
+            raw = raw if isinstance(raw, dict) else ({"exempt": bool(raw)} if isinstance(raw, bool) else {})
+            existing_evidence = raw.get("evidence") or []
+            evidence_ids = payload.get("evidenceIds")
+            # NOT_EXEMPT does not need evidence. Keep the legacy metadata exactly as
+            # it was saved, rather than forcing old references through the approved
+            # file lookup or replacing them with an empty list.
+            if status == "NOT_EXEMPT":
+                evidence = existing_evidence if isinstance(existing_evidence, list) else []
+                evidence_ids = []
+            elif evidence_ids is None or evidence_ids == []:
+                evidence_ids = [str(item.get("id")) for item in existing_evidence if isinstance(item, dict) and item.get("id")]
+            if not isinstance(evidence_ids, list):
+                return _error("evidenceIds must be a list.", 400)
+            evidence_ids = [str(value) for value in evidence_ids if value]
+            evidence = []
+            if evidence_ids:
+                from .evidence_tables import ensure_evidence_tables
+                ensure_evidence_tables()
+                with connections["enrolment"].cursor() as cur:
+                    cur.execute(
+                        'select id, original_filename, uploaded_at, status, section_ref from "Learner"."evidence_files" '
+                        'where learner_kind = %s and learner_id = %s and id = any(%s::uuid[])',
+                        [str(getattr(user, "learner_type", "apprenticeship") or "apprenticeship"), str(pk), evidence_ids],
+                    )
+                    rows = cur.fetchall()
+                expected_section = f"functional-skills:{subject}"
+                if len(rows) != len(set(evidence_ids)) or any(row[4] != expected_section or row[3] != "approved" for row in rows):
+                    return _error("One or more evidence files are invalid for this learner and subject.", 400)
+                evidence = [{"id": str(row[0]), "fileName": row[1], "uploaded": row[2].isoformat() if row[2] else ""} for row in rows]
+                # Keep any older metadata that was not part of this request. The
+                # evidence_files table remains authoritative for validation, while
+                # the JSON compatibility representation never silently loses rows.
+                seen = {item["id"] for item in evidence}
+                evidence.extend(item for item in existing_evidence if isinstance(item, dict) and item.get("id") not in seen)
+            if status in {"EXEMPT", "OPT_OUT"} and not evidence:
+                return _error("Evidence is required for this status.", 400)
+            setattr(user, field, {"status": status, "exempt": status == "EXEMPT", "evidence": evidence})
+            user.save(update_fields=[field])
+            return JsonResponse({"subject": subject, "status": status, "evidence": evidence})
+    except DatabaseError:
+        return _error("Could not save functional skills status.", 503)
 
 
 

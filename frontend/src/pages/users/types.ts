@@ -158,10 +158,12 @@ export interface FsAssessmentRecord {
   level: string;
   date: string;
   result?: string;
+  status?: string;
 }
 export interface FsBlock {
   assessments: FsAssessmentRecord[];
   exempt: boolean;
+  status?: 'EXEMPT' | 'NOT_EXEMPT' | 'OPT_OUT';
   evidence: DocRow[];
 }
 

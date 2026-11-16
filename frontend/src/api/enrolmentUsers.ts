@@ -8,6 +8,13 @@ import { invalidateWizardCacheById } from './extendedIlr';
 import { invalidateLearnerDetailCache } from './learnerDetail';
 
 const BASE = '/learner_api/enrolment-users';
+export type FunctionalSkillsStatus = 'EXEMPT' | 'NOT_EXEMPT' | 'OPT_OUT';
+export async function updateFunctionalSkillsStatus(id: string, subject: 'english' | 'maths', status: FunctionalSkillsStatus, evidenceIds: string[] = []) {
+  const res = await fetch(`${BASE}/${id}/functional-skills/`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ subject, status, evidenceIds }) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Could not save status');
+  return data as { subject: string; status: FunctionalSkillsStatus; evidence: unknown[] };
+}
 
 // ---- Canonical option lists (mirror api/constants.py; validated server-side) ----
 export const STATUS_OPTIONS = ['FullUser', 'Invited', 'Prospect', 'Expired', 'Cancelled', 'Archived'];
