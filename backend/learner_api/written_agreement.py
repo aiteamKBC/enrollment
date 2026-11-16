@@ -37,6 +37,7 @@ from .apprenticeship_agreement import (
     _employer_address,
     _group_dates,
 )
+from .constants import MAIN_PROVIDER
 from .learner_progression import advance_learner
 from .mappers import _s
 from .models import EnrolmentUser, WrittenAgreement
@@ -47,7 +48,6 @@ logger = logging.getLogger(__name__)
 SIGNING_PARTIES = ("learner", "employer", "provider")
 MAX_SIGNATURE_CHARS = 400_000
 
-MAIN_PROVIDER = "Kent Business College"
 
 # The costs table, in the order the form prints it. Values have no source in the
 # system, so each line is issued blank for an officer to complete.

@@ -9,10 +9,12 @@ from unittest.mock import MagicMock, patch
 from django.test import RequestFactory, SimpleTestCase
 
 from enrolment_api import ilr_employer_details as view
+from enrolment_api.document_templates.learner_sources import employer_postcode
+from learner_api.apprenticeship_agreement import _employer_address
 
 
 def _learner(employer_id=7, organization="", employer=""):
-    return SimpleNamespace(employer_id=employer_id, organization=organization, employer=employer)
+    return SimpleNamespace(employer_id=employer_id, organisation_id=None, organization=organization, employer=employer)
 
 
 def _employer(group_ids=(3,)):
@@ -26,6 +28,15 @@ ORG = SimpleNamespace(name="Example Ltd", post_code="CT1 1AA", address_1="1 Offi
 
 
 class EmployerDetailsTests(SimpleTestCase):
+    def test_direct_organisation_link_works_without_manager(self):
+        learner = _learner(employer_id=None)
+        learner.organisation_id = 3
+        details, employers, organisations = self._resolve(learner, organisation=ORG)
+        organisations.objects.filter.assert_called_once_with(pk=3)
+        employers.objects.filter.assert_not_called()
+        self.assertEqual(details["organisationName"], "Example Ltd")
+        self.assertEqual(details["postcode"], "CT1 1AA")
+
     def _resolve(self, learner, employer=None, organisation=None):
         with patch.object(view, "Employer") as employers, patch.object(view, "Organisation") as organisations:
             employers.objects.filter.return_value.first.return_value = employer
@@ -61,6 +72,32 @@ class EmployerDetailsTests(SimpleTestCase):
 
         employers.objects.filter.assert_not_called()
         self.assertEqual(set(details.values()), {""})
+
+    def test_documents_use_the_organisation_not_the_manager_address(self):
+        learner = _learner()
+        manager = _employer()
+        manager.address_1 = "Manager's personal address"
+        manager.post_code = "PRIVATE"
+        organisation = SimpleNamespace(**vars(ORG), county="Kent")
+        with patch.object(view, "Employer") as employers, patch.object(view, "Organisation") as organisations:
+            employers.objects.filter.return_value.first.return_value = manager
+            organisations.objects.filter.return_value.first.return_value = organisation
+            self.assertEqual(_employer_address(learner), "1 Office Park\nUnit 4\nCanterbury\nKent\nCT1 1AA")
+            self.assertEqual(employer_postcode(learner, {"postcode": "OLD"}), "CT1 1AA")
+            organisation.post_code = ""
+            self.assertEqual(employer_postcode(learner, {"postcode": "OLD"}), "")
+
+    def test_documents_do_not_guess_between_multiple_organisations(self):
+        learner = _learner()
+        learner.employer_address = "Recorded workplace address"
+        manager = _employer(group_ids=(3, 4))
+        manager.address_1 = "Manager's personal address"
+        manager.post_code = "PRIVATE"
+        with patch.object(view, "Employer") as employers, patch.object(view, "Organisation") as organisations:
+            employers.objects.filter.return_value.first.return_value = manager
+            self.assertEqual(_employer_address(learner), "Recorded workplace address")
+            self.assertEqual(employer_postcode(learner, {"postcode": "SAVED"}), "SAVED")
+            organisations.objects.filter.assert_not_called()
 
     def test_another_learner_gets_not_found(self):
         request = RequestFactory().get("/enrolment_api/extended-ilr/apprenticeship/41/employer-details/")

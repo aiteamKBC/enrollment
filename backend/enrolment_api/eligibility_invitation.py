@@ -94,7 +94,13 @@ def invite_applicant(row, *, application_id=None, ip=None, user_agent=None):
         if has_account(row["work_email"]):
             return EXISTING_ACCOUNT
         with transaction.atomic(using="enrolment"):
-            learner = EnrolmentUser.all_learners.create(**learner_fields(row))
+            from .organisation_matching import resolve_application_organisation
+
+            organisation = resolve_application_organisation(row)
+            fields = learner_fields(row)
+            fields["organisation_id"] = organisation.pk
+            fields["organization"] = organisation.name
+            learner = EnrolmentUser.all_learners.create(**fields)
             if application_id is not None:
                 from login.identity import ensure_account
                 from . import eligibility_link

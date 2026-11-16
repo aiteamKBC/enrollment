@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { DatePickerField } from '@/components/feature/DatePickerField';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { useToast } from "@/hooks/useToast.helpers";
-import { ADMIN_POSITION, TUTOR_POSITION, createStaffUser } from '@/api/staffUsers';
+import { ADMIN_POSITION, createStaffUser } from '@/api/staffUsers';
 import type { StaffAccess, StaffUserRow } from '@/api/staffUsers';
 import { Modal } from './Modal';
 import { inputClass, btnPrimary, btnSecondary } from './ui';
 
 // ============================================================================
-// Create staff — the Aptem-shaped "Add user" form, in two variants.
+// Create staff — the Aptem-shaped "Add user" form.
 //
 // Mirrors Aptem's admin variant of the Add-user screen: the user type is fixed
 // (this form only creates staff), and email is entered twice to catch typos in
@@ -17,50 +17,14 @@ import { inputClass, btnPrimary, btnSecondary } from './ui';
 // Writes to enrolment."Staff_users" via createStaffUser — staff are not learners,
 // so they never touch Enrolment_Users / Commercial_users.
 //
-// One component, not one per role: the two variants differ by a position, an
-// access grant and some wording, and every field, validation rule and
-// invitation-outcome branch below is identical. Copying the file per role is how
-// those branches drift.
+// Roles are access grants. One staff member can coach and tutor; super-admin
+// already grants every workspace and is therefore selected alone.
 // ============================================================================
-
-export type StaffVariant = 'admin' | 'tutor';
-
-interface VariantConfig {
-  /** Shown in the fixed "User type" row and in the toasts. */
-  noun: string;
-  icon: string;
-  position: string;
-  /**
-   * Granted at creation, or undefined to leave the account with no access.
-   *
-   * Admin deliberately has none: 'Admin' is a job title, and what such an
-   * account may actually reach is decided on the Accounts page — granting
-   * anything here would hand out access nobody chose.
-   *
-   * A tutor is the opposite case. 'Tutor access' exists for exactly one
-   * workspace, so withholding it would create an account whose only possible
-   * destination is /access-required — broken on arrival, and quietly, since
-   * nothing prompts anyone to finish the job.
-   */
-  access?: StaffAccess;
-  /** Where this account lands on first sign-in, for the invitation note. */
-  landsOn?: string;
-}
-
-const VARIANTS: Record<StaffVariant, VariantConfig> = {
-  admin: {
-    noun: 'Admin',
-    icon: 'ri-shield-user-line',
-    position: ADMIN_POSITION,
-  },
-  tutor: {
-    noun: 'Tutor',
-    icon: 'ri-presentation-line',
-    position: TUTOR_POSITION,
-    access: 'tutor',
-    landsOn: 'the Tutor workspace',
-  },
-};
+const ROLE_OPTIONS: { id: StaffAccess; label: string }[] = [
+  { id: 'super-admin', label: 'Super Admin' },
+  { id: 'coach', label: 'Coach' },
+  { id: 'tutor', label: 'Tutor' },
+];
 
 type FieldType = 'text' | 'email' | 'tel' | 'date' | 'radio';
 
@@ -90,23 +54,30 @@ const FIELDS: FieldDef[] = [
   { name: 'organization', label: 'Organisation', type: 'text', placeholder: 'e.g. Kent Business College' },
 ];
 
-export function CreateStaffModal({ variant, onClose, onCreated }: {
-  variant: StaffVariant;
+export function CreateStaffModal({ onClose, onCreated }: {
   onClose: () => void;
   onCreated: (row: StaffUserRow) => void;
 }) {
-  const config = VARIANTS[variant];
   const { success, error } = useToast();
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [roles, setRoles] = useState<StaffAccess[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const setField = (name: string, value: string) => setFormData((prev) => ({ ...prev, [name]: value }));
+  const toggleRole = (role: StaffAccess) => setRoles((current) => {
+    if (current.includes(role)) return current.filter((selected) => selected !== role);
+    return role === 'super-admin' ? [role] : [...current.filter((selected) => selected !== 'super-admin'), role];
+  });
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const missing = FIELDS.filter((f) => f.required && !formData[f.name]?.trim());
     if (missing.length > 0) {
       error('Missing details', `Please complete: ${missing.map((f) => f.label).join(', ')}`);
+      return;
+    }
+    if (roles.length === 0) {
+      error('Roles required', 'Choose at least one role for this staff member.');
       return;
     }
     // Compared case-insensitively: addresses aren't case-sensitive in practice,
@@ -123,11 +94,11 @@ export function CreateStaffModal({ variant, onClose, onCreated }: {
       const row = await createStaffUser({
         username: name,
         email,
-        position: config.position,
-        access: config.access,
+        position: ADMIN_POSITION,
+        accesses: roles,
         // Staff share the learner tables' Type/Status vocabulary; "Admin" marks
         // the row as a non-learner. The directory's Type column shows the
-        // position, so a tutor still reads as a Tutor there.
+        // position; the selected access grants determine their permissions.
         type: 'Admin',
         status: 'FullUser',
         phone: formData.phone,
@@ -141,8 +112,8 @@ export function CreateStaffModal({ variant, onClose, onCreated }: {
       // can sign in at all, while a mail failure leaves a link that can still
       // be re-sent.
       const invite = row.invitation;
-      const label = `${config.noun} created`;
-      const created = `${row.name || name} was created as a ${config.noun}.`;
+      const label = 'Staff member created';
+      const created = `${row.name || name} was created with ${roles.map((role) => ROLE_OPTIONS.find((option) => option.id === role)?.label).join(' and ')} access.`;
       if (!invite) {
         success(label, created);
       } else if (invite.forbidden) {
@@ -175,7 +146,7 @@ export function CreateStaffModal({ variant, onClose, onCreated }: {
         );
       } else {
         success(
-          `${config.noun} created and invited`,
+          'Staff member created and invited',
           `${row.name || name} was emailed a link to set their password.`,
         );
       }
@@ -183,7 +154,7 @@ export function CreateStaffModal({ variant, onClose, onCreated }: {
       onClose();
     } catch (err) {
       error(
-        `Could not create ${config.noun.toLowerCase()}`,
+        'Could not create staff member',
         err instanceof Error ? err.message : 'Unexpected error',
       );
     } finally {
@@ -240,14 +211,14 @@ export function CreateStaffModal({ variant, onClose, onCreated }: {
 
   return (
     <Modal
-      title="Add user"
+      title="Create staff member"
       size="max-w-3xl"
       onClose={onClose}
       footer={
         <>
           <button type="button" className={btnSecondary} onClick={onClose} disabled={submitting}>Close</button>
           <button type="button" className={btnPrimary} onClick={() => handleSubmit()} disabled={submitting}>
-            {submitting ? <><AppIcon className="ri-loader-4-line animate-spin" />Saving…</> : <><AppIcon className={config.icon} />Create</>}
+            {submitting ? <><AppIcon className="ri-loader-4-line animate-spin" />Saving…</> : <><AppIcon className="ri-shield-user-line" />Create</>}
           </button>
         </>
       }
@@ -255,17 +226,34 @@ export function CreateStaffModal({ variant, onClose, onCreated }: {
       <form onSubmit={handleSubmit} className="space-y-5">
         <section className="rounded-xl border border-foreground-200/70 overflow-hidden">
           <header className="flex items-center gap-2 px-4 py-2.5 bg-background-100/70 border-b border-foreground-200/60">
-            <AppIcon className={`${config.icon} text-primary-500`} />
+            <AppIcon className="ri-shield-user-line text-primary-500" />
             <h3 className="text-[12px] font-semibold uppercase tracking-wider text-foreground-600">Identity</h3>
           </header>
           <div className="divide-y divide-foreground-100">
-            {/* Fixed, not a picker: each variant of this form creates one kind
-                of staff account. */}
             <div className="grid grid-cols-1 sm:grid-cols-[minmax(160px,240px)_1fr] gap-1 sm:gap-4 px-4 py-2.5 items-start">
               <span className="text-[12px] font-medium text-foreground-600 sm:py-2">User type</span>
-              <p className="text-[13px] font-semibold text-primary-700 sm:py-2">{config.noun}</p>
+              <p className="text-[13px] font-semibold text-primary-700 sm:py-2">Staff member</p>
             </div>
             {FIELDS.map(renderField)}
+            <fieldset className="grid grid-cols-1 sm:grid-cols-[minmax(160px,240px)_1fr] gap-1 sm:gap-4 px-4 py-2.5 items-start">
+              <legend className="sr-only">Roles</legend>
+              <span className="text-[12px] font-medium text-foreground-600 sm:py-2">Roles <span className="text-red-500">*</span></span>
+              <details className="min-w-0">
+                <summary aria-label="Choose roles" className={`${inputClass} cursor-pointer list-none flex items-center justify-between gap-2`}>
+                  <span>{roles.length ? roles.map((role) => ROLE_OPTIONS.find((option) => option.id === role)?.label).join(', ') : 'Select roles'}</span>
+                  <AppIcon className="ri-arrow-down-s-line" />
+                </summary>
+                <div className="mt-1 rounded-lg border border-foreground-200 bg-background-50 p-3 space-y-2">
+                  {ROLE_OPTIONS.map(({ id, label }) => (
+                    <label key={id} className="flex items-center gap-2 text-[13px] text-foreground-700 cursor-pointer">
+                      <input type="checkbox" checked={roles.includes(id)} onChange={() => toggleRole(id)} className="accent-primary-500" />
+                      {label}
+                    </label>
+                  ))}
+                  <p className="text-[12px] text-foreground-500">Coach and Tutor can be combined. Super Admin includes all access.</p>
+                </div>
+              </details>
+            </fieldset>
           </div>
         </section>
 
@@ -285,18 +273,7 @@ export function CreateStaffModal({ variant, onClose, onCreated }: {
             <p className="text-[12px] text-foreground-500 mt-0.5">
               Send their invitation from Accounts in the Super Admin workspace when the record is ready — that emails a single-use link to set their own password. They cannot sign in until they do.
             </p>
-            {/* Only the variants that grant access can promise a destination.
-                An admin's access is chosen afterwards, so saying where they land
-                would be a guess. */}
-            {config.landsOn && (
-              <p className="text-[12px] text-foreground-500 mt-2 flex items-start gap-1.5">
-                <AppIcon className="ri-arrow-right-circle-line text-primary-500 mt-0.5 shrink-0" />
-                <span>
-                  They are granted <strong className="font-semibold text-foreground-700">Tutor access</strong> and
-                  will land in {config.landsOn}. Change it any time from the Accounts page.
-                </span>
-              </p>
-            )}
+            <p className="text-[12px] text-foreground-500 mt-2">Their selected roles give them access to the corresponding workspaces.</p>
           </div>
         </section>
 

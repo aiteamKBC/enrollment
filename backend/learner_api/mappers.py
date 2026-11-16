@@ -153,6 +153,7 @@ def to_edit_fields(u):
         # The record id alongside the name: the form's employer select is keyed
         # on it, because two employers can share a name.
         "employerId": u.employer_id,
+        "organisationId": getattr(u, "organisation_id", None),
         "organization": _s(u.organization),
         "lineManager": _s(u.line_manager),
         "learnerType": _s(getattr(u, "learner_type", "")) or "apprenticeship",
@@ -227,18 +228,16 @@ def _subscription(u):
 
 
 def _employer_label(u):
-    """(display name, id) for the learner's employer.
+    """(company display name, contact id) for the learner's employer.
 
-    Prefers the live name from enrolment."Employers" when "Employer_id" is set:
-    the learner's own "Employer" text is a snapshot typed at create time, so a
-    renamed employer would otherwise keep showing the old name.
-
-    Falls back to that text for learners created before employer profiles existed
-    (their id is NULL), which is most historical rows. Never raises — a broken
-    employer lookup must not fail the whole board.
+    Directly linked learners display their company, independently of the
+    assigned manager. Historical rows retain the older employer-profile lookup
+    and text fallback. A broken legacy contact lookup cannot fail the board.
     """
     employer_id = getattr(u, "employer_id", None)
     fallback = _s(getattr(u, "employer", ""))
+    if getattr(u, "organisation_id", None):
+        return _s(getattr(u, "organization", "")) or fallback, employer_id
     if employer_id is None:
         return fallback, None
 
@@ -383,8 +382,6 @@ APTEM_TEXT_FIELDS = {
     "country": "country",
     "caseOwner": "case_owner",
     "mentor": "mentor",
-    "referenceNumber": "reference_number",
-    "extendedBreak": "extended_break",
     "attendanceType": "attendance_type",
     "employerAddress": "employer_address",
     "targetProgramme": "target_programme",
@@ -655,6 +652,22 @@ def validate_choices(payload):
             raise ValidationError(f"Invalid {key}: {val!r}. Allowed: {', '.join(allowed)}")
 
 
+def _id_field(payload, key, attr):
+    """Parse a nullable database id without passing it through text mapping."""
+    if key not in payload:
+        return {}
+    raw = payload[key]
+    if raw in (None, ""):
+        return {attr: None}
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        raise ValidationError(f"Invalid {key}: expected a whole number.")
+    if value <= 0:
+        raise ValidationError(f"Invalid {key}: expected a positive number.")
+    return {attr: value}
+
+
 def _employer_id_field(payload):
     """{'employer_id': int|None} for a payload carrying "employerId", else {}.
 
@@ -662,15 +675,7 @@ def _employer_id_field(payload):
     of the referenced employer is checked by the caller (it needs a DB read) —
     see _resolve_employer in views.py.
     """
-    if "employerId" not in payload:
-        return {}
-    raw = payload["employerId"]
-    if raw in (None, ""):
-        return {"employer_id": None}
-    try:
-        return {"employer_id": int(str(raw).strip())}
-    except (TypeError, ValueError):
-        raise ValidationError(f"Invalid employerId: {raw!r}. Expected a whole number.")
+    return _id_field(payload, "employerId", "employer_id")
 
 
 def validate_learner_dates(fields, existing=None):
@@ -732,6 +737,7 @@ def write_fields(payload, *, require_create=False):
     if "trainingPlan" in payload:
         fields["learning_plan"] = _normalize_training_plan(payload["trainingPlan"])
     fields.update(_employer_id_field(payload))
+    fields.update(_id_field(payload, "organisationId", "organisation_id"))
     _blank_attendance_type_to_null(fields)
     if require_create and not _s(fields.get("programme_status")):
         # Every account starts at 'Fresh user'. Left unset it was stored NULL,
@@ -1194,12 +1200,6 @@ EMPLOYER_WRITABLE_FIELDS = {
     "gender": "gender",
     "email": "email",
     "mobile": "mobile",
-    "postCode": "post_code",
-    "address1": "address_1",
-    "address2": "address_2",
-    "townCity": "town_city",
-    "county": "county",
-    "country": "country",
 }
 
 
@@ -1312,12 +1312,6 @@ def to_employer_row(e):
         "gender": _s(e.gender),
         "email": _s(e.email),
         "mobile": _s(e.mobile),
-        "postCode": _s(e.post_code),
-        "address1": _s(e.address_1),
-        "address2": _s(e.address_2),
-        "townCity": _s(e.town_city),
-        "county": _s(e.county),
-        "country": _s(e.country),
         # Ids are the link; names travel with them so a row renders without a join.
         "employerGroupIds": [str(i) for i in _as_list(e.employer_group_ids)],
         "employerGroupNames": [_s(n) for n in _as_list(e.employer_group_names)],

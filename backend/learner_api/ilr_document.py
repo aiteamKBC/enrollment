@@ -147,8 +147,6 @@ def derive_learner_details(learner):
     ]
 
     return {
-        # No column holds a learner reference number yet.
-        "learnerReferenceNumber": "",
         "uln": _s(getattr(rpl, "uln", "")) or _s(getattr(plr, 'uln', '')),
         "familyName": last,
         "givenNames": first,

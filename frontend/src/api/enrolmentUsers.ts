@@ -58,8 +58,6 @@ export interface AptemUserFields {
   caseOwner?: string;
   employerAddress?: string;
   mentor?: string;
-  referenceNumber?: string;
-  extendedBreak?: string;
   /** One of ATTENDANCE_TYPE_OPTIONS; null clears it. */
   attendanceType?: string | null;
   allowCheckpoint?: boolean;
@@ -95,6 +93,7 @@ export interface CreateEnrolmentUserInput extends AptemUserFields {
    * clears it. The API rejects an id naming no employer record.
    */
   employerId?: number | null;
+  organisationId?: number | null;
   organization?: string;
   lineManager?: string;
   phone?: string;
@@ -142,6 +141,7 @@ export interface EnrolmentUserFields extends AptemUserFields {
   group: string;
   employer: string;
   employerId: number | null;
+  organisationId: number | null;
   organization: string;
   lineManager: string;
   learnerType: LearnerType;

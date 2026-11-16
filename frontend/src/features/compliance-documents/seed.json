@@ -249,10 +249,6 @@
               "{{document.programme.standard}}"
             ],
             [
-              "Apprenticeship Reference:",
-              "{{document.programme.reference}}"
-            ],
-            [
               "Apprenticeship Level:",
               "{{document.programme.level}}"
             ],
@@ -1035,12 +1031,6 @@
           "type": "heading",
           "text": "Learner details",
           "level": 2
-        },
-        {
-          "id": "ilr-row-2",
-          "type": "field",
-          "label": "Learner reference number",
-          "value": "{{document.learnerDetails.learnerReferenceNumber}}"
         },
         {
           "id": "ilr-row-3",
@@ -2406,12 +2396,6 @@
         "group": "Document",
         "format": "text"
       },
-      "document.programme.reference": {
-        "key": "document.programme.reference",
-        "label": "Apprenticeship Reference:",
-        "group": "Document",
-        "format": "text"
-      },
       "document.programme.level": {
         "key": "document.programme.level",
         "label": "Apprenticeship Level:",
@@ -2984,12 +2968,6 @@
       }
     },
     "ilr": {
-      "document.learnerDetails.learnerReferenceNumber": {
-        "key": "document.learnerDetails.learnerReferenceNumber",
-        "label": "Learner reference number",
-        "group": "Document",
-        "format": "text"
-      },
       "document.learnerDetails.uln": {
         "key": "document.learnerDetails.uln",
         "label": "ULN",

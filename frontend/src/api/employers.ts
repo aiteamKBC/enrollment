@@ -62,12 +62,6 @@ export interface EmployerRow {
   gender: string;
   email: string;
   mobile: string;
-  postCode: string;
-  address1: string;
-  address2: string;
-  townCity: string;
-  county: string;
-  country: string;
   /** Organisation ids this person belongs to — the real link. */
   employerGroupIds: string[];
   /** Their names, denormalised server-side so a row renders without a lookup. */

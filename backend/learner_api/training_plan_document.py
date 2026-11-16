@@ -36,6 +36,7 @@ from .apprenticeship_agreement import (
     _group_dates,
     _weeks_between,
 )
+from .constants import MAIN_PROVIDER
 from .learning_plan import _saved_modules, learner_group_module_ids, learner_programme_modules
 from .learner_progression import advance_learner
 from .mappers import _s
@@ -174,9 +175,8 @@ def derive_content(learner):
         "cohort": _s(learner.cohort),
         "group": _s(learner.group),
         # Standard name follows the assigned programme. Its level is resolved
-        # separately from the catalogue; the reference remains learner-owned.
+        # separately from the catalogue.
         "standard": _s(learner.programme),
-        "reference": _s(learner.reference_number),
         "level": programme_level(learner),
         "startDate": _iso(start),
         "endDate": _iso(end),
@@ -198,7 +198,7 @@ def derive_content(learner):
 
     # Each module with the weeks and components that deliver it, so the printed
     # plan lists actual teaching activities rather than just module names.
-    delivery_lead = "Kent Business College"
+    delivery_lead = MAIN_PROVIDER
     breakdown = _module_breakdown([_s(m.get("moduleId")) for m in modules])
     learning_plan = []
     for m in modules:

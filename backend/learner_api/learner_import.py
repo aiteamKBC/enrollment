@@ -37,15 +37,21 @@ COLUMNS = (
     ("Postcode", "postcode"), ("Address 1", "addressLine1"), ("Address 2", "addressLine2"),
     ("Town/City", "townCity"), ("County", "county"), ("Country", "country"),
     ("Manager", "lineManager"),
-    ("Mentor", "mentor"), ("Reference number", "referenceNumber"),
+    ("Mentor", "mentor"),
     ("Employer address", "employerAddress"),
-    ("Extended break", "extendedBreak"),
     # The first session is booked as part of enrolment, with the case owner, so
     # an imported learner arrives with one exactly as a form-created learner
     # does. Date is YYYY-MM-DD and time is HH:MM, both UK wall clock.
     ("First session date", "firstSessionDate"),
     ("First session time", "firstSessionTime"),
 )
+# Older downloaded templates may contain these retired fields. Accept their
+# headings but ignore their values; new templates no longer offer them.
+LEGACY_IGNORED_COLUMNS = (
+    ("Reference number", "referenceNumber"),
+    ("Extended break", "extendedBreak"),
+)
+LEGACY_IGNORED_KEYS = {key for _, key in LEGACY_IGNORED_COLUMNS}
 #: Case owner and the session date joined these when the first session became
 #: part of enrolment: the case owner is who the session is booked with, and the
 #: date is the learner's programme start.
@@ -112,13 +118,15 @@ def read_students(upload):
         if "Students" not in workbook.sheetnames:
             raise ValidationError("The workbook must contain a sheet named Students.")
         sheet = workbook["Students"]
-        if (sheet.max_row or 0) > MAX_SHEET_ROWS or (sheet.max_column or 0) > len(COLUMNS):
+        if (sheet.max_row or 0) > MAX_SHEET_ROWS or (sheet.max_column or 0) > len(COLUMNS) + len(LEGACY_IGNORED_COLUMNS):
             raise ValidationError("The Students sheet is too large. Use the template and at most 500 students.")
         # Some spreadsheet writers under-report dimensions. Read the actual
         # rows so a misleading dimension cannot silently omit students.
         sheet.reset_dimensions()
         aliases = {_header(label): key for label, key in COLUMNS}
         aliases.update({_header(key): key for _, key in COLUMNS})
+        aliases.update({_header(label): key for label, key in LEGACY_IGNORED_COLUMNS})
+        aliases.update({_header(key): key for _, key in LEGACY_IGNORED_COLUMNS})
         columns, errors = [], []
         for cell in next(sheet.iter_rows(min_row=1, max_row=1), []):
             label = _text(cell.value)
@@ -134,7 +142,7 @@ def read_students(upload):
             return [], errors
         students = []
         for row_number, cells in enumerate(sheet.iter_rows(min_row=2), start=2):
-            if row_number > MAX_SHEET_ROWS or len(cells) > len(COLUMNS):
+            if row_number > MAX_SHEET_ROWS or len(cells) > len(COLUMNS) + len(LEGACY_IGNORED_COLUMNS):
                 raise ValidationError("The Students sheet is too large. Use the template and at most 500 students.")
             if not any(cell.value is not None and _text(cell.value) for cell in cells):
                 continue
@@ -149,6 +157,8 @@ def read_students(upload):
                 if not key:
                     errors.append(_issue(row_number, "A value has no column heading."))
                     continue
+                if key in LEGACY_IGNORED_KEYS:
+                    continue
                 if cell.data_type in {"f", "e"}:
                     errors.append(_issue(row_number, "Use a plain value, not an Excel formula or error.", key))
                     continue
@@ -159,7 +169,7 @@ def read_students(upload):
                     value = value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
                 elif key == "employerId" and isinstance(value, (float, int)) and not isinstance(value, bool):
                     value = str(int(value)) if int(value) == value else str(value)
-                elif key in {"phone", "niNumber", "postcode", "referenceNumber"} and not isinstance(value, str):
+                elif key in {"phone", "niNumber", "postcode"} and not isinstance(value, str):
                     errors.append(_issue(row_number, "Enter this value as text to preserve leading zeros.", key))
                     continue
                 value = _text(value)
@@ -380,7 +390,7 @@ def template_workbook(references):
         ("6", "Optional Employer ID and Case owner must match the Employers and Case owners sheets. Organisation follows the employer."),
         ("7", "Upload for preview, correct any listed errors, then import. If any row is invalid, no students are saved."),
         ("8", "Existing learner or platform-account emails and repeated emails are rejected. Existing records are never updated."),
-        ("9", "New students are commercial learners (Type User, subscription FullUser). Country defaults to United Kingdom."),
+        ("9", "New students are commercial learners (Type User, subscription FullUser). Country defaults to United Kingdom; Kent Business College is always the training provider."),
         ("10", "Cohort dates and the case owner's coach details follow the normal Add user flow. Accounts are created without sending emails; send invitations from Accounts when ready."),
     ])
     workbook["Instructions"].column_dimensions["B"].width = 135
