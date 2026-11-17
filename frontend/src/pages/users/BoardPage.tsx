@@ -33,7 +33,7 @@ import {
 import { renderWrittenAgreementPdf, writtenAgreementFilename } from '@/lib/writtenAgreementPdf';
 import { fetchLearnerCoach, updateLearnerCoach } from '@/api/coach';
 import { reviewHandoverMessage } from '@/api/reviewHandover';
-import { fetchCoachOptions, type CoachOption } from '@/api/staffUsers';
+import { fetchCaseOwners, fetchCoachOptions, type CoachOption } from '@/api/staffUsers';
 
 /** Render the Written Agreement from its record and save it. */
 async function downloadWrittenAgreement(document: WrittenAgreementDocument, learnerId: string) {
@@ -137,9 +137,9 @@ function MetaItem({ icon, label, value }: { icon: string; label: string; value: 
 function LearnerHeader({
   name,
   reference,
-  ownerSlot,
+  caseOwner,
+  skillsCoach,
   programme,
-  employer,
   cohort,
   onboardingStatus,
   dates,
@@ -148,9 +148,9 @@ function LearnerHeader({
 }: {
   name: string;
   reference: string;
-  ownerSlot: ReactNode;
+  caseOwner: string;
+  skillsCoach: string;
   programme: string;
-  employer?: string;
   cohort?: string;
   onboardingStatus: string;
   dates: ReactNode;
@@ -174,10 +174,10 @@ function LearnerHeader({
           <div className="flex flex-wrap items-center gap-2">{actions}</div>
         </div>
         <div className="mt-5 grid grid-cols-1 gap-5 border-t border-foreground-100 pt-5 sm:grid-cols-2 lg:grid-cols-4">
-          {ownerSlot}
+          <MetaItem icon="ri-briefcase-4-line" label="Case Owner" value={caseOwner || 'Not assigned'} />
+          <MetaItem icon="ri-graduation-cap-line" label="Skills Coach" value={skillsCoach || 'Not assigned'} />
           <MetaItem icon="ri-book-open-line" label="Programme" value={programme || '—'} />
           <MetaItem icon="ri-team-line" label="Cohort" value={cohort || '—'} />
-          <MetaItem icon="ri-briefcase-line" label="Employer" value={employer || '—'} />
         </div>
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4 border-t border-foreground-100 bg-background-100/60 px-5 py-4 sm:px-6">
@@ -218,7 +218,7 @@ function LearnerHeader({
  * The pick is held locally until Save, matching HeroProgrammeStatus, so a
  * mis-click never writes to the learner's record.
  */
-function HeroCoach({ learnerId, fallbackOwner }: { learnerId: string; fallbackOwner: string }) {
+function SkillsCoachEditor({ learnerId, initialCoach }: { learnerId: string; initialCoach: EnrolmentBoard['learnerTeam']['skillsCoach'] }) {
   const [options, setOptions] = useState<CoachOption[]>([]);
   // '' = no coach set. Otherwise the chosen staff member's email.
   const [val, setVal] = useState('');
@@ -283,9 +283,10 @@ function HeroCoach({ learnerId, fallbackOwner }: { learnerId: string; fallbackOw
     }
   };
 
-  // Not Active yet: no row to write to, so show what the enrolment record says.
+  // Before Active the create/edit learner form owns this assignment. Keep the
+  // saved value visible here without substituting a Case Owner or Line Manager.
   if (!editable) {
-    return <MetaItem icon="ri-user-star-line" label="Owner" value={fallbackOwner || 'Unassigned'} />;
+    return <MetaItem icon="ri-user-star-line" label="Skills Coach" value={initialCoach?.name || 'Not assigned'} />;
   }
 
   // A stored coach who is not among the staff options — keep them visible
@@ -299,12 +300,12 @@ function HeroCoach({ learnerId, fallbackOwner }: { learnerId: string; fallbackOw
 
   return (
     <div className="min-w-0">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Owner</p>
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Skills Coach</p>
       <div className="flex items-center gap-2 min-w-0">
         <select
           value={val}
           onChange={(e) => setVal(e.target.value)}
-          aria-label="Coach"
+          aria-label="Skills Coach"
           className="min-w-0 flex-1 px-2.5 py-1.5 text-[13px] font-medium bg-background-50 border border-foreground-200 rounded-lg text-foreground-800 outline-none cursor-pointer hover:border-primary-400 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 transition-smooth max-w-[220px] [&>option]:text-foreground-900 [&>option]:bg-background-50"
         >
           <option value="">— Unassigned —</option>
@@ -326,6 +327,112 @@ function HeroCoach({ learnerId, fallbackOwner }: { learnerId: string; fallbackOw
       </div>
       {err && <span className="block text-[11px] text-red-700 mt-1"><i className="ri-error-warning-line mr-1" />{err}</span>}
     </div>
+  );
+}
+
+function CaseOwnerEditor({ learnerId, initialOwner }: { learnerId: string; initialOwner: EnrolmentBoard['learnerTeam']['caseOwner'] }) {
+  const initialName = initialOwner?.name || '';
+  const [options, setOptions] = useState<string[]>([]);
+  const [value, setValue] = useState(initialName);
+  const [saved, setSaved] = useState(initialName);
+  const [email, setEmail] = useState(initialOwner?.email || '');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchCaseOwners().then(setOptions).catch((error: Error) => setErr(error.message));
+  }, []);
+
+  const save = async () => {
+    if (value === saved || saving) return;
+    setSaving(true); setErr(null);
+    try {
+      const board = await updateEnrolmentUser(learnerId, { caseOwner: value });
+      const next = board.learnerTeam.caseOwner;
+      setValue(next?.name || '');
+      setSaved(next?.name || '');
+      setEmail(next?.email || '');
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not save the Case Owner.');
+    } finally { setSaving(false); }
+  };
+
+  const legacy = saved && !options.includes(saved);
+  return (
+    <div className="min-w-0">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Case Owner</p>
+      <div className="flex min-w-0 items-center gap-2">
+        <select value={value} onChange={(event) => setValue(event.target.value)} aria-label="Case Owner" className="min-w-0 flex-1 rounded-lg border border-foreground-200 bg-background-50 px-2.5 py-1.5 text-[13px] font-medium text-foreground-800 outline-none hover:border-primary-400 focus-visible:ring-2 focus-visible:ring-primary-500">
+          <option value="">Not assigned</option>
+          {legacy && <option value={saved}>{saved}</option>}
+          {options.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+        </select>
+        {value !== saved && <button type="button" onClick={save} disabled={saving} className={btnSecondary}>{saving ? 'Saving...' : 'Save'}</button>}
+      </div>
+      <p className="mt-2 text-[11px] text-foreground-500">{email || (saved ? 'Email unavailable' : 'Not assigned')}</p>
+      {err && <span className="mt-1 block text-[11px] text-red-700"><i className="ri-error-warning-line mr-1" />{err}</span>}
+    </div>
+  );
+}
+
+function LearnerTeamCard({ learnerId, team }: { learnerId: string; team: EnrolmentBoard['learnerTeam'] }) {
+  return (
+    <Card title="Learner Team" icon={Users}>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-foreground-100 bg-background-100/40 p-4">
+          <CaseOwnerEditor learnerId={learnerId} initialOwner={team.caseOwner} />
+          <p className="mt-2 text-[11px] text-foreground-400">Enrolment administration, bookings and follow-up</p>
+        </div>
+        <div className="rounded-xl border border-foreground-100 bg-background-100/40 p-4">
+          <SkillsCoachEditor learnerId={learnerId} initialCoach={team.skillsCoach} />
+          <p className="mt-2 text-[11px] text-foreground-400">Training, progress and learning support</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function EmploymentDetailsCard({ details }: { details: EnrolmentBoard['employmentDetails'] }) {
+  const organisation = details.organisation;
+  const representative = details.employerRepresentative;
+  const manager = details.lineManager;
+  const value = (text?: string) => text || <span className="text-foreground-400">Not recorded</span>;
+  return (
+    <Card title="Employer & Manager" icon={Briefcase}>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section aria-label="Organisation" className="overflow-hidden rounded-xl border border-foreground-100">
+          <h4 className="flex items-center gap-2 bg-primary-50 px-4 py-2.5 text-[12px] font-semibold text-primary-700">
+            <i className="ri-building-line" aria-hidden="true" />Organisation
+          </h4>
+          <div className="p-4">
+            <Facts items={[
+              { label: 'Organisation', value: value(organisation?.name), wide: true },
+              { label: 'Address', value: value(organisation?.address), wide: true },
+              { label: 'Employer representative', value: value(representative?.name), wide: true },
+              { label: 'Employer email', value: representative?.email
+                ? <a href={`mailto:${representative.email}`} className="text-primary-600 hover:underline">{representative.email}</a>
+                : value(), wide: true },
+            ]} />
+          </div>
+        </section>
+        <section aria-label="Line Manager" className="overflow-hidden rounded-xl border border-foreground-100">
+          <h4 className="flex items-center gap-2 bg-primary-50 px-4 py-2.5 text-[12px] font-semibold text-primary-700">
+            <i className="ri-user-settings-line" aria-hidden="true" />Line Manager
+          </h4>
+          <div className="p-4">
+            <Facts items={[
+              { label: 'Manager', value: value(manager?.name), wide: true },
+              { label: 'Manager email', value: manager?.email
+                ? <a href={`mailto:${manager.email}`} className="text-primary-600 hover:underline">{manager.email}</a>
+                : value(), wide: true },
+              { label: 'Manager phone number', value: manager?.phone
+                ? <a href={`tel:${manager.phone}`} className="text-primary-600 hover:underline">{manager.phone}</a>
+                : value(), wide: true },
+            ]} />
+          </div>
+        </section>
+      </div>
+    </Card>
   );
 }
 
@@ -1665,8 +1772,17 @@ function BoardView({
   // ---- overview: contacts table paging ----
   const CONTACTS_PER_PAGE = 5;
   const [contactPage, setContactPage] = useState(1);
-  const contactPages = Math.max(1, Math.ceil(board.contacts.length / CONTACTS_PER_PAGE));
-  const contactRows = board.contacts.slice((contactPage - 1) * CONTACTS_PER_PAGE, contactPage * CONTACTS_PER_PAGE);
+  const manager = board.employmentDetails.lineManager;
+  const normalized = (value?: string) => (value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const visibleContacts = board.contacts.filter((contact) => {
+    if (!manager || normalized(contact.name) !== normalized(manager.name)) return true;
+    const sameEmail = Boolean(contact.email && manager.email && normalized(contact.email) === normalized(manager.email));
+    const samePhone = Boolean(contact.phone && manager.phone
+      && contact.phone.replace(/\D/g, '') === manager.phone.replace(/\D/g, ''));
+    return !(sameEmail || samePhone);
+  });
+  const contactPages = Math.max(1, Math.ceil(visibleContacts.length / CONTACTS_PER_PAGE));
+  const contactRows = visibleContacts.slice((contactPage - 1) * CONTACTS_PER_PAGE, contactPage * CONTACTS_PER_PAGE);
 
   // ---- activity: filters over the rows already on the board ----
   const [activityQuery, setActivityQuery] = useState('');
@@ -1743,9 +1859,9 @@ function BoardView({
           <LearnerHeader
             name={board.user.name}
             reference={board.user.reference}
-            ownerSlot={<HeroCoach learnerId={userId} fallbackOwner={board.user.owner} />}
+            caseOwner={board.learnerTeam.caseOwner?.name || ''}
+            skillsCoach={board.learnerTeam.skillsCoach?.name || ''}
             programme={board.programme.name}
-            employer={board.user.employer}
             cohort={board.programme.cohort}
             onboardingStatus={board.programme.onboardingStatus}
             dates={
@@ -1808,7 +1924,6 @@ function BoardView({
                     { label: 'Date of birth', value: board.contact.dob },
                     { label: 'Group', value: board.contact.groupMembership },
                     { label: 'Home address', value: board.contact.address, wide: true },
-                    { label: 'Employer', value: board.user.employer },
                     {
                       label: 'Signature',
                       value: signature
@@ -1841,8 +1956,13 @@ function BoardView({
                 </Card>
               </div>
 
-              {board.contacts.length > 0 && (
-                <Card title="Contacts" icon={Users} count={board.contacts.length}>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <LearnerTeamCard learnerId={userId} team={board.learnerTeam} />
+                <EmploymentDetailsCard details={board.employmentDetails} />
+              </div>
+
+              {visibleContacts.length > 0 && (
+                <Card title="Contacts" icon={Users} count={visibleContacts.length}>
                   <Table headers={['Name', 'Type', 'Phone', 'Email', 'Role', 'Notes']}>
                     {contactRows.map((c) => (
                       <tr key={c.id} className="border-b border-foreground-100 last:border-0">

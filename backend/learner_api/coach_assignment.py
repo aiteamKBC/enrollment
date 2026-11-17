@@ -1,4 +1,4 @@
-"""Resolve the current case owner and keep coach names/emails together."""
+"""Resolve independent case-owner and Skills Coach staff assignments."""
 from .models import StaffUser
 
 
@@ -18,6 +18,12 @@ def _is_legacy_email(email):
 
 
 def case_owner_coach(owner, source=None):
+    """Resolve a case owner's contact for enrolment bookings.
+
+    The historical function name is retained for callers, but this helper never
+    assigns a Skills Coach.  It only turns the existing name-only Case Owner
+    column into the contact shape used by the booking code.
+    """
     name = _text(owner)
     if not name:
         return {"coach_name": "", "coach_email": ""}
@@ -46,9 +52,6 @@ def case_owner_coach(owner, source=None):
 
 def source_coach(source):
     """None means a legacy row with no assignment; empty strings mean cleared."""
-    owner = _text(getattr(source, "case_owner", ""))
-    if owner:
-        return case_owner_coach(owner, source)
     name = getattr(source, "coach_name", None)
     email = getattr(source, "coach_email", None)
     if name is not None or email is not None:
@@ -58,6 +61,40 @@ def source_coach(source):
             return {"coach_name": clean_name, "coach_email": _text(staff.email)}
         return {"coach_name": clean_name, "coach_email": _text(email)}
     return None
+
+
+def resolve_coach_assignment(name, email, source=None):
+    """Return a canonical Skills Coach contact backed by Coach access.
+
+    Assignment never grants access.  The selected staff account must already
+    hold the real ``coach`` grant (primary or additional), and name/email must
+    identify the same unique account.  Blank values explicitly clear the
+    assignment.
+    """
+    from login.identity import accesses_for_staff
+    from .mappers import ValidationError
+
+    clean_name = _text(name)
+    clean_email = _text(email)
+    if not clean_name and not clean_email:
+        return {"coach_name": "", "coach_email": ""}
+
+    queryset = StaffUser.objects.all()
+    if clean_email:
+        queryset = queryset.filter(email__iexact=clean_email)
+    if clean_name:
+        queryset = queryset.filter(username__iexact=clean_name)
+    staff = list(queryset.only("username", "email", "access", "access_extra")[:2])
+    if len(staff) != 1:
+        raise ValidationError("Choose one valid staff account for the Skills Coach.")
+    account = staff[0]
+    if "coach" not in accesses_for_staff(account):
+        raise ValidationError("The selected staff member does not have Coach access.")
+    resolved_name = _text(account.username)
+    resolved_email = _text(account.email)
+    if not resolved_name or not resolved_email:
+        raise ValidationError("The selected Skills Coach must have a name and email address.")
+    return {"coach_name": resolved_name, "coach_email": resolved_email}
 
 
 def current_coach(source, profile=None, historical=None):

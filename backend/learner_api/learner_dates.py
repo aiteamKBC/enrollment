@@ -1,7 +1,6 @@
-"""Save enrolment fields and mirror learner-specific dates and coach contact."""
+"""Save enrolment fields and mirror learner-specific dates and Skills Coach."""
 from django.db import transaction
 
-from .coach_assignment import case_owner_coach
 from .identity import learner_profile_for_source
 
 
@@ -16,21 +15,29 @@ def save_enrolment_fields(user, fields):
     profile_fields = {}
     if any(field in fields for field in DATE_FIELDS):
         profile_fields.update(learner_date_values(user))
-    if "case_owner" in fields:
-        contact = ({key: fields[key] for key in ("coach_name", "coach_email")}
-                   if all(key in fields for key in ("coach_name", "coach_email"))
-                   else case_owner_coach(fields["case_owner"], user))
+    if any(field in fields for field in ("coach_name", "coach_email")):
+        contact = {
+            "coach_name": str(getattr(user, "coach_name", "") or "").strip(),
+            "coach_email": str(getattr(user, "coach_email", "") or "").strip(),
+        }
         fields = {**fields, **contact}
-        for field, value in contact.items():
-            setattr(user, field, value)
         profile_fields.update(contact)
-        # Imported ownership is a separate, explicit outcome of reassignment.
+        # Imported review ownership follows the Skills Coach only. A Case Owner
+        # edit is administrative and must never transfer coaching work.
         # Resolve without opportunistically repairing an identity link.
         profile = learner_profile_for_source(user, heal=False)
-        from coach_api.review_handover import save_assignment
-        handover = save_assignment(user, profile, fields, profile_fields)
-        if handover is not None and handover[0]:
-            return {"reviewHandover": handover[1]}
+        previous = (
+            str(getattr(profile, "coach_name", "") or "").strip().casefold(),
+            str(getattr(profile, "coach_email", "") or "").strip().casefold(),
+        ) if profile is not None else None
+        current = (contact["coach_name"].casefold(), contact["coach_email"].casefold())
+        if profile is not None and previous != current:
+            from coach_api.review_handover import save_assignment
+            handover = save_assignment(user, profile, fields, profile_fields)
+            if handover is not None and handover[0]:
+                return {"reviewHandover": handover[1]}
+        else:
+            handover = None
     else:
         handover = None
     if not profile_fields:

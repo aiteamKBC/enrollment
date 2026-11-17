@@ -44,7 +44,7 @@ from .active_users import (
 from .identity import learner_profile_for_source
 from .account_deletion import delete_learner_account
 from .learner_dates import save_enrolment_fields
-from .coach_assignment import case_owner_coach, current_coach
+from .coach_assignment import case_owner_coach, current_coach, resolve_coach_assignment
 from .directory import learner_directory_queryset
 from .learner_progression import ACTIVE_STATUS, advance_learner
 from login.services import sync_account
@@ -639,9 +639,9 @@ def _create_profile_from_delivery_payload(payload, *, apprenticeship):
 def learner_coach(request, pk):
     """Read/update the coach on the enrolment record and its linked profile.
 
-    The Owner picker and the edit form's Case owner represent one assignment.
-    Persist both name and email on the source so reactivation preserves them.
-    This picker is available only while the learner is Active.
+    The Skills Coach is independent of the learner's Case Owner. Persist both
+    coach name and email on the source so reactivation preserves the assignment.
+    This endpoint is available only while the learner is Active.
 
         GET   /learner_api/learners/<id>/coach/   -> {coachName, coachEmail}
         PATCH /learner_api/learners/<id>/coach/   -> {coachName?, coachEmail?} -> same
@@ -692,20 +692,16 @@ def learner_coach(request, pk):
             return _error("Provide coachName and/or coachEmail.", 400)
 
         try:
-            if "coach_email" not in update:
-                update = case_owner_coach(update["coach_name"], source)
-            elif "coach_name" not in update:
-                if not update["coach_email"]:
-                    update["coach_name"] = ""
-                else:
-                    staff = list(StaffUser.objects.filter(email__iexact=update["coach_email"]).only("username")[:2])
-                    if len(staff) != 1:
-                        return _error("Provide coachName with this coachEmail.", 400)
-                    update["coach_name"] = staff[0].username or ""
-            update["case_owner"] = update["coach_name"]
+            update = resolve_coach_assignment(
+                update.get("coach_name", ""),
+                update.get("coach_email", ""),
+                source,
+            )
             for attr, value in update.items():
                 setattr(source, attr, value)
             handover = save_enrolment_fields(source, update)
+        except ValidationError as exc:
+            return _error(str(exc), 400)
         except DatabaseError as exc:
             return _error(f"Database error: {exc}", 502)
         return JsonResponse({"coachName": update["coach_name"], "coachEmail": update["coach_email"],
@@ -860,8 +856,11 @@ def _create_enrolment_user(request, fields, *, require_account=False,
 
     # all_learners: the default manager is scoped to apprenticeship, so
     # creating through it would fight the learnerType we just set.
-    if "case_owner" in fields:
-        fields.update(case_owner_coach(fields["case_owner"]))
+    if "coach_name" in fields or "coach_email" in fields:
+        fields.update(resolve_coach_assignment(
+            fields.get("coach_name", ""), fields.get("coach_email", "")
+        ))
+    owner_contact = case_owner_coach(fields.get("case_owner", ""))
     user = EnrolmentUser.all_learners.create(**fields)
 
     # Commercial learners are date-driven from the moment they are
@@ -879,8 +878,8 @@ def _create_enrolment_user(request, fields, *, require_account=False,
             user,
             scheduled_date=session_date,
             scheduled_time=session_time,
-            owner_name=_s(fields.get("coach_name")) or _s(fields.get("case_owner")),
-            owner_email=_s(fields.get("coach_email")),
+            owner_name=_s(fields.get("case_owner")),
+            owner_email=_s(owner_contact.get("coach_email")),
         )
     elif session_date is not None:
         # A date with no time: an imported row that knows the day but not the
@@ -982,6 +981,12 @@ def enrolment_user_detail(request, pk):
                         pk, ", ".join(rejected),
                     )
             fields = write_fields(payload)
+            if "coach_name" in fields or "coach_email" in fields:
+                fields.update(resolve_coach_assignment(
+                    fields.get("coach_name", ""),
+                    fields.get("coach_email", ""),
+                    user,
+                ))
             if (getattr(request, "learner_self_write", False)
                     and str(fields.get("onboarding_status", "")).strip().lower() in {"submitted", "completed"}):
                 from programme_suitability.completion import submission_error
