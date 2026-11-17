@@ -4,7 +4,7 @@ import { DatePickerField } from '@/components/feature/DatePickerField';
 import { SelectMenu } from '@/components/feature/SelectField';
 import { reviewHandoverMessage } from '@/api/reviewHandover';
 import { fetchProgrammes, fetchCohorts, fetchGroups } from '@/api/curriculum';
-import { fetchCaseOwners } from '@/api/staffUsers';
+import { fetchCaseOwners, fetchCoachOptions, type CoachOption } from '@/api/staffUsers';
 import {
   ATTENDANCE_TYPE_OPTIONS,
   createEnrolmentUser,
@@ -69,7 +69,7 @@ interface FieldDef {
    * until its parent is chosen. `caseOwner` and `employer` are independent,
    * loaded once.
    */
-  lookup?: 'programme' | 'cohort' | 'group' | 'caseOwner' | 'employer' | 'organisation';
+  lookup?: 'programme' | 'cohort' | 'group' | 'caseOwner' | 'skillsCoach' | 'employer' | 'organisation';
 }
 
 interface SectionDef {
@@ -171,6 +171,7 @@ const SECTIONS: SectionDef[] = [
       // Required: the first session below is booked with this person, and a
       // learner cannot be enrolled without someone to hold it.
       { name: 'caseOwner', label: 'Case owner', type: 'select', lookup: 'caseOwner', required: true },
+      { name: 'coachEmail', label: 'Skills coach', type: 'select', lookup: 'skillsCoach', hint: 'Optional. Only staff with Coach access appear.' },
       { name: 'organisationId', label: 'Organisation', type: 'select', lookup: 'organisation' },
       { name: 'employer', label: 'Manager', type: 'select', lookup: 'employer', hint: 'Optional. Only people linked to the selected organisation appear.' },
       { name: 'mentor', label: 'Mentor', type: 'text' },
@@ -223,6 +224,7 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   // Case owners come from Staff_users (positions Caseowner / Admin) — independent
   // of the programme cascade, so loaded once alongside programmes.
   const [caseOwners, setCaseOwners] = useState<string[]>([]);
+  const [coaches, setCoaches] = useState<CoachOption[]>([]);
   // Manager records are filtered by the selected organisation.
   const [employers, setEmployers] = useState<EmployerRow[]>([]);
   const [organisations, setOrganisations] = useState<OrganisationRow[]>([]);
@@ -297,6 +299,9 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
     fetchCaseOwners()
       .then((rows) => { if (!cancelled) setCaseOwners(rows); })
       .catch((e: Error) => { if (!cancelled) setStaffError(e.message); });
+    fetchCoachOptions()
+      .then((rows) => { if (!cancelled) setCoaches(rows); })
+      .catch((e: Error) => { if (!cancelled) setStaffError(e.message); });
     // A failure here doesn't block the form — but it must not be silent either.
     // Reported separately so "the lookup broke" can't be mistaken for "no
     // employers exist yet", which is what the empty-state hint means.
@@ -333,7 +338,7 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   }, [programme, cohort]);
 
   /** Options + disabled state for a database-backed programme/staff field. */
-  const lookupState = (level: Exclude<NonNullable<FieldDef['lookup']>, 'employer' | 'organisation'>) => {
+  const lookupState = (level: Exclude<NonNullable<FieldDef['lookup']>, 'employer' | 'organisation' | 'skillsCoach'>) => {
     if (level === 'programme') return { values: programmes, disabled: false, waitingFor: '', empty: 'None available' };
     if (level === 'cohort') return { values: cohorts, disabled: !programme, waitingFor: 'programme', empty: 'None available' };
     if (level === 'group') return { values: groups, disabled: !cohort, waitingFor: 'cohort', empty: 'None available' };
@@ -417,6 +422,8 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       county: formData.county,
       country: formData.country,
       caseOwner: formData.caseOwner,
+      coachName: formData.coachName ?? '',
+      coachEmail: formData.coachEmail ?? '',
       employerAddress: formData.employerAddress,
       mentor: formData.mentor,
       // Optional: "Select…" is sent as null, which clears it on edit and leaves
@@ -573,6 +580,20 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
                   {e.employerGroupNames.length ? `${e.name} — ${e.employerGroupNames.join(', ')}` : e.name}
                 </option>
               ))}
+            </select>
+          ) : field.lookup === 'skillsCoach' ? (
+            <select
+              id={`cu-${field.name}`}
+              value={value}
+              onChange={(e) => {
+                const selected = coaches.find((coach) => coach.email === e.target.value);
+                setField('coachEmail', selected?.email ?? '');
+                setField('coachName', selected?.name ?? '');
+              }}
+              className={`${inputClass} cursor-pointer`}
+            >
+              <option value="">Not assigned</option>
+              {coaches.map((coach) => <option key={coach.email} value={coach.email}>{coach.name}</option>)}
             </select>
           ) : field.lookup ? (
             (() => {

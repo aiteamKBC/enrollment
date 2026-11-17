@@ -28,7 +28,7 @@ const api = vi.hoisted(() => ({
   finishEnrolment: vi.fn(),
   updateFunctionalSkillsStatus: vi.fn(),
   uploadEnrolmentDocument: vi.fn(),
-  fetchEvidence: vi.fn(async () => []),
+  fetchEvidence: vi.fn(async (_kind?: unknown, _id?: unknown, _opts?: { sectionRef?: string }) => []),
   uploadEvidence: vi.fn(),
   getEvidenceDownloadUrl: vi.fn(),
   deleteEvidence: vi.fn(),
@@ -62,7 +62,7 @@ vi.mock('@/api/writtenAgreement', () => ({ fetchWrittenAgreement: vi.fn(async ()
 const reviews = vi.hoisted(() => ({ fetchOnboardingReviewSlots: vi.fn(), issueOnboardingReview: vi.fn(), fetchReviewForm: vi.fn() }));
 vi.mock('@/api/reviewForm', async (original) => ({ ...(await original<typeof import('@/api/reviewForm')>()), ...reviews }));
 vi.mock('@/api/coach', () => ({ fetchLearnerCoach: vi.fn(async () => { throw new Error('not active'); }), updateLearnerCoach: vi.fn() }));
-vi.mock('@/api/staffUsers', () => ({ fetchCoachOptions: vi.fn(async () => []) }));
+vi.mock('@/api/staffUsers', () => ({ fetchCaseOwners: vi.fn(async () => ['Case Owner']), fetchCoachOptions: vi.fn(async () => []) }));
 const rplApi = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn(), generate: vi.fn(), issued: vi.fn(async () => ({ documents: [] })) }));
 vi.mock('@/api/suitabilityRplReport', () => ({
   fetchSuitabilityRplReport: rplApi.fetch,
@@ -78,6 +78,15 @@ const NO_FS: FsBlock = { assessments: [], exempt: false, evidence: [] };
 function makeBoard(overrides: Partial<EnrolmentBoard> = {}): EnrolmentBoard {
   return {
     user: { id: '20', name: 'Sam Example', reference: 'Example Org', owner: 'Case Owner', employer: 'Example Ltd' },
+    learnerTeam: {
+      caseOwner: { name: 'Case Owner', email: 'owner@example.test' },
+      skillsCoach: { name: 'Skills Coach', email: 'coach@example.test' },
+    },
+    employmentDetails: {
+      organisation: { name: 'Example Ltd', address: '1 Business Street, London, SW1A 1AA' },
+      employerRepresentative: { name: 'Robin Representative', email: 'robin@example.test' },
+      lineManager: { name: 'Pat Manager', email: 'pat@example.test', phone: '020 7000 0000' },
+    },
     contact: { email: 'sam@example.test', phone: '07000 000000', dob: '01/01/2000', groupMembership: 'Group A', hasMandate: false, address: '1 Example Street' },
     activity: { aptemUsage: '00:00', daysTillNextReporting: 0, logins: 0, tasksAddedByUser: 0, uncompletedTasks: 0, adviceItemsAccessed: 0, actionPlans: 'No plans created' },
     programme: {
@@ -189,19 +198,35 @@ describe('the enrolment board', () => {
       reviewHandover: { transferred: [], unchanged: [], historical: [], uninitialized: [],
         blocked: [{ reviewId: 'imported-review:synthetic', code: 'booking_handover_required' }] } });
     renderBoard();
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Coach' }), { target: { value: 'new@example.invalid' } });
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Skills Coach' }), { target: { value: 'new@example.invalid' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText(/Coach assignment saved.*Existing meeting bookings need a separate handover/)).toBeVisible();
-    expect(screen.getByRole('combobox', { name: 'Coach' })).toHaveValue('new@example.invalid');
+    expect(screen.getByRole('combobox', { name: 'Skills Coach' })).toHaveValue('new@example.invalid');
+    expect(updateLearnerCoach).toHaveBeenCalledWith('20', {
+      coachName: 'New Coach', coachEmail: 'new@example.invalid',
+    });
+    expect(vi.mocked(updateLearnerCoach).mock.calls[0][1]).not.toHaveProperty('caseOwner');
   });
 
   it('opens on the overview with the wired panels only', async () => {
     renderBoard();
     expect(await screen.findByRole('heading', { name: 'Sam Example' })).toBeInTheDocument();
     expect(tab(/Overview/)).toHaveAttribute('aria-selected', 'true');
-    for (const name of ['Contact details', 'Programme', 'Contacts', 'Functional Skills']) {
+    for (const name of ['Contact details', 'Programme', 'Learner Team', 'Employer & Manager', 'Contacts', 'Functional Skills']) {
       expect(screen.getByRole('region', { name })).toBeInTheDocument();
     }
+    const header = screen.getByRole('region', { name: 'Learner overview' });
+    expect(within(header).getAllByText('Case Owner')).toHaveLength(2);
+    expect(within(header).getAllByText('Skills Coach')).toHaveLength(2);
+    expect(within(header).queryByText('Employer')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Learner Team' })).getByRole('combobox', { name: 'Case Owner' })).toHaveValue('Case Owner');
+    expect(within(screen.getByRole('region', { name: 'Learner Team' })).getAllByText('Skills Coach').length).toBeGreaterThan(0);
+    const employment = screen.getByRole('region', { name: 'Employer & Manager' });
+    expect(within(employment).getByText('Example Ltd')).toBeInTheDocument();
+    expect(within(employment).getByText('1 Business Street, London, SW1A 1AA')).toBeInTheDocument();
+    expect(within(employment).getByText('Robin Representative')).toBeInTheDocument();
+    expect(within(employment).getByText('Pat Manager')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Contact details' })).queryByText('Employer')).not.toBeInTheDocument();
     expect(screen.getByText('English')).toBeInTheDocument();
     expect(screen.getByText('Maths')).toBeInTheDocument();
     expect(screen.getAllByText('No assessments recorded')).toHaveLength(2);
@@ -211,6 +236,67 @@ describe('the enrolment board', () => {
     }
     // Subscription status alone is the learner's record status, not subscription data.
     expect(screen.queryByRole('region', { name: 'Subscription' })).not.toBeInTheDocument();
+  });
+
+  it('shows both missing learner-team assignments as Not assigned', async () => {
+    api.fetchEnrolmentBoard.mockResolvedValue(makeBoard({ learnerTeam: { caseOwner: null, skillsCoach: null } }));
+    renderBoard();
+    const header = await screen.findByRole('region', { name: 'Learner overview' });
+    expect(within(header).getAllByText('Not assigned')).toHaveLength(2);
+    const team = await screen.findByRole('region', { name: 'Learner Team' });
+    expect(within(team).getAllByText('Not assigned').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('displays Case Owner and Skills Coach independently in the header', async () => {
+    api.fetchEnrolmentBoard.mockResolvedValue(makeBoard({
+      learnerTeam: {
+        caseOwner: { name: 'Alex Administrator', email: 'alex.admin@example.test' },
+        skillsCoach: { name: 'Jamie Coach', email: 'jamie.coach@example.test' },
+      },
+    }));
+    renderBoard();
+    const header = await screen.findByRole('region', { name: 'Learner overview' });
+    expect(within(header).getByText('Alex Administrator')).toBeInTheDocument();
+    expect(within(header).getByText('Jamie Coach')).toBeInTheDocument();
+  });
+
+  it('renders explicit empty employment values without inventing employer data', async () => {
+    api.fetchEnrolmentBoard.mockResolvedValue(makeBoard({
+      user: { id: '20', name: 'Sam Example', reference: 'Example Org', owner: '', employer: 'Legacy Header Employer' },
+      employmentDetails: { organisation: null, employerRepresentative: null, lineManager: null },
+    }));
+    renderBoard();
+    const employment = await screen.findByRole('region', { name: 'Employer & Manager' });
+    expect(within(employment).getAllByText('Not recorded')).toHaveLength(7);
+    expect(screen.queryByText('Legacy Header Employer')).not.toBeInTheDocument();
+  });
+
+  it('does not repeat the authoritative manager in Contacts when identity matches safely', async () => {
+    api.fetchEnrolmentBoard.mockResolvedValue(makeBoard({
+      contacts: [
+        { id: 'manager', name: 'Pat Manager', type: 'Line manager', phone: '020 7000 0000', email: 'pat@example.test', role: 'Manager', notes: '' },
+        { id: 'kin', name: 'Alex Relative', type: 'Next of kin', phone: '', email: 'alex@example.test', role: 'Sibling', notes: '' },
+      ],
+    }));
+    renderBoard();
+    const contacts = await screen.findByRole('region', { name: 'Contacts' });
+    expect(within(contacts).queryByText('Pat Manager')).not.toBeInTheDocument();
+    expect(within(contacts).getByText('Alex Relative')).toBeInTheDocument();
+  });
+
+  it('updates the Case Owner without submitting Skills Coach fields', async () => {
+    api.updateEnrolmentUser.mockResolvedValue(makeBoard({
+      learnerTeam: {
+        caseOwner: { name: 'New Owner', email: 'new-owner@example.test' },
+        skillsCoach: { name: 'Skills Coach', email: 'coach@example.test' },
+      },
+    }));
+    renderBoard();
+    const team = await screen.findByRole('region', { name: 'Learner Team' });
+    fireEvent.change(within(team).getByRole('combobox', { name: 'Case Owner' }), { target: { value: '' } });
+    fireEvent.click(within(team).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.updateEnrolmentUser).toHaveBeenCalledWith('20', { caseOwner: '' }));
+    expect(api.updateEnrolmentUser.mock.calls[0][1]).not.toHaveProperty('coachName');
   });
 
   it('renders saved BKSB result levels and assessment dates in the Overview', async () => {

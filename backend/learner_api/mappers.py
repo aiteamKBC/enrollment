@@ -137,7 +137,7 @@ def to_edit_fields(u):
     The keys are ``WRITABLE_FIELDS`` keys, so whatever comes out of here can be
     handed straight back to PATCH without a translation layer in between.
     """
-    return {
+    fields = {
         "id": str(u.id),
         "username": _s(u.username),
         "email": _s(u.email),
@@ -160,6 +160,15 @@ def to_edit_fields(u):
         **{key: _s(getattr(u, attr)) for key, attr in APTEM_TEXT_FIELDS.items()},
         **{key: getattr(u, attr) for key, attr in APTEM_BOOL_FIELDS.items()},
     }
+    # A few pre-link records stored the coach only on LearnerProfile. Preserve
+    # that assignment when the edit form round-trips unrelated learner fields.
+    if getattr(u, "coach_name", None) is None and getattr(u, "coach_email", None) is None:
+        from .coach_assignment import current_coach
+        from .identity import learner_profile_for_source
+        coach = current_coach(u, learner_profile_for_source(u, heal=False))
+        fields["coachName"] = _s(coach["coach_name"])
+        fields["coachEmail"] = _s(coach["coach_email"])
+    return fields
 
 
 # --------------------------------------------------------------------------- #
@@ -290,6 +299,130 @@ def _employer_label(u):
     return employer.full_name or fallback, employer_id
 
 
+def _learner_team(u):
+    """Return explicit staff assignments without legacy Owner fallbacks."""
+    from .coach_assignment import case_owner_coach, current_coach
+    from .identity import learner_profile_for_source
+
+    case_owner_name = _s(getattr(u, "case_owner", ""))
+    case_owner = case_owner_coach(case_owner_name) if case_owner_name else {"coach_email": ""}
+    profile = (
+        learner_profile_for_source(u, heal=False)
+        if getattr(u, "coach_name", None) is None and getattr(u, "coach_email", None) is None
+        else None
+    )
+    coach = current_coach(u, profile)
+    return {
+        "caseOwner": ({"name": case_owner_name, "email": _s(case_owner["coach_email"])}
+                      if case_owner_name else None),
+        "skillsCoach": ({"name": _s(coach["coach_name"]), "email": _s(coach["coach_email"])}
+                         if _s(coach["coach_name"]) or _s(coach["coach_email"]) else None),
+    }
+
+
+def _extended_employment(u):
+    """Return the learner's saved Extended ILR employer block, if available."""
+    from django.db import DatabaseError
+
+    try:
+        from enrolment_api.models import ExtendedIlr
+        row = ExtendedIlr.objects.filter(learner_id=u.pk).only("answers").first()
+    except DatabaseError:
+        return {}
+    answers = getattr(row, "answers", None)
+    if not isinstance(answers, dict):
+        return {}
+    employer = answers.get("employer")
+    return employer if isinstance(employer, dict) else {}
+
+
+def _verified_employer_representative(u):
+    """Representative from this learner's exact verified Eligibility link."""
+    from django.db import DatabaseError
+
+    try:
+        from enrolment_api.eligibility_link import verified_application
+        application = verified_application(u.pk)
+    except DatabaseError:
+        return None
+    if not application:
+        return None
+    name = _s(application.get("representative_name"))
+    email = _s(application.get("representative_email"))
+    return {"name": name, "email": email} if name or email else None
+
+
+def _employment_details(u):
+    """Resolve coherent organisation, representative and manager records.
+
+    Each person is returned wholly from one source.  In particular, a legacy
+    manager name is never combined with an assigned Employer's email or phone.
+    """
+    from django.db import DatabaseError
+    from .models import Employer, Organisation
+
+    employer = None
+    organisation = None
+    try:
+        employer_id = getattr(u, "employer_id", None)
+        employer = Employer.objects.filter(pk=employer_id).first() if employer_id else None
+        organisation_id = getattr(u, "organisation_id", None)
+        if organisation_id:
+            organisation = Organisation.objects.filter(pk=organisation_id).first()
+        elif employer is not None:
+            ids = [value for value in (employer.employer_group_ids or [])
+                   if isinstance(value, int) or str(value).isdigit()]
+            if len(ids) == 1:
+                organisation = Organisation.objects.filter(pk=int(ids[0])).first()
+    except DatabaseError:
+        employer = None
+        organisation = None
+
+    # A manager linked to a different company is not valid for this learner.
+    direct_org_id = getattr(u, "organisation_id", None)
+    if organisation is not None and employer is not None and direct_org_id:
+        linked_ids = {str(value) for value in (employer.employer_group_ids or [])}
+        if str(direct_org_id) not in linked_ids:
+            employer = None
+
+    extended = _extended_employment(u)
+    if organisation is not None:
+        address = ", ".join(part for part in (
+            _s(organisation.address_1), _s(organisation.address_2),
+            _s(organisation.city_town), _s(organisation.county),
+            _s(organisation.post_code), _s(organisation.country),
+        ) if part)
+        organisation_details = {"name": _s(organisation.name), "address": address}
+    elif any(_s(extended.get(key)) for key in ("organisationName", "address", "city", "postcode")):
+        address = ", ".join(part for part in (
+            _s(extended.get("address")), _s(extended.get("city")), _s(extended.get("postcode")),
+        ) if part)
+        organisation_details = {"name": _s(extended.get("organisationName")), "address": address}
+    else:
+        legacy_name = _s(getattr(u, "organization", "")) or _s(getattr(u, "employer", ""))
+        legacy_address = _s(getattr(u, "employer_address", ""))
+        organisation_details = ({"name": legacy_name, "address": legacy_address}
+                                if legacy_name or legacy_address else None)
+
+    if employer is not None:
+        manager = {"name": _s(employer.full_name), "email": _s(employer.email), "phone": _s(employer.mobile)}
+    elif any(_s(extended.get(key)) for key in ("lineManagerName", "lineManagerEmail", "lineManagerPhone")):
+        manager = {
+            "name": _s(extended.get("lineManagerName")),
+            "email": _s(extended.get("lineManagerEmail")),
+            "phone": _s(extended.get("lineManagerPhone")),
+        }
+    else:
+        legacy_manager = _s(getattr(u, "line_manager", ""))
+        manager = {"name": legacy_manager, "email": "", "phone": ""} if legacy_manager else None
+
+    return {
+        "organisation": organisation_details,
+        "employerRepresentative": _verified_employer_representative(u),
+        "lineManager": manager,
+    }
+
+
 def to_board(u):
     # Imported here, not at module scope: enrolment_api.models imports from
     # learner_api.models, so a top-level import would be circular.
@@ -322,6 +455,8 @@ def to_board(u):
             "employer": employer_name,
             "employerId": employer_id,
         },
+        "learnerTeam": _learner_team(u),
+        "employmentDetails": _employment_details(u),
         "contact": {
             "title": _s(getattr(u, "title", None)),
             "country": _s(getattr(u, 'country', None)),
@@ -414,6 +549,8 @@ APTEM_TEXT_FIELDS = {
     "gender": "gender",
     "country": "country",
     "caseOwner": "case_owner",
+    "coachName": "coach_name",
+    "coachEmail": "coach_email",
     "mentor": "mentor",
     "attendanceType": "attendance_type",
     "employerAddress": "employer_address",
@@ -900,6 +1037,8 @@ def to_staff_row(u):
     """A staff account, shaped like a UserListRow so the directory can list
     learners and staff in one table."""
     status = _s(u.status)
+    from login.identity import accesses_for_staff
+
     return {
         "id": str(u.id),
         "uuid": str(u.uuid) if getattr(u, "uuid", None) else None,
@@ -916,6 +1055,7 @@ def to_staff_row(u):
         "programmeStatus": "",
         "position": _s(u.position),
         "access": _s(u.access).lower(),
+        "accesses": sorted(accesses_for_staff(u)),
         "phone": _s(u.phone_number),
         "title": _s(u.title),
         "preferredName": _s(u.preferred_name),

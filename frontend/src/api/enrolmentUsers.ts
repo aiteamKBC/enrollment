@@ -63,6 +63,8 @@ export interface AptemUserFields {
   county?: string;
   country?: string;
   caseOwner?: string;
+  coachName?: string;
+  coachEmail?: string;
   employerAddress?: string;
   mentor?: string;
   /** One of ATTENDANCE_TYPE_OPTIONS; null clears it. */

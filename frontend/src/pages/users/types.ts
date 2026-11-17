@@ -285,6 +285,15 @@ export interface EnrolmentBoard {
     employer?: string;
     employerId?: number | null;
   };
+  learnerTeam: {
+    caseOwner: { name: string; email: string } | null;
+    skillsCoach: { name: string; email: string } | null;
+  };
+  employmentDetails: {
+    organisation: { name: string; address: string } | null;
+    employerRepresentative: { name: string; email: string } | null;
+    lineManager: { name: string; email: string; phone: string } | null;
+  };
   contact: {
     title?: string;
     /** False only for existing signed/submitted records grandfathered without Title. */
