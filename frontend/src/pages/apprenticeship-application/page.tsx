@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, Info, Loader2, MapPin, RotateCcw, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -45,6 +45,7 @@ import type { EligibilityLayout } from './layout/types';
 import frame from '../coach-booking/booking.module.css';
 import styles from './application.module.css';
 import { DatePickerField } from '@/components/feature/DatePickerField';
+import { IpcFundRecommendation } from './IpcFundRecommendation';
 
 /** A postcode check as the page tracks it, by compact postcode. */
 type Check = PostcodeCheck | { status: 'checking' };
@@ -374,6 +375,7 @@ export default function ApprenticeshipApplicationPage() {
               {outcome.reasons.map(reason => <p key={reason}>Reason: {reason}</p>)}
               <p>Government-funded apprenticeships in England generally require qualifying paid employment and at least 50% of working hours to be spent in England.</p>
               <p>If your employer is based outside England but you work at an English branch, or you believe your circumstances may qualify for an exception, please contact our Admissions Team at <a href={`mailto:${EMPLOYMENT_CONTACT_EMAIL}`}>{EMPLOYMENT_CONTACT_EMAIL}</a>.</p>
+              <IpcFundRecommendation programme={answers.programme} ineligible={outcome.eligible === false} />
             </>}
           </div>
         </section>
@@ -416,8 +418,8 @@ export default function ApprenticeshipApplicationPage() {
                 const [title, ...paragraphs] = item.text.split('\n\n');
                 if (item.key === EMPLOYMENT_REQUIREMENTS_NOTICE_KEY) {
                   return (
+                    <Fragment key={item.key}>
                     <div
-                      key={item.key}
                       id={EMPLOYMENT_REQUIREMENTS_NOTICE_KEY}
                       className={`${styles.note} ${styles.employmentNotice}`}
                       role="note"
@@ -440,6 +442,8 @@ export default function ApprenticeshipApplicationPage() {
                         </p>
                       ))}
                     </div>
+                    <IpcFundRecommendation programme={answers.programme} ineligible={isEmploymentRestricted(answers.employmentStatus)} />
+                    </Fragment>
                   );
                 }
                 return (
