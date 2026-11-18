@@ -34,6 +34,16 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+it.each([
+  ['PCP_L6', false, true], ['Project Controls Professional Level 6', false, true],
+  ['PCP_L6', true, false], ['PCP_L6', null, false], ['Marketing Manager Level 6', false, false],
+])('shows the IPC recommendation in review only for rejected PCP: %s eligible=%s', async (programme, eligible, visible) => {
+  detail.mockResolvedValue({ application: { ...application, programme, eligible } });
+  open('/users/eligibility-applications/42');
+  await screen.findByRole('heading', { name: 'Sam Example' });
+  expect(!!screen.queryByRole('region', { name: 'IPC Fund recommendation' })).toBe(visible);
+});
+
 function open(path = '/users/eligibility-applications') {
   return render(<MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/users/eligibility-applications" element={<EligibilityApplicationsPage />} />
