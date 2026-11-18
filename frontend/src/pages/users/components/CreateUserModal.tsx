@@ -90,7 +90,7 @@ const COUNTRY_OPTIONS = opts(ALL_COUNTRIES);
 // of creating somebody who could never sign in.
 const SECTIONS: SectionDef[] = [
   {
-    title: 'Identity',
+    title: 'Personal Information',
     icon: 'ri-user-line',
     fields: [
       { name: 'firstName', label: 'First name', type: 'text', required: true, placeholder: 'firstname', phase: 'create' },
@@ -103,6 +103,18 @@ const SECTIONS: SectionDef[] = [
       { name: 'phone', label: 'Mobile', type: 'tel', placeholder: 'NNN NNNN NNNN or +NNN NNN NNN NNNN' },
       { name: 'dob', label: 'Date of birth', type: 'date' },
       { name: 'niNumber', label: 'National Insurance number', type: 'text', placeholder: 'AB123456A' },
+    ],
+  },
+  {
+    title: 'Address',
+    icon: 'ri-map-pin-line',
+    fields: [
+      { name: 'addressLine1', label: 'Address 1', type: 'text' },
+      { name: 'addressLine2', label: 'Address 2', type: 'text' },
+      { name: 'townCity', label: 'Town/City', type: 'text' },
+      { name: 'county', label: 'County', type: 'text' },
+      { name: 'postcode', label: 'Postcode', type: 'text', placeholder: 'CT1 1AA' },
+      { name: 'country', label: 'Country', type: 'select', options: COUNTRY_OPTIONS },
     ],
   },
   {
@@ -153,26 +165,14 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
-    title: 'Address',
-    icon: 'ri-map-pin-line',
-    fields: [
-      { name: 'postcode', label: 'Postcode', type: 'text', placeholder: 'CT1 1AA' },
-      { name: 'addressLine1', label: 'Address 1', type: 'text' },
-      { name: 'addressLine2', label: 'Address 2', type: 'text' },
-      { name: 'townCity', label: 'Town/City', type: 'text' },
-      { name: 'county', label: 'County', type: 'text' },
-      { name: 'country', label: 'Country', type: 'select', options: COUNTRY_OPTIONS },
-    ],
-  },
-  {
     title: 'Delivery & employer',
     icon: 'ri-building-line',
     fields: [
+      { name: 'organisationId', label: 'Organisation', type: 'select', lookup: 'organisation' },
+      { name: 'employer', label: 'Manager', type: 'select', lookup: 'employer', hint: 'Optional. Only people linked to the selected organisation appear.' },
       // Required: the first session below is booked with this person, and a
       // learner cannot be enrolled without someone to hold it.
       { name: 'caseOwner', label: 'Case owner', type: 'select', lookup: 'caseOwner', required: true },
-      { name: 'organisationId', label: 'Organisation', type: 'select', lookup: 'organisation' },
-      { name: 'employer', label: 'Manager', type: 'select', lookup: 'employer', hint: 'Optional. Only people linked to the selected organisation appear.' },
       { name: 'mentor', label: 'Mentor', type: 'text' },
     ],
   },
