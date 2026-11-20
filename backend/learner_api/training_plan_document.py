@@ -156,16 +156,29 @@ def _module_breakdown(module_ids):
     return breakdown
 
 
-def derive_content(learner):
+def derive_content(learner, *, activities=False):
     """Everything the Training Plan states, from the learner's own records."""
     from enrolment_api.document_templates.learner_sources import document_dates
-    start, end, dates_from = document_dates(learner)
-    modules = _plan_modules(learner)
+    start, practical_end, dates_from = document_dates(learner)
+    overview = None
+    if activities:
+        from .training_plan_activities import build
+        overview = build(learner)
+        from enrolment_api.document_templates.learner_sources import lms_apprenticeship_end
+        end, end_issue = lms_apprenticeship_end(learner)
+        if end_issue:
+            overview['warnings'].append({'field': 'programme.endDate', 'code': end_issue,
+                'message': 'The assigned LMS cohort apprenticeship end date could not be verified; no local date was substituted.'})
+        modules = [{'moduleId': m['lmsOfferingId'], 'moduleTitle': m['title'], 'hours': m['hours'],
+            'startDate': m['startDate'], 'groupName': _s(learner.group)} for m in overview['modules']]
+    else:
+        end = practical_end
+        modules = _plan_modules(learner)
     total_hours = round(sum(float(m.get("hours") or 0) for m in modules), 2)
     answers = _extended_ilr_answers(learner.pk)
     employer_block = answers.get("employer") if isinstance(answers.get("employer"), dict) else {}
 
-    weeks = _weeks_between(start, end)
+    weeks = _weeks_between(start, practical_end)
     from enrolment_api.document_templates.learner_sources import employment_details, programme_level
     ilr_details = employment_details(learner)
 
@@ -177,20 +190,20 @@ def derive_content(learner):
         # Standard name follows the assigned programme. Its level is resolved
         # separately from the catalogue.
         "standard": _s(learner.programme),
-        "level": programme_level(learner),
+        "level": (_s(learner.programme).rsplit('Level ', 1)[-1] if overview else programme_level(learner)),
         "startDate": _iso(start),
         "endDate": _iso(end),
         "practicalStartDate": _iso(start),
-        "practicalEndDate": _iso(end),
+        "practicalEndDate": _iso(practical_end),
         "durationWeeks": float(weeks) if weeks is not None else None,
-        "ilrPlannedHours": total_hours,
+        "ilrPlannedHours": overview['totals']['totalHours'] if overview else total_hours,
     }
 
     employment = {
         "employerName": _s(learner.employer) or _s(employer_block.get("organisationName")),
         "deliveryAddress": _employer_address(learner) or _s(employer_block.get("address")),
         "jobTitle": _s(getattr(ilr_details, 'job_title', '')),
-        "workingHoursPerWeek": "",
+        "workingHoursPerWeek": _s(getattr(ilr_details, 'working_hours_per_week', None)),
         "lineManager": _s(learner.line_manager) or _s(employer_block.get("lineManagerName")),
         "lineManagerTitle": "",
         "startDateWithEmployer": _iso(getattr(ilr_details, 'employment_start_date', None)),
@@ -199,7 +212,7 @@ def derive_content(learner):
     # Each module with the weeks and components that deliver it, so the printed
     # plan lists actual teaching activities rather than just module names.
     delivery_lead = MAIN_PROVIDER
-    breakdown = _module_breakdown([_s(m.get("moduleId")) for m in modules])
+    breakdown = {} if overview else _module_breakdown([_s(m.get("moduleId")) for m in modules])
     learning_plan = []
     for m in modules:
         module_id = _s(m.get("moduleId"))
@@ -230,6 +243,9 @@ def derive_content(learner):
         "rplVolume": None,
         "minimumReducedByRpl": None,
     }
+    if overview:
+        otjh['plannedTotal'] = overview['totals']['totalHours']
+        otjh['activitiesOverview'] = overview
 
     epa = {"epao": "", "gatewayReviewDate": "", "epaPeriodFrom": "", "epaPeriodTo": ""}
 
@@ -265,6 +281,7 @@ def derive_content(learner):
         "epa": epa,
         "contacts": contacts,
         "datesFrom": dates_from,
+        **({'activitiesOverview': overview} if overview else {}),
     }
 
 
@@ -324,6 +341,8 @@ def _document_json(document):
     }
 
 
+    if isinstance(document.otjh, dict) and document.otjh.get('activitiesOverview'):
+        payload['activitiesOverview'] = document.otjh['activitiesOverview']
     return template_service.with_template('training-plan', document, payload)
 
 
@@ -401,7 +420,9 @@ def issue_training_plan(request, pk):
             return _error("Learner not found.", 404)
 
         kind = _learner_kind(learner)
-        derived = derive_content(learner)
+        derived = derive_content(learner, activities=True)
+        from .training_plan_activities import require_ready
+        require_ready(derived.get('activitiesOverview'))
 
         # `using="enrolment"` is required — a bare atomic() opens on `default`
         # and leaves this supersede+create unprotected. See BE-1.
@@ -422,6 +443,8 @@ def issue_training_plan(request, pk):
                 contacts=derived["contacts"],
             )
             template_service.bind_issue('training-plan', document, learner, _document_json(document))
+    except template_service.TemplateError as exc:
+        return _error(str(exc), 409)
     except DatabaseError as exc:
         logger.exception("issue_training_plan: failed")
         return _error(f"Database error: {exc}", 502)

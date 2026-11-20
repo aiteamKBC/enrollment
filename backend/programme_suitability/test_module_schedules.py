@@ -42,7 +42,7 @@ class ModuleScheduleTests(SimpleTestCase):
         result=schedules.project('PCP_L6','chartered',self.modules,self.home,today=date(2026,11,14))
         self.assertEqual(result['offeringCount'],2)
         offers=[o for m in result['modules'] for o in m['offerings']]
-        self.assertTrue(all(o['matchConfidence']=='tentative' and o['provisional'] and o['allowLocalSelection'] and not o['reviewOnly'] for o in offers))
+        self.assertTrue(all(o['matchConfidence']=='tentative' and o['provisional'] and not o['allowLocalSelection'] and not o['reviewOnly'] for o in offers))
         read.assert_called_once_with('PROG-PCP-L6',None)
 
     def test_future_uk_day_and_test_records(self):
@@ -84,17 +84,74 @@ class ModuleScheduleTests(SimpleTestCase):
         self.assertEqual(schedules.matching_confidence({'title':'Risk, Quality and Issue Management'},'Risk Management',())[0],None)
 
     @patch.object(schedules, 'read_all')
-    def test_fixed_programmes_never_borrow_other_cohort_deliveries(self, read):
-        row={**self.offering('fixed','Social Media'), 'programme_id':'PROG-ME-L4'}
-        read.return_value=[row]
-        result=schedules.project('ME_L4',None,[{'id':'social-media','title':'Social Media'}],self.home,today=date(2026,11,14))
-        self.assertEqual(result['offeringCount'],0)
-        read.assert_called_once_with('PROG-ME-L4','home-feb')
+    def test_admin_confirmed_martech_alias_is_scoped_to_its_programme_and_module(self, read):
+        read.return_value = [{**self.offering('confirmed', 'MarTech'), 'programme_id': 'PROG-ME-L4', 'cohort_id': 'home-feb', 'group_id': 'g1', 'weeks_number': 20, 'sessions_number': 99},
+                             {**self.offering('possible', 'Martech - Fri'), 'programme_id': 'PROG-ME-L4', 'cohort_id': 'home-feb', 'group_id': 'g1'}]
+        module = {'id': 'martech', 'title': 'Marketing Technology (MarTech)'}
+        result = schedules.project('ME_L4', None, [module], {**self.home, 'groupId': 'g1'}, today=date(2026, 11, 17))
+        offers = result['modules'][0]['offerings']
+        self.assertEqual([o['matchConfidence'] for o in offers], ['confirmed_alias', 'tentative'])
+        self.assertFalse(offers[0]['provisional'])
+        self.assertFalse(offers[0]['approved'])  # Matching is separate from booking.
+        self.assertEqual(offers[0]['lmsTitle'], 'MarTech')
+        self.assertEqual(offers[0]['weeks'], 20)
+        unrelated = schedules.project('ME_L4', None, [{**module, 'id': 'another-module'}], self.home, today=date(2026, 11, 17))
+        self.assertEqual(unrelated['offeringCount'], 0)
+
+    @patch.object(schedules, 'read_all')
+    def test_me_mm_apm_only_query_and_return_home_cohort_and_allocated_group(self, read):
+        for programme_id in ('ME_L4', 'MM_L6', 'APM_L4'):
+            for review in (False, True):
+                with self.subTest(programme=programme_id, review=review):
+                    programme = next(p for p in self.config['programmes'] if p['id'] == programme_id)
+                    module = programme['modules'][0]
+                    pid = schedules.PROGRAMMES[programme_id]
+                    correct = {**self.offering('saved', module['title']), 'programme_id': pid,
+                               'cohort_id': 'home-feb', 'group_id': 'g1'}
+                    # Deliberately make the mocked reader return an out-of-scope
+                    # row despite its cohort parameter: response filtering must
+                    # independently enforce programme-specific restrictions.
+                    read.return_value = [correct,
+                        {**correct, 'module_catalogue_id': 'other-cohort', 'cohort_id': 'delivery-oct'},
+                        {**correct, 'module_catalogue_id': 'other-group', 'group_id': 'g2'}]
+                    read.reset_mock()
+                    result = schedules.project(programme_id, None, [module], {**self.home, 'groupId': 'g1'},
+                        today=date(2026, 11, 17), review=review, home_group={'status': 'assigned', 'groupId': 'g1'})
+                    self.assertEqual([o['id'] for o in result['modules'][0]['offerings']], ['saved'])
+                    self.assertFalse(result['modules'][0]['offerings'][0]['informationOnly'])
+                    self.assertFalse(result['modules'][0]['offerings'][0]['allowLocalSelection'])
+                    read.assert_called_once_with(pid, 'home-feb')
+
+    @patch.object(schedules, 'read_all')
+    def test_me_mm_apm_never_fall_back_to_other_cohorts_or_an_unallocated_eligible_group(self, read):
+        for programme_id in ('ME_L4', 'MM_L6', 'APM_L4'):
+            module = next(p for p in self.config['programmes'] if p['id'] == programme_id)['modules'][0]
+            for home, group in (
+                ({'status': 'pending', 'cohortId': None}, {'status': 'assigned', 'groupId': 'g1'}),
+                (self.home, {'status': 'unavailable', 'groupId': None}),
+                (self.home, {'status': 'eligible', 'groupId': 'g1'}),
+            ):
+                with self.subTest(programme=programme_id, home=home, group=group):
+                    read.reset_mock()
+                    result = schedules.project(programme_id, None, [module], home,
+                        today=date(2026, 11, 17), home_group=group)
+                    self.assertEqual(result['offeringCount'], 0)
+                    self.assertNotEqual((result['homeGroup'] or {}).get('status'), 'eligible')
+                    read.assert_not_called()
+
+    @patch.object(schedules, 'read_all')
+    def test_lms_home_schedule_never_borrows_another_groups_delivery(self, read):
+        first = {**self.offering('fixed', 'Social Media'), 'programme_id': 'PROG-ME-L4', 'cohort_id': 'home-feb', 'group_id': 'g1'}
+        read.return_value = [first, {**first, 'module_catalogue_id': 'other', 'group_id': 'g2'}]
+        home = {**self.home, 'source': 'lms', 'groupId': 'g1'}
+        result = schedules.project('ME_L4', None, [{'id': 'social-media', 'title': 'Social Media'}], home, today=date(2026, 11, 14))
+        self.assertEqual(result['offeringCount'], 1)
+        self.assertEqual(result['modules'][0]['offerings'][0]['groupId'], 'g1')
 
     @patch.object(schedules, 'read_all')
     def test_fixed_home_schedule_is_exact_and_not_selectable(self, read):
         read.return_value=[{**self.offering('home-offer','Social Media'), 'programme_id':'PROG-ME-L4','cohort_id':'home-feb'}]
-        result=schedules.project('ME_L4',None,[{'id':'social-media','title':'Social Media'}],self.home,today=date(2026,11,14))
+        result=schedules.project('ME_L4',None,[{'id':'social-media','title':'Social Media'}],{**self.home, 'groupId': 'home-offer-group'},today=date(2026,11,14))
         offer=result['modules'][0]['offerings'][0]
         self.assertEqual(offer['matchConfidence'],'exact_title')
         self.assertFalse(offer['allowLocalSelection'])
@@ -103,7 +160,7 @@ class ModuleScheduleTests(SimpleTestCase):
     def test_staff_read_is_get_only_and_does_not_pin_or_save(self, read):
         request=RequestFactory().get('/schedule/?review=1')
         request.user=SimpleNamespace(is_authenticated=True,is_staff=True)
-        with patch.object(schedules, 'learner_record', return_value=object()), patch.object(schedules.Assessment.objects,'filter') as manager, patch.object(schedules,'read_home_cohort',return_value=self.home):
+        with patch.object(schedules, 'learner_record', return_value=object()), patch.object(schedules.Assessment.objects,'filter') as manager, patch.object(schedules,'read_home_cohort',return_value=self.home), patch.object(schedules,'preview_home_group',return_value={'status': 'unavailable', 'groupId': None}):
             manager.return_value.first.return_value=self.row
             read.return_value=[]
             response=schedules.learner_module_schedule(request,kind='apprenticeship',learner_id=1)
@@ -128,3 +185,30 @@ class ModuleScheduleTests(SimpleTestCase):
         request.user=SimpleNamespace(is_authenticated=False)
         with patch('enrolment_api.auth.auth_required',return_value=True):
             self.assertEqual(schedules.learner_module_schedule(request,kind='apprenticeship',learner_id=1).status_code,404)
+
+    @patch.object(schedules, 'read_all')
+    def test_home_uses_one_saved_or_eligible_group_while_other_cohorts_keep_both(self, read):
+        read.return_value = [
+            {**self.offering('home1', 'Portfolio Management (APMG)'), 'cohort_id': 'home-feb', 'group_id': 'g1'},
+            {**self.offering('home2', 'Portfolio Management (APMG)'), 'cohort_id': 'home-feb', 'group_id': 'g2'},
+            self.offering('other1', 'Portfolio Management (APMG)'), self.offering('other2', 'Portfolio Management (APMG)'),
+        ]
+        for status in ('assigned', 'allocated', 'eligible'):
+            result = schedules.project('PCP_L6', 'chartered', self.modules, self.home,
+                today=date(2026, 11, 17), home_group={'status': status, 'groupId': 'g1'})
+            offers = next(m for m in result['modules'] if m['academicModuleId'] == 'portfolio')['offerings']
+            self.assertEqual({o['id'] for o in offers}, {'home1', 'other1', 'other2'})
+            self.assertTrue(all(not o['allowLocalSelection'] for o in offers))
+        blocked = schedules.project('PCP_L6', 'chartered', self.modules, self.home,
+            today=date(2026, 11, 17), home_group={'status': 'unavailable', 'groupId': None})
+        offers = next(m for m in blocked['modules'] if m['academicModuleId'] == 'portfolio')['offerings']
+        self.assertEqual({o['id'] for o in offers}, {'other1', 'other2'})
+
+    @patch.object(schedules, 'read_all')
+    def test_saved_marketing_group_keeps_marketing_impact_delivery_visible(self, read):
+        read.return_value = [{**self.offering('impact', 'Marketing Impact and Planning'),
+            'programme_id': 'PROG-ME-L4', 'cohort_id': 'home-feb', 'group_id': 'g1'}]
+        result = schedules.project('ME_L4', None, [{'id': 'marketing-impact', 'title': 'Marketing Impact and Planning'}],
+            {**self.home, 'source': 'lms', 'groupId': 'g1'}, today=date(2026, 11, 17),
+            home_group={'status': 'assigned', 'groupId': 'g1'})
+        self.assertEqual(result['modules'][0]['offerings'][0]['id'], 'impact')

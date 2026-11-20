@@ -7,6 +7,7 @@ import seedData from './seed.json';
 import { isLavender, isReferencePurple, documentPalette } from './documentTheme';
 import jsPDF from 'jspdf';
 import { learningPlanRows, learningPlanWidths } from './learningPlanLayout';
+import { trainingPlanActivitiesHtml } from './trainingPlanActivities';
 
 export const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 export interface DocumentPage { id: string; breakBlock?: DocumentBlock; blocks: DocumentBlock[] }
@@ -75,6 +76,7 @@ function sourceHtml(block: DocumentBlock, template: DocumentTemplate, data?: Rec
     return table(['Question', 'Answer'], rows.slice(starts[index + 1] + 1, starts[index + 2] ?? rows.length).filter((r) => r.kind === 'text' || r.kind === 'note').map((r) => r.kind === 'text' ? [r.label, r.value] : [r.kind === 'note' ? r.text : '', '']));
   }
   if (block.source === 'learning-plan') {
+    if (['activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', 'activities-overview-v5'].includes(data.activitiesOverview?.version)) return trainingPlanActivitiesHtml(data.activitiesOverview);
     if (isReferencePurple(template)) {
       const rows=learningPlanRows(data.learningPlan||[]);
       const measureDoc=new jsPDF();measureDoc.setFont('helvetica','normal').setFontSize(9.5);

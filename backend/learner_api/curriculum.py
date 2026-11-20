@@ -30,6 +30,7 @@ from django.views.decorators.csrf import csrf_exempt
 from curriculum_api.week_visibility import visible_child_sql, visible_week_sql
 
 from .ksb_sources import PROFILE, STANDARD, parse_source, resolve_source
+from enrollment_service.lms_readonly import LmsReadUnavailable
 
 
 def _conn():
@@ -51,6 +52,10 @@ def _guard(fn):
     """Wrap a lookup so DB errors become a clean 502 instead of a 500."""
     try:
         return JsonResponse({"results": fn()})
+    except LmsReadUnavailable as exc:
+        if exc.code == 'groups_access_unavailable':
+            return _error('The LMS reader cannot read the group catalogue. An administrator must enable read access to LMS groups.', 503)
+        return _error('LMS placement data is temporarily unavailable. Please retry.', 503)
     except DatabaseError as exc:
         return _error(f"Database error: {exc}", 502)
 
@@ -76,6 +81,11 @@ def cohorts(request):
     programme = (request.GET.get("programme") or "").strip()
     if not programme:
         return _error("programme query param is required.", 400)
+    from programme_suitability.lms_placement import enabled, curriculum_programme_id, programme_cohorts
+    identifier = curriculum_programme_id(name=programme) or curriculum_programme_id(identifier=programme)
+    if enabled() and identifier:
+        return _guard(lambda: sorted({r['cohort_name'] for r in programme_cohorts(identifier)
+                                     if r['cohort_name'] and str(r['status']).strip().casefold() in {'active', 'planned'}}))
     return _guard(lambda: [
         r["cohort_name"]
         for r in _rows(
@@ -95,6 +105,16 @@ def groups(request):
     cohort = (request.GET.get("cohort") or "").strip()
     if not programme or not cohort:
         return _error("programme and cohort query params are required.", 400)
+    from programme_suitability.lms_placement import enabled, curriculum_programme_id, saved_cohort
+    identifier = curriculum_programme_id(name=programme) or curriculum_programme_id(identifier=programme)
+    if enabled() and identifier:
+        from programme_suitability.lms_placement import cohort_groups
+        def lms_groups():
+            item, _ = saved_cohort(identifier, cohort, cohort)
+            if item is None:
+                return []
+            return sorted({r['group_name'] for r in cohort_groups(identifier, item['cohort_id']) if r.get('group_name')})
+        return _guard(lms_groups)
     return _guard(lambda: [
         r["group_name"]
         for r in _rows(

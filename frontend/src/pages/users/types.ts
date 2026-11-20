@@ -1,4 +1,5 @@
 import type { CustomAnswer } from './wizard/layout/types';
+import type { HomeCohort } from '@/features/programme-suitability/modules/configuration';
 // ============================================================================
 // Enrolment Console — shared types
 // Frontend only. Every shape is named so it can be mapped to the API later.
@@ -321,6 +322,7 @@ export interface EnrolmentBoard {
     actionPlans: string;
   };
   programme: {
+    homeCohort?: HomeCohort | null;
     type: string;
     name: string;
     cohort: string;

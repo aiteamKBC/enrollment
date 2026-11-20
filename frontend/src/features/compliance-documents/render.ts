@@ -11,6 +11,7 @@ import { drawReferenceDecorations, purpleReferencePainter } from './purpleRefere
 import { CURRENT_BRAND_ID, BRANDED_PURPLE, isBrandedPresentation } from './brandedPurpleTheme';
 import { PDF_HEADER } from './documentHeader';
 import { brandedPage, brandedPurplePainter } from './brandedPurplePdf';
+import { drawTrainingPlanActivities } from './trainingPlanActivities';
 
 const latin = (value: unknown) => String(value ?? '').replace(/[\u2022\u25cf]/g, '-').replace(/[—–]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/…/g, '...').replace(/£/g, 'GBP ').replace(/€/g, 'EUR ').replace(/[Ā-\u{10FFFF}]/gu, '?');
 
@@ -250,6 +251,10 @@ export function renderManagedDocument(template: IssuedTemplate | undefined, data
     } else if (block.type === 'native') {
       if (block.source?.startsWith('review:')) { reviewSection(block.source, block.labels); if (block.fields) renderFields(block.fields); continue; }
       if (block.source === 'learning-plan') {
+        if (template.content.documentKey === 'training-plan' && ['activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', 'activities-overview-v5'].includes(data.activitiesOverview?.version)) {
+          drawTrainingPlanActivities(doc, bounds, data.activitiesOverview, latin, ensureDecoration);
+          continue;
+        }
         if (referencePaint) { if (data.learningPlan?.length) referencePaint.learningPlan((block.columns || []).map(value=>substitute(value,template)), data.learningPlan); else para('No learning plan activities have been recorded.'); continue; }
         const rows: unknown[][] = [];
         for (const module of data.learningPlan || []) {

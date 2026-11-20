@@ -31,6 +31,19 @@ def resolve_future_cohort(row, database, programme_id, completed_on, *, include_
     assignment; this consumer does not repair or override them.
     """
     from .programme_assignment import automatic_cohort_window, resolve_automatic_cohort
+    from .lms_placement import enabled, future_cohort
+    if enabled():
+        from enrollment_service.lms_readonly import LmsReadUnavailable
+        from .programme_identity import CURRICULUM_PROGRAMME_IDS
+        if CURRICULUM_PROGRAMME_IDS.get(row.selected_programme) != programme_id:
+            return None
+        try:
+            result = future_cohort(programme_id, completed_on)
+        except LmsReadUnavailable:
+            return None
+        if result is None or include_publication:
+            return result
+        return result['cohortId'], result['name'], result['fallback']
 
     try:
         pinned_version, pinned, _ = learner_published_layout(

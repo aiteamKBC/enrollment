@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { reviewReturnPath } from './navigation';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { DatePickerField } from '@/components/feature/DatePickerField';
 import { roleNavMap } from '@/mocks/navigation';
@@ -384,6 +385,7 @@ export default function ReviewFormPage() {
   const adminMode = Boolean(userId && search.get('admin') === '1');
   const kind = adminMode ? 'apprenticeship' : own.kind;
   const id = adminMode ? userId! : own.id;
+  const returnPath = reviewReturnPath(userId);
   const navigate = useNavigate();
 
   const [data, setData] = useState<ReviewFormResponse | null>(null);
@@ -454,7 +456,7 @@ export default function ReviewFormPage() {
       const res = await saveReviewForm(kind, id, eventKey, { answers: pending, finish: true });
       setData(res);
       setDirty({});
-      navigate(adminMode ? `/users/${id}?tab=documents` : '/learner/onboarding/reviews');
+      navigate(returnPath);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not finish this review.');
     } finally {
@@ -472,7 +474,7 @@ export default function ReviewFormPage() {
       ) as Partial<ReviewFormAnswers>;
       await saveReviewForm(kind, id, eventKey, { answers: pending, finish: true });
       await issueOnboardingReview(kind, id, data.reviewType as 'eligibility-review' | 'workspace' | 'training-plan' | 'uln-privacy');
-      navigate(`/users/${id}?tab=documents`);
+      navigate(returnPath);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not issue this review.');
     } finally {
@@ -506,7 +508,7 @@ export default function ReviewFormPage() {
       <main className="page-container min-w-0 w-full space-y-3 p-3 md:space-y-4 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <button onClick={() => navigate('/learner/onboarding/reviews')} className="text-foreground-500 hover:text-foreground-800">
+            <button aria-label="Back" onClick={() => navigate(returnPath)} className="text-foreground-500 hover:text-foreground-800">
               <i className="ri-arrow-left-line text-[18px]" />
             </button>
             <h1 className="text-[15px] font-heading font-semibold text-foreground-900 truncate">
@@ -947,7 +949,7 @@ export default function ReviewFormPage() {
             )}
 
             <div className="flex items-center justify-end gap-2 pt-1 pb-4">
-              <button onClick={() => navigate('/learner/onboarding/reviews')} className={btnSecondary}>Save and Close</button>
+              <button onClick={() => navigate(returnPath)} className={btnSecondary}>Save and Close</button>
               {adminMode && <button onClick={issueReview} disabled={finishing} className={`${btnPrimary} ${finishing ? 'opacity-60 cursor-not-allowed' : ''}`}>
                 {finishing ? <><i className="ri-loader-4-line animate-spin" />Issuing…</> : <><i className="ri-send-plane-line" />Issue Review</>}
               </button>}

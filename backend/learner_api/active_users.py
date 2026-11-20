@@ -1673,6 +1673,16 @@ def _linkable_placement_ids(programme_id="", programme="", cohort="", group=""):
     The group lookup is handed the cohort id this just resolved, because that is
     what makes a repeated group name unambiguous.
     """
+    from programme_suitability.lms_placement import enabled, curriculum_programme_id, placement_ids
+    identifier = curriculum_programme_id(programme_id, programme)
+    if enabled() and identifier:
+        from enrollment_service.lms_readonly import LmsReadUnavailable
+        try:
+            return placement_ids(identifier, cohort, group)
+        except LmsReadUnavailable:
+            # Existing callers handle database lookup failures without exposing
+            # credentials or ever writing to the external LMS connection.
+            raise DatabaseError('LMS placement lookup unavailable.') from None
     cohort_id = _resolve_linkable_cohort_id(cohort, programme_id, programme)
     group_id = _resolve_linkable_group_id(group, cohort_id, programme_id, programme)
     return cohort_id, group_id
@@ -2008,6 +2018,12 @@ def mirror_learner_placement(source):
             updates["cohort_id"] = cohort_id
         if group_id:
             updates["group_id"] = group_id
+        from programme_suitability.lms_placement import enabled, curriculum_programme_id
+        if enabled() and curriculum_programme_id(programme_id, programme):
+            # Clearing a group or moving to a new LMS cohort must not preserve
+            # the old placement's IDs when the new fields are empty/unresolved.
+            updates['cohort_id'] = cohort_id or None
+            updates['group_id'] = group_id or None
 
         # The window belongs to the cohort, so it moves with the placement. Read
         # it from the cohort id the profile is left holding: a name this record

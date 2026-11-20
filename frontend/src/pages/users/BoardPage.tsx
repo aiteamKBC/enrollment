@@ -1,4 +1,5 @@
 import { useAdminDocumentPreview } from '@/features/compliance-documents/useAdminDocumentPreview';
+import { LmsAssignedModules } from '@/features/programme-suitability/modules/LmsAssignedModules';
 import { LearnerDocumentRevisions } from '@/features/compliance-documents/LearnerDocumentRevisions';
 import { DocumentHistory } from '@/features/compliance-documents/DocumentHistory';
 import { downloadOriginalPdf } from '@/features/compliance-documents/persistOriginalPdf';
@@ -67,6 +68,7 @@ import { fetchOnboardingReviewSlots, fetchReviewForm, issuedLabel, issueOnboardi
 import SignReviewModal from '@/pages/learner/onboarding/reviews/SignReviewModal';
 import { downloadReviewPdf } from '@/pages/learner/onboarding/reviews/reviewDocument';
 import { REVIEW_QUESTION_LABELS } from '@/pages/learner/onboarding/reviews/questions';
+import { enrolmentReviewPath } from '@/pages/learner/onboarding/reviews/navigation';
 import type { LearnerKind } from '@/api/extendedIlr';
 import { SuitabilityRplReportTab } from './suitability-rpl/SuitabilityRplReportTab';
 import { fetchSuitabilityRplIssuedDocuments, type SuitabilityRplIssuedDocument } from '@/api/suitabilityRplReport';
@@ -74,7 +76,7 @@ import type { EnrolmentBoard, FsBlock } from './types';
 import { competenceMeta } from '@/mocks/enrolment-console';
 import {
   AlertTriangle, Award, Briefcase, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, FileCheck2, Flag,
-  FolderOpen, GraduationCap, History, LayoutGrid, ListChecks, MessageSquareText, Network, PenLine, Search,
+  FolderOpen, GraduationCap, History, Layers, LayoutGrid, ListChecks, MessageSquareText, Network, PenLine, Search,
   ShieldCheck, Target, Trash2, Upload, UserX, Users, Wand2, Wrench, type LucideIcon,
 } from 'lucide-react';
 import { Table, EmptyState, ActionLink, StatusBadge, Pagination, btnSecondary } from './components/ui';
@@ -1244,7 +1246,7 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
       const prepared = await prepareOnboardingReview(kind, learnerId, review.type);
       setReviews(prepared.reviews);
       setIssueRetry(null);
-      navigate(`/users/${learnerId}/reviews/${encodeURIComponent(prepared.reviews.find(r => r.type === review.type)?.eventKey || '')}?admin=1`);
+      navigate(enrolmentReviewPath(learnerId, prepared.reviews.find(r => r.type === review.type)?.eventKey || ''));
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not issue the review.');
       // Someone else may have issued it meanwhile: show what is there now.
@@ -1320,7 +1322,7 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
                 <ActionLink
                   label={r.completed ? 'View' : r.started ? 'Continue' : 'Open'}
                   icon="ri-external-link-line"
-                  onClick={() => navigate(`/learner/onboarding/reviews/${encodeURIComponent(r.eventKey!)}`)}
+                  onClick={() => navigate(enrolmentReviewPath(learnerId, r.eventKey!))}
                 />
               </span>
               <div className="w-full"><LearnerDocumentRevisions learnerId={learnerId} documentKey={REVIEW_DOCUMENT_KEYS[r.type]} sourceId={r.eventKey} historyControl={historyControl} /></div>
@@ -1333,11 +1335,11 @@ function ReviewDocuments({ kind, learnerId, programme }: { kind: LearnerKind; le
                 <span className="truncate">{r.label} {r.draft ? (r.completed ? 'ready to issue' : 'in preparation') : 'not issued yet'}</span>
               </span>
               <span className="flex flex-wrap items-center gap-2">
-                {r.draft && r.eventKey && <ActionLink label="Continue" icon="ri-edit-line" onClick={() => navigate(`/users/${learnerId}/reviews/${encodeURIComponent(r.eventKey!)}?admin=1`)} />}
+                {r.draft && r.completed && r.eventKey && <ActionLink label="Continue" icon="ri-edit-line" onClick={() => navigate(enrolmentReviewPath(learnerId, r.eventKey!))} />}
               <ActionLink
                 label={busy === r.type ? (r.draft ? 'Issuing…' : 'Preparing…') : r.draft && r.completed ? 'Issue Review' : r.draft ? 'Continue' : 'Issue review'}
                 icon="ri-quill-pen-line"
-                onClick={() => { if (r.draft && r.completed) void issue(r); else if (!r.draft) void issue(r); else if (r.eventKey) navigate(`/users/${learnerId}/reviews/${encodeURIComponent(r.eventKey)}?admin=1`); }}
+                onClick={() => { if (r.draft && r.completed) void issue(r); else if (!r.draft) void issue(r); else if (r.eventKey) navigate(enrolmentReviewPath(learnerId, r.eventKey)); }}
               />
               </span>
             </div>
@@ -1414,7 +1416,7 @@ export default function BoardPage() {
 // writes any more appear only for learners who have some.                     //
 // --------------------------------------------------------------------------- //
 
-type TabId = 'overview' | 'suitability-rpl' | 'documents' | 'skills' | 'activity';
+type TabId = 'overview' | 'modules' | 'suitability-rpl' | 'documents' | 'skills' | 'activity';
 
 /** A titled card, with an optional count and actions. */
 function Card({
@@ -1556,6 +1558,7 @@ function BoardView({
   // ---- tabs: kept in the URL, so a reload or a shared link reopens the same one ----
   const tabs: { id: TabId; label: string; icon: LucideIcon; count?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
+    { id: 'modules', label: 'Modules', icon: Layers },
     ...(isAdmin ? [{ id: 'suitability-rpl' as const, label: 'Suitability & RPL Report', icon: FileCheck2 }] : []),
     // The compliance paperwork, reviews and uploads are apprenticeship-only.
     ...(isCommercial ? [] : [{ id: 'documents' as const, label: 'Documents', icon: FolderOpen }]),
@@ -1744,6 +1747,8 @@ function BoardView({
           {tab === 'suitability-rpl' && isAdmin && (
             <SuitabilityRplReportTab kind={kind} learnerId={userId} learnerName={board.user.name} />
           )}
+
+          {tab === 'modules' && <LmsAssignedModules home={board.programme.homeCohort} />}
 
           {tab === 'overview' && (
             <>

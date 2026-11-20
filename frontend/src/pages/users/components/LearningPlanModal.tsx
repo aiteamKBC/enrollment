@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/useToast.helpers";
 import {
   fetchLearningPlan,
   saveLearningPlan,
+  saveConfirmedProgrammePlan,
   formatHours,
   formatPlanDate,
   type LearningPlanModule,
@@ -226,7 +227,10 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
   }, [learnerId, readOnly]);
 
   // The learner is not placed yet, so the plan below has nothing to draw on.
-  const needsPlacement = Boolean(data) && !isPlaced(data!.learner);
+  const hasAcademicPlan = Boolean(data?.plan.some(module => ['programme_suitability_fixed', 'programme_suitability_pcp'].includes(module.assignmentSource ?? '') && module.academicModuleId));
+  const needsPlacement = Boolean(data) && !isPlaced(data!.learner) && !hasAcademicPlan;
+  const canSavePreparedPlan = Boolean(data?.confirmedPlanPreviewToken && !data.saved
+    && data.prefillSource === 'confirmed-programme' && plan.length > 0 && !dirtyRef.current && !freeDirtyRef.current);
 
   // The three lists cascade the way the directory's own filters do: a cohort
   // belongs to a programme, a group to a cohort. Each is fetched only once the
@@ -306,7 +310,9 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
       case 'no-otjh-reviews':
         return 'No review on this programme counts towards OTJH yet. Set “Expected OTJH” and tick “counts towards OTJH” on a review to see it here.';
       case 'not-eligible':
-        return 'This programme has reviews worth OTJH, but none applies to this learner’s current programme status.';
+        return 'No programme review applies to this learner’s current status and placement in the saved date window.';
+      case 'no-reviews':
+        return 'No enabled review templates are configured for this programme.';
       case 'no-dates':
         return 'This learner needs a start and end date before their reviews can be scheduled.';
       case 'no-programme':
@@ -325,6 +331,7 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
   // The whole off-the-job commitment: taught modules plus the reviews that
   // count towards OTJH. The footer figure staff read is this one.
   const totalHours = moduleHours + meetingHours;
+  const hoursPending = plan.some(module => module.hoursPending);
 
   const dirty = useMemo(() => {
     if (!data) return false;
@@ -421,6 +428,27 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
     }
   };
 
+  const savePreparedPlan = async () => {
+    if (!data?.confirmedPlanPreviewToken || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError('');
+    try {
+      const res = await saveConfirmedProgrammePlan(learnerId, data.confirmedPlanPreviewToken);
+      setData(res);
+      setPlan(res.plan);
+      toast.success('Learning plan saved', `${res.plan.length} programme modules saved.`);
+      onSaved?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save the prepared learning plan.';
+      setError(message);
+      toast.error('Could not save learning plan', message);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
   const save = async () => {
     // Named rather than described in the abstract: an officer confirming a
     // removal should see which module they are taking away.
@@ -489,7 +517,7 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
               <>
                 {plan.length} module{plan.length === 1 ? '' : 's'}
                 {meetings.length > 0 && ` · ${meetings.length} meeting${meetings.length === 1 ? '' : 's'}`} ·{' '}
-                <strong className="text-foreground-800">{formatHours(totalHours)}</strong> total
+                <strong className="text-foreground-800">{formatHours(totalHours)}{hoursPending ? ' + pending hours' : ''}</strong> total
               </>
             )}
           </span>
@@ -513,9 +541,16 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
               </button>
             </span>
           ) : readOnly ? (
-            <button type="button" className={btnSecondary} onClick={onClose}>
-              Close
-            </button>
+            <span className="flex items-center gap-2">
+              <button type="button" className={btnSecondary} onClick={onClose} disabled={saving}>
+                Close
+              </button>
+              {canSavePreparedPlan && (
+                <button type="button" className={btnPrimary} onClick={savePreparedPlan} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save learning plan'}
+                </button>
+              )}
+            </span>
           ) : (
             <span className="flex items-center gap-2">
               <button type="button" className={btnSecondary} onClick={onClose} disabled={saving}>
@@ -524,7 +559,7 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
               <button
                 type="button"
                 className={btnPrimary}
-                onClick={save}
+                onClick={canSavePreparedPlan ? savePreparedPlan : save}
                 disabled={saving || !canSave}
                 title={
                   canSave || saving
@@ -661,19 +696,25 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
             <span>
               Programme: <strong className="text-foreground-800">{learner?.programme || '—'}</strong>
             </span>
+            {data?.plan.some(module => module.assignmentSource === 'programme_suitability_pcp') && (
+              <span>Cohort: <strong className="text-foreground-800">{learner?.cohort || '—'}</strong></span>
+            )}
             <span>
               Group: <strong className="text-foreground-800">{learner?.group || '—'}</strong>
             </span>
             {!data?.saved && (
               <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                Pre-filled from group — not saved yet
+                  {data?.prefillSource === 'confirmed-programme' ? 'Confirmed programme modules — not saved yet' : 'Pre-filled from group — not saved yet'}
               </span>
+            )}
+            {data?.saved && plan.some(module => module.assignmentSource === 'programme_suitability_fixed') && (
+              <span className="rounded-full bg-background-100 px-2 py-0.5 text-[11px] font-semibold text-foreground-500">Saved</span>
             )}
             {/* Says why there is nothing to change here, rather than leaving the
                 missing controls to be read as a bug. */}
             {readOnly && (
               <span className="rounded-full bg-background-100 px-2 py-0.5 text-[11px] font-semibold text-foreground-500">
-                View only — a plan is edited while the learner is in Delivery
+                {canSavePreparedPlan ? 'Save the prepared modules. Editing is available while the learner is in Delivery.' : 'View only — a plan is edited while the learner is in Delivery'}
               </span>
             )}
           </div>
@@ -707,6 +748,14 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
                   <tr key={m.moduleId} className="border-t border-foreground-200/50">
                     <td className="py-2 px-3 text-foreground-900">
                       {m.moduleTitle}
+                      {m.replacementNotice && (
+                        <span className="block text-[11px] font-normal text-foreground-500">{m.replacementNotice}</span>
+                      )}
+                      {m.schedulingStatus === 'pending' && (
+                        <span className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                          Schedule pending
+                        </span>
+                      )}
                       {m.orphaned && (
                         <span
                           className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
@@ -754,7 +803,7 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
                       {formatPlanDate(m.endDate)}
                     </td>
                     <td className="py-2 px-3 text-right font-medium text-foreground-700">
-                      {formatHours(m.hours)}
+                      {m.hoursPending ? 'Pending' : formatHours(m.hours)}
                     </td>
                     {!readOnly && (
                       <td className="py-2 px-3 text-right">
@@ -779,7 +828,7 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
                     {meetings.length > 0 ? 'Modules total' : 'Total'}
                   </td>
                   <td className="py-2 px-3 text-right font-bold text-foreground-900">
-                    {formatHours(moduleHours)}
+                    {formatHours(moduleHours)}{hoursPending ? ' + pending hours' : ''}
                   </td>
                   {!readOnly && <td />}
                 </tr>
@@ -799,6 +848,14 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
                   Scheduled from this learner&apos;s start date — not editable here
                 </span>
               </div>
+              {meetings.some(m => m.scheduleKind === 'projected') && (
+                <p className="text-[11px] text-foreground-500 mb-2">Planned review dates from programme templates; these are not booked appointments.</p>
+              )}
+              {!!data?.meetingsBlockers?.length && (
+                <p role="status" className="text-[11px] text-foreground-500 mb-2">
+                  {data.meetingsBlockers.map(b => b.message || b.code.replaceAll('_', ' ')).join(' ')}
+                </p>
+              )}
               <div className="rounded-xl border border-foreground-200/60 overflow-hidden">
                 <table className="w-full text-[13px]">
                   <thead>
@@ -867,7 +924,7 @@ export function LearningPlanModal({ learnerId, learnerName, onClose, onSaved, re
               {meetings.length > 0 && (
                 <div className="mt-2 flex items-baseline justify-end gap-2 text-[13px]">
                   <span className="font-semibold text-foreground-700">Plan total</span>
-                  <strong className="text-foreground-900">{formatHours(totalHours)}</strong>
+                  <strong className="text-foreground-900">{formatHours(totalHours)}{hoursPending ? ' + pending hours' : ''}</strong>
                 </div>
               )}
             </div>
