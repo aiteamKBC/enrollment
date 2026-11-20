@@ -19,6 +19,30 @@ class CohortLearnerApiTests(TestCase):
     databases = {'default', 'enrolment'}
     ksb_id = 'ksb:ME_L4:K1'
 
+    @patch.dict(os.environ, {'LMS_READONLY_DATABASE_URL': 'synthetic-reader-config', 'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
+    @patch('enrollment_service.lms_readonly.get_assigned_cohort')
+    def test_lms_placement_is_shared_by_step_six_and_profile_without_snapshot_changes(self, read):
+        from .home_cohort import home_cohort_for_board
+        profile = LearnerProfile.objects.get(enrolment_id=8101)
+        # A staff change after publication need not exist in an old wizard layout.
+        profile.cohort_id = 'new-lms-cohort'
+        profile.group_id = 'saved-group'
+        profile.save(update_fields=['cohort_id', 'group_id'])
+        read.return_value = [dict(programme_id='PROG-ME-L4', cohort_id='new-lms-cohort',
+            cohort_name='Current LMS cohort', group_id='saved-group', group_name='Current LMS group',
+            module_catalogue_id='lms-module', title='Current module', sessions_number=16, start_date=None, end_date=None)]
+        before = Assessment.objects.filter(learner_id=8101).values().get()
+        response = self.clients[8101].get('/enrolment_api/programme-suitability/apprenticeship/8101/modules/')
+        self.assertEqual(response.status_code, 200, response.content)
+        home = response.json()['homeCohort']
+        self.assertEqual(home['name'], 'Current LMS cohort')
+        self.assertEqual(home['groupName'], 'Current LMS group')
+        source = EnrolmentUser.all_learners.get(pk=8101)
+        self.assertEqual(home, home_cohort_for_board(source))
+        self.assertEqual(home['lmsModules'][0]['id'], 'lms-module')
+        self.assertEqual(Assessment.objects.filter(learner_id=8101).values().get(), before)
+        read.assert_called_with('PROG-ME-L4', 'new-lms-cohort', 'saved-group')
+
     def prepare_account_only_assignment(self):
         # Disposable fixtures only: model deletion would traverse unmanaged
         # lifecycle tables that this focused test runner deliberately excludes.
@@ -31,6 +55,30 @@ class CohortLearnerApiTests(TestCase):
                    'cohortName': 'Feb 2027', 'cohortPublicationVersion': 1, 'profileId': None}
         Assessment.objects.filter(learner_id=8101).update(review={'programmeAssignment': outcome})
         return outcome
+
+    @patch.dict(os.environ, {'LMS_READONLY_DATABASE_URL': 'synthetic-reader-config', 'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
+    @patch('enrollment_service.lms_readonly.get_programme_cohorts')
+    @patch('enrollment_service.lms_readonly.get_assigned_cohort')
+    def test_legacy_account_recovers_after_matching_lms_cohort_is_added_without_backfill(self, modules, cohorts):
+        self.prepare_account_only_assignment()
+        before = Assessment.objects.filter(learner_id=8101).values().get()
+        cohorts.return_value = []
+        modules.return_value = []
+        endpoint = '/enrolment_api/programme-suitability/apprenticeship/8101/modules/'
+        first = self.clients[8101].get(endpoint)
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(first.json()['homeCohort']['reason'], 'assigned_cohort_not_in_lms')
+        cohorts.return_value = [dict(programme_id='PROG-ME-L4', cohort_id='real-lms-id', cohort_name='Feb 2027')]
+        modules.side_effect = lambda programme, cohort, group=None: ([dict(programme_id=programme,
+            cohort_id=cohort, cohort_name='Feb 2027', module_catalogue_id='lms-m1', title='Live module',
+            group_id='g1', group_name='G1', sessions_number=16, start_date=None, end_date=None)] if cohort == 'real-lms-id' else [])
+        second = self.clients[8101].get(endpoint)
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(second.json()['homeCohort']['cohortId'], 'real-lms-id')
+        self.assertIsNone(second.json()['homeCohort']['groupId'])
+        self.assertEqual(second.json()['homeCohort']['lmsModules'][0]['groupId'], 'g1')
+        self.assertEqual(Assessment.objects.filter(learner_id=8101).values().get(), before)
+        self.assertFalse(LearnerProfile.objects.filter(enrolment_id=8101).exists())
 
     @patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1', 'API_REQUIRE_AUTH': '1'})
     def test_account_only_assignment_resolves_in_step_six_and_admin_without_creating_profile(self):

@@ -8,10 +8,10 @@ by those two parties only — the training provider does not sign it (note 6).
 Everything on the form is derived from our own records rather than typed twice:
   * apprentice name, employer name             -> the learner's record
   * employer address                            -> linked organisation, then learner's record
-  * start / end dates                          -> the learner's own dates (the
-    group delivery window is no longer stored on curriculum.groups)
+  * practical dates                           -> the learner-specific date fields
+  * apprenticeship end                        -> the assigned LMS cohort's end
   * planned off-the-job hours                  -> the learning plan total, the
-    sum of total_otjh across the modules on their plan
+    current module hours plus applicable meeting OTJ, counted once
   * duration of practical period               -> weeks between its start and end
 
 Those values are SNAPSHOT onto the row when the agreement is issued. Once a
@@ -168,24 +168,36 @@ def _weeks_between(start, end):
 
 def derive_particulars(learner):
     """Everything the agreement states, derived from the learner's records."""
-    from enrolment_api.document_templates.learner_sources import document_dates
-    start, end, dates_from = document_dates(learner)
-    modules = _plan_modules(learner)
-    hours = round(sum(float(m.get("hours") or 0) for m in modules), 2)
+    from enrolment_api.document_templates.learner_sources import document_dates, lms_apprenticeship_end
+    from .learning_plan import ACADEMIC_SOURCES, _meetings, _totals
+    start, practical_end, dates_from = document_dates(learner)
+    end, _ = lms_apprenticeship_end(learner)
+    saved = _saved_modules(learner)
+    if saved and all(m.get('assignmentSource') in ACADEMIC_SOURCES and m.get('academicModuleId') for m in saved):
+        # Same current/replacement module projection as the Learning Plan modal.
+        # This never saves the projection or changes the agreed plan itself.
+        from programme_suitability.module_replacements import resolve_saved_learning_plan
+        modules = resolve_saved_learning_plan(learner, saved)
+    else:
+        modules = _plan_modules(learner)
+    meetings, _ = _meetings(learner)
+    hours = _totals(modules, meetings)['totalHours']
+    from enrolment_api.ilr_employer_details import employer_details_for
+    employer = employer_details_for(learner)
 
     return {
         "apprenticeName": _s(learner.username),
-        "employerName": _s(learner.organization) or _s(learner.employer),
+        "employerName": _s(employer.get('organisationName')) or _s(learner.organization) or _s(learner.employer),
         "employerAddress": _employer_address(learner),
         # We hold no level/version for the standard, so the programme name is
         # what we can honestly state; an officer completes the rest.
         "standard": _s(learner.programme),
         "startDate": start,
         "endDate": end,
-        # One delivery window seeds both periods.
+        # The practical period is distinct from the cohort's EPA-inclusive end.
         "practicalStart": start,
-        "practicalEnd": end,
-        "durationWeeks": _weeks_between(start, end),
+        "practicalEnd": practical_end,
+        "durationWeeks": _weeks_between(start, practical_end),
         "plannedOtjh": hours,
         "planModules": modules,
         "datesFrom": dates_from,

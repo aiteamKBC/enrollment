@@ -15,6 +15,7 @@ from .models import Assessment
 from .permissions import is_staff
 from .modules_rules import available_modules
 from .home_cohort import read_home_cohort
+from .group_capacity import preview_home_group
 from .views import learner_record
 
 PROGRAMMES = {'ME_L4': 'PROG-ME-L4', 'MM_L6': 'PROG-MM-L6',
@@ -57,36 +58,55 @@ def normalized_title(title):
     return ' '.join(re.findall(r'[^\W_]+', text, re.UNICODE))
 
 
-def matching_confidence(module, title, possible_titles):
+def matching_confidence(module, title, possible_titles, confirmed_titles=()):
     if normalized_title(module['title']) == normalized_title(title):
         return 'exact_title', 'Exact or safely normalized title in the confirmed programme; not a confirmed booking.'
+    if any(normalized_title(alias) == normalized_title(title) for alias in confirmed_titles):
+        return 'confirmed_alias', 'Administrator-confirmed alternative title for this programme module; not a confirmed booking.'
     if any(normalized_title(alias) == normalized_title(title) for alias in possible_titles):
         return 'tentative', 'Documented possible title; academic/qualification equivalence is uncertain.'
     return None, None
 
 
-def project(programme, pathway, modules, home, *, review=False, today=None):
+def project(programme, pathway, modules, home, *, review=False, today=None, home_group=None):
     today = today or timezone.now().astimezone(ZoneInfo('Europe/London')).date()
     evidence = json.loads(Path(__file__).with_name('schedule_review_candidates.json').read_text(encoding='utf-8'))
-    # These documented candidates never imply verified qualification equivalence.
+    # Only explicitly confirmed aliases establish module identity; the remaining
+    # documented candidates stay tentative. Neither implies a booking approval.
     academic = {m['id']: m['title'] for m in modules}
     titles = {(m['programme'], m['pathway'], m['academic_id']): tuple(m['titles']) for m in evidence['modules']
               if academic.get(m['academic_id']) == m['academic_title']}
+    confirmed_titles = {(m['programme'], m['pathway'], m['academic_id']): tuple(m.get('confirmed_titles', ()))
+                        for m in evidence['modules'] if academic.get(m['academic_id']) == m['academic_title']}
     keys = [(programme, pathway, m['id']) for m in modules]
     home_id = home.get('cohortId') if home.get('status') == 'resolved' else None
-    fixed_pending = programme != 'PCP_L6' and not home_id
+    pcp = programme == 'PCP_L6'
+    if not pcp and (home_group or {}).get('status') == 'eligible':
+        home_group = {'status': 'unavailable', 'groupId': None, 'groupName': None,
+                      'code': 'saved_group_pending',
+                      'message': 'Your assigned home-cohort group is pending. Only its scheduled modules can be shown.'}
+    # Fixed programmes may use only a saved/allocated group, never a capacity
+    # preview for an unassigned learner. PCP alone can preview an eligible group.
+    saved_group = home.get('groupId')
+    allocated_group = (home_group or {}).get('groupId') if (home_group or {}).get('status') in {'assigned', 'allocated'} else None
+    fixed_group = saved_group or allocated_group
+    pcp_home_group = home_group.get('groupId') if home_group is not None else saved_group
+    fixed_pending = not pcp and not home_id
     candidates = []
-    if modules and not fixed_pending:
-        candidates = [r for r in read_all(PROGRAMMES[programme], None if programme == 'PCP_L6' else home_id)
+    if modules and (pcp or (home_id and fixed_group)):
+        candidates = [r for r in read_all(PROGRAMMES[programme], None if pcp else home_id)
                       if eligible(r, PROGRAMMES[programme], date.min)
-                      and (programme == 'PCP_L6' or r['cohort_id'] == home_id)]
+                      and (pcp or (r['cohort_id'] == home_id and r.get('group_id') == fixed_group))]
     results = []
     for module, key in zip(modules, keys):
         possible_titles = titles.get(key, ())
         matches = []
         historical_match = False
         for row in candidates:
-            confidence, confidence_reason = matching_confidence(module, row['title'], possible_titles)
+            if pcp and row['cohort_id'] == home_id:
+                if not pcp_home_group or row.get('group_id') != pcp_home_group:
+                    continue
+            confidence, confidence_reason = matching_confidence(module, row['title'], possible_titles, confirmed_titles.get(key, ()))
             if not confidence:
                 continue
             if not eligible(row, PROGRAMMES[programme], today):
@@ -94,18 +114,22 @@ def project(programme, pathway, modules, home, *, review=False, today=None):
                 continue
             matches.append({'id': row['module_catalogue_id'], 'moduleId': module['id'],
                             'academicTitle': module['title'], 'lmsTitle': row['title'],
+                            'weeks': row.get('weeks_number'),
                             'programmeId': row['programme_id'], 'delivery': row['cohort_id'],
                             'cohortId': row['cohort_id'], 'cohortName': row['cohort_name'],
                             'groupId': row.get('group_id'), 'group': row.get('group_name') or '',
+                            'informationOnly': row['cohort_id'] != home_id,
                             'start': str(row['start_date']), 'end': str(row['end_date']),
                             'approved': False, 'reviewOnly': review,
                             'matchConfidence': confidence, 'confidenceReason': confidence_reason,
-                            'provisional': confidence == 'tentative', 'allowLocalSelection': not review and programme == 'PCP_L6'})
+                            'provisional': confidence == 'tentative', 'allowLocalSelection': False})
         matches.sort(key=lambda r: (r['start'], r['end'], r['id']))
         if matches:
-            reason = 'Possible LMS match; any choice is provisional and is not a confirmed booking.' if any(o['provisional'] for o in matches) else 'Exact LMS title match; session choices remain local and unsaved.'
+            reason = 'Possible LMS match; academic equivalence remains provisional.' if any(o['provisional'] for o in matches) else 'LMS module title match; delivery dates are informational and do not reserve a place.'
         elif fixed_pending:
             reason = 'Your saved home cohort is pending; other cohorts cannot be substituted.'
+        elif not pcp and not fixed_group:
+            reason = 'Your saved home-cohort group is pending; other groups or cohorts cannot be substituted.'
         elif historical_match:
             reason = 'Matching LMS deliveries have already started; no eligible future session is available.'
         elif possible_titles:
@@ -114,7 +138,8 @@ def project(programme, pathway, modules, home, *, review=False, today=None):
             reason = 'No reliable LMS counterpart or future delivery was found for this academic module.'
         results.append({'academicModuleId': module['id'], 'academicTitle': module['title'], 'reason': reason, 'offerings': matches})
     return {'programmeId': programme, 'pathway': pathway, 'review': review, 'asOfDate': today.isoformat(),
-            'homeCohort': home, 'modules': results, 'offeringCount': sum(len(m['offerings']) for m in results)}
+            'homeCohort': home, 'homeGroup': home_group,
+            'modules': results, 'offeringCount': sum(len(m['offerings']) for m in results)}
 
 
 @enrolment_login_required
@@ -158,7 +183,8 @@ def learner_module_schedule(request, kind, learner_id):
         else:
             modules = [m for m in programme['modules'] if m.get('active', True)]
         home = read_home_cohort(row, kind, learner_id, row.modules_configuration_version)
-        response = JsonResponse(project(programme['id'], pathway, modules, home, review=review))
+        group = preview_home_group(row, home)
+        response = JsonResponse(project(programme['id'], pathway, modules, home, review=review, home_group=group))
     except lms_readonly.LmsReadUnavailable:
         response = JsonResponse({'error': 'LMS schedules are temporarily unavailable. Retry the read.'}, status=503)
     except Exception:

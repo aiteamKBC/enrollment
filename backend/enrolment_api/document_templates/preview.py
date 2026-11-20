@@ -60,7 +60,8 @@ def learner_data(key, learner):
         data.update(learnerDetails=derive_learner_details(learner), answers=derive_answers(learner))
     elif key in ('written-agreement', 'training-plan'):
         from learner_api import written_agreement, training_plan_document
-        data.update((written_agreement if key == 'written-agreement' else training_plan_document).derive_content(learner))
+        data.update(written_agreement.derive_content(learner) if key == 'written-agreement'
+                    else training_plan_document.derive_content(learner, activities=True))
     else:
         from learner_api.models import EnrolmentReview
         from learner_api.review_form import _serialize_form, _learner_information

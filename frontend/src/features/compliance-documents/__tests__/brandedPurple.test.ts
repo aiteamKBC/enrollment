@@ -5,7 +5,7 @@ import { keys, payloadFor } from './fixtures';
 import assets from '../brandingAssets.json';
 import { BRAND_ID } from '../brandedPurpleTheme';
 import { previewPdf } from '../previewPdf';
-import { renderManagedDocument } from '../render';
+import { configuredReviewRows, renderManagedDocument } from '../render';
 import { buildReviewPdf } from '@/pages/learner/onboarding/reviews/reviewDocument';
 
 describe('versioned KBC and DfE PDF branding', () => {
@@ -37,6 +37,27 @@ describe('versioned KBC and DfE PDF branding', () => {
     value.pdfUnavailable='Historical PDF unavailable';
     await expect(previewPdf(value)).rejects.toThrow('Historical PDF unavailable');
   });
+  it.each(['review-eligibility', 'review-rpl', 'review-health-safety', 'review-uln'] as const)(
+    'uses the structured purple renderer for current-design %s previews', async key => {
+      const value = payloadFor(key); value.template.presentationTheme = BRAND_ID;
+      const blob = await previewPdf(value);
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      expect(blob.type).toBe('application/pdf');
+      expect(new TextDecoder().decode(bytes)).toContain('Page 1 of ');
+      expect(Object.keys((renderManagedDocument(value.template, value.data)!.internal as any).collections.addImage_images)).toHaveLength(2);
+    },
+  );
+  it.each(['review-eligibility', 'review-rpl', 'review-health-safety', 'review-uln'] as const)(
+    'keeps every configured question row in the %s template preview without answers', key => {
+      const value = payloadFor(key); value.template.presentationTheme = BRAND_ID;
+      for (const block of value.template.content.blocks) {
+        if (!block.source?.startsWith('review:')) continue;
+        if (Object.keys(block.labels || {}).length) {
+          expect(configuredReviewRows(value.template, value.data, block.source.slice(7), (block.labels || {}) as Record<string, string>)).toHaveLength(Object.keys(block.labels || {}).length);
+        }
+      }
+    },
+  );
   it('preserves every row in a long multipage field/value table and numbers its final page', () => {
     const value=payloadFor('ilr');value.template.presentationTheme=BRAND_ID;
     value.template.content.blocks=[{id:'title',type:'heading',level:1,text:'Long document'},

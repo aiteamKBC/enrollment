@@ -427,7 +427,10 @@ def to_board(u):
     # Imported here, not at module scope: enrolment_api.models imports from
     # learner_api.models, so a top-level import would be circular.
     from .board_wizard import fmt_date, merge_wizard_sections, record_address, saved_signature
-    from programme_suitability.home_cohort import cohort_label_for_board
+    from programme_suitability.home_cohort import home_cohort_for_board
+
+    home_cohort = home_cohort_for_board(u)
+    resolved_home = home_cohort if home_cohort and home_cohort['status'] == 'resolved' else {}
 
     enrolled_at, enrolled_by = _split_enrolled(u.enrolled_time_and_user)
     saved_signature_value, saved_signature_date = saved_signature(u.id)
@@ -468,7 +471,7 @@ def to_board(u):
             "email": _s(u.email),
             "phone": _s(u.phone_number),
             "dob": fmt_date(u.date_of_birth),
-            "groupMembership": _s(u.group),
+            "groupMembership": (resolved_home.get('groupName') or 'Group pending') if resolved_home.get('source') == 'lms' else _s(u.group),
             "signatureUrl": None,
             "hasMandate": False,
             # What the learner already gave on their record (first sign-in, or
@@ -492,7 +495,8 @@ def to_board(u):
         "programme": {
             "type": "Delivery",
             "name": _s(u.programme),
-            "cohort": cohort_label_for_board(u, _s(u.cohort)),
+            "cohort": resolved_home.get('name') or _s(u.cohort),
+            "homeCohort": home_cohort,
             "status": programme_status(u) or DEFAULT_PROGRAMME_STATUS,
             # Cohort dates, matched from curriculum.cohort_authoring_details.
             # apprenticeship_end_date is the learner's own override and only

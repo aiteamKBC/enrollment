@@ -221,6 +221,8 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   const [programmes, setProgrammes] = useState<string[]>([]);
   const [cohorts, setCohorts] = useState<string[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupLookupError, setGroupLookupError] = useState<string | null>(null);
   // Case owners come from Staff_users (positions Caseowner / Admin) — independent
   // of the programme cascade, so loaded once alongside programmes.
   const [caseOwners, setCaseOwners] = useState<string[]>([]);
@@ -330,10 +332,14 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   useEffect(() => {
     let cancelled = false;
     setGroups([]);
+    setGroupLookupError(null);
+    setGroupsLoading(false);
     if (!programme || !cohort) return;
+    setGroupsLoading(true);
     fetchGroups(programme, cohort)
       .then((rows) => { if (!cancelled) setGroups(rows); })
-      .catch((e: Error) => { if (!cancelled) setLookupError(e.message); });
+      .catch((e: Error) => { if (!cancelled) setGroupLookupError(e.message); })
+      .finally(() => { if (!cancelled) setGroupsLoading(false); });
     return () => { cancelled = true; };
   }, [programme, cohort]);
 
@@ -341,7 +347,7 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   const lookupState = (level: Exclude<NonNullable<FieldDef['lookup']>, 'employer' | 'organisation' | 'skillsCoach'>) => {
     if (level === 'programme') return { values: programmes, disabled: false, waitingFor: '', empty: 'None available' };
     if (level === 'cohort') return { values: cohorts, disabled: !programme, waitingFor: 'programme', empty: 'None available' };
-    if (level === 'group') return { values: groups, disabled: !cohort, waitingFor: 'cohort', empty: 'None available' };
+    if (level === 'group') return { values: groups, disabled: !cohort || groupsLoading, waitingFor: cohort ? '' : 'cohort', empty: groupsLoading ? 'Loading groups...' : groupLookupError ? 'Unable to load groups' : 'None available' };
     return {
       values: caseOwners,
       disabled: false,
@@ -730,9 +736,9 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
                 <h3 className="text-[12px] font-semibold uppercase tracking-wider text-foreground-600">{section.title}</h3>
               </header>
               <div className="divide-y divide-foreground-100">{fields.map(renderField)}</div>
-              {section.title === 'Programme' && lookupError && (
+              {section.title === 'Programme' && (lookupError || groupLookupError) && (
                 <p className="px-4 py-2 text-[11px] text-red-600 border-t border-foreground-100">
-                  <AppIcon className="ri-error-warning-line mr-1" />Could not load curriculum options: {lookupError}
+                  <AppIcon className="ri-error-warning-line mr-1" />Could not load curriculum options: {groupLookupError || lookupError}
                 </p>
               )}
               {section.title === 'Delivery & employer' && staffError && (

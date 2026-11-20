@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { FileText } from 'lucide-react';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { Modal } from '@/pages/users/components/Modal';
 import { btnPrimary, btnSecondary, inputClass } from '@/pages/users/components/ui';
@@ -10,11 +11,13 @@ import seedData from './seed.json';
 import { newQuestion, questionFields, questionProblems } from './questionFields';
 import { designDraft } from './documentTheme';
 import { DocumentDesignControl } from './DocumentDesignControl';
-import type { DocumentBlock, DocumentTemplate, FieldDefinition, PreviewResponse, ProgrammeId, TemplateIndex, TemplateVersion } from './types';
+import type { DocumentBlock, DocumentTemplate, FieldDefinition, PreviewResponse, ProgrammeId, TemplateIndex, TemplateListItem, TemplateVersion } from './types';
 
+const categories = [{ value: 'Compliance', label: 'Compliance Documents' }, { value: 'Review', label: 'Reviews Documents' }] as const;
 const clone = <T,>(value: T): T => structuredClone(value);
 
 export default function ComplianceDocumentsBuilder() {
+  const [selectedCategory, setSelectedCategory] = useState<DocumentTemplate['category'] | null>(null);
   const [index, setIndex] = useState<TemplateIndex | null>(null); const [query, search] = useState('');
   const [content, setContent] = useState<DocumentTemplate | null>(null); const [saved, setSaved] = useState('');
   const [baseVersion, setBaseVersion] = useState(''); const [revision, setRevision] = useState(0);
@@ -55,12 +58,12 @@ export default function ComplianceDocumentsBuilder() {
     catch (e) { setError(e instanceof Error ? e.message : 'Could not save draft.'); }
     finally { setBusy(false); }
   };
-  const previewSaved = async (id = content?.templateId, version?: string) => {
+  const previewSaved = async (id = content?.templateId, version?: string, currentDesign = false) => {
     if (!id) return;
     setBusy(true); setError('');
     try {
       if (realPreview && (!/^\d+$/.test(learnerId) || Number(learnerId) < 1)) throw new Error('Enter an existing learner identifier for an authorised real-data preview.');
-      showPreview(await api.previewTemplate(id, revision, realPreview ? Number(learnerId) : undefined, version));
+      showPreview(await api.previewTemplate(id, revision, realPreview ? Number(learnerId) : undefined, version, currentDesign));
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not preview document.'); }
     finally { setBusy(false); }
   };
@@ -106,11 +109,15 @@ export default function ComplianceDocumentsBuilder() {
     const position = content.blocks.findIndex((b) => b.id === active); const blocks = [...content.blocks]; blocks.splice(position < 0 ? blocks.length : position + 1, 0, next);
     edit({ ...content, blocks }); selectBlock(next.id);
   };
-  const filtered = index?.results.filter((t) => `${t.title} ${t.fullTitle || ''} ${t.category} ${t.programmes.map((p) => index.programmes[p]).join(' ')}`.toLowerCase().includes(query.toLowerCase())) || [];
+  const matchesSearch = (template: TemplateListItem, text: string) =>
+    `${template.title} ${template.fullTitle || ''} ${template.category} ${template.programmes.map((p) => index?.programmes[p]).join(' ')}`.toLowerCase().includes(text.toLowerCase());
+  const filtered = index?.results.filter((template) => matchesSearch(template, query)) || [];
+  const selectedCategoryLabel = categories.find((category) => category.value === selectedCategory)?.label;
+  const documents = filtered.filter((template) => template.category === selectedCategory);
   const nativeBlocks = content ? (seedData.templates[content.documentKey].blocks as DocumentBlock[]).filter((b) => b.type === 'native') : [];
   const selectedNative = nativeBlocks.find((b) => b.source === nativeSource) || nativeBlocks[0];
   const nativeAlreadyPresent = Boolean(selectedNative && content?.blocks.some((b) => b.type === 'native' && b.source === selectedNative.source && questionFields(b, content.documentKey).length));
-  return <WorkspaceShell role="compliance" roleLabel="Enrolment" navItems={[]} pageTitle="Compliance Documents Builder" pageSubtitle="Manage versioned Compliance and Review document templates">
+  return <WorkspaceShell role="compliance" roleLabel="Enrolment" navItems={[]} pageTitle="Documents Builder" pageSubtitle="Manage versioned Compliance and Review document templates">
     <div className="min-w-0 space-y-4 p-3 md:p-6">
       <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">These documents may contain contractual or compliance wording. Obtain the appropriate organisational review before publishing. Publishing a template does not certify legal compliance. Previously issued and signed documents retain their original content.</p>
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
@@ -119,13 +126,34 @@ export default function ComplianceDocumentsBuilder() {
       {index?.setupRequired && <p role="alert" className="rounded-lg border border-amber-200 p-3 text-sm">Document template storage has not been deployed. Current templates can be previewed. Ask the deployment owner to run <code>python manage.py apply_document_templates</code> before saving or publishing.</p>}
       <section aria-label="Document templates" className="rounded-xl border bg-background-50 p-4">
         <label className="block max-w-xl text-sm font-medium">Search document templates<input className={`${inputClass} mt-1`} value={query} onChange={(e) => search(e.target.value)} placeholder="Title, category or programme" /></label>
-        <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm"><thead><tr><th className="p-2">Document title</th><th>Category</th><th>Programmes</th><th>Published version</th><th>Draft</th><th>Last updated</th><th>Actions</th></tr></thead><tbody>
-          {filtered.map((t) => <tr key={t.templateId} className="border-t align-top"><th className="p-2"><div>{t.title}</div>{t.fullTitle && <div className="mt-1 text-xs font-normal text-foreground-600">PDF: {t.fullTitle}</div>}</th><td className="p-2">{t.category}</td><td className="p-2">{t.programmes.length ? t.programmes.map((p) => index!.programmes[p]).join(', ') : 'Shared — all programmes'}</td><td className="p-2">{t.dynamic ? 'Learner-specific' : t.publishedVersion ? t.publishedVersion.number ? `v${t.publishedVersion.number}` : 'Original' : 'Not published'}</td><td className="p-2">{t.dynamic ? 'Managed by report workflow' : t.draft ? 'Saved draft' : '—'}</td><td className="p-2">{t.dynamic ? 'Finalised report snapshot' : t.updatedAt ? new Date(t.updatedAt).toLocaleString('en-GB') : 'Original template'}</td><td className="p-2"><div className="flex flex-wrap gap-2">
+        <div className="mt-4 grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
+          <nav aria-label="Document categories" className="min-w-0 space-y-3">
+            {categories.map((category) => {
+              const total = index?.results.filter((template) => template.category === category.value).length ?? 0;
+              const matching = filtered.filter((template) => template.category === category.value).length;
+              const selected = selectedCategory === category.value;
+              return <button key={category.value} type="button" aria-pressed={selected} aria-controls="document-category-content"
+                className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left ${selected ? 'border-primary-300 bg-primary-50 text-primary-800' : 'border-foreground-200 bg-background-50'}`}
+                onClick={() => setSelectedCategory(category.value)}>
+                <FileText size={24} className="shrink-0 text-foreground-500" aria-hidden="true" />
+                <span className="min-w-0 flex-1"><span className="block font-semibold">{category.label}</span>
+                  <span className="block text-sm text-foreground-500">{index ? `${total} ${total === 1 ? 'document' : 'documents'}${query ? ` / ${matching} matching` : ''}` : 'Loading documents...'}</span></span>
+              </button>;
+            })}
+          </nav>
+          <section id="document-category-content" aria-label={selectedCategoryLabel ?? 'Document category content'} className="min-w-0 rounded-xl border border-foreground-200 bg-background-50 p-4">
+            {!selectedCategory ? <p className="py-8 text-center text-sm text-foreground-500">Select a document category</p> : <>
+              <h2 className="mb-4 font-semibold">{selectedCategoryLabel}</h2>
+              <div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm"><thead><tr><th className="p-2">Document title</th><th>Category</th><th>Programmes</th><th>Published version</th><th>Draft</th><th>Last updated</th><th>Actions</th></tr></thead><tbody>
+          {documents.map((t) => <tr key={t.templateId} className="border-t align-top"><th className="p-2"><div>{t.title}</div>{t.fullTitle && <div className="mt-1 text-xs font-normal text-foreground-600">PDF: {t.fullTitle}</div>}</th><td className="p-2">{t.category}</td><td className="p-2">{t.programmes.length ? t.programmes.map((p) => index!.programmes[p]).join(', ') : 'Shared — all programmes'}</td><td className="p-2">{t.dynamic ? 'Learner-specific' : t.publishedVersion ? t.publishedVersion.number ? `v${t.publishedVersion.number}` : 'Original' : 'Not published'}</td><td className="p-2">{t.dynamic ? 'Managed by report workflow' : t.draft ? 'Saved draft' : '—'}</td><td className="p-2">{t.dynamic ? 'Finalised report snapshot' : t.updatedAt ? new Date(t.updatedAt).toLocaleString('en-GB') : 'Original template'}</td><td className="p-2"><div className="flex flex-wrap gap-2">
             {t.dynamic ? <span className="text-xs text-foreground-600">Open from the learner’s Suitability &amp; RPL Report tab</span> : <><button className={btnSecondary} disabled={busy} aria-label={`Edit ${t.title}`} onClick={() => void open(t.templateId)}>Edit</button>
-            <button className={btnSecondary} disabled={busy || !t.publishedVersion} aria-label={`Preview ${t.title}`} onClick={() => void previewSaved(t.templateId, t.publishedVersion?.id)}>Preview</button>
+            <button className={btnSecondary} disabled={busy || !t.publishedVersion} aria-label={`Preview ${t.title}`} onClick={() => void previewSaved(t.templateId, t.publishedVersion?.id, true)}>Preview</button>
             <button className={btnSecondary} disabled={busy} aria-label={`Version history for ${t.title}`} onClick={() => { setBusy(true); void api.templateHistory(t.templateId).then((data) => setHistory({ id: t.templateId, versions: data.results })).catch((e: Error) => setError(e.message)).finally(() => setBusy(false)); }}>Version history</button></>}
           </div></td></tr>)}
-        </tbody></table>{index && !filtered.length && <p className="p-3 text-sm">No matching templates.</p>}</div>
+        </tbody></table>{index && !documents.length && <p className="p-3 text-sm">{query ? 'No matching templates in this category.' : 'No templates in this category.'}</p>}</div>
+            </>}
+          </section>
+        </div>
       </section>
       {content && <section aria-label="Document template editor" className="min-w-0 space-y-4 rounded-xl border bg-background-50 p-4">
         <div className="flex flex-wrap items-end gap-4"><label className="min-w-60 flex-1 text-sm font-medium">Document title<input className={`${inputClass} mt-1`} value={content.title} onChange={(e) => edit({ ...content, title: e.target.value })} /></label>
@@ -150,7 +178,7 @@ export default function ComplianceDocumentsBuilder() {
       </section>}
       {variant && content && <Modal title="Create programme-specific template" onClose={() => setVariant(null)} footer={<><button className={btnSecondary} onClick={() => setVariant(null)}>Cancel</button><button className={btnPrimary} disabled={!variant.length} onClick={() => { const next = { ...clone(content), templateId: `${content.documentKey}@${crypto.randomUUID()}`, programmes: variant }; setContent(next); setSaved(''); setBaseVersion('new'); setRevision(0); setReviewedPreview(null); confirm(false); setVariant(null); setMessage('Programme variant created locally. Save, preview and publish it; the shared template remains unchanged.'); }}>Create draft variant</button></>}><p className="mb-3 text-sm">The shared template remains available to other programmes. Published programme variants cannot overlap.</p><div className="space-y-3">{Object.entries(index?.programmes || {}).map(([pid, title]) => <label key={pid} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={variant.includes(pid as ProgrammeId)} onChange={(e) => setVariant(e.target.checked ? [...variant, pid as ProgrammeId] : variant.filter((p) => p !== pid))} />{title}</label>)}</div></Modal>}
       {history && <Modal title="Document template version history" onClose={() => setHistory(null)} footer={<button className={btnSecondary} onClick={() => setHistory(null)}>Close history</button>}><div className="space-y-3">{history.versions.map((v) => <article key={v.id} className="rounded-lg border p-3 text-sm"><p className="font-semibold">{v.number ? `Version ${v.number}` : 'Original application template'} — {v.content.title}</p><p>{v.publishedAt ? new Date(v.publishedAt).toLocaleString('en-GB') : 'Original wording'} · {v.publishedBy}</p>{v.approvalNote && <p className="mt-1 whitespace-pre-wrap">{v.approvalNote}</p>}<button className={`${btnSecondary} mt-2`} disabled={busy} onClick={() => void previewSaved(history.id, v.id)}>Preview historical PDF</button></article>)}{!history.versions.length && <p>No published versions yet.</p>}</div></Modal>}
-      {preview && <DocumentPreview value={preview} onClose={() => showPreview(null)} onReady={acceptPreview} />}
+      {preview && <DocumentPreview showDiagnostics value={preview} onClose={() => showPreview(null)} onReady={acceptPreview} />}
     </div>
   </WorkspaceShell>;
 }

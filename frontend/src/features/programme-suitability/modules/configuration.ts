@@ -22,6 +22,8 @@ export interface HomeCohort {
   status: 'resolved' | 'pending'; programmeId: ProgrammeId;
   cohortId: string | null; name: string | null; layoutVersion: number | null;
   reason?: string | null;
+  source?: 'lms'; groupId?: string | null; groupName?: string | null; assignedCohortName?: string;
+  lmsModules?: { id: string; title: string; sessions: number | null; weeks?: number | null; start: string | null; end: string | null; groupId?: string | null; groupName?: string | null }[];
 }
 export interface ModulesState { configuration: ModulesConfiguration; configurationVersion: number | null; selectedProgramme: ProgrammeId;
   selectionComplete?: boolean; savedSelection?: ProgrammeModuleSelection | null; selectionRevision?: number; homeCohort?: HomeCohort }

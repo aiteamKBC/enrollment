@@ -1,6 +1,6 @@
 import copy
 import uuid
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from . import test_templates as helpers, service, views
 from .models import TemplateVersion
 from .registry import seed, seeds, validate, legacy_equivalent, TemplateError, PROGRAMMES
@@ -61,3 +61,31 @@ class DocumentDesignVersionTests(TestCase):
         issue.refresh_from_db(); self.assertEqual(issue.template_snapshot,before)
         self.assertEqual(str(issue.version_id),old['id'])
         self.assertEqual(TemplateVersion.objects.get(pk=old['id']).content,validate(seed(key)))
+
+    @override_settings(DOCUMENT_BRANDED_PDF_ENABLED=True)
+    def test_published_purple_version_preview_uses_the_branded_pdf_runtime(self):
+        key = 'ilr'
+        saved = self.save({**seed(key), 'designTheme': 'purple-reference-v2'})
+        preview = self.payload(self.request(views.preview, 'POST', {
+            'revision': saved['revision'],
+        }, identifier=key))
+        published = self.payload(self.request(views.publish, 'POST', {
+            'revision': saved['revision'], 'previewToken': preview['previewToken'],
+            'reviewConfirmed': True, 'approvalNote': 'Purple design',
+        }, identifier=key), 201)['published']
+
+        historical = self.payload(self.request(views.preview, 'POST', {
+            'version': published['id'],
+        }, identifier=key))
+        self.assertTrue(historical['pdfBase64'])
+        self.assertEqual(historical['template']['presentationTheme'], 'kbc-dfe-purple-v4')
+
+    @override_settings(DOCUMENT_BRANDED_PDF_ENABLED=True)
+    def test_published_classic_version_preview_does_not_restyle_the_legacy_pdf(self):
+        key = 'ilr'
+        published = self.publish(seed(key))
+        historical = self.payload(self.request(views.preview, 'POST', {
+            'version': published['id'],
+        }, identifier=key))
+        self.assertNotIn('pdfBase64', historical)
+        self.assertNotIn('presentationTheme', historical['template'])

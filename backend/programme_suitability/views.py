@@ -169,6 +169,8 @@ def assessment(request, kind, learner_id):
                     if data.get("selectedProgramme", row.selected_programme) != row.selected_programme:
                         return JsonResponse({"error": "Your programme selection is confirmed and cannot be changed."}, status=403)
                     if data["revision"] in (row.revision, row.revision - 1):
+                        from .fixed_learning_plan import populate_fixed_learning_plan
+                        populate_fixed_learning_plan(row)
                         return JsonResponse(completion_payload(row, learner, is_staff(request)))
             if (row and confirm and status_for(row) == "SUBMITTED" and same_answers and same_selection
                     and data["revision"] in (row.revision, row.revision - 1)):
@@ -197,6 +199,8 @@ def assessment(request, kind, learner_id):
                     row.revision += 1
                     row.save()
                     sync_confirmed_programme_to_learner(row, actor=_actor(request))
+                    from .fixed_learning_plan import populate_fixed_learning_plan
+                    populate_fixed_learning_plan(row)
                     return JsonResponse(completion_payload(row, learner, is_staff(request)))
                 audit(row, request, "PROGRAMME_SELECTION" if action == "select" else "LEARNER_REVIEW_REQUEST")
                 if action == "select":
@@ -226,6 +230,8 @@ def assessment(request, kind, learner_id):
                 row.save()
                 if action == "select":
                     sync_confirmed_programme_to_learner(row, actor=_actor(request))
+                    from .fixed_learning_plan import populate_fixed_learning_plan
+                    populate_fixed_learning_plan(row)
             else:
                 if row is None:
                     version, config = published()

@@ -59,7 +59,7 @@ vi.mock('@/api/apprenticeshipAgreement', () => ({ fetchAgreement: vi.fn(async ()
 vi.mock('@/api/ilrDocument', () => ({ fetchIlrDocument: vi.fn(async () => null), issueIlrDocument: vi.fn(), signIlrDocument: vi.fn() }));
 vi.mock('@/api/trainingPlanDocument', () => ({ fetchTrainingPlanDocument: vi.fn(async () => null), issueTrainingPlanDocument: vi.fn(), signTrainingPlanDocument: vi.fn() }));
 vi.mock('@/api/writtenAgreement', () => ({ fetchWrittenAgreement: vi.fn(async () => null), issueWrittenAgreement: vi.fn(), signWrittenAgreement: vi.fn() }));
-const reviews = vi.hoisted(() => ({ fetchOnboardingReviewSlots: vi.fn(), issueOnboardingReview: vi.fn(), fetchReviewForm: vi.fn() }));
+const reviews = vi.hoisted(() => ({ fetchOnboardingReviewSlots: vi.fn(), prepareOnboardingReview: vi.fn(), issueOnboardingReview: vi.fn(), fetchReviewForm: vi.fn() }));
 vi.mock('@/api/reviewForm', async (original) => ({ ...(await original<typeof import('@/api/reviewForm')>()), ...reviews }));
 vi.mock('@/api/coach', () => ({ fetchLearnerCoach: vi.fn(async () => { throw new Error('not active'); }), updateLearnerCoach: vi.fn() }));
 vi.mock('@/api/staffUsers', () => ({ fetchCaseOwners: vi.fn(async () => ['Case Owner']), fetchCoachOptions: vi.fn(async () => []) }));
@@ -130,6 +130,7 @@ function renderBoard(path = '/users/20') {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/users/:userId" element={<><BoardPage /><Where /></>} />
+        <Route path="/users/:userId/reviews/:eventKey" element={<Where />} />
         <Route path="/users" element={<p>Users directory</p>} />
       </Routes>
     </MemoryRouter>,
@@ -320,6 +321,10 @@ describe('the enrolment board', () => {
     await screen.findByRole('heading', { name: 'Sam Example' });
     tab(/Overview/).focus();
     fireEvent.keyDown(tab(/Overview/), { key: 'ArrowRight' });
+    expect(tab(/^Modules$/)).toHaveAttribute('aria-selected', 'true');
+    expect(tab(/^Modules$/)).toHaveFocus();
+    expect(location).toBe('/users/20?tab=modules');
+    fireEvent.keyDown(tab(/^Modules$/), { key: 'ArrowRight' });
     expect(tab(/Suitability & RPL Report/)).toHaveAttribute('aria-selected', 'true');
     expect(tab(/Suitability & RPL Report/)).toHaveFocus();
     fireEvent.click(tab(/Skills & progress/));
@@ -451,11 +456,11 @@ describe('the enrolment board', () => {
     expect(screen.getByRole('region', { name: 'Uploaded documents' })).toBeInTheDocument();
   });
 
-  it('issues an enrolment review from Review documents', async () => {
-    reviews.issueOnboardingReview.mockResolvedValue({
+  it('prepares an enrolment review without issuing it from Review documents', async () => {
+    reviews.prepareOnboardingReview.mockResolvedValue({
       programme: 'Marketing Executive Level 4', allIssued: false, allCompleted: false,
       reviews: [
-        { type: 'workspace', label: 'RPL And Experience', issued: true, issuedAt: '2026-10-15T13:32:00Z', eventKey: 'review:apprenticeship:20:workspace', started: false, completed: false, sectionsDone: 0, sectionsTotal: 4, signatures: SIGNATURES },
+        { type: 'workspace', label: 'RPL And Experience', issued: false, draft: true, eventKey: 'review:apprenticeship:20:workspace', started: false, completed: false, sectionsDone: 0, sectionsTotal: 4, signatures: SIGNATURES },
       ],
     });
     renderBoard('/users/20?tab=documents');
@@ -466,13 +471,108 @@ describe('the enrolment board', () => {
     expect(within(panel).getByText('Completed 15 Oct 2026, 14:05')).toBeInTheDocument();
     expect(within(panel).getAllByText(/^Completed /)).toHaveLength(1);
     fireEvent.click(within(panel).getByRole('button', { name: /Issue review/ }));
-    await waitFor(() => expect(reviews.issueOnboardingReview).toHaveBeenCalledWith('apprenticeship', '20', 'workspace'));
-    expect(await within(panel).findByText('issued')).toBeInTheDocument();
-    // When it was issued, in UK time (13:32 UTC is 14:32 BST).
-    expect(within(panel).getByText('Issued 15 Oct 2026, 14:32')).toBeInTheDocument();
-    expect(within(panel).queryByText('RPL And Experience not issued yet')).not.toBeInTheDocument();
+    await waitFor(() => expect(reviews.prepareOnboardingReview).toHaveBeenCalledWith('apprenticeship', '20', 'workspace'));
+    expect(reviews.prepareOnboardingReview).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(location).toBe('/users/20/reviews/review%3Aapprenticeship%3A20%3Aworkspace?admin=1'));
     // Nothing to book: no dates, times or booking controls.
     expect(within(panel).queryByText(/book/i)).not.toBeInTheDocument();
+  });
+
+  it.each(['Continue', 'View'])('keeps the learner identity when opening an issued review with %s', async label => {
+    renderBoard('/users/20?tab=documents');
+    const panel = await screen.findByRole('region', { name: 'Review documents' });
+    await within(panel).findByText('in progress 2/6');
+    fireEvent.click(within(panel).getByRole('button', { name: label }));
+    const type = label === 'Continue' ? 'eligibility-review' : 'uln-privacy';
+    expect(location).toBe(`/users/20/reviews/${encodeURIComponent(`review:apprenticeship:20:${type}`)}?admin=1`);
+  });
+
+  it.each(['eligibility-review', 'workspace', 'training-plan', 'uln-privacy'])(
+    'shows exactly one Continue for an unfinished %s draft and preserves its destination', async type => {
+      const eventKey = `review:apprenticeship:20:${type}`;
+      reviews.fetchOnboardingReviewSlots.mockResolvedValue({
+        programme: '', allIssued: false, allCompleted: false,
+        reviews: [{ type, label: 'Selected Review', issued: false, draft: true, completed: false, eventKey }],
+      });
+      renderBoard('/users/20?tab=documents');
+      const panel = await screen.findByRole('region', { name: 'Review documents' });
+      await within(panel).findByText('Selected Review in preparation');
+      const actions = within(panel).getAllByRole('button', { name: 'Continue' });
+      expect(actions).toHaveLength(1);
+      expect(within(panel).queryByRole('button', { name: /Issue review/i })).not.toBeInTheDocument();
+      fireEvent.click(actions[0]);
+      expect(location).toBe(`/users/20/reviews/${encodeURIComponent(eventKey)}?admin=1`);
+      expect(reviews.prepareOnboardingReview).not.toHaveBeenCalled();
+      expect(reviews.issueOnboardingReview).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps Continue and Issue Review as separate actions for a completed draft', async () => {
+    reviews.fetchOnboardingReviewSlots.mockResolvedValue({
+      programme: '', allIssued: false, allCompleted: false,
+      reviews: [{ type: 'workspace', label: 'Selected Review', issued: false, draft: true, completed: true, eventKey: 'ready-review' }],
+    });
+    renderBoard('/users/20?tab=documents');
+    const panel = await screen.findByRole('region', { name: 'Review documents' });
+    await within(panel).findByText('Selected Review ready to issue');
+    expect(within(panel).getAllByRole('button', { name: 'Continue' })).toHaveLength(1);
+    expect(within(panel).getByRole('button', { name: 'Issue Review' })).toBeInTheDocument();
+  });
+
+  it('shows the same live LMS assignment on the learner profile', async () => {
+    const board = makeBoard();
+    board.programme.homeCohort = { status: 'resolved', source: 'lms', programmeId: 'ME_L4',
+      cohortId: 'lms-home', name: 'Live cohort', groupId: 'g1', groupName: 'Live group', layoutVersion: null,
+      lmsModules: [{ id: 'lms-m1', title: 'Live module', sessions: 16, start: null, end: null }] };
+    api.fetchEnrolmentBoard.mockResolvedValue(board);
+    renderBoard('/users/20');
+    await screen.findByRole('heading', { name: 'Sam Example' });
+    expect(screen.getAllByRole('tab').map(t => t.textContent?.replace(/\d+$/, '').trim())).toEqual([
+      'Overview', 'Modules', 'Suitability & RPL Report', 'Documents', 'Skills & progress', 'Activity',
+    ]);
+    expect(screen.queryByRole('region', { name: 'Assigned LMS modules' })).not.toBeInTheDocument();
+    fireEvent.click(tab(/^Modules$/));
+    const panel = await screen.findByRole('region', { name: 'Assigned LMS modules' });
+    expect(screen.getAllByRole('region', { name: 'Assigned LMS modules' })).toHaveLength(1);
+    expect(location).toBe('/users/20?tab=modules');
+    expect(within(panel).getByText('Live module')).toBeVisible();
+    expect(within(panel).getByText('Cohort: Live cohort · Group: Live group')).toBeVisible();
+    expect(api.fetchEnrolmentBoard).toHaveBeenCalledTimes(1);
+    fireEvent.click(tab(/^Overview$/));
+    expect(screen.queryByRole('region', { name: 'Assigned LMS modules' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Contact details' })).toBeVisible();
+  });
+
+  it.each(['ME_L4', 'MM_L6', 'APM_L4', 'PCP_L6'] as const)('opens Modules directly using only the current learner\'s returned %s assignment', async programmeId => {
+    const board = makeBoard();
+    board.programme.homeCohort = { status: 'resolved', source: 'lms', programmeId,
+      cohortId: 'saved-home', name: 'Saved cohort', groupId: 'saved-group', groupName: 'Assigned group', layoutVersion: null,
+      lmsModules: [{ id: 'confirmed-offering', title: 'Confirmed learner module', weeks: 16, sessions: 99,
+        groupName: 'Assigned group', start: '2027-02-01', end: '2027-06-20' }] };
+    api.fetchEnrolmentBoard.mockResolvedValue(board);
+    renderBoard('/users/20?tab=modules');
+    const panel = await screen.findByRole('region', { name: 'Assigned LMS modules' });
+    expect(tab(/^Modules$/)).toHaveAttribute('aria-selected', 'true');
+    expect(panel).toHaveTextContent('Confirmed learner module');
+    expect(panel).toHaveTextContent('Cohort: Saved cohort · Group: Assigned group');
+    expect(within(panel).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Module', 'Group', 'Duration (weeks)', 'Start', 'End']);
+    expect(within(panel).getByText('16')).toBeVisible();
+    expect(within(panel).getByText('2027-02-01')).toBeVisible();
+    expect(within(panel).getByText('2027-06-20')).toBeVisible();
+    expect(api.fetchEnrolmentBoard).toHaveBeenCalledWith('20');
+    expect(within(panel).queryByRole('button')).toBeNull();
+  });
+
+  it.each(['empty', 'unavailable'])('preserves the existing %s module state in the new tab', async state => {
+    const board = makeBoard();
+    board.programme.homeCohort = { status: state === 'empty' ? 'resolved' : 'pending', source: 'lms', programmeId: 'ME_L4',
+      cohortId: 'saved-home', name: 'Saved cohort', groupId: 'g1', groupName: 'Group 1', layoutVersion: null,
+      reason: state === 'unavailable' ? 'lms_unavailable' : undefined, lmsModules: [] };
+    api.fetchEnrolmentBoard.mockResolvedValue(board);
+    renderBoard('/users/20?tab=modules');
+    const panel = await screen.findByRole('region', { name: 'Assigned LMS modules' });
+    expect(panel).toHaveTextContent(state === 'empty' ? 'No LMS modules are available' : 'LMS data is temporarily unavailable');
+    expect(within(panel).queryByRole('table')).toBeNull();
   });
 
   it('does not render the removed destructive actions', async () => {

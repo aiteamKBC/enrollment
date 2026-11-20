@@ -180,6 +180,22 @@ def _existing_profile(source, database):
 def _check_placement(database, assignment, cohort, group, cohort_id=None, group_id=None):
     if not cohort and not group and not cohort_id and not group_id:
         return
+    from .lms_placement import enabled, saved_cohort, group_key, cohort_groups
+    if enabled():
+        from enrollment_service import lms_readonly
+        try:
+            item, reason = saved_cohort(assignment['programmeId'], cohort_id, cohort)
+            if item is None:
+                raise ProgrammeAssignmentError('The assigned cohort is missing or ambiguous in LMS. Admissions must review the placement.')
+            if group or group_id:
+                groups = {r['group_id']: r['group_name'] for r in cohort_groups(assignment['programmeId'], item['cohort_id'])}
+                matches = [gid for gid, name in groups.items() if (group_id and gid == group_id)
+                           or (group and group_key(name) == group_key(group))]
+                if len(matches) != 1:
+                    raise ProgrammeAssignmentError('The assigned group is missing or ambiguous in this LMS cohort. Admissions must review the placement.')
+        except lms_readonly.LmsReadUnavailable:
+            raise ProgrammeAssignmentError('LMS placement data is temporarily unavailable. Please retry confirmation.') from None
+        return
     with connections[database].cursor() as cursor:
         cursor.execute(
             'SELECT cohort_id FROM curriculum.cohorts WHERE (programme_id = %s OR programme_name = %s) '
@@ -264,6 +280,8 @@ def sync_confirmed_programme_to_learner(row, *, actor="system", reconcile=False,
         outcome.update(cohortAssignmentVersion=1, cohortId=prepared_cohort['cohortId'],
                        cohortName=prepared_cohort['name'],
                        cohortPublicationVersion=prepared_cohort['publicationVersion'])
+        if prepared_cohort.get('source') == 'lms':
+            outcome['cohortSource'] = 'lms'
     if dry_run:
         return outcome
     source_changes = []

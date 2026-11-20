@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fetchLearningPlan = vi.fn();
 const saveLearningPlan = vi.fn();
+const saveConfirmedProgrammePlan = vi.fn();
 const updateEnrolmentUser = vi.fn();
 const fetchProgrammes = vi.fn();
 const fetchCohorts = vi.fn();
@@ -19,7 +20,7 @@ const fetchFreeProgrammeModules = vi.fn();
 
 vi.mock('@/api/learningPlan', async () => {
   const actual = await vi.importActual<typeof import('@/api/learningPlan')>('@/api/learningPlan');
-  return { ...actual, fetchLearningPlan, saveLearningPlan };
+  return { ...actual, fetchLearningPlan, saveLearningPlan, saveConfirmedProgrammePlan };
 });
 vi.mock('@/api/enrolmentUsers', () => ({ updateEnrolmentUser }));
 vi.mock('@/api/curriculum', () => ({ fetchProgrammes, fetchCohorts, fetchGroups }));
@@ -97,6 +98,154 @@ describe('learning plan placement step', () => {
 
     await waitFor(() => expect(screen.queryByText(/is not on a programme yet/)).toBeNull());
     expect(screen.getByText('Add a module')).toBeTruthy();
+  });
+
+  it('shows confirmed fixed academic modules while cohort/group scheduling is pending', async () => {
+    fetchLearningPlan.mockResolvedValue({ ...planResponse({ programme: 'Marketing Executive Level 4', cohort: '', group: '' }, [{
+      moduleId: 'academic:ME_L4:marketing-impact', academicModuleId: 'marketing-impact',
+      moduleTitle: 'Marketing Impact and Planning', programmeId: 'PROG-ME-L4',
+      programmeName: 'Marketing Executive Level 4', groupName: '', hours: 0,
+      startDate: '', endDate: '', assignmentSource: 'programme_suitability_fixed', schedulingStatus: 'pending',
+    }]), saved: true });
+    render(<LearningPlanModal learnerId="91" learnerName="Aya Aya Test" onClose={vi.fn()} readOnly />);
+    expect(await screen.findByText('Marketing Impact and Planning')).toBeVisible();
+    expect(screen.getByText('Schedule pending')).toBeVisible();
+    expect(screen.queryByText(/is not on a programme yet/)).toBeNull();
+    expect(screen.queryByText('Not in catalogue')).toBeNull();
+    expect(fetchProgrammes).not.toHaveBeenCalled();
+    expect(fetchGroups).not.toHaveBeenCalled();
+    expect(saveLearningPlan).not.toHaveBeenCalled();
+  });
+
+  it('shows persisted PCP academic modules without a legacy learner group or catalogue', async () => {
+    fetchLearningPlan.mockResolvedValue({ ...planResponse({ programme: 'Project Controls Professional Level 6', cohort: 'Feb 2027', group: '' }, [{
+      moduleId: 'home-g1-portfolio', academicModuleId: 'portfolio', lmsOfferingId: 'home-g1-portfolio',
+      moduleTitle: 'Portfolio Management (APMG)', programmeId: 'PROG-PCP-L6',
+      programmeName: 'Project Controls Professional Level 6', groupName: 'Group 1', hours: 105.75,
+      startDate: '2027-02-01', endDate: '2027-06-20', assignmentSource: 'programme_suitability_pcp', schedulingStatus: 'scheduled',
+    }]), saved: true });
+    render(<LearningPlanModal learnerId="91" learnerName="PCP fixture" onClose={vi.fn()} readOnly />);
+    expect(await screen.findByText('Portfolio Management (APMG)')).toBeVisible();
+    expect(screen.getByText('Feb 2027')).toBeVisible();
+    expect(screen.getAllByText('105h 45m')[0]).toBeVisible();
+    expect(screen.queryByText(/is not on a programme yet/)).toBeNull();
+    expect(screen.queryByText('Not in catalogue')).toBeNull();
+    expect(fetchGroups).not.toHaveBeenCalled();
+    expect(saveLearningPlan).not.toHaveBeenCalled();
+  });
+
+  it('saves the prepared programme plan in view-only mode without editing placement', async () => {
+    const user = userEvent.setup();
+    const response = { ...planResponse(PLACED, [{ moduleId: 'fixed-impact', academicModuleId: 'marketing-impact', moduleTitle: 'Marketing Impact and Planning', groupName: 'Group 1', hours: 138, assignmentSource: 'programme_suitability_fixed' }]),
+      prefillSource: 'confirmed-programme', confirmedPlanPreviewToken: 'snapshot-token' };
+    fetchLearningPlan.mockResolvedValue(response);
+    saveConfirmedProgrammePlan.mockResolvedValue({ ...response, saved: true, confirmedPlanPreviewToken: null });
+    const onSaved = vi.fn();
+    const onClose = vi.fn();
+    render(<LearningPlanModal learnerId="91" learnerName="vv bb" readOnly onSaved={onSaved} onClose={onClose} />);
+    await user.click(await screen.findByRole('button', { name: 'Save learning plan' }));
+    await waitFor(() => expect(saveConfirmedProgrammePlan).toHaveBeenCalledWith('91', 'snapshot-token'));
+    expect(await screen.findByText('Saved', { exact: true })).toBeVisible();
+    expect(screen.queryByText(/not saved yet/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save learning plan' })).toBeNull();
+    expect(updateEnrolmentUser).not.toHaveBeenCalled();
+    expect(saveLearningPlan).not.toHaveBeenCalled();
+    expect(onSaved).toHaveBeenCalledOnce();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('shows a safe conflict if the prepared plan changed before saving', async () => {
+    const user = userEvent.setup();
+    fetchLearningPlan.mockResolvedValue({ ...planResponse(PLACED, [{ moduleId: 'fixed-impact', moduleTitle: 'Marketing Impact and Planning', hours: 138 }]), prefillSource: 'confirmed-programme', confirmedPlanPreviewToken: 'snapshot-token' });
+    saveConfirmedProgrammePlan.mockRejectedValue(new Error('The prepared modules changed. Close and reopen the Learning Plan before saving.'));
+    render(<LearningPlanModal learnerId="91" learnerName="vv bb" readOnly onClose={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: 'Save learning plan' }));
+    expect(await screen.findByText(/The prepared modules changed/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Save learning plan' })).toBeEnabled();
+    expect(saveLearningPlan).not.toHaveBeenCalled();
+  });
+
+  it('identifies previously confirmed programme modules instead of the legacy group preset', async () => {
+    fetchLearningPlan.mockResolvedValue({ ...planResponse(PLACED, [
+      { moduleId: 'lms-impact', academicModuleId: 'marketing-impact', moduleTitle: 'Marketing Impact and Planning', groupName: 'Group 1', hours: 0, assignmentSource: 'programme_suitability_fixed' },
+      { moduleId: 'lms-social', academicModuleId: 'social-media', moduleTitle: 'Social Media', groupName: 'Group 1', hours: 0, assignmentSource: 'programme_suitability_fixed' },
+      { moduleId: 'lms-martech', academicModuleId: 'martech', moduleTitle: 'Martech', groupName: 'Group 1', hours: 0, assignmentSource: 'programme_suitability_fixed' },
+    ]), saved: false, prefillSource: 'confirmed-programme' });
+    render(<LearningPlanModal learnerId="91" learnerName="Aya Aya Test" onClose={vi.fn()} readOnly />);
+    expect(await screen.findByText('Marketing Impact and Planning')).toBeVisible();
+    expect(screen.getByText('Social Media')).toBeVisible();
+    expect(screen.getByText('Martech')).toBeVisible();
+    expect(screen.getByText('Confirmed programme modules — not saved yet')).toBeVisible();
+    expect(screen.queryByText('Pre-filled from group — not saved yet')).toBeNull();
+    expect(screen.queryByText('Impact& Planning')).toBeNull();
+    expect(saveLearningPlan).not.toHaveBeenCalled();
+  });
+
+  it('shows exact LMS module hours, fractional minutes and their total', async () => {
+    fetchLearningPlan.mockResolvedValue({ ...planResponse(PLACED, [
+      { moduleId: 'impact', moduleTitle: 'Marketing Impact and Planning', hours: 138, hoursPending: false },
+      { moduleId: 'social', moduleTitle: 'Social Media', hours: 103, hoursPending: false },
+      { moduleId: 'martech', moduleTitle: 'Martech', hours: 105.75, hoursPending: false },
+    ]), saved: false, prefillSource: 'confirmed-programme' });
+    render(<LearningPlanModal learnerId="91" learnerName="Aya Aya Test" onClose={vi.fn()} readOnly />);
+    expect(await screen.findByText('138h')).toBeVisible();
+    expect(screen.getByText('103h')).toBeVisible();
+    expect(screen.getByText('105h 45m')).toBeVisible();
+    expect(screen.getAllByText('346h 45m').length).toBeGreaterThan(0);
+    expect(screen.queryByText('0h')).toBeNull();
+  });
+
+  it('shows projected programme reviews in the existing Meetings table without adding their hours twice', async () => {
+    fetchLearningPlan.mockResolvedValue({ ...planResponse(PLACED, [
+      { moduleId: 'saved', moduleTitle: 'Confirmed module', hours: 138 },
+    ]), saved: true, meetings: [
+      { reviewTemplateId: 'coaching', name: 'Monthly Coaching Meeting', hoursEach: 2.5, occurrences: 2,
+        hours: 5, recurrenceLabel: 'Every 1 month', startDate: '2027-02-01', endDate: '2027-03-01',
+        plannedDates: ['2027-02-01', '2027-03-01'], scheduleKind: 'projected' },
+      { reviewTemplateId: 'support', name: 'Personal Support Plan', hoursEach: 0, occurrences: 2,
+        hours: 0, recurrenceLabel: 'Every 1 month', startDate: '2027-02-01', endDate: '2027-03-01', scheduleKind: 'projected' },
+    ] });
+    render(<LearningPlanModal learnerId="91" learnerName="Aya Aya Test" onClose={vi.fn()} readOnly />);
+    expect(await screen.findByText('Monthly Coaching Meeting')).toBeVisible();
+    expect(screen.getByText('Personal Support Plan')).toBeVisible();
+    expect(screen.getByText(/these are not booked appointments/)).toBeVisible();
+    expect(screen.getAllByText('143h').length).toBeGreaterThan(0);
+    expect(saveLearningPlan).not.toHaveBeenCalled();
+  });
+
+  it('shows exact review source permission blockers without hiding the learner modules', async () => {
+    fetchLearningPlan.mockResolvedValue({ ...planResponse(PLACED, [
+      { moduleId: 'saved', moduleTitle: 'Confirmed module', hours: 138 },
+    ]), saved: true, meetings: [], meetingsReason: 'unavailable', meetingsBlockers: [
+      { code: 'select_denied', message: 'LMS curriculum.review_templates: select denied. Columns: name.' },
+    ] });
+    render(<LearningPlanModal learnerId="91" learnerName="Aya Aya Test" onClose={vi.fn()} readOnly />);
+    expect(await screen.findByText('Confirmed module')).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('curriculum.review_templates: select denied');
+  });
+
+  it('shows a verified replacement in a saved plan without requiring another save', async () => {
+    fetchLearningPlan.mockResolvedValue({ ...planResponse(PLACED, [
+      { moduleId: 'new-social', moduleTitle: 'Social Media', hours: 110.5, replacementStatus: 'resolved',
+        assignmentSource: 'programme_suitability_fixed',
+        replacesLmsOfferingId: 'old-social', replacementNotice: 'Using the replacement LMS module in the same home cohort and group.' },
+    ]), saved: true, assignmentMode: 'explicit' });
+    render(<LearningPlanModal learnerId="91" learnerName="Aya Aya Test" onClose={vi.fn()} readOnly />);
+    expect(await screen.findByText('Social Media')).toBeVisible();
+    expect(screen.getByText('Using the replacement LMS module in the same home cohort and group.')).toBeVisible();
+    expect(screen.getByText('Saved')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Save learning plan' })).toBeNull();
+    expect(saveLearningPlan).not.toHaveBeenCalled();
+    expect(saveConfirmedProgrammePlan).not.toHaveBeenCalled();
+  });
+
+  it('marks unreadable module hours pending rather than claiming zero hours', async () => {
+    fetchLearningPlan.mockResolvedValue(planResponse(PLACED, [
+      { moduleId: 'pending', moduleTitle: 'Pending module', hours: 0, hoursPending: true },
+    ]));
+    render(<LearningPlanModal learnerId="91" learnerName="Aya Aya Test" onClose={vi.fn()} readOnly />);
+    expect(await screen.findByText('Pending')).toBeVisible();
+    expect(screen.getAllByText('0h + pending hours').length).toBeGreaterThan(0);
   });
 
   it('cannot be saved until all three are chosen', async () => {

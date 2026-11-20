@@ -4,6 +4,41 @@ from django.db import models
 from django.db.models import Q
 
 
+class CohortGroupPool(models.Model):
+    """Enrolment-owned, owner-verified capacity baseline; never created on GET."""
+    programme_id = models.CharField(max_length=100)
+    cohort_id = models.CharField(max_length=100)
+    verified_members = models.JSONField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verification_evidence = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'cohort_group_pools'
+        constraints = [models.UniqueConstraint(fields=('programme_id', 'cohort_id'), name='unique_group_capacity_pool')]
+
+
+class CohortGroupAllocation(models.Model):
+    learner_id = models.BigIntegerField(unique=True)
+    learner_kind = models.CharField(max_length=20)
+    pool = models.ForeignKey(CohortGroupPool, on_delete=models.PROTECT)
+    group_id = models.CharField(max_length=100)
+    group_name = models.CharField(max_length=200)
+    seat = models.PositiveSmallIntegerField()
+    pathway = models.CharField(max_length=100, blank=True)
+    academic_ids = models.JSONField()
+    offerings = models.JSONField()
+    configuration_version = models.BigIntegerField()
+    selection_revision = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'cohort_group_allocations'
+        constraints = [
+            models.UniqueConstraint(fields=('pool', 'group_id', 'seat'), name='unique_group_capacity_seat'),
+            models.CheckConstraint(condition=Q(seat__gte=1, seat__lte=20), name='group_capacity_seat_1_to_20'),
+        ]
+
+
 class Assessment(models.Model):
     # Learner ids are unique across the enrolment service's Created_users table.
     learner_id = models.BigIntegerField(unique=True)
