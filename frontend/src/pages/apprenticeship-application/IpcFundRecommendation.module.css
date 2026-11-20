@@ -1,0 +1,31 @@
+﻿.card {
+  border: 1px solid var(--theme-border, #d8cbe8);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--theme-surface, #fff);
+  color: var(--theme-text-primary, #241638);
+  margin-top: 20px;
+  text-align: left;
+}
+.header { display: flex; align-items: center; gap: 20px; padding: 20px clamp(20px, 4vw, 28px); background: #241e30; border-bottom: 1px solid #a88b51; }
+.logo { display: block; flex: 0 0 auto; width: 100px; height: auto; object-fit: contain; transform: translateX(-30px); }
+.headerCopy { min-width: 0; transform: translateX(-50px); text-align: left; }
+.card .header h3 { margin: 0 0 8px; color: #fffaf0; font-size: clamp(18px, 3vw, 22px); line-height: 1.35; font-weight: 700; text-wrap: balance; }
+.card .header p { margin: 0; color: #e2c78e; font-size: 13px; line-height: 1.6; font-weight: 600; }
+.header span { margin-inline: 6px; }
+.body { padding: clamp(20px, 4vw, 28px); }
+.card .body > p { max-width: 70ch; margin: 0 0 14px; font-size: 14px; line-height: 1.7; color: inherit; }
+.funding { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 24px; padding: 18px 0; margin: 18px 0; border-block: 1px solid var(--theme-border, #e5def0); }
+.card .funding .amount { color: var(--theme-text-primary, #593282); font-size: clamp(28px, 5vw, 34px); line-height: 1.15; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.card .funding p { margin: 0; color: inherit; font-size: 14px; line-height: 1.6; }
+.card .body .disclaimer { font-size: 13px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-top: 22px; }
+.actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 650; line-height: 1.5; text-underline-offset: 4px; }
+.actions svg { flex-shrink: 0; }
+.actions .primary { padding: 12px 18px; border-radius: 8px; background: #593282; color: #fff; text-decoration: none; }
+.actions .primary:hover { background: #432363; }
+.actions .secondary { color: inherit; text-decoration: underline; }
+.actions .secondary:hover { text-decoration-thickness: 2px; }
+.actions a:focus-visible { outline: 3px solid var(--theme-text-primary, #241638); outline-offset: 4px; }
+@media (max-width: 540px) { .actions { align-items: stretch; flex-direction: column; } .actions a { justify-content: flex-start; } }
+@media (max-width: 540px) { .header { gap: 12px; } .logo { width: 64px; } }

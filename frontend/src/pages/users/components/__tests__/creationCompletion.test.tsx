@@ -7,7 +7,10 @@ import { CreateEmployerModal } from '../CreateEmployerModal';
 const mocks = vi.hoisted(() => ({ createLearner: vi.fn(), createEmployer: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock('@/api/enrolmentUsers', async () => ({ ...await vi.importActual('@/api/enrolmentUsers'), createEnrolmentUser: mocks.createLearner }));
 vi.mock('@/api/curriculum', () => ({ fetchProgrammes: async () => [], fetchCohorts: async () => [], fetchGroups: async () => [] }));
-vi.mock('@/api/staffUsers', () => ({ fetchCaseOwners: async () => ['Test Coach'] }));
+vi.mock('@/api/staffUsers', () => ({
+  fetchCaseOwners: async () => ['Test Owner'],
+  fetchCoachOptions: async () => [{ name: 'Learning Coach', email: 'coach@example.test' }],
+}));
 vi.mock('@/api/employers', () => ({ createEmployer: mocks.createEmployer, listEmployers: async () => ({ results: [] }),
   listOrganisations: async () => ({ results: [{ id: '1', name: 'Test organisation' }], count: 1 }) }));
 vi.mock("@/hooks/useToast.helpers", () => ({ useToast: () => ({ success: mocks.success, error: mocks.error }) }));
@@ -34,13 +37,19 @@ describe('successful creation awaiting a manual invitation', () => {
       // The first session is no longer arranged here: the learner books it
       // themselves after signing in. A case owner is still required, because
       // that is who they will book with.
-      fireEvent.change(await screen.findByLabelText(/^Case owner/), { target: { value: 'Test Coach' } });
+      fireEvent.change(await screen.findByLabelText(/^Case owner/), { target: { value: 'Test Owner' } });
+      fireEvent.change(await screen.findByLabelText(/^Skills coach/), { target: { value: 'coach@example.test' } });
       fireEvent.click(await screen.findByRole('combobox', { name: 'Organisation' }));
       fireEvent.change(screen.getByRole('textbox', { name: 'Search organisations' }), { target: { value: 'Test' } });
       fireEvent.click(screen.getByRole('option', { name: 'Test organisation' }));
     }
     fireEvent.click(screen.getByRole('button', { name: /^Create/ }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(row));
+    if (kind === 'learner') {
+      expect(mocks.createLearner).toHaveBeenCalledWith(expect.objectContaining({
+        caseOwner: 'Test Owner', coachName: 'Learning Coach', coachEmail: 'coach@example.test',
+      }));
+    }
     expect(onClose).toHaveBeenCalledOnce();
     expect(mocks.error).not.toHaveBeenCalled();
     expect(mocks.success).toHaveBeenCalledWith(expect.stringContaining(kind === 'learner' ? 'learner' : 'Employer'), expect.stringContaining('Send their invitation from Accounts'));

@@ -148,6 +148,8 @@ export interface StaffUserRow extends UserListRow {
   position: string;
   /** The access grant — '' when nobody has set one yet. */
   access: StaffAccess | '';
+  /** Every effective grant, including the primary grant. */
+  accesses?: StaffAccess[];
   phone: string;
   organization: string;
   title: string;
@@ -229,9 +231,9 @@ export interface CoachOption {
  * name-only pick would leave the two fields disagreeing about who the coach is.
  */
 export async function fetchCoachOptions(): Promise<CoachOption[]> {
-  const rows = await fetchStaffUsers(CASE_OWNER_POSITIONS);
+  const rows = await fetchStaffUsers();
   return rows
-    .filter((r) => r.name && r.email)
+    .filter((r) => r.name && r.email && (r.accesses ?? [r.access]).includes('coach'))
     .map((r) => ({ name: r.name, email: r.email }));
 }
 

@@ -159,10 +159,12 @@ export interface FsAssessmentRecord {
   level: string;
   date: string;
   result?: string;
+  status?: string;
 }
 export interface FsBlock {
   assessments: FsAssessmentRecord[];
   exempt: boolean;
+  status?: 'EXEMPT' | 'NOT_EXEMPT' | 'OPT_OUT';
   evidence: DocRow[];
 }
 
@@ -283,6 +285,15 @@ export interface EnrolmentBoard {
     /** Resolved from Employer_id where set, else the learner's own text. */
     employer?: string;
     employerId?: number | null;
+  };
+  learnerTeam: {
+    caseOwner: { name: string; email: string } | null;
+    skillsCoach: { name: string; email: string } | null;
+  };
+  employmentDetails: {
+    organisation: { name: string; address: string } | null;
+    employerRepresentative: { name: string; email: string } | null;
+    lineManager: { name: string; email: string; phone: string } | null;
   };
   contact: {
     title?: string;
