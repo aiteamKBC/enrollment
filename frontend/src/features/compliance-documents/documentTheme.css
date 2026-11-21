@@ -181,3 +181,42 @@
 .document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-totals th { background: #70268b !important; color: white !important; }
 .document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-totals { margin-top: 5mm; }
 .document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-note { margin: 3mm 0 0; font-style: italic; font-size: 8pt; }
+
+/* Version 6: a single compact source-Week summary table per module. Older
+   snapshot renderers keep their own pinned weekly/flat presentation. */
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] {
+  font: 9pt/1.2 Arial, sans-serif; color: #1b1123;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] table {
+  width: 100%; table-layout: fixed; margin: 0 0 3mm; border-color: #ad83bf !important;
+  border-radius: 1.8mm !important; overflow: hidden; font: inherit;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] table th,
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] table td {
+  padding: 1mm 2mm; font: inherit; line-height: 1.2; vertical-align: top;
+  overflow-wrap: anywhere; border-color: #ad83bf;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] table th {
+  background: #e2c6f0 !important; color: #65207f !important; font-weight: 700;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-overview td:first-child {
+  width: 29%; background: #e2c6f0 !important; font-weight: 700; color: #400b69;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-module-title {
+  padding: 2mm 3mm; margin: 4mm 0 2mm; border-radius: 1.5mm;
+  background: linear-gradient(100deg, #65207f, #852ba1); color: white;
+  font-size: 11pt; font-weight: 700; line-height: 1.25; break-after: avoid;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-details td:first-child { width: 62%; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-details td { padding: 2mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-activities td:not(:first-child),
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-activities th:not(:first-child) { text-align: center; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-section-title {
+  padding: 1.5mm 3mm; margin: 4mm 0 2mm; border-radius: 1.5mm;
+  background: linear-gradient(100deg, #e8d3f5, #c58ce2); color: #400b69;
+  font-size: 12pt; font-weight: 700; break-after: avoid;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-pending-coaching td:first-child { font-weight: 700; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] .tpc-note { font-size: 8pt; font-style: italic; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] thead { display: table-header-group; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-summary] tr { break-inside: avoid; }
