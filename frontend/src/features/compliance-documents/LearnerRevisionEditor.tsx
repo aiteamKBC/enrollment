@@ -51,6 +51,6 @@ export function LearnerRevisionEditor({ learnerId, initial, onClose, onChanged }
         <p className="text-xs text-foreground-600">Finalisation makes this content read-only and available to the learner. Further edits create the next revision. Preview the saved signature choice first.</p>
       </section>
     </div>
-    {preview && <DocumentPreview value={preview} onReady={setReviewed} onClose={() => showPreview(null)} />}
+    {preview && <DocumentPreview showDiagnostics value={preview} onReady={setReviewed} onClose={() => showPreview(null)} />}
   </div>;
 }

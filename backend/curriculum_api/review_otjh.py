@@ -102,8 +102,15 @@ def planned_meetings(
     window_end,
     *,
     template_cache=None,
+    include_non_otjh=False,
+    occurrence_resolver=None,
 ):
     """One row per OTJH-bearing Review template, for display beside a plan.
+
+    Enrolment may include non-OTJ templates with zero claimable hours and
+    provide a reader-backed occurrence resolver. Defaults retain existing
+    callers' OTJ-only behaviour and arithmetic. Individual projected dates
+    are included; this function never creates or claims appointment bookings.
 
     Same projection ``planned_hours`` sums, kept itemised so a reader can see
     WHERE the hours come from -- a total that rises with no visible cause is
@@ -122,7 +129,8 @@ def planned_meetings(
     cache_key = f'otjh:{programme_id}'
     try:
         if cache_key not in template_cache:
-            template_cache[cache_key] = otjh_template_rows(programme_id)
+            template_cache[cache_key] = (review_instances.list_enabled_review_templates(programme_id)
+                if include_non_otjh else otjh_template_rows(programme_id))
         template_rows = template_cache[cache_key]
     except Exception as exc:
         logger.warning('Could not load OTJH review templates for programme %s: %s', programme_id, exc)
@@ -132,7 +140,7 @@ def planned_meetings(
     for template_row in template_rows:
         hours = template_otjh_hours(template_row)
         try:
-            occurrences = review_instances.resolve_learner_occurrences(
+            occurrences = (occurrence_resolver or review_instances.resolve_learner_occurrences)(
                 template_row, learner_id, learner_status, learner_start_date,
                 window_start, window_end,
             )
@@ -161,6 +169,9 @@ def planned_meetings(
             # the same start/end columns it shows for a module.
             'startDate': dates[0],
             'endDate': dates[-1],
+            'plannedDates': dates,
+            'scheduleKind': 'projected',
+            'bookedAppointmentsLoaded': False,
         })
     return meetings
 

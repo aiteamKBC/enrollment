@@ -978,6 +978,65 @@ async function submitApplication() {
   fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
 }
 
+it('shows IPC directly after the employment restriction only for PCP L6 and clears it when corrected', async () => {
+  await open();
+  fillPersonalDetails('Project Controls Professional Level 6'); next();
+  await heading('Employment');
+  const status = screen.getByLabelText(/Your Employment Status/);
+  expect(screen.queryByRole('region', { name: 'IPC Fund recommendation' })).not.toBeInTheDocument();
+  for (const value of ['Self employment', 'Not in paid employment, looking for work and available to start work', 'Not in paid employment, not looking for work and/or not available to start work']) {
+    fireEvent.change(status, { target: { value } });
+    const card = screen.getByRole('region', { name: 'IPC Fund recommendation' });
+    expect(card.previousElementSibling).toHaveAttribute('id', 'note.employmentRequirements');
+    expect(screen.getByRole('button', { name: /Continue/ })).toBeDisabled();
+  }
+  fireEvent.change(status, { target: { value: 'In paid employment' } });
+  expect(screen.queryByRole('region', { name: 'IPC Fund recommendation' })).not.toBeInTheDocument();
+  fireEvent.change(status, { target: { value: 'Self employment' } });
+  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  await heading('Personal Details');
+  type(/Choose Your Applying Programme/, 'Marketing Manager Level 6'); next();
+  await heading('Employment');
+  expect(screen.getByText('Apprenticeship Employment Requirements')).toBeVisible();
+  expect(screen.queryByRole('region', { name: 'IPC Fund recommendation' })).not.toBeInTheDocument();
+  expect(submitApprenticeshipApplication).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['Project Controls Professional Level 6', false, true],
+  ['Project Controls Professional Level 6', true, false],
+  ['Marketing Manager Level 6', false, false],
+])('shows IPC on the final result only for rejected PCP: %s eligible=%s', async (programme, eligible, visible) => {
+  vi.mocked(submitApprenticeshipApplication).mockResolvedValue({ eligible, reasons: eligible ? [] : ['Residency requirement not met.'], outcome: eligible ? 'invited' : 'notEligible' });
+  await open();
+  fillPersonalDetails(programme); next();
+  await heading('Employment');
+  fireEvent.change(screen.getByLabelText(/Your Employment Status/), { target: { value: 'In paid employment' } });
+  type(/Start Date with Employer/, '2020-09-01');
+  type(/Job Title/, 'Engineer');
+  type(/^\d+\. Employer\s*\*?$/, 'Example Ltd');
+  type(/Employer Street Address/, '2 Business Park');
+  type(/Employer Town\/City/, 'Exampletown');
+  type(/Employer Postcode/, 'EX3 4MP');
+  type(/Employer Representative Name/, 'Alex Manager');
+  type(/Employer Representative Email/, 'alex@employer.example');
+  choose(/50% of your working hours in England/, 'Yes'); next();
+  await heading('Residency');
+  fireEvent.change(screen.getByLabelText(/Country of Residence/), { target: { value: 'United Kingdom' } });
+  choose(/UK\/EEA National/, 'Yes');
+  fireEvent.change(screen.getByLabelText(/Please state your nationality/), { target: { value: 'United Kingdom' } });
+  fireEvent.change(screen.getByLabelText(/residency status/), { target: { value: 'Pre-settled Status' } });
+  choose(/resident in the UK and Islands/, 'Yes');
+  choose(/ordinary residence in the UK/, 'Yes');
+  choose(/full-time education or training/, 'No');
+  choose(/government-funded training programmes/, 'No');
+  type(/Residential Street Address/, '1 Example Street');
+  type(/Residential Town\/City/, 'Exampletown');
+  fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
+  await heading(eligible ? 'You Are Eligible to Proceed!' : 'You Are Not Currently Eligible');
+  expect(!!screen.queryByRole('region', { name: 'IPC Fund recommendation' })).toBe(visible);
+});
+
 it('tells an eligible applicant their set-password invitation has been emailed', async () => {
   vi.mocked(submitApprenticeshipApplication).mockResolvedValue(ELIGIBLE);
   await submitApplication();

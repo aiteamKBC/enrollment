@@ -1,4 +1,5 @@
 import type { CustomAnswer } from './wizard/layout/types';
+import type { HomeCohort } from '@/features/programme-suitability/modules/configuration';
 // ============================================================================
 // Enrolment Console — shared types
 // Frontend only. Every shape is named so it can be mapped to the API later.
@@ -158,10 +159,12 @@ export interface FsAssessmentRecord {
   level: string;
   date: string;
   result?: string;
+  status?: string;
 }
 export interface FsBlock {
   assessments: FsAssessmentRecord[];
   exempt: boolean;
+  status?: 'EXEMPT' | 'NOT_EXEMPT' | 'OPT_OUT';
   evidence: DocRow[];
 }
 
@@ -283,6 +286,15 @@ export interface EnrolmentBoard {
     employer?: string;
     employerId?: number | null;
   };
+  learnerTeam: {
+    caseOwner: { name: string; email: string } | null;
+    skillsCoach: { name: string; email: string } | null;
+  };
+  employmentDetails: {
+    organisation: { name: string; address: string } | null;
+    employerRepresentative: { name: string; email: string } | null;
+    lineManager: { name: string; email: string; phone: string } | null;
+  };
   contact: {
     title?: string;
     /** False only for existing signed/submitted records grandfathered without Title. */
@@ -321,6 +333,7 @@ export interface EnrolmentBoard {
     actionPlans: string;
   };
   programme: {
+    homeCohort?: HomeCohort | null;
     type: string;
     name: string;
     cohort: string;

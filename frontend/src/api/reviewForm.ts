@@ -293,6 +293,7 @@ export interface OnboardingReviewSlot {
   type: OnboardingReviewType;
   label: string;
   issued: boolean;
+  draft?: boolean;
   eventKey?: string;
   issuedAt?: string | null;
   started?: boolean;
@@ -318,10 +319,17 @@ export function fetchOnboardingReviewSlots(kind: LearnerKind, id: string): Promi
 }
 
 /** Issue one onboarding review to the learner. Staff only; each is issued once. */
-export function issueOnboardingReview(kind: LearnerKind, id: string, type: OnboardingReviewType): Promise<OnboardingReviewSlotsResponse> {
+export function prepareOnboardingReview(kind: LearnerKind, id: string, type: OnboardingReviewType): Promise<OnboardingReviewSlotsResponse> {
   return call<OnboardingReviewSlotsResponse>(`${BASE}/${kind}/${id}/issue/`, {
     method: 'POST',
-    body: JSON.stringify({ type }),
+    body: JSON.stringify({ type, action: 'prepare' }),
+    headers: { 'Content-Type': 'application/json', 'X-Document-Issue-Mode': 'initial' },
+  });
+}
+
+export function issueOnboardingReview(kind: LearnerKind, id: string, type: OnboardingReviewType): Promise<OnboardingReviewSlotsResponse> {
+  return call<OnboardingReviewSlotsResponse>(`${BASE}/${kind}/${id}/issue/`, {
+    method: 'POST', body: JSON.stringify({ type, action: 'finalize' }),
     headers: { 'Content-Type': 'application/json', 'X-Document-Issue-Mode': 'initial' },
   }).then(async result => {
     if (result.issuedDocumentSnapshot) await persistOriginalPdf(id, result.issuedDocumentSnapshot);

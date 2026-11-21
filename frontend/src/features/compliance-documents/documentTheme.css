@@ -112,3 +112,72 @@
 .document-branded-editor .document-signature > small { margin: 2mm 3mm 0; }
 
 .document-branded-editor .document-content[role="textbox"] table thead td { background: var(--document-secondary) !important; color: var(--document-white) !important; font-weight: 700; }
+
+/* The compact Activities Overview owns its presentation inside the protected
+   native block. Keep the generic document heading/dashboard table skins out. */
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] {
+  font: 9pt/1.18 Arial, sans-serif; color: #17121e;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] table {
+  width: 100%; margin: 0; font: inherit; table-layout: fixed;
+  border-radius: 1.8mm !important; overflow: hidden;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] table th,
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] table td {
+  padding: .65mm 1.5mm; font: inherit; line-height: 1.18;
+  vertical-align: top; overflow-wrap: anywhere;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] table th {
+  background: #e5cef3 !important; color: #400b69 !important; font-weight: 700;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-overview { margin-bottom: 2mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-overview td:first-child {
+  width: 27%; background: #e5cef3 !important; color: #400b69; font-weight: 700;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-module-title {
+  padding: 1.6mm 3mm; margin: 2.5mm 0 1mm; border-radius: 1.5mm;
+  background: linear-gradient(100deg, #662481, #852ba1); color: white;
+  font-size: 11pt; font-weight: 700; line-height: 1.25;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-module-details { margin-bottom: 2.5mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-module-details td:first-child { width: 70%; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-week-card {
+  margin: 2.5mm 0; padding: 0 1.3mm 1.3mm; border: .2mm solid #baa9c9;
+  border-radius: 2.5mm; background: white; overflow: hidden;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-week-title,
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-reviews-title {
+  margin: 0 -1.3mm; padding: .9mm 2mm;
+  background: linear-gradient(100deg, #e8d3f5, #c58ce2); color: #400b69;
+  font-size: 11pt; font-weight: 700; line-height: 1.2;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-activities {
+  border-radius: 1.5mm !important; border-width: 0 !important;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-activities td:first-child { position: relative; padding-left: 9mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-activities th:first-child { padding-left: 9mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-activities td:not(:first-child),
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-activities th:not(:first-child) { text-align: center; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-icon {
+  display: inline-block; width: 4mm; height: 4mm; color: #8b2cb1; vertical-align: middle;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-activities .tp-icon { position: absolute; top: .6mm; left: 2mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-resources {
+  display: flex; gap: 2mm; padding: 1.2mm 2mm; margin-top: .7mm;
+  background: linear-gradient(100deg, #f4e7fc, #eddbf8); border-radius: 2mm; font-size: 8.5pt;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-resources > .tp-icon { flex: 0 0 5mm; width: 5mm; height: 5mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-resources > div { flex: 1; min-width: 0; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-resources > div > strong { display: block; color: #400b69; font-size: 9pt; margin-bottom: 1mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-resource-list { line-height: 1.4; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-resource-item { display: inline; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-resource-separator { padding: 0 1.2mm; color: #642783; font-weight: 700; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-resource-item strong { color: #400b69; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-reviews-title {
+  display: flex; align-items: center; gap: 2mm; border-radius: 2mm; margin: 4mm 0 2mm;
+}
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-reviews-title .tp-icon { color: white; background: #742795; padding: 1mm; box-sizing: content-box; border-radius: 1mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-reviews th,
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-totals th { background: #70268b !important; color: white !important; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-totals { margin-top: 5mm; }
+.document-branded-editor .document-content[role="textbox"] [data-training-plan-weekly] .tp-note { margin: 3mm 0 0; font-style: italic; font-size: 8pt; }

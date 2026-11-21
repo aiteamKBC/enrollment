@@ -137,7 +137,7 @@ def to_edit_fields(u):
     The keys are ``WRITABLE_FIELDS`` keys, so whatever comes out of here can be
     handed straight back to PATCH without a translation layer in between.
     """
-    return {
+    fields = {
         "id": str(u.id),
         "username": _s(u.username),
         "email": _s(u.email),
@@ -160,6 +160,15 @@ def to_edit_fields(u):
         **{key: _s(getattr(u, attr)) for key, attr in APTEM_TEXT_FIELDS.items()},
         **{key: getattr(u, attr) for key, attr in APTEM_BOOL_FIELDS.items()},
     }
+    # A few pre-link records stored the coach only on LearnerProfile. Preserve
+    # that assignment when the edit form round-trips unrelated learner fields.
+    if getattr(u, "coach_name", None) is None and getattr(u, "coach_email", None) is None:
+        from .coach_assignment import current_coach
+        from .identity import learner_profile_for_source
+        coach = current_coach(u, learner_profile_for_source(u, heal=False))
+        fields["coachName"] = _s(coach["coach_name"])
+        fields["coachEmail"] = _s(coach["coach_email"])
+    return fields
 
 
 # --------------------------------------------------------------------------- #
@@ -174,7 +183,37 @@ def _fs_block(assessments, exemption):
         evidence = _as_list(ex.get("evidence"))
     elif isinstance(exemption, bool):
         exempt = exemption
-    return {"assessments": _as_list(assessments), "exempt": exempt, "evidence": evidence}
+    status = str(ex.get("status") or ("EXEMPT" if exempt else "NOT_EXEMPT")).upper() if ex else ("EXEMPT" if exempt else "NOT_EXEMPT")
+    if status not in {"EXEMPT", "NOT_EXEMPT", "OPT_OUT"}: status = "NOT_EXEMPT"
+    return {"assessments": _as_list(assessments), "exempt": status == "EXEMPT", "status": status, "evidence": evidence}
+
+
+def _bksb_assessment_rows(user):
+    """Project completed BKSB rows into the board's existing FS assessment shape."""
+    try:
+        from enrolment_api.models import BksbInitialAssessment
+        kind = _s(getattr(user, "learner_type", None)) or "apprenticeship"
+        rows = BksbInitialAssessment.objects.filter(
+            learner_kind=kind, learner_id=user.pk, status="completed"
+        ).only("subject", "course_name", "result", "level", "assessment_date")
+    except Exception:
+        # The board must remain available if the additive BKSB table has not
+        # been provisioned in an older environment.
+        return {"english": [], "maths": []}
+    output = {"english": [], "maths": []}
+    for row in rows:
+        subject = _s(row.subject).lower()
+        if subject not in output or not (row.result or row.level or row.assessment_date):
+            continue
+        output[subject].append({
+            "id": f"bksb-{row.pk}",
+            "name": _s(row.course_name) or subject.title(),
+            "level": _s(row.level) or _s(row.result) or "",
+            "result": _s(row.result),
+            "date": row.assessment_date.isoformat() if row.assessment_date else "",
+            "status": "Completed",
+        })
+    return output
 
 
 def _split_enrolled(value):
@@ -260,15 +299,145 @@ def _employer_label(u):
     return employer.full_name or fallback, employer_id
 
 
+def _learner_team(u):
+    """Return explicit staff assignments without legacy Owner fallbacks."""
+    from .coach_assignment import case_owner_coach, current_coach
+    from .identity import learner_profile_for_source
+
+    case_owner_name = _s(getattr(u, "case_owner", ""))
+    case_owner = case_owner_coach(case_owner_name) if case_owner_name else {"coach_email": ""}
+    profile = (
+        learner_profile_for_source(u, heal=False)
+        if getattr(u, "coach_name", None) is None and getattr(u, "coach_email", None) is None
+        else None
+    )
+    coach = current_coach(u, profile)
+    return {
+        "caseOwner": ({"name": case_owner_name, "email": _s(case_owner["coach_email"])}
+                      if case_owner_name else None),
+        "skillsCoach": ({"name": _s(coach["coach_name"]), "email": _s(coach["coach_email"])}
+                         if _s(coach["coach_name"]) or _s(coach["coach_email"]) else None),
+    }
+
+
+def _extended_employment(u):
+    """Return the learner's saved Extended ILR employer block, if available."""
+    from django.db import DatabaseError
+
+    try:
+        from enrolment_api.models import ExtendedIlr
+        row = ExtendedIlr.objects.filter(learner_id=u.pk).only("answers").first()
+    except DatabaseError:
+        return {}
+    answers = getattr(row, "answers", None)
+    if not isinstance(answers, dict):
+        return {}
+    employer = answers.get("employer")
+    return employer if isinstance(employer, dict) else {}
+
+
+def _verified_employer_representative(u):
+    """Representative from this learner's exact verified Eligibility link."""
+    from django.db import DatabaseError
+
+    try:
+        from enrolment_api.eligibility_link import verified_application
+        application = verified_application(u.pk)
+    except DatabaseError:
+        return None
+    if not application:
+        return None
+    name = _s(application.get("representative_name"))
+    email = _s(application.get("representative_email"))
+    return {"name": name, "email": email} if name or email else None
+
+
+def _employment_details(u):
+    """Resolve coherent organisation, representative and manager records.
+
+    Each person is returned wholly from one source.  In particular, a legacy
+    manager name is never combined with an assigned Employer's email or phone.
+    """
+    from django.db import DatabaseError
+    from .models import Employer, Organisation
+
+    employer = None
+    organisation = None
+    try:
+        employer_id = getattr(u, "employer_id", None)
+        employer = Employer.objects.filter(pk=employer_id).first() if employer_id else None
+        organisation_id = getattr(u, "organisation_id", None)
+        if organisation_id:
+            organisation = Organisation.objects.filter(pk=organisation_id).first()
+        elif employer is not None:
+            ids = [value for value in (employer.employer_group_ids or [])
+                   if isinstance(value, int) or str(value).isdigit()]
+            if len(ids) == 1:
+                organisation = Organisation.objects.filter(pk=int(ids[0])).first()
+    except DatabaseError:
+        employer = None
+        organisation = None
+
+    # A manager linked to a different company is not valid for this learner.
+    direct_org_id = getattr(u, "organisation_id", None)
+    if organisation is not None and employer is not None and direct_org_id:
+        linked_ids = {str(value) for value in (employer.employer_group_ids or [])}
+        if str(direct_org_id) not in linked_ids:
+            employer = None
+
+    extended = _extended_employment(u)
+    if organisation is not None:
+        address = ", ".join(part for part in (
+            _s(organisation.address_1), _s(organisation.address_2),
+            _s(organisation.city_town), _s(organisation.county),
+            _s(organisation.post_code), _s(organisation.country),
+        ) if part)
+        organisation_details = {"name": _s(organisation.name), "address": address}
+    elif any(_s(extended.get(key)) for key in ("organisationName", "address", "city", "postcode")):
+        address = ", ".join(part for part in (
+            _s(extended.get("address")), _s(extended.get("city")), _s(extended.get("postcode")),
+        ) if part)
+        organisation_details = {"name": _s(extended.get("organisationName")), "address": address}
+    else:
+        legacy_name = _s(getattr(u, "organization", "")) or _s(getattr(u, "employer", ""))
+        legacy_address = _s(getattr(u, "employer_address", ""))
+        organisation_details = ({"name": legacy_name, "address": legacy_address}
+                                if legacy_name or legacy_address else None)
+
+    if employer is not None:
+        manager = {"name": _s(employer.full_name), "email": _s(employer.email), "phone": _s(employer.mobile)}
+    elif any(_s(extended.get(key)) for key in ("lineManagerName", "lineManagerEmail", "lineManagerPhone")):
+        manager = {
+            "name": _s(extended.get("lineManagerName")),
+            "email": _s(extended.get("lineManagerEmail")),
+            "phone": _s(extended.get("lineManagerPhone")),
+        }
+    else:
+        legacy_manager = _s(getattr(u, "line_manager", ""))
+        manager = {"name": legacy_manager, "email": "", "phone": ""} if legacy_manager else None
+
+    return {
+        "organisation": organisation_details,
+        "employerRepresentative": _verified_employer_representative(u),
+        "lineManager": manager,
+    }
+
+
 def to_board(u):
     # Imported here, not at module scope: enrolment_api.models imports from
     # learner_api.models, so a top-level import would be circular.
     from .board_wizard import fmt_date, merge_wizard_sections, record_address, saved_signature
-    from programme_suitability.home_cohort import cohort_label_for_board
+    from programme_suitability.home_cohort import home_cohort_for_board
+
+    home_cohort = home_cohort_for_board(u)
+    resolved_home = home_cohort if home_cohort and home_cohort['status'] == 'resolved' else {}
 
     enrolled_at, enrolled_by = _split_enrolled(u.enrolled_time_and_user)
     saved_signature_value, saved_signature_date = saved_signature(u.id)
     employer_name, employer_id = _employer_label(u)
+    bksb = _bksb_assessment_rows(u)
+    english_assessments = bksb["english"] or _as_list(u.english_assessments)
+    maths_assessments = bksb["maths"] or _as_list(u.maths_assessments)
     board = {
         "user": {
             "id": str(u.id),
@@ -289,6 +458,8 @@ def to_board(u):
             "employer": employer_name,
             "employerId": employer_id,
         },
+        "learnerTeam": _learner_team(u),
+        "employmentDetails": _employment_details(u),
         "contact": {
             "title": _s(getattr(u, "title", None)),
             "country": _s(getattr(u, 'country', None)),
@@ -300,7 +471,7 @@ def to_board(u):
             "email": _s(u.email),
             "phone": _s(u.phone_number),
             "dob": fmt_date(u.date_of_birth),
-            "groupMembership": _s(u.group),
+            "groupMembership": (resolved_home.get('groupName') or 'Group pending') if resolved_home.get('source') == 'lms' else _s(u.group),
             "signatureUrl": None,
             "hasMandate": False,
             # What the learner already gave on their record (first sign-in, or
@@ -324,7 +495,8 @@ def to_board(u):
         "programme": {
             "type": "Delivery",
             "name": _s(u.programme),
-            "cohort": cohort_label_for_board(u, _s(u.cohort)),
+            "cohort": resolved_home.get('name') or _s(u.cohort),
+            "homeCohort": home_cohort,
             "status": programme_status(u) or DEFAULT_PROGRAMME_STATUS,
             # Cohort dates, matched from curriculum.cohort_authoring_details.
             # apprenticeship_end_date is the learner's own override and only
@@ -344,8 +516,8 @@ def to_board(u):
         "aims": _as_list(u.aims_qualifications),
         "previousProgrammes": [],
         "functionalSkills": {
-            "english": _fs_block(u.english_assessments, u.english_exemption),
-            "maths": _fs_block(u.maths_assessments, u.maths_exemption),
+            "english": _fs_block(english_assessments, u.english_exemption),
+            "maths": _fs_block(maths_assessments, u.maths_exemption),
             "ict": _fs_block(u.ict_assessments, u.ict_exemption),
         },
         "managedJobs": _as_list(_maybe_json(u.managed_jobs)),
@@ -381,6 +553,8 @@ APTEM_TEXT_FIELDS = {
     "gender": "gender",
     "country": "country",
     "caseOwner": "case_owner",
+    "coachName": "coach_name",
+    "coachEmail": "coach_email",
     "mentor": "mentor",
     "attendanceType": "attendance_type",
     "employerAddress": "employer_address",
@@ -867,6 +1041,8 @@ def to_staff_row(u):
     """A staff account, shaped like a UserListRow so the directory can list
     learners and staff in one table."""
     status = _s(u.status)
+    from login.identity import accesses_for_staff
+
     return {
         "id": str(u.id),
         "uuid": str(u.uuid) if getattr(u, "uuid", None) else None,
@@ -883,6 +1059,7 @@ def to_staff_row(u):
         "programmeStatus": "",
         "position": _s(u.position),
         "access": _s(u.access).lower(),
+        "accesses": sorted(accesses_for_staff(u)),
         "phone": _s(u.phone_number),
         "title": _s(u.title),
         "preferredName": _s(u.preferred_name),

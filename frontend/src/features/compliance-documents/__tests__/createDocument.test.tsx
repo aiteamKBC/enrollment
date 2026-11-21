@@ -59,7 +59,7 @@ describe('Create a current learner document from the latest template', () => {
     expect(within(editor).queryByRole('button', { name: 'Keep Existing Signatures' })).not.toBeInTheDocument();
     expect(within(editor).queryByRole('button', { name: 'Sign Again' })).not.toBeInTheDocument();
     expect(within(editor).queryByRole('img')).not.toBeInTheDocument();
-    for (const name of ['Add table', 'Insert dynamic field', 'Insert date', 'Insert signature block', 'Insert page break']) expect(within(editor).getByRole('button', { name })).toBeInTheDocument();
+    for (const name of ['Table', 'Insert dynamic field', 'Insert date', 'Insert signature block', 'Insert page break']) expect(within(editor).getByRole('button', { name })).toBeInTheDocument();
     fireEvent.click(within(editor).getByRole('button', { name: 'Close editor' }));
     expect(await screen.findByRole('button', { name: `Expand version history for ${contentFor(key).title}` })).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(screen.getByRole('button', { name: 'History' }));

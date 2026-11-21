@@ -1,7 +1,7 @@
 """Enrolment-only API surface. Study/delivery endpoints remain in LMS."""
 from django.urls import path
 from learner_api.coach_availability import coach_available_slots, case_owner_available_slots
-from learner_api import learner_import
+from learner_api import learner_import, evidence
 from learner_api.attendance_mode import attendance_modes, review_attendance_mode
 from learner_api.first_session_bookings import first_session_bookings
 from learner_api.first_login_details import first_login_details
@@ -19,6 +19,10 @@ urlpatterns = [
     path('first-login-details/<int:pk>/', first_login_details, name='first-login-details'),
     path('account-settings/<int:pk>/', learner_account_settings, name='learner-account-settings'),
     path('profile-photo/<str:kind>/<int:pk>/', learner_profile_photo, name='learner-profile-photo'),
+    path('evidence/<str:kind>/<int:pk>/upload/', evidence.upload_evidence, name='learner-evidence-upload'),
+    path('evidence/<str:kind>/<int:pk>/', evidence.list_evidence, name='learner-evidence-list'),
+    path('evidence/<str:kind>/<int:pk>/<uuid:file_id>/download/', evidence.download_evidence, name='learner-evidence-download'),
+    path('evidence/<str:kind>/<int:pk>/<uuid:file_id>/', evidence.delete_evidence, name='learner-evidence-delete'),
     path('enrolment-users/', views.enrolment_users, name='enrolment-users'),
     path('enrolment-users/import-template/', learner_import.import_template, name='enrolment-users-import-template'),
     path('enrolment-users/import/', learner_import.import_students, name='enrolment-users-import'),
@@ -26,6 +30,7 @@ urlpatterns = [
     path('enrolment-users/<int:pk>/', views.enrolment_user_detail, name='enrolment-user-detail'),
     path('enrolment-users/<int:pk>/fields/', views.enrolment_user_fields, name='enrolment-user-fields'),
     path('enrolment-users/<int:pk>/finish/', views.enrolment_user_finish, name='enrolment-user-finish'),
+    path('enrolment-users/<int:pk>/functional-skills/', views.functional_skills, name='enrolment-user-functional-skills'),
     path('learning-plan/<int:pk>/', learning_plan.learning_plan, name='learning-plan'),
     path('module-shift/options/', module_shift.module_shift_options, name='module-shift-options'),
     path('module-shift/<int:pk>/', module_shift.module_shift, name='module-shift'),

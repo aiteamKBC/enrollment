@@ -57,7 +57,7 @@ def learner_modules(request, kind, learner_id):
         try:
             if getattr(settings, 'PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED', False):
                 profile = LearnerProfile.objects.filter(enrolment_id=learner_id).only('programme_id', 'cohort_id').first()
-            if profile and profile.programme_id and profile.cohort_id:
+            if profile and profile.programme_id and profile.cohort_id and home_cohort.get('source') != 'lms':
                 _, layout, _ = learner_published_layout(kind, learner_id, module_version=version)
                 if layout:
                     resolved = resolve_published(layout, compare_legacy=False)

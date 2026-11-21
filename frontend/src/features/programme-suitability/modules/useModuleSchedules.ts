@@ -6,12 +6,16 @@ export interface ScheduleOffering {
   id: string; moduleId: string; academicTitle: string; lmsTitle: string;
   delivery: string; cohortId: string; cohortName: string; groupId: string | null;
   group: string; start: string; end: string; approved: boolean; reviewOnly: boolean;
-  matchConfidence?: 'exact_title' | 'tentative'; confidenceReason?: string;
+  weeks?: number | null;
+  matchConfidence?: 'exact_title' | 'confirmed_alias' | 'tentative'; confidenceReason?: string;
   provisional?: boolean; allowLocalSelection?: boolean;
+  informationOnly?: boolean;
 }
 export interface ScheduleResponse {
   programmeId: string; pathway: string | null; review: boolean; asOfDate: string; offeringCount: number;
   modules: { academicModuleId: string; academicTitle: string; reason: string; offerings: ScheduleOffering[] }[];
+  homeGroup?: { status: 'assigned' | 'allocated' | 'eligible' | 'unavailable'; groupId: string | null;
+    groupName?: string | null; message?: string; code?: string } | null;
 }
 export interface ScheduleContext { id: string; kind: LearnerKind }
 
@@ -60,9 +64,18 @@ export function useModuleSchedules(context: ScheduleContext | undefined, pathway
       void load(true); // A return to focus always checks current LMS data.
     };
     window.addEventListener('focus', refresh);
+    const confirmed = (event: Event) => {
+      const detail = (event as CustomEvent<ScheduleContext>).detail;
+      if (detail?.id === context?.id && detail?.kind === context?.kind) {
+        reads.current.cache.delete(url);
+        reads.current.pending.delete(url);
+        void load(true);
+      }
+    };
+    window.addEventListener('pcp-cohort-modules-confirmed', confirmed);
     document.addEventListener('visibilitychange', refresh);
-    return () => { active = false; window.clearTimeout(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
-  }, [url, attempt]);
+    return () => { active = false; window.clearTimeout(timer); window.removeEventListener('focus', refresh); window.removeEventListener('pcp-cohort-modules-confirmed', confirmed); document.removeEventListener('visibilitychange', refresh); };
+  }, [url, attempt, context?.id, context?.kind]);
   return { data: snapshot?.url === url ? snapshot.data : undefined, error: snapshot?.url === url ? snapshot.error : '',
     loading: Boolean(url && snapshot?.url !== url), reviewRequested: review,
     retry: () => { setSnapshot(undefined); setAttempt(n => n + 1); } };

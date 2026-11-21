@@ -116,6 +116,7 @@ def template(request, identifier):
 def preview(request, identifier):
     if request.method != 'POST': return error('Method not allowed.', 405)
     data = body(request)
+    current_design = data.get('previewMode') == 'current-design'
     preview_token = None
     historical_version = None
     if data.get('version'):
@@ -147,9 +148,15 @@ def preview(request, identifier):
     result = render_payload(content, learner)
     if historical_version:
         result['template'].update(service.reference(content, historical_version))
-    if not data.get('version'):
+    # Draft previews are rendered by the shared branded runtime. Apply the
+    # same path to published purple-design versions so the historical/version
+    # preview matches the PDF that version will issue. Original legacy versions
+    # intentionally remain on their historical fallback and are never restyled.
+    if current_design or not data.get('version') or content.get('designTheme') in ('lavender-v1', 'purple-reference-v2'):
         from .pdf_artifacts import render_preview
         result = render_preview(result)
+        if current_design:
+            result['notice'] = 'CURRENT DESIGN PREVIEW — no document issued or signing request created.'
     return response({**result, 'previewToken': preview_token})
 
 

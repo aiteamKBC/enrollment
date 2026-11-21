@@ -4,7 +4,7 @@ import { DatePickerField } from '@/components/feature/DatePickerField';
 import { SelectMenu } from '@/components/feature/SelectField';
 import { reviewHandoverMessage } from '@/api/reviewHandover';
 import { fetchProgrammes, fetchCohorts, fetchGroups } from '@/api/curriculum';
-import { fetchCaseOwners } from '@/api/staffUsers';
+import { fetchCaseOwners, fetchCoachOptions, type CoachOption } from '@/api/staffUsers';
 import {
   ATTENDANCE_TYPE_OPTIONS,
   createEnrolmentUser,
@@ -69,7 +69,7 @@ interface FieldDef {
    * until its parent is chosen. `caseOwner` and `employer` are independent,
    * loaded once.
    */
-  lookup?: 'programme' | 'cohort' | 'group' | 'caseOwner' | 'employer' | 'organisation';
+  lookup?: 'programme' | 'cohort' | 'group' | 'caseOwner' | 'skillsCoach' | 'employer' | 'organisation';
 }
 
 interface SectionDef {
@@ -220,9 +220,12 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   const [programmes, setProgrammes] = useState<string[]>([]);
   const [cohorts, setCohorts] = useState<string[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupLookupError, setGroupLookupError] = useState<string | null>(null);
   // Case owners come from Staff_users (positions Caseowner / Admin) — independent
   // of the programme cascade, so loaded once alongside programmes.
   const [caseOwners, setCaseOwners] = useState<string[]>([]);
+  const [coaches, setCoaches] = useState<CoachOption[]>([]);
   // Manager records are filtered by the selected organisation.
   const [employers, setEmployers] = useState<EmployerRow[]>([]);
   const [organisations, setOrganisations] = useState<OrganisationRow[]>([]);
@@ -297,6 +300,9 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
     fetchCaseOwners()
       .then((rows) => { if (!cancelled) setCaseOwners(rows); })
       .catch((e: Error) => { if (!cancelled) setStaffError(e.message); });
+    fetchCoachOptions()
+      .then((rows) => { if (!cancelled) setCoaches(rows); })
+      .catch((e: Error) => { if (!cancelled) setStaffError(e.message); });
     // A failure here doesn't block the form — but it must not be silent either.
     // Reported separately so "the lookup broke" can't be mistaken for "no
     // employers exist yet", which is what the empty-state hint means.
@@ -325,18 +331,22 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   useEffect(() => {
     let cancelled = false;
     setGroups([]);
+    setGroupLookupError(null);
+    setGroupsLoading(false);
     if (!programme || !cohort) return;
+    setGroupsLoading(true);
     fetchGroups(programme, cohort)
       .then((rows) => { if (!cancelled) setGroups(rows); })
-      .catch((e: Error) => { if (!cancelled) setLookupError(e.message); });
+      .catch((e: Error) => { if (!cancelled) setGroupLookupError(e.message); })
+      .finally(() => { if (!cancelled) setGroupsLoading(false); });
     return () => { cancelled = true; };
   }, [programme, cohort]);
 
   /** Options + disabled state for a database-backed programme/staff field. */
-  const lookupState = (level: Exclude<NonNullable<FieldDef['lookup']>, 'employer' | 'organisation'>) => {
+  const lookupState = (level: Exclude<NonNullable<FieldDef['lookup']>, 'employer' | 'organisation' | 'skillsCoach'>) => {
     if (level === 'programme') return { values: programmes, disabled: false, waitingFor: '', empty: 'None available' };
     if (level === 'cohort') return { values: cohorts, disabled: !programme, waitingFor: 'programme', empty: 'None available' };
-    if (level === 'group') return { values: groups, disabled: !cohort, waitingFor: 'cohort', empty: 'None available' };
+    if (level === 'group') return { values: groups, disabled: !cohort || groupsLoading, waitingFor: cohort ? '' : 'cohort', empty: groupsLoading ? 'Loading groups...' : groupLookupError ? 'Unable to load groups' : 'None available' };
     return {
       values: caseOwners,
       disabled: false,
@@ -417,6 +427,8 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       county: formData.county,
       country: formData.country,
       caseOwner: formData.caseOwner,
+      coachName: formData.coachName ?? '',
+      coachEmail: formData.coachEmail ?? '',
       employerAddress: formData.employerAddress,
       mentor: formData.mentor,
       // Optional: "Select…" is sent as null, which clears it on edit and leaves
@@ -574,6 +586,20 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
                 </option>
               ))}
             </select>
+          ) : field.lookup === 'skillsCoach' ? (
+            <select
+              id={`cu-${field.name}`}
+              value={value}
+              onChange={(e) => {
+                const selected = coaches.find((coach) => coach.email === e.target.value);
+                setField('coachEmail', selected?.email ?? '');
+                setField('coachName', selected?.name ?? '');
+              }}
+              className={`${inputClass} cursor-pointer`}
+            >
+              <option value="">Not assigned</option>
+              {coaches.map((coach) => <option key={coach.email} value={coach.email}>{coach.name}</option>)}
+            </select>
           ) : field.lookup ? (
             (() => {
               const { values, disabled, waitingFor, empty } = lookupState(field.lookup);
@@ -709,9 +735,9 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
                 <h3 className="text-[12px] font-semibold uppercase tracking-wider text-foreground-600">{section.title}</h3>
               </header>
               <div className="divide-y divide-foreground-100">{fields.map(renderField)}</div>
-              {section.title === 'Programme' && lookupError && (
+              {section.title === 'Programme' && (lookupError || groupLookupError) && (
                 <p className="px-4 py-2 text-[11px] text-red-600 border-t border-foreground-100">
-                  <AppIcon className="ri-error-warning-line mr-1" />Could not load curriculum options: {lookupError}
+                  <AppIcon className="ri-error-warning-line mr-1" />Could not load curriculum options: {groupLookupError || lookupError}
                 </p>
               )}
               {section.title === 'Delivery & employer' && staffError && (

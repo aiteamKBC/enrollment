@@ -38,9 +38,11 @@ from datetime import date, datetime
 from django.db import DatabaseError, connection
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_protect
 
 from audit_api.last_audit_ledger_views import _connection as _audit_connection
 from login.permissions import learner_self_or_staff, staff_only
+from programme_suitability.learning_plan_storage import ACADEMIC_SOURCES
 
 from .constants import DELIVERY_PROGRAMME_STATUS
 from .learner_progression import advance_learner
@@ -525,6 +527,11 @@ def _meetings(learner):
             logger.exception("learning_plan: could not resolve migrated review hours")
             return [], "unavailable"
 
+    from .programme_meetings import confirmed_programme_meetings
+    confirmed = confirmed_programme_meetings(learner)
+    if confirmed is not None:
+        return confirmed
+
     try:
         programme_id = resolve_curriculum_programme_id(_s(learner.programme))
     except Exception:
@@ -698,15 +705,31 @@ def _serialize(learner):
     programme = _s(learner.programme)
     group = _s(learner.group)
 
-    catalogue = learner_programme_modules(learner)
+    saved = _saved_modules(learner)
+    persisted = saved is not None
+    if persisted and saved:
+        from programme_suitability.module_replacements import resolve_saved_learning_plan
+        saved = resolve_saved_learning_plan(learner, saved)
+    confirmed_preview = False
+    if saved is None:
+        from programme_suitability.fixed_learning_plan import preview_uninitialised_fixed_plan
+        projected = preview_uninitialised_fixed_plan(learner)
+        if projected is not None:
+            saved = projected
+            confirmed_preview = True
+    def fixed_academic(entry):
+        return entry.get('assignmentSource') in ACADEMIC_SOURCES and bool(entry.get('academicModuleId'))
+    # These are saved academic snapshots, including genuinely unscheduled rows.
+    # Never resolve their dates through a programme-wide or namesake catalogue.
+    fixed_only = bool(saved) and all(fixed_academic(m) for m in saved)
+    catalogue = [] if fixed_only else learner_programme_modules(learner)
     by_id = {m["moduleId"]: m for m in catalogue}
 
-    preset_ids = learner_group_module_ids(learner)
+    preset_ids = [] if fixed_only else learner_group_module_ids(learner)
     preset = [by_id[i] for i in preset_ids if i in by_id]
 
     # A saved plan wins; an unsaved learner starts from their group's preset so
     # staff are editing something real rather than an empty list.
-    saved = _saved_modules(learner)
     if saved is not None:
         # Re-read hours/titles from the catalogue so an edited module shows its
         # current values. Entries with no catalogue match are kept (the module
@@ -717,10 +740,10 @@ def _serialize(learner):
         # still live modules, so their hours and title come from master rather
         # than from the plan's saved snapshot.
         off_programme = _modules_by_id(
-            _s(m.get("moduleId")) for m in saved if _s(m.get("moduleId")) not in by_id
+            _s(m.get("moduleId")) for m in saved if not fixed_academic(m) and _s(m.get("moduleId")) not in by_id
         )
         plan = [
-            {**(by_id.get(_s(m.get("moduleId")))
+            dict(m) if fixed_academic(m) else {**(by_id.get(_s(m.get("moduleId")))
                 or off_programme.get(_s(m.get("moduleId")))
                 or _orphan_module(m)),
              **({'assignmentMode': 'explicit'} if m.get('assignmentMode') == 'explicit' else {})}
@@ -782,10 +805,15 @@ def _serialize(learner):
     learner_programme_id = next(
         (m["programmeId"] for m in catalogue if m["programmeId"]), "",
     )
+    if fixed_only:
+        learner_programme_id = _s(saved[0].get('programmeId'))
+        if all(m.get('assignmentSource') == 'programme_suitability_pcp' for m in saved):
+            group = _s(saved[0].get('groupName'))
     # Reviews follow the learner's programme, not the plan's modules -- so this
     # deliberately does not reuse learner_programme_id above, which is derived
     # from the module catalogue for the picker's benefit.
-    meetings, meetings_reason = _meetings(learner)
+    meeting_result = _meetings(learner)
+    meetings, meetings_reason = meeting_result
     return {
         "learner": {
             "id": str(learner.id),
@@ -808,7 +836,9 @@ def _serialize(learner):
         # the rest are a dropdown away.
         "available": [m for m in everything if m["moduleId"] not in chosen],
         "programmes": _programmes(everything),
-        "saved": saved is not None,
+        "saved": persisted,
+        "prefillSource": 'confirmed-programme' if confirmed_preview else 'group',
+        "confirmedPlanPreviewToken": _confirmed_preview_token(saved) if confirmed_preview else None,
         # How many of the rows above arrived from the group since this plan was
         # last agreed. Non-zero means the plan on screen is ahead of the stored
         # one, so the modal can say so and offer to save it.
@@ -817,8 +847,44 @@ def _serialize(learner):
         "meetings": meetings,
         # Why `meetings` is empty, so the table can say so rather than vanish.
         "meetingsReason": meetings_reason,
+        "meetingsBlockers": getattr(meeting_result, 'blockers', []),
         "totals": _totals(plan, meetings),
     }
+
+
+def _confirmed_preview_token(plan):
+    from programme_suitability.fixed_learning_plan import fixed_plan_preview_token
+    return fixed_plan_preview_token(plan)
+
+
+@csrf_protect
+@staff_only()
+def _save_confirmed_preview(request, pk):
+    # Never use the normal editable-plan PATCH path: it mirrors and advances status.
+    from programme_suitability.permissions import is_staff
+    from programme_suitability.fixed_learning_plan import save_previewed_fixed_plan, FixedPlanSaveConflict
+    from programme_suitability.programme_assignment import ProgrammeAssignmentError
+    if not is_staff(request):
+        return _error('Only staff can save prepared programme modules.', 403)
+    try:
+        payload = json.loads(request.body or b'{}')
+        if (not isinstance(payload, dict) or set(payload) != {'action', 'previewToken'}
+                or payload['action'] != 'save-confirmed-programme' or not isinstance(payload['previewToken'], str)
+                or len(payload['previewToken']) != 64):
+            return _error('Provide the prepared programme preview token only.', 400)
+        save_previewed_fixed_plan(pk, payload['previewToken'])
+        learner = EnrolmentUser.all_learners.get(pk=pk)
+        response = JsonResponse(_serialize(learner))
+        response['Cache-Control'] = 'private, no-store'
+        return response
+    except (TypeError, ValueError):
+        return _error('Invalid save request.', 400)
+    except (FixedPlanSaveConflict, ProgrammeAssignmentError) as error:
+        return _error(str(error), 409)
+    except EnrolmentUser.DoesNotExist:
+        return _error('Learner not found.', 404)
+    except DatabaseError:
+        return _error('The prepared Learning Plan could not be saved. Please retry.', 503)
 
 
 @csrf_exempt
@@ -827,6 +893,8 @@ def _serialize(learner):
 @learner_self_or_staff(kwarg="pk")
 def learning_plan(request, pk):
     """GET the learner's plan (with preset + pickable modules), or PATCH to save."""
+    if request.method == 'POST':
+        return _save_confirmed_preview(request, pk)
     try:
         learner = EnrolmentUser.all_learners.get(pk=pk)
     except EnrolmentUser.DoesNotExist:
@@ -882,6 +950,18 @@ def learning_plan(request, pk):
         for m in _plan_entries(learner)
         if _s(m.get("moduleId"))
     }
+    if retained:
+        from programme_suitability.module_replacements import resolve_saved_learning_plan
+        original_entries = _plan_entries(learner)
+        for original, effective in zip(original_entries, resolve_saved_learning_plan(learner, original_entries)):
+            if effective.get('replacementStatus') == 'resolved':
+                # Keep the original confirmed reference in storage/history. The
+                # shared current-read resolver supplies its verified replacement.
+                retained.setdefault(effective['moduleId'], original)
+    if _saved_modules(learner) is None:
+        from programme_suitability.fixed_learning_plan import preview_uninitialised_fixed_plan
+        for entry in preview_uninitialised_fixed_plan(learner) or []:
+            retained.setdefault(entry['moduleId'], entry)
 
     # Rebuild each entry from the catalogue rather than trusting the client's
     # titles/hours/dates/programme, and reject anything that is not a live
@@ -898,7 +978,10 @@ def learning_plan(request, pk):
         if module_id not in catalogue and module_id not in retained:
             return _error(f"Module '{module_id}' is not in the module catalogue.", 400)
         seen.add(module_id)
-        resolved.append(dict(catalogue.get(module_id) or retained[module_id]))
+        academic = retained.get(module_id, {}).get('assignmentSource') in ACADEMIC_SOURCES
+        resolved_entry = dict(retained[module_id] if academic else catalogue.get(module_id) or retained[module_id])
+        if not any(m['moduleId'] == resolved_entry['moduleId'] for m in resolved):
+            resolved.append(resolved_entry)
 
     # Is this save agreeing to the learner's group, or overriding it?
     #
