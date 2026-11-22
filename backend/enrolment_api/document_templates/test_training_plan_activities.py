@@ -18,6 +18,7 @@ from . import revisions, service, pdf_artifacts as pdf
 from .models import LearnerDocumentRevision as Revision, IssuedTemplate, RenderHistory
 from .registry import seed, TemplateError, digest
 from .learner_sources import lms_apprenticeship_end as resolve_lms_apprenticeship_end
+from .learner_sources import lms_cohort_end as resolve_lms_cohort_end
 from . import test_templates as helpers, revision_views, pdf_views
 
 
@@ -45,6 +46,8 @@ class TrainingActivitiesWorkflowTests(TestCase):
         patch('learner_api.training_plan_document._employer_address', return_value='Recorded fixture workplace').start()
         patch('enrolment_api.document_templates.learner_sources.employment_details', return_value=None).start()
         self.apprenticeship_end_read = patch('enrolment_api.document_templates.learner_sources.lms_apprenticeship_end',
+            return_value=(date(2028, 2, 1), '')).start()
+        self.cohort_end_read = patch('enrolment_api.document_templates.learner_sources.lms_cohort_end',
             return_value=(date(2028, 2, 1), '')).start()
         self.review_read = patch.object(programme_meetings, 'read_programme_reviews', side_effect=self.reviews).start()
         self.definition_read = patch.object(activities, 'read_document_review_definitions', side_effect=self.definitions).start()
@@ -164,7 +167,7 @@ class TrainingActivitiesWorkflowTests(TestCase):
             draft = self.create(self.original())
         self.assertEqual(draft.data['programme']['endDate'], '2028-06-30')
         self.assertEqual(draft.data['documentFieldValues']['enrolment.endDate'], '2028-06-30')
-        self.assertEqual(draft.data['activitiesOverview']['endDate'], '2027-10-31')
+        self.assertEqual(draft.data['activitiesOverview']['endDate'], '2028-02-01')
         cohort.assert_called_once_with('PROG-ME-L4', None, self.source.cohort)
         read.assert_called_once_with('PROG-ME-L4', 'verified-home')
         self.source.refresh_from_db()
@@ -177,6 +180,50 @@ class TrainingActivitiesWorkflowTests(TestCase):
         self.assertEqual(draft.data['programme']['endDate'], '')
         self.assertIsNone(draft.data['documentFieldValues']['enrolment.endDate'])
         self.assertTrue(any(w['code'] == 'lms_apprenticeship_end_not_recorded' for w in draft.data['bindingWarnings']))
+
+    def test_overview_uses_home_cohort_end_while_apprenticeship_and_practical_dates_remain_distinct(self):
+        self.source.end_date = '2027-10-31'
+        self.source.save()
+        original = self.original()
+        before = revisions.serialize_source('training-plan', original, self.source)
+        totals_before = activities.build(self.source)['totals']
+        self.cohort_end_read.return_value = (date(2028, 1, 31), '')
+        draft = self.create(original)
+        overview = draft.data['activitiesOverview']
+        self.assertEqual(overview['endDate'], '2028-01-31')
+        self.assertEqual(overview['endDateSource'], 'LMS curriculum.cohorts.end_date')
+        self.assertFalse(any(b['code'] == 'module_outside_saved_programme_period' for b in overview['blockers']))
+        self.assertTrue(overview['finalisationAllowed'], overview['blockers'])
+        self.assertEqual(draft.data['programme']['endDate'], '2028-02-01')
+        self.assertEqual(overview['totals'], totals_before)
+        self.source.refresh_from_db(); original.refresh_from_db()
+        self.assertEqual(self.source.end_date, '2027-10-31')
+        self.assertEqual(revisions.serialize_source('training-plan', original, self.source), before)
+
+    def test_missing_cohort_end_blocks_instead_of_falling_back_to_local_end(self):
+        self.cohort_end_read.return_value = (None, 'lms_cohort_end_not_recorded')
+        overview = activities.build(self.source)
+        self.assertEqual(overview['endDate'], '')
+        self.assertFalse(overview['finalisationAllowed'])
+        self.assertTrue(any(b['code'] == 'lms_cohort_end_not_recorded' for b in overview['blockers']))
+
+    def test_cohort_end_resolves_each_saved_programme_and_cohort_only(self):
+        from types import SimpleNamespace
+        from programme_suitability.programme_assignment import CATALOGUE_NAMES
+        from programme_suitability.programme_identity import CURRICULUM_PROGRAMME_IDS
+        from enrollment_service.lms_readonly import LmsReadUnavailable
+        for key, name in CATALOGUE_NAMES.items():
+            with self.subTest(programme=key), patch('programme_suitability.lms_placement.saved_cohort',
+                    return_value=({'cohort_id':'saved-home','end_date':date(2028,1,31)}, '')) as read:
+                learner = SimpleNamespace(programme=name, cohort='Saved home', end_date='2027-10-31')
+                self.assertEqual(resolve_lms_cohort_end(learner), (date(2028,1,31), ''))
+                read.assert_called_once_with(CURRICULUM_PROGRAMME_IDS[key], None, 'Saved home')
+        with patch('programme_suitability.lms_placement.saved_cohort', return_value=(None, 'lms_cohort_ambiguous')):
+            self.assertEqual(resolve_lms_cohort_end(learner), (None, 'lms_cohort_ambiguous'))
+        with patch('programme_suitability.lms_placement.saved_cohort', return_value=({'end_date':None}, '')):
+            self.assertEqual(resolve_lms_cohort_end(learner), (None, 'lms_cohort_end_not_recorded'))
+        with patch('programme_suitability.lms_placement.saved_cohort', side_effect=LmsReadUnavailable('read_failed')):
+            self.assertEqual(resolve_lms_cohort_end(learner), (None, 'read_failed'))
 
     def test_lms_apprenticeship_end_scopes_all_supported_programmes_and_fails_closed(self):
         from types import SimpleNamespace
@@ -338,7 +385,7 @@ class TrainingActivitiesWorkflowTests(TestCase):
         source.refresh_from_db()
         self.assertEqual(source.apprentice_signature, 'historical-mark')
 
-    def test_long_module_repeats_activity_headers_and_contains_last_recorded_activity(self):
+    def test_compact_pdf_summarises_many_components_without_losing_source_ids(self):
         def long_content(mid, pid, cid, gid):
             raw = self.content(mid, pid, cid, gid)
             if mid == self.plan[0]['moduleId']:
@@ -353,8 +400,10 @@ class TrainingActivitiesWorkflowTests(TestCase):
         import fitz
         document = fitz.open(stream=base64.b64decode(artifact.payload['pdf']), filetype='pdf')
         texts = [p.get_text() for p in document]
-        self.assertTrue(any('Isolated long module activity 159' in t for t in texts))
-        self.assertGreater(sum('Learning Activity' in t for t in texts), 3)
+        self.assertFalse(any('Isolated long module activity 159' in t for t in texts))
+        module = next(m for m in draft.data['activitiesOverview']['modules'] if m['lmsOfferingId'] == self.plan[0]['moduleId'])
+        self.assertTrue(any('long-159' in w['componentIds'] for w in module['weekSummaries']))
+        self.assertTrue(any('Learning Activity' in t for t in texts))
 
     def test_new_edit_revision_upgrades_design_without_refreshing_existing_custom_draft(self):
         source = self.original()
@@ -424,6 +473,7 @@ class TrainingActivitiesWorkflowTests(TestCase):
 
     def test_module_period_outside_actual_saved_dates_blocks_issuance_without_changing_dates(self):
         self.source.end_date = '2027-03-01'
+        self.cohort_end_read.return_value = (date(2027, 3, 1), '')
         result = activities.build(self.source)
         self.assertFalse(result['finalisationAllowed'])
         self.assertIn('module_outside_saved_programme_period', [b['code'] for b in result['blockers']])
@@ -499,6 +549,58 @@ class TrainingActivitiesWorkflowTests(TestCase):
         self.assertEqual(updated[1]['title'], 'Recorded textbook')
         self.assertEqual(updated[2]['title'], 'Original session')
         self.assertEqual(original, before)
+
+    def test_new_summary_capture_preserves_frozen_v5_and_aggregates_only_own_components(self):
+        before_plan = copy.deepcopy(self.source.learning_plan)
+        overview = activities.build(self.source)
+        self.assertEqual(overview['version'], 'activities-overview-v6')
+        for module in overview['modules']:
+            self.assertEqual([w['sourceId'] for w in module['weeks']], [w['id'] for w in module['weekSummaries']])
+            for week in module['weekSummaries']:
+                rows = [a for a in module['activities'] if a.get('weekId') == week['id'] and a['source'] == 'LMS component']
+                self.assertEqual(week['componentIds'], [r['id'] for r in rows])
+                self.assertEqual(week['hours'], None if any(r['hours'] is None for r in rows) else sum(r['hours'] for r in rows))
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.learning_plan, before_plan)
+        legacy = {'activitiesOverview': {**overview, 'version': 'activities-overview-v5'}}
+        self.assertEqual(activities.clean_document_presentation(legacy)['activitiesOverview']['version'], 'activities-overview-v5')
+
+    def test_compact_coaching_after_supported_assignment_is_bold_in_real_pdf(self):
+        from decimal import Decimal
+        def content(mid, pid, cid, gid):
+            raw = self.content(mid, pid, cid, gid)
+            for component in raw['components']:
+                if component['type'] == 'assignment':
+                    component['settings_json']['dueTiming'] = '2027-02-01'
+            return raw
+        self.read.side_effect = content
+        for entry in self.plan[1:]:
+            entry.update(startDate='2027-06-01', endDate='2028-01-31')
+        self.source.learning_plan = self.plan; self.source.save()
+        self.calendar_read.side_effect = lambda mid,pid,cid,gid,weeks: {'weeks': {
+            weeks[0]['sourceId']: {'start':'2027-02-01','end':'2027-02-07','source':'isolated verified calendar'}}, 'blockers':[]}
+        self.review_read.side_effect = None
+        template = dict(id='one-coaching', programme_id='PROG-ME-L4', name='Source coaching label', enabled=True,
+            recurrence_interval=1, recurrence_unit='months', occurrence_count=1, applicable_statuses=[], applicability=None,
+            expected_otjh=Decimal('1.5'), counts_towards_otjh=True, deleted_at=None)
+        progress = {**template, 'id':'one-progress', 'name':'Isolated programme checkpoint',
+                    'expected_otjh':0, 'counts_towards_otjh':False}
+        self.review_read.return_value = {'review_templates':[template, progress], 'review_occurrence_overrides':[], 'blockers':[]}
+        draft = self.create(self.original())
+        artifact = pdf.store_revision(draft)
+        self.export('compact-coaching', draft, artifact)
+        import fitz
+        document = fitz.open(stream=base64.b64decode(artifact.payload['pdf']), filetype='pdf')
+        spans = [s for p in document for b in p.get_text('dict')['blocks'] if 'lines' in b for line in b['lines'] for s in line['spans']]
+        coaching = [s for s in spans if 'Monthly Coaching Meeting (MCS)' in s['text']]
+        self.assertEqual(len(coaching), 1)
+        self.assertTrue(all('Bold' in s['font'] for s in coaching))
+        full = '\n'.join(p.get_text() for p in document)
+        self.assertLess(full.index('Assignment:'), full.index('Monthly Coaching Meeting (MCS)'))
+        self.assertLess(full.index('Reviews Schedule'), full.index('Isolated programme checkpoint'))
+        self.assertEqual(full.count('Isolated programme checkpoint'), 1)
+        self.assertIn('Advisor, Employer, Participant', full)
+        self.assertEqual(draft.data['activitiesOverview']['totals']['meetingHours'], 1.5)
 
     def test_weekly_schedule_contains_only_progress_with_programme_specific_roles(self):
         result = activities.build(self.source)
@@ -619,11 +721,11 @@ class TrainingActivitiesWorkflowTests(TestCase):
         self.assertFalse(result['reviews'])
         self.assertFalse(result['unassignedMeetings'])
 
-    def test_weekly_large_pdf_preserves_every_week_component_and_duplicate_named_resource(self):
+    def test_compact_pdf_preserves_source_records_and_represents_every_week_once(self):
         from datetime import timedelta
         from collections import Counter
         import fitz
-        root = Path(__file__).resolve().parents[3] / '.cache' / 'weekly-training-plan'
+        root = Path(__file__).resolve().parents[3] / '.cache' / 'compact-training-plan'
         root.mkdir(parents=True, exist_ok=True)
         ranges = [('2027-02-01', '2027-06-20'), ('2027-06-21', '2027-09-26'), ('2027-09-28', '2028-01-04')]
         for entry, (start, end) in zip(self.plan, ranges):
@@ -687,18 +789,17 @@ class TrainingActivitiesWorkflowTests(TestCase):
         self.assertLess(len(after_doc), len(before_doc))
         import re
         extracted = re.sub(r'\s+', ' ', ' '.join(texts))
-        expected_titles = Counter(r['title'] for m in overview['modules'] for r in m['activities'] if r['source'] == 'LMS component')
+        expected_titles = Counter(r['title'] for m in overview['modules'] for r in m['weekSummaries'])
         for title, count in expected_titles.items():
             self.assertGreaterEqual(extracted.count(re.sub(r'\s+', ' ', title)), count, title)
-        self.assertTrue(any('Week 20:' in t for t in texts))
-        self.assertTrue(any('Supporting Resources' in t for t in texts))
-        self.assertTrue(any('OTJ unavailable' in t for t in texts))
+        self.assertFalse(any('Week 20:' in t or 'Supporting Resources' in t for t in texts))
+        self.assertEqual(sum(len(m['weekSummaries']) for m in overview['modules']), 26)
+        self.assertTrue(any(w['hours'] is None for m in overview['modules'] for w in m['weekSummaries']))
         self.assertEqual(overview['totals'], draft.data['activitiesOverview']['totals'])
         (root/'before-flat.pdf').write_bytes(before_pdf); (root/'after-weekly.pdf').write_bytes(after_pdf)
         (root/'snapshot.json').write_text(json.dumps({'template':frozen['template'], 'data':frozen}, default=str), encoding='utf-8')
         (root/'reconciliation.json').write_text(json.dumps({'beforePages':len(before_doc), 'afterPages':len(after_doc),
             'totalsUnchanged':overview['totals'], 'modules':reconciliation}, indent=2), encoding='utf-8')
-        selected = sorted({i for i, t in enumerate(texts) if 'Activities Overview' in t or 'Reviews Schedule' in t} |
-            {next(i for i, t in enumerate(texts) if 'Supporting Resources' in t)})
+        selected = sorted({i for i, t in enumerate(texts) if 'Activities Overview' in t or 'Reviews Schedule' in t or 'Learning Activity' in t})
         for i in selected:
             after_doc[i].get_pixmap(matrix=fitz.Matrix(1.5, 1.5)).save(root/f'weekly-page-{i+1}.png')

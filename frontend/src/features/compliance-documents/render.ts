@@ -251,7 +251,7 @@ export function renderManagedDocument(template: IssuedTemplate | undefined, data
     } else if (block.type === 'native') {
       if (block.source?.startsWith('review:')) { reviewSection(block.source, block.labels); if (block.fields) renderFields(block.fields); continue; }
       if (block.source === 'learning-plan') {
-        if (template.content.documentKey === 'training-plan' && ['activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', 'activities-overview-v5'].includes(data.activitiesOverview?.version)) {
+        if (template.content.documentKey === 'training-plan' && ['activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', 'activities-overview-v5', 'activities-overview-v6'].includes(data.activitiesOverview?.version)) {
           drawTrainingPlanActivities(doc, bounds, data.activitiesOverview, latin, ensureDecoration);
           continue;
         }

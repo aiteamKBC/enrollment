@@ -4,13 +4,16 @@ import type { PdfBounds } from './lavenderPdf';
 import { BRANDED_PURPLE as T } from './brandedPurpleTheme';
 import { formatHoursMinutes } from '@/lib/format';
 import { drawWeeklyTrainingPlan, weeklyTrainingPlanHtml } from './weeklyTrainingPlan';
+import { drawCompactTrainingPlan, compactTrainingPlanHtml } from './compactTrainingPlan';
 
 export interface Activity { id: string; title: string; kind?: string; hours: number | null; date?: string | null; timing?: string; source?: string; reviewTypeCode?: string; scheduleKind?: string; weekId?: string; parentComponentId?: string }
 interface Review extends Activity { templateId: string; date: string; participants: string | null; scheduleKind: 'projected' | 'booked' | 'completed' }
 export interface PlanWeek { sourceId: string; title: string | null; weekNumber?: number | null; order?: number | null }
+export interface WeekSummary { id: string; title: string; kind: 'topic' | 'assignment'; hours: number | null;
+  componentIds: string[]; assignmentComponentIds: string[]; dueDates: string[]; startDate?: string | null; endDate?: string | null }
 export interface Module { academicModuleId: string; title: string; description: string | null; hours: number | null;
-  startDate: string | null; endDate: string | null; coveredKsbs: { code: string }[]; activities: Activity[]; weeks?: PlanWeek[] }
-export interface ActivitiesOverview { version: 'activities-overview-v1' | 'activities-overview-v2' | 'activities-overview-v3' | 'activities-overview-v4' | 'activities-overview-v5'; programme: string; startDate: string; endDate: string;
+  startDate: string | null; endDate: string | null; coveredKsbs: { code: string }[]; activities: Activity[]; weeks?: PlanWeek[]; weekSummaries?: WeekSummary[] }
+export interface ActivitiesOverview { version: 'activities-overview-v1' | 'activities-overview-v2' | 'activities-overview-v3' | 'activities-overview-v4' | 'activities-overview-v5' | 'activities-overview-v6'; programme: string; startDate: string; endDate: string;
   deliveryResponsibility: string; deliverySchedule: string; modules: Module[]; reviews: Review[];
   totals: { moduleHours: number; meetingHours: number; totalHours: number };
   warnings: { message?: string; code: string }[]; blockers: { message?: string; code: string }[];
@@ -41,6 +44,7 @@ const reviewColumns = (v: ActivitiesOverview) => ['Review Type', 'Planned Date',
 /** The same immutable snapshot feeds Django PDF, browser preview and editor. */
 export function drawTrainingPlanActivities(doc: jsPDF, b: PdfBounds, v: ActivitiesOverview,
   latin: (value: unknown) => string, decorate: () => void) {
+  if (v.version === 'activities-overview-v6') return drawCompactTrainingPlan(doc, b, v, latin, decorate);
   if (v.version === 'activities-overview-v5') return drawWeeklyTrainingPlan(doc, b, v, latin, decorate);
   const rgb = (colour: string | readonly number[]): [number, number, number] =>
     (typeof colour === 'string' ? [1, 3, 5].map(i => parseInt(colour.slice(i, i + 2), 16)) : [...colour]) as [number, number, number];
@@ -78,6 +82,7 @@ export function drawTrainingPlanActivities(doc: jsPDF, b: PdfBounds, v: Activiti
 }
 
 export function trainingPlanActivitiesHtml(v: ActivitiesOverview): string {
+  if (v.version === 'activities-overview-v6') return compactTrainingPlanHtml(v);
   if (v.version === 'activities-overview-v5') return weeklyTrainingPlanHtml(v);
   const escape = (value: unknown) => plain(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const table = (head: string[] | null, rows: string[][]) => `<table>${head ? `<thead><tr>${head.map(c => `<th>${escape(c)}</th>`).join('')}</tr></thead>` : ''}<tbody>${rows.map(r => `<tr>${r.map(c => `<td>${escape(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;

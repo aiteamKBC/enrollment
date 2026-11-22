@@ -12,6 +12,28 @@ def document_dates(learner):
     return start, end, 'learner-specific'
 
 
+def lms_cohort_end(learner):
+    """Programme delivery end from the learner's saved home LMS cohort only.
+
+    Distinct from the EPA-inclusive apprenticeship_end_date. No local End_date,
+    module maximum, other intake, Programme Structure or reassignment fallback.
+    """
+    from enrollment_service import lms_readonly
+    from programme_suitability.lms_placement import curriculum_programme_id, saved_cohort
+    from learner_api.programme_meetings import day
+    pid = curriculum_programme_id(name=_s(learner.programme))
+    if not pid or not _s(learner.cohort):
+        return None, 'saved_programme_or_cohort_unavailable'
+    try:
+        cohort, reason = saved_cohort(pid, None, learner.cohort)
+        if cohort is None:
+            return None, reason
+        end = day(cohort.get('end_date'))
+        return (end, '') if end else (None, 'lms_cohort_end_not_recorded')
+    except lms_readonly.LmsReadUnavailable as error:
+        return None, error.code
+
+
 def lms_apprenticeship_end(learner):
     """Read the current LMS end of the learner's saved programme/home cohort.
 

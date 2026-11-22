@@ -11,7 +11,7 @@ from .subject_dates import activity_schedule
 from enrollment_service.lms_reviews_readonly import read_document_review_definitions
 from enrollment_service.lms_activity_readonly import get_document_week_dates
 
-VERSION = 'activities-overview-v5'
+VERSION = 'activities-overview-v6'
 
 
 def clean_document_presentation(data):
@@ -22,10 +22,10 @@ def clean_document_presentation(data):
     """
     value = copy.deepcopy(data)
     overview = value.get('activitiesOverview')
-    if overview and overview.get('version') in ('activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', VERSION):
+    if overview and overview.get('version') in ('activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', 'activities-overview-v5', VERSION):
         # Old custom drafts lack the full Week records (including empty weeks).
-        # Retain their frozen flat layout; new captures alone use weekly v5.
-        if overview.get('version') != VERSION:
+        # Retain frozen flat/weekly layouts; only new captures use summary v6.
+        if overview.get('version') not in ('activities-overview-v5', VERSION):
             overview['version'] = 'activities-overview-v4'
         for module in overview.get('modules', []):
             for activity in module.get('activities', []):
@@ -71,14 +71,22 @@ def build(learner):
     Never saves a plan, allocates a group, creates a booking or sums activities
     into module totals. Missing identity/content blocks later official issuance.
     """
+    from enrolment_api.document_templates.learner_sources import lms_cohort_end
+    end, end_issue = lms_cohort_end(learner)
+    start = day(learner.start_date)
     result = {'version': VERSION, 'programme': text(learner.programme), 'learnerId': learner.pk,
-        'startDate': text(learner.start_date)[:10], 'endDate': text(learner.end_date)[:10],
+        'startDate': text(learner.start_date)[:10], 'endDate': end.isoformat() if end else '',
+        'endDateSource': 'LMS curriculum.cohorts.end_date',
         'deliveryResponsibility': MAIN_PROVIDER,
         'deliverySchedule': 'Activities follow the recorded LMS order within each module. Dates are shown only for verified assignment deadlines and planned Monthly Coaching Meetings. Projected dates are not appointment bookings.',
         'modules': [], 'reviews': [], 'unassignedMeetings': [], 'unclassifiedMeetings': [], 'blockers': [], 'warnings': []}
-    start, end = day(learner.start_date), day(learner.end_date)
-    if not start or not end or start > end:
-        result['blockers'].append({'code': 'saved_learner_dates_required', 'message': 'The learner needs valid saved programme start and end dates.'})
+    if not start:
+        result['blockers'].append({'code': 'saved_learner_dates_required', 'message': 'The learner needs a valid saved programme start date.'})
+    if end_issue:
+        result['blockers'].append({'code': end_issue, 'database': 'LMS', 'schema': 'curriculum', 'table': 'cohorts',
+            'columns': ['end_date'], 'message': 'The assigned home-cohort programme end date could not be verified. No local date was substituted.'})
+    if start and end and start > end:
+        result['blockers'].append({'code': 'programme_period_conflict', 'message': 'The saved learner start date is after the assigned LMS cohort end date.'})
     plan = stored_training_plan(learner)
     if not plan:
         result['blockers'].append({'code': 'persisted_learning_plan_required', 'message': 'Save the confirmed learner Learning Plan before creating this document.'})
@@ -125,10 +133,13 @@ def build(learner):
                 ('sourceId', 'weekNumber', 'order', 'title', 'summary', 'learningOutcomes')})
             schedule = activity_schedule('', section_title=week.get('title', ''))
             window = calendar['weeks'].get(week['sourceId'])
+            week_records[-1]['componentsAvailable'] = week.get('components') is not None
             if window:
+                week_records[-1].update(startDate=window['start'], endDate=window['end'])
                 windows.append({'id': week['sourceId'], **window})
             elif not schedule['date_needs_review'] and schedule.get('week_start'):
                 windows.append({'id': week['sourceId'], 'start': schedule['week_start'], 'end': schedule['week_end']})
+                week_records[-1].update(startDate=schedule['week_start'], endDate=schedule['week_end'])
             for component in week.get('components') or []:
                 due, due_source = assignment_due(component, week, window) if component['type'].casefold() == 'assignment' else (None, None)
                 if component['type'].casefold() == 'assignment' and not due:
@@ -160,10 +171,10 @@ def build(learner):
             result['blockers'].append({'code': 'module_schedule_unavailable',
                 'message': 'A confirmed module has no valid verified delivery period.', 'academicModuleId': module['academicModuleId']})
         elif start and end and (module_start < start or module_end > end):
-            result['blockers'].append({'code': 'module_outside_saved_programme_period', 'database': 'Enrolment',
-                'schema': 'enrolment', 'table': 'Created_users', 'columns': ['Start_date', 'End_date'],
+            result['blockers'].append({'code': 'module_outside_saved_programme_period', 'database': 'LMS',
+                'schema': 'curriculum', 'table': 'cohorts', 'columns': ['end_date'],
                 'academicModuleId': module['academicModuleId'],
-                'message': f"{module.get('lmsTitle') or module['title']}: its recorded module period ({module_start} to {module_end}) falls outside the learner's saved programme dates ({start} to {end}). Review the saved dates or source schedule before issuance."})
+                'message': f"{module.get('lmsTitle') or module['title']}: its recorded module period ({module_start} to {module_end}) falls outside the saved learner start / assigned LMS home-cohort end ({start} to {end}). Review the source dates before issuance."})
     if plan and len(result['modules']) != len(plan):
         result['blockers'].append({'code': 'confirmed_module_bundle_incomplete', 'message': 'Not every confirmed Learning Plan module could be verified.'})
     if any(m['hoursPending'] or m['hours'] is None for m in result['modules']):
@@ -231,13 +242,27 @@ def build(learner):
         result['warnings'].append({'code': 'meeting_module_range_unverified',
             'message': 'Monthly Coaching dates could not be placed in exactly one verified module/week: ' +
                 ', '.join(r['date'] for r in result['unassignedMeetings']) + '. No random week has been assigned.'})
+    from .compact_training_plan import summarise
+    for module in result['modules']:
+        module['weekSummaries'], diagnostics = summarise(module)
+        by_week = {w['id']: w for w in module['weekSummaries']}
+        for row in module['activities']:
+            if row.get('reviewTypeCode') != 'mcm':
+                continue
+            week = by_week.get(row.get('weekId'), {})
+            if week.get('kind') != 'assignment' or (week.get('dueDates') and row['date'] < week['dueDates'][0]):
+                diagnostics.append({'code': 'coaching_assignment_placement_unverified',
+                    'sourceId': row['id'], 'weekId': row.get('weekId'), 'lmsOfferingId': module['lmsOfferingId'],
+                    'message': 'The verified coaching Week/date does not support placement after an Assignment. The actual Week/date is retained.'})
+        result['sourceDiagnostics'].extend(copy.deepcopy(diagnostics))
+        result['warnings'].extend(diagnostics)
     result['finalisationAllowed'] = not result['blockers']
     return result
 
 
 def require_ready(overview):
     from enrolment_api.document_templates.registry import TemplateError
-    if overview and overview.get('version') in ('activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', VERSION) and not overview.get('finalisationAllowed'):
+    if overview and overview.get('version') in ('activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', 'activities-overview-v5', VERSION) and not overview.get('finalisationAllowed'):
         reasons = '; '.join(i.get('message') or i.get('code', 'Source unavailable') for i in overview.get('blockers', []))
         raise TemplateError('Training Plan cannot be issued: ' + reasons)
 
