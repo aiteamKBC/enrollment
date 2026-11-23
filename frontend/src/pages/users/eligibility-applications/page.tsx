@@ -14,6 +14,9 @@ import { WORKPLACE_LABELS } from '@/api/apprenticeshipApplication';
 import { btnPrimary, btnSecondary, FieldRow, inputClass, Pagination } from '../components/ui';
 import { ExceptionPanel } from './ExceptionPanel';
 import { IpcFundRecommendation } from '@/pages/apprenticeship-application/IpcFundRecommendation';
+import { Search } from 'lucide-react';
+import { EligibilityEmptyState, EligibilityHero, EligibilityStatistics } from './EligibilityApplicationsPresentation';
+import './eligibilityApplications.css';
 
 const BASE = '/users/eligibility-applications';
 const DEFAULTS = { search: '', status: 'pending_assessment', page: 1 };
@@ -38,7 +41,7 @@ function AssessmentBadge({ status }: { status: string | null }) {
 }
 
 function ApplicationsList() {
-  const { state, setValues } = useListQueryState(DEFAULTS);
+  const { state, setValues, reset } = useListQueryState(DEFAULTS);
   const { search } = useLocation();
   const [draft, setDraft] = useState(String(state.search));
   const [data, setData] = useState<ApplicationsPage | null>(null);
@@ -58,20 +61,21 @@ function ApplicationsList() {
   }, [appliedSearch, status, page, attempt]);
   const submitSearch = (event: FormEvent) => { event.preventDefault(); setValues({ search: draft.trim() }, { resetPage: true }); };
   return <>
-    <AdminPageHeader title="Eligibility applications" description="Review saved screening applications. Pending assessment is separate from technical verification or invitation failures." icon="ri-file-search-line" eyebrow="Enrolment" />
-    <form onSubmit={submitSearch} className="flex flex-wrap items-end gap-3 rounded-2xl border border-foreground-200 bg-background-50 p-4">
-      <div className="min-w-60 flex-1"><label className="mb-1 block text-xs font-semibold" htmlFor="application-search">Search applications</label>
-        <input id="application-search" className={inputClass} value={draft} maxLength={200} onChange={e => setDraft(e.target.value)} placeholder="Name, email, employer or postcode" /></div>
-      <div><label className="mb-1 block text-xs font-semibold" htmlFor="assessment-filter">Assessment status</label>
+    <EligibilityHero />
+    <EligibilityStatistics data={data} search={appliedSearch} status={status} />
+    <form onSubmit={submitSearch} className="ea-search">
+      <div className="ea-search-field"><label htmlFor="application-search">Search applications</label>
+        <div className="ea-search-input"><Search size={21} aria-hidden="true" /><input id="application-search" className={inputClass} value={draft} maxLength={200} onChange={e => setDraft(e.target.value)} placeholder="Name, email, employer or postcode" /></div></div>
+      <div className="ea-status-field"><label htmlFor="assessment-filter">Assessment status</label>
         <select id="assessment-filter" className={inputClass} value={status} onChange={e => setValues({ status: e.target.value }, { resetPage: true })}>
           <option value="pending_assessment">Pending assessment</option><option value="all">All applications</option>
           <option value="provisional_eligible">Provisional screening pass</option><option value="not_eligible">Not eligible</option>
           <option value="legacy">Legacy / not assessed</option>
         </select></div>
-      <button type="submit" className={btnPrimary}>Search</button>
+      <button type="submit" className={`${btnPrimary} ea-search-submit`}><Search size={21} aria-hidden="true" />Search</button>
     </form>
-    <DataPanel loading={loading} error={error} empty={data?.applications.length === 0} emptyMessage="No applications match these filters." onRetry={() => setAttempt(value => value + 1)}>
-      {data && <><p className="mb-3 text-sm text-foreground-500" aria-live="polite">{data.total} application{data.total === 1 ? '' : 's'}</p>
+    <DataPanel loading={loading} error={error} onRetry={() => setAttempt(value => value + 1)}>
+      {data?.applications.length === 0 ? <EligibilityEmptyState onClear={() => { setDraft(''); reset(); }} /> : data && <><p className="mb-3 text-sm text-foreground-500" aria-live="polite">{data.total} application{data.total === 1 ? '' : 's'}</p>
         <div className="overflow-x-auto rounded-xl border border-foreground-200 bg-background-50"><table className="w-full text-left text-sm">
           <caption className="sr-only">Eligibility applications</caption>
           <thead className="bg-background-100 text-xs text-foreground-600"><tr>{['Applicant', 'Email', 'Submitted (UK time)', 'Employer', 'Employer postcode', 'Main workplace postcode', 'Workplace arrangement', 'Assessment status', 'Assessment reason'].map(label => <th scope="col" className="px-4 py-3" key={label}>{label}</th>)}</tr></thead>
@@ -170,8 +174,8 @@ export default function EligibilityApplicationsPage() {
   if (!auth.account || !canManageEnrolment(auth.account)) return <p role="alert" className="p-6">Your account does not have access to eligibility applications.</p>;
   const nav = roleNavMap.apprentice;
   return <WorkspaceShell role="compliance" roleLabel={nav.label} navItems={nav.items} workspaceLabel={nav.workspaceLabel} pageTitle="Eligibility applications" pageSubtitle="Screening results">
-    <div className="admin-console-page min-w-0 space-y-4 p-3 md:p-6">
-      <p className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-800">Screening evidence does not confirm government funding eligibility. Evidence uploads are not available here.</p>
+    <div className={`admin-console-page min-w-0 space-y-4 p-3 md:p-6 ${applicationId ? '' : 'eligibility-applications-page'}`}>
+      <p className="ea-disclaimer rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-800">Screening evidence does not confirm government funding eligibility. Evidence uploads are not available here.</p>
       {applicationId ? <ApplicationDetails id={applicationId} /> : <ApplicationsList />}
     </div>
   </WorkspaceShell>;

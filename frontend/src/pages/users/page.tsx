@@ -29,6 +29,8 @@ import { LearningPlanModal } from './components/LearningPlanModal';
 import { ShiftModuleModal } from './components/ShiftModuleModal';
 import { BulkAttendanceModeModal } from './components/BulkAttendanceModeModal';
 import { TableBodySkeleton } from '@/components/feature/Skeletons';
+import { UsersPortalFilterIcon, UsersPortalHeroShape } from '@/components/feature/UsersPortalVisuals';
+import './usersPortal.css';
 
 const enrolmentNav = roleNavMap.apprentice;
 const PAGE_SIZE = 8;
@@ -144,6 +146,7 @@ function ActiveProgrammeCard({ active, total, onClick, selected = false }: { act
 
   const content = (
     <>
+      <span className="up-active-icon" aria-hidden="true"><AppIcon name="ri-bar-chart-line" /></span>
       <div className="min-w-0">
         <p className="text-[13px] font-semibold text-foreground-800">Active on programme</p>
         <p className="mt-3 text-[28px] font-semibold leading-none tracking-tight text-foreground-950">{active}</p>
@@ -493,7 +496,9 @@ export default function UsersListPage() {
 
   return (
     <WorkspaceShell role="compliance" roleLabel={enrolmentNav.label} navItems={enrolmentNav.items} workspaceLabel={enrolmentNav.workspaceLabel} pageTitle="Users" pageSubtitle="Directory of learners, administrators and employers">
-      <div className="admin-console-page enrolment-users-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6">
+      <div className="admin-console-page enrolment-users-page up-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6">
+        <div className="up-hero">
+        <UsersPortalHeroShape />
         <AdminPageHeader
           title="User Management"
           description="Manage learners, administrators and employers across all programmes."
@@ -538,17 +543,18 @@ export default function UsersListPage() {
           }
         />
 
-        <div aria-label="User totals" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        </div>
+        <div aria-label="User totals" className="up-metrics grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <UserMetricCard icon="ri-group-line" label="Total users" value={rows.length} detail="Across all roles" active={summaryFilter === 'all'} onClick={() => selectSummary('all')} />
           <UserMetricCard icon="ri-graduation-cap-line" label="Learners" value={learners} detail={`${rows.length ? Math.round((learners / rows.length) * 100) : 0}% of total`} active={summaryFilter === 'learners'} onClick={() => selectSummary('learners')} />
           <ActiveProgrammeCard active={active} total={rows.length} selected={summaryFilter === 'active'} onClick={() => selectSummary('active')} />
         </div>
 
         {/* Filter card */}
-        <div className="overflow-hidden rounded-2xl border border-foreground-100 bg-background-50 shadow-sm">
+        <div className="up-filters overflow-hidden rounded-2xl border border-foreground-100 bg-background-50 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-5">
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary-100 bg-primary-50 text-primary-600"><AppIcon className="ri-filter-3-line" /></span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary-100 bg-primary-50 text-primary-600"><UsersPortalFilterIcon /></span>
               <div>
                 <h2 className="text-[14px] font-semibold text-foreground-900">Filter users</h2>
                 <p className="mt-0.5 text-[11px] text-foreground-400">Use filters to refine the user list.</p>
@@ -597,7 +603,7 @@ export default function UsersListPage() {
           </div>
           <div className="mt-5 flex items-center justify-end gap-4 lg:col-span-4">
             <button type="button" className="text-[12px] font-medium text-foreground-600 transition hover:text-primary-700" onClick={reset}>Clear all</button>
-            <button type="button" className={btnPrimary} onClick={search}><AppIcon className="ri-filter-3-line" />Apply filters</button>
+            <button type="button" className={btnPrimary} onClick={search}><UsersPortalFilterIcon />Apply filters</button>
           </div>
           </div>
         </div>
@@ -642,6 +648,14 @@ export default function UsersListPage() {
           </div>
           <div className="overflow-x-auto">
             <table id="users-directory-table" className="w-full text-[13px]">
+              <colgroup>
+                <col style={{ width: '10.6%' }} /><col style={{ width: '4.2%' }} />
+                <col style={{ width: '11%' }} /><col style={{ width: '8.1%' }} />
+                <col style={{ width: '5.5%' }} /><col style={{ width: '10%' }} />
+                <col style={{ width: '6.9%' }} /><col style={{ width: '20.8%' }} />
+                <col style={{ width: '6.1%' }} /><col style={{ width: '6.4%' }} />
+                <col style={{ width: '10.4%' }} />
+              </colgroup>
               <thead>
                 <tr className="border-b border-foreground-200/70 bg-background-100/50">
                   {['User', 'Type', 'Email', 'Programme', 'Cohort', 'Group', 'Subscription status', 'Learning plan', 'Programme status', 'Attendance mode', 'Actions'].map((h) => (

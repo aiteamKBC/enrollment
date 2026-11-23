@@ -103,6 +103,28 @@ it('shows an empty state without inventing pending applications', async () => {
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
 });
 
+it('clears only the existing list filters back to their original defaults', async () => {
+  list.mockImplementation(async options => ({ applications: [], total: 0, page: options.page, pageSize: 25 }));
+  open('/users/eligibility-applications?search=missing&status=all&page=3');
+  await screen.findByRole('heading', { name: 'No applications match these filters.' });
+  expect(list).toHaveBeenLastCalledWith({ search: 'missing', status: 'all', page: 3 });
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ search: '', status: 'pending_assessment', page: 1 }));
+  expect(screen.getByLabelText('Search applications')).toHaveValue('');
+  expect(screen.getByLabelText('Assessment status')).toHaveValue('pending_assessment');
+  expect(screen.getByText(/Screening evidence does not confirm government funding eligibility/)).toBeInTheDocument();
+});
+
+it('keeps search trimming and assessment query semantics unchanged', async () => {
+  open();
+  await screen.findByRole('link', { name: 'Sam Example' });
+  fireEvent.change(screen.getByLabelText('Search applications'), { target: { value: '  Example  ' } });
+  fireEvent.click(screen.getByRole('button', { name: /^Search$/ }));
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ search: 'Example', status: 'pending_assessment', page: 1 }));
+  fireEvent.change(screen.getByLabelText('Assessment status'), { target: { value: 'not_eligible' } });
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ search: 'Example', status: 'not_eligible', page: 1 }));
+});
+
 it('offers retry after a queue error', async () => {
   list.mockRejectedValueOnce(new Error('Applications are temporarily unavailable.'));
   open();

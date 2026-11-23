@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
-import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
+import './eligibilityBuilder.css';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
 import { fetchEligibilityLayout, publishEligibilityLayout } from '@/api/eligibilityFormLayout';
@@ -133,14 +133,28 @@ export default function EligibilityBuilderPage() {
 
   return (
     <WorkspaceShell role="compliance" roleLabel={enrolmentNav.label} navItems={enrolmentNav.items} workspaceLabel={enrolmentNav.workspaceLabel} pageTitle="Eligibility form" pageSubtitle="Edit the public apprenticeship eligibility form">
-      <div className="admin-console-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6">
-        <AdminPageHeader
-          title="Apprenticeship eligibility form"
-          description="Edit the public eligibility form and its eligible applicant activation email. Published changes apply to new form visitors and applicants who submit the new version."
-          icon="ri-task-line"
-          eyebrow="Enrolment"
-          actions={
-            <div className="flex flex-wrap items-start gap-2">
+      <div className="eligibility-builder-page admin-console-page min-w-0">
+        <header className="eb-page-heading">
+          <nav aria-label="Breadcrumb" className="eb-breadcrumb"><Link to="/users"><AppIcon className="ri-home-4-line" /> Users</Link><span aria-hidden="true">&rsaquo;</span><span>Eligibility Form Builder</span></nav>
+          <h1>Apprenticeship eligibility form</h1>
+          <p>Edit the public eligibility form and its eligible applicant activation email. Published changes apply to new form visitors and applicants who submit the new version.</p>
+        </header>
+        <section className="eb-hero" aria-labelledby="eb-hero-title">
+          <svg className="eb-hero-wave" viewBox="0 0 1600 120" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eb-wave-fill"><stop stopColor="#f5eafa"/><stop offset="1" stopColor="#dfc1f7"/></linearGradient></defs><path fill="url(#eb-wave-fill)" d="M0 0H800C940 0 930 120 1110 120C1340 120 1390 -25 1550 30Q1600 45 1600 80V120H0Z"/><path fill="none" stroke="#e9bd43" strokeWidth="1.5" d="M630 0H800C940 0 930 120 1110 120"/></svg>
+          <div className="eb-hero-copy"><span className="eb-hero-icon" aria-hidden="true"><AppIcon className="ri-survey-line" /></span><div><h2 id="eb-hero-title">Build and manage your eligibility form</h2><p>Customise the sections and questions, set which fields are mandatory, and control what information is shown to applicants.</p></div></div>
+          <img className="eb-hero-image" src="/images/eligibility/eligibility-builder-hero.png" alt="" />
+        </section>
+        <div className="eb-publication-row">
+          <div className="eb-version-slot">{!loading && !loadError && layout && (<p className="text-[12px] text-foreground-500" aria-live="polite">
+              {dirty ? (
+                <span className="font-medium text-amber-700"><AppIcon className="ri-edit-circle-line mr-1 inline" />You have unpublished changes.</span>
+              ) : version ? (
+                <>Published version {version}{updatedAt ? ` · ${new Date(updatedAt).toLocaleString('en-GB')}` : ''}{updatedBy ? ` · ${updatedBy}` : ''}</>
+              ) : (
+                'Showing the standard form — nothing has been published from the builder yet.'
+              )}
+            </p>)}</div>
+            <div className="eb-publication-actions flex flex-wrap items-start gap-2">
               <Link className={btnSecondary} to="/apprenticeship_application" target="_blank" rel="noopener noreferrer">
                 <AppIcon className="ri-external-link-line" />Open the form
               </Link>
@@ -151,8 +165,7 @@ export default function EligibilityBuilderPage() {
                 <AppIcon className="ri-upload-cloud-2-line" />Publish changes
               </button>
             </div>
-          }
-        />
+        </div>
 
         {loading && <p className="text-[13px] text-foreground-400"><AppIcon className="ri-loader-4-line mr-2 inline animate-spin" />Loading the eligibility form…</p>}
         {!loading && loadError && (
@@ -164,16 +177,8 @@ export default function EligibilityBuilderPage() {
 
         {!loading && !loadError && layout && (
           <>
-            <p className="text-[12px] text-foreground-500" aria-live="polite">
-              {dirty ? (
-                <span className="font-medium text-amber-700"><AppIcon className="ri-edit-circle-line mr-1 inline" />You have unpublished changes.</span>
-              ) : version ? (
-                <>Published version {version}{updatedAt ? ` · ${new Date(updatedAt).toLocaleString('en-GB')}` : ''}{updatedBy ? ` · ${updatedBy}` : ''}</>
-              ) : (
-                'Showing the standard form — nothing has been published from the builder yet.'
-              )}
-            </p>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+
+            <div className="eb-workspace flex flex-col gap-4 lg:flex-row lg:items-start">
               <SectionList
                 layout={layout}
                 selected={selected}
@@ -230,7 +235,7 @@ function SectionList({
   let number = 0;
   const pageActive = selected === PAGE;
   return (
-    <nav aria-label="Form sections" className="shrink-0 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm lg:w-72">
+    <nav aria-label="Form sections" className="eb-sections shrink-0 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm lg:w-72">
       <div className="border-b border-foreground-100 px-4 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Sections</p>
       </div>
@@ -308,7 +313,7 @@ function SectionList({
 
 function PageEditor({ layout, edit }: { layout: EligibilityLayout; edit: (fn: (l: EligibilityLayout) => EligibilityLayout) => void }) {
   return (
-    <section aria-label="Form heading" className="min-w-0 flex-1 space-y-4 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 p-5 shadow-sm">
+    <section aria-label="Form heading" className="eb-editor min-w-0 flex-1 space-y-4 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 p-5 shadow-sm">
       <p className="text-[12px] text-foreground-500">The purple banner at the top of the form.</p>
       {PAGE_TEXT_SLOTS.map((slot) => (
         <TextEditor key={slot.key} slot={slot} texts={layout.texts} onChange={(v) => edit((l) => setText(l, slot.key, v))} />
@@ -325,7 +330,7 @@ function ActivationEmailEditor({ layout, edit }: {
   const preview = value.replaceAll('{{greeting}}', 'Hello Learner,').replaceAll('{{start_text}}', 'Getting started is simple: set your password and log in.');
   const setEmail = (html: string) => edit((current) => ({ ...current, activationEmailHtml: html }));
   return (
-    <section aria-label="Activation email" className="min-w-0 flex-1 space-y-4 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 p-5 shadow-sm">
+    <section aria-label="Activation email" className="eb-editor min-w-0 flex-1 space-y-4 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 p-5 shadow-sm">
       <div>
         <h2 className="text-lg font-semibold text-foreground-800">Eligible applicant activation email</h2>
         <p className="mt-1 text-[12px] text-foreground-500">Edit the HTML content above the set password button. The subject, activation link, expiry information, booking step and footer remain in place.</p>
@@ -378,7 +383,7 @@ function SectionEditor({
   };
 
   return (
-    <section aria-label={`${section.title || 'Untitled'} section`} className="min-w-0 flex-1 rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
+    <section aria-label={`${section.title || 'Untitled'} section`} className="eb-editor min-w-0 flex-1 rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
       <div className="grid gap-3 border-b border-foreground-100 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-end">
         <label className="min-w-[220px] text-[12px] font-medium text-foreground-600" htmlFor="eligibility-section-name">
           Section name
@@ -517,9 +522,9 @@ function ItemRow({
   };
 
   return (
-    <div className="rounded-xl border border-foreground-100 bg-background-50 px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-0 flex-[1_1_16rem]">
+    <div className="eb-question rounded-xl border border-foreground-100 bg-background-50 px-3 py-2.5">
+      <div className="eb-question-summary flex flex-wrap items-center gap-2">
+        <div className="eb-question-copy min-w-0 flex-[1_1_16rem]">
           <p className="break-words text-[13px] font-medium text-foreground-900">{label}</p>
           {hint && !note && <p className="mt-0.5 break-words text-[12px] text-foreground-500">{hint}</p>}
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px]">
