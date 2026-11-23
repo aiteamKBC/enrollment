@@ -238,6 +238,7 @@ export function resolveLayout(raw: EligibilityLayout | null | undefined, workpla
     workplaceEnabled,
     ...(texts ? { texts } : {}),
     ...(typeof raw.activationEmailHtml === 'string' ? { activationEmailHtml: raw.activationEmailHtml } : {}),
+    ...(typeof raw.copiedFromVersion === 'number' ? { copiedFromVersion: raw.copiedFromVersion } : {}),
   };
 }
 
