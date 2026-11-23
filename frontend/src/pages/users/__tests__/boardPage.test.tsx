@@ -347,7 +347,19 @@ describe('the enrolment board', () => {
     expect(heading).toHaveClass('text-white');
     expect(rplApi.fetch).toHaveBeenCalledWith('apprenticeship', '20', expect.any(AbortSignal));
     expect(screen.queryByText('Learner and programme evidence')).not.toBeInTheDocument();
-    expect(screen.getByText(/Section 06 includes assessor, learner and employer \/ line manager/)).toBeVisible();
+    expect(screen.getByRole('complementary', { name: 'Report status and version history' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Report status' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Version history' })).toBeVisible();
+    expect(screen.getByText('Signatures available after issue')).toBeVisible();
+    expect(screen.getAllByText('Not issued')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: 'Preview PDF' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Download draft' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Finalise report' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /Sign as assessor/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Create amended version/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Section 06 includes assessor, learner and employer \/ line manager/)).not.toBeInTheDocument();
     expect(screen.getAllByText(/If an AI draft is not acceptable, edit or replace it first/)).toHaveLength(2);
     cleanup();
 

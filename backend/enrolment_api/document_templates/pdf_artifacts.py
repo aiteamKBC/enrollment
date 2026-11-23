@@ -1,5 +1,6 @@
 """Django-owned generation/cache using the existing shared jsPDF renderer."""
 import base64
+import binascii
 import copy
 import hashlib
 import json
@@ -14,6 +15,7 @@ from .models import RenderHistory
 from .registry import digest
 
 BRAND = 'kbc-dfe-purple-v4'
+RPL_PDF_BINDING = ('reportId', 'reportVersion', 'reportRevision')
 
 
 def enabled():
@@ -106,7 +108,35 @@ def revision_url(pk, revision_id, render_id=None):
 
 def http_pdf(row, filename):
     if row is None: return None
-    result = HttpResponse(base64.b64decode(row.payload['pdf']), content_type='application/pdf')
+    return _pdf_response(base64.b64decode(row.payload['pdf']), filename)
+
+
+def rpl_issued_pdf(issue, row, expected=None):
+    """Serve the stored bytes only if the request and immutable issue agree."""
+    if row is None:
+        return None
+    payload, snapshot = row.payload, issue.template_snapshot
+    if not isinstance(payload, dict) or not isinstance(snapshot, dict):
+        return None
+    binding = {name: str(payload.get(name, '')) for name in RPL_PDF_BINDING}
+    if any(not value.isdecimal() or value != str(snapshot.get(name)) for name, value in binding.items()):
+        return None
+    if expected is not None and any(value != str(expected.get(name)) for name, value in binding.items()):
+        return None
+    sha256 = payload.get('sha256')
+    if not sha256 or sha256 != snapshot.get('pdfSha256'):
+        return None
+    try:
+        content = base64.b64decode(payload['pdf'], validate=True)
+    except (KeyError, ValueError, TypeError, binascii.Error):
+        return None
+    if hashlib.sha256(content).hexdigest() != sha256:
+        return None
+    return _pdf_response(content, 'suitability-rpl-report-issued')
+
+
+def _pdf_response(content, filename):
+    result = HttpResponse(content, content_type='application/pdf')
     result['Content-Disposition'] = f'inline; filename="{filename}.pdf"'
     result['Cache-Control'] = 'private, no-store'
     result['X-Content-Type-Options'] = 'nosniff'

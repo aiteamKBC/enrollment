@@ -14,10 +14,13 @@ def issued_pdf(request, pk, issue_id):
     account = getattr(request, 'login_account', None)
     if issue is None or account and account.role == 'employer' and issue.document_key == 'ilr':
         return JsonResponse({'error': 'Not found.'}, status=404)
+    binding = request.GET if any(name in request.GET for name in pdf.RPL_PDF_BINDING) else None
     if issue.document_key == 'suitability-rpl-report':
         row = RenderHistory.objects.filter(issue=issue, payload__kind='suitability-rpl-issued-pdf-v1').first()
-        result = pdf.http_pdf(row, 'suitability-rpl-report-issued')
+        result = pdf.rpl_issued_pdf(issue, row, binding)
         return result if result is not None else JsonResponse({'error': 'This exact saved PDF is unavailable.'}, status=409)
+    if binding is not None:
+        return JsonResponse({'error': 'Not found.'}, status=404)
     learner = EnrolmentUser.all_learners.filter(pk=pk).first()
     source = revisions.source_record(issue.document_key, pk, issue.source_id)
     if learner is None or source is None: return JsonResponse({'error': 'Not found.'}, status=404)

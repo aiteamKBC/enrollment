@@ -6,11 +6,14 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
+from learner_api.models import EnrolmentUser
 
 from .models import SuitabilityCvExtraction, SuitabilityRplReport
 from .rpl_report import (
+    ReportContextConflict,
     ReportInputError,
     _context,
+    _current_report,
     _cv_evidence,
     _ai_input,
     _programme_metadata,
@@ -22,6 +25,7 @@ from .rpl_report import (
     build_source_snapshot,
     generate_ai_justification,
     generate_rpl_evidence_analysis,
+    preview_suitability_rpl_report,
     suitability_rpl_analysis,
     suitability_rpl_report,
 )
@@ -82,15 +86,93 @@ class SuitabilityRplPersistenceTests(TestCase):
         self.context_a = {
             'key': 'a' * 64, 'programmeId': 'PM-L5', 'programmeName': 'Project Manager Level 5',
             'enrolmentReference': 'SYN-41-A', 'practicalStartDate': '2026-11-01',
+            '_sourceProgrammeId': 'PM-L5', '_referenceNumber': 'SYN-41-A',
         }
         self.context_b = {
             'key': 'b' * 64, 'programmeId': 'OD-L5', 'programmeName': 'Operations Manager Level 5',
             'enrolmentReference': 'SYN-41-B', 'practicalStartDate': '2026-12-01',
+            '_sourceProgrammeId': 'OD-L5', '_referenceNumber': 'SYN-41-B',
         }
 
     def save(self, context, payload, snapshot=None):
         with patch('programme_suitability.rpl_report.build_source_snapshot', return_value=(snapshot or source_snapshot(context['programmeId']), {'layout': 7})):
             return _save_report(self.request, self.learner, 'apprenticeship', context, None, payload)
+
+    def report_context(self, reference, **overrides):
+        learner = EnrolmentUser(**{
+            'pk': 41, 'programme': 'ME_L4', 'start_date': '2026-11-01',
+            'reference_number': reference, 'aptem_id': 'APT-41', **overrides,
+        })
+        return _context(learner, 'apprenticeship', None)
+
+    def test_adding_reference_preserves_existing_report_and_amendment_lineage(self):
+        legacy_context = self.report_context(None)
+        draft = self.save(legacy_context, base_payload())
+        current_context = self.report_context('ILR-41')
+        self.assertNotEqual(current_context['key'], draft.context_key)
+        self.assertEqual(_current_report('apprenticeship', 41, current_context).pk, draft.pk)
+        finalised = self.save(current_context, base_payload(revision=draft.revision, finalise=True))
+        self.assertEqual(finalised.pk, draft.pk)
+        self.assertEqual(finalised.report_reference, draft.report_reference)
+        self.assertEqual(finalised.enrolment_reference, 'APT-41')
+        self.assertEqual(finalised.source_snapshot_hash, draft.source_snapshot_hash)
+        amended = self.save(current_context, base_payload(newVersion=True, amendmentReason='New verified evidence.'))
+        self.assertEqual(amended.parent_report_id, finalised.pk)
+        self.assertEqual(amended.context_key, draft.context_key)
+        self.assertEqual(amended.report_version, 2)
+        self.assertEqual(amended.enrolment_reference, 'ILR-41')
+        self.assertEqual(SuitabilityRplReport.objects.count(), 2)
+
+    def test_blank_reference_fallback_is_limited_to_exact_learner_and_enrolment(self):
+        original = self.save(self.report_context('ILR-41'), base_payload())
+        for reference in (None, '', '  '):
+            with self.subTest(reference=reference):
+                selected = _current_report('apprenticeship', 41, self.report_context(reference))
+                self.assertEqual(selected.pk, original.pk)
+        self.assertIsNone(_current_report('commercial', 41, self.report_context(None)))
+        self.assertIsNone(_current_report('apprenticeship', 42, self.report_context(None, pk=42)))
+        self.assertIsNone(_current_report('apprenticeship', 41, self.report_context(None, start_date='2027-01-02')))
+        self.assertIsNone(_current_report('apprenticeship', 41, self.report_context(None, programme='APM_L4')))
+
+    def test_exact_match_wins_and_missing_reference_does_not_guess_between_contexts(self):
+        exact_context = self.report_context('ILR-41-A')
+        exact = self.save(exact_context, base_payload())
+        other = self.save(self.report_context('ILR-41-B'), base_payload())
+        self.assertNotEqual(other.pk, exact.pk)
+        self.assertEqual(_current_report('apprenticeship', 41, exact_context).pk, exact.pk)
+        blank_context = self.report_context('')
+        with self.assertRaisesMessage(ReportContextConflict, 'Multiple saved enrolment contexts'):
+            self.save(blank_context, base_payload())
+        learner = EnrolmentUser(pk=41, programme='ME_L4', start_date='2026-11-01')
+        with patch('login.permissions.authenticate_request', return_value=self.request.login_account), \
+             patch('programme_suitability.rpl_report._learner', return_value=learner), \
+             patch('programme_suitability.rpl_report._programme_assessment', return_value=None), \
+             patch('programme_suitability.rpl_report.build_source_snapshot', return_value=(source_snapshot(), {})):
+            response = suitability_rpl_report(self.factory.get('/report/'), 'apprenticeship', 41)
+            preview = self.factory.post('/preview-pdf/', data='{}', content_type='application/json')
+            preview._dont_enforce_csrf_checks = True
+            preview_response = preview_suitability_rpl_report(preview, 'apprenticeship', 41)
+        self.assertEqual(response.status_code, 200)
+        state = json.loads(response.content)
+        self.assertIsNone(state['report'])
+        self.assertIn('Multiple saved enrolment contexts', state['contextError'])
+        self.assertEqual({item['id'] for item in state['history']}, {str(exact.pk), str(other.pk)})
+        self.assertEqual(preview_response.status_code, 409)
+        self.assertEqual(SuitabilityRplReport.objects.count(), 2)
+
+    def test_populated_reference_prefers_exact_and_refuses_ambiguous_legacy_chain(self):
+        exact = self.save(self.report_context('ILR-41-A'), base_payload())
+        blank = self.report_context('')
+        # A legacy blank-reference report predates the reference-backed one.
+        SuitabilityRplReport.objects.create(
+            learner_kind='apprenticeship', learner_id=41, context_key=blank['key'],
+            programme_id=blank['programmeId'], programme_name=blank['programmeName'],
+            practical_start_date=blank['practicalStartDate'], enrolment_reference='APT-41',
+            report_reference='RPL-41-LEGACY',
+        )
+        self.assertEqual(_current_report('apprenticeship', 41, self.report_context('ILR-41-A')).pk, exact.pk)
+        with self.assertRaises(ReportContextConflict):
+            _current_report('apprenticeship', 41, self.report_context('ILR-41-B'))
 
     def test_separate_programme_contexts_create_separate_reports(self):
         first = self.save(self.context_a, base_payload())
@@ -169,6 +251,43 @@ class SuitabilityRplPersistenceTests(TestCase):
         self.assertIsNotNone(approved.suitability_reviewed_at)
 
 
+    def test_save_returns_server_totals_and_refreshed_version_history(self):
+        with patch('login.permissions.authenticate_request', return_value=self.request.login_account), \
+             patch('programme_suitability.rpl_report._learner', return_value=self.learner), \
+             patch('programme_suitability.rpl_report._programme_assessment', return_value=None), \
+             patch('programme_suitability.rpl_report._context', return_value=self.context_a), \
+             patch('programme_suitability.rpl_report.build_source_snapshot', return_value=(source_snapshot(), {})):
+            payload = base_payload(
+                relevantPriorLearning=True, reductionJustified=True,
+                reductions=[
+                    {'moduleId': 'module-a', 'reducedHours': 12.25},
+                    {'moduleId': 'module-b', 'reducedHours': 0.05},
+                ],
+            )
+
+            def save_via_view(body):
+                request = self.factory.put('/report/', data=json.dumps(body), content_type='application/json')
+                request._dont_enforce_csrf_checks = True
+                response = suitability_rpl_report(request, 'apprenticeship', 41)
+                self.assertEqual(response.status_code, 200, response.content)
+                return json.loads(response.content)
+
+            draft = save_via_view(payload)
+            final = save_via_view(dict(payload, revision=draft['report']['revision'], finalise=True))
+            amended = save_via_view(base_payload(newVersion=True, amendmentReason='New evidence available.'))
+            state = suitability_rpl_report(self.factory.get('/report/'), 'apprenticeship', 41)
+
+        self.assertEqual(draft['report']['trainingHours'],
+                         {'originalHours': 120, 'reductionHours': 12.3, 'remainingHours': 107.7})
+        self.assertEqual(final['report']['trainingHours'], draft['report']['trainingHours'])
+        self.assertEqual(final['history'][0]['id'], draft['report']['id'])
+        self.assertEqual(final['history'][0]['status'], 'finalised')
+        self.assertEqual([(row['reportVersion'], row['status']) for row in amended['history']],
+                         [(2, 'draft'), (1, 'finalised')])
+        self.assertEqual(amended['history'][0]['parentReportId'], final['report']['id'])
+        self.assertEqual(amended['history'], json.loads(state.content)['history'])
+
+
 def source_snapshot_hash(report):
     """Return the stored value to make the immutability assertion explicit."""
     report.refresh_from_db()
@@ -199,9 +318,9 @@ class SuitabilityRplPermissionAndAiTests(TestCase):
         with patch('login.permissions.authenticate_request', return_value=self.admin), \
              patch('programme_suitability.rpl_report._learner', return_value=SimpleNamespace(pk=41)), \
              patch('programme_suitability.rpl_report._context', return_value={'key': 'context-a'}), \
-             patch('programme_suitability.rpl_report.SuitabilityRplReport.objects') as manager, \
+             patch('programme_suitability.rpl_report._reports_for_context') as matching_reports, \
              patch('programme_suitability.rpl_report.generate_rpl_evidence_analysis', return_value=(recommendation, {'sourceSnapshotHash': 'snapshot-a'})):
-            manager.prefetch_related.return_value.filter.return_value.first.return_value = report
+            matching_reports.return_value.prefetch_related.return_value.filter.return_value.first.return_value = report
             request = self.factory.post('/analysis/', data='{}', content_type='application/json')
             request._dont_enforce_csrf_checks = True
             response = suitability_rpl_analysis(request, 'apprenticeship', 41)
@@ -761,6 +880,31 @@ class RplEvidenceAnalysisTests(SimpleTestCase):
 
 
 class SuitabilityRplEvidenceMappingTests(SimpleTestCase):
+    @patch('programme_suitability.rpl_report.programme_for', return_value='ME_L4')
+    def test_canonical_reference_number_prefers_learner_reference_with_aptem_fallback(self, _programme_for_mock):
+        learner = EnrolmentUser(pk=71, programme='Marketing Executive Level 4', aptem_id='APT-71')
+        for value in (None, '', '  ', '  ILR-71  '):
+            with self.subTest(value=value):
+                learner.reference_number = value
+                context = _context(learner, 'apprenticeship', None)
+                self.assertEqual(context['enrolmentReference'], (value or '').strip() or 'APT-71')
+                self.assertEqual(context['programmeId'], 'ME_L4')
+
+    @patch('programme_suitability.rpl_report.programme_for', return_value='ME_L4')
+    def test_context_uses_aptem_reference_when_legacy_learner_has_no_reference_number(
+        self, _programme_for_mock,
+    ):
+        learner = SimpleNamespace(
+            pk=70, programme='Marketing Executive Level 4', aptem_id='APT-70',
+            learner_start_date='', start_date='2026-09-01',
+        )
+        self.assertFalse(hasattr(learner, 'reference_number'))
+
+        context = _context(learner, 'apprenticeship', None)
+
+        self.assertEqual(context['enrolmentReference'], 'APT-70')
+        self.assertEqual(context['programmeId'], 'ME_L4')
+
     @patch('programme_suitability.rpl_report.programme_for', return_value='ME_L4')
     def test_reference_number_and_aptem_fallback_do_not_expose_other_ids(self, _programme_for_mock):
         learner = SimpleNamespace(
