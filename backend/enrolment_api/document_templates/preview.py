@@ -34,7 +34,49 @@ def sample(key, programmes):
             delivery={'activities': [{'title': 'SAMPLE Activity', 'method': 'Workshop', 'hours': 4}], 'totalOtjHours': 300},
             epa={}, costs={'items': [{'item': label, 'price': None} for name, label in next(b['labels'] for b in seed(key)['blocks'] if b.get('source') == 'costs').items() if name.startswith('cost-')], 'total': None}, contacts={})
     elif key == 'ilr':
-        data.update(learnerDetails={'givenNames': 'SAMPLE', 'familyName': 'Learner', 'email': 'sample@example.test', 'uln': ''}, answers={})
+        data.update(
+            learnerDetails={
+                'learnerReferenceNumber': 'SAMPLE001',
+                'givenNames': 'SAMPLE',
+                'familyName': 'Learner',
+                'email': 'sample@example.test',
+                'uln': '9999999999',
+                'dateOfBirth': '1990-06-15',
+                'employmentStatus': 'In paid employment',
+                'employmentStartDate': '2029-09-01',
+                'dateStatusApplies': '2030-01-15',
+                'agreementIdentifier': 'AGR123',
+                'edrsErn': '123456789',
+                'selfEmployed': False,
+                'fullTimeEducationPrior': False,
+                'workingHoursPerWeek': '37.5',
+            },
+            answers={
+                'circumstances': {'careLeaver': False},
+                'additional': {
+                    'aged16to18': False,
+                    'aged19to24': False,
+                },
+                'media': {'consent': False},
+                'additionalInformation': {
+                    'jobRoleRelevance': 'Synthetic employed adult developing role-specific skills through the apprenticeship.',
+                    'residenceNotForFullTimeEducation': 'Yes',
+                    'ehcp': 'No',
+                    'otherNames': 'SYNTHETIC Previous Name',
+                },
+                'declarations': {
+                    'plrShared': True,
+                    'dfeContact': True,
+                    'epaoDetails': True,
+                    'kbcHoldsCerts': True,
+                    'infoAccurate': True,
+                    'over50PercentEngland': True,
+                    'wageRateBand': 'Synthetic date-effective rate band',
+                    'knownByOtherName': True,
+                    'plrAccessAware': True,
+                },
+            },
+        )
     else:
         original = seed(key)
         data.update(eventKey='sample-preview', reviewType=original['reviewType'], reviewLabel=original['title'],
@@ -43,6 +85,25 @@ def sample(key, programmes):
                 'plannedEndDate': '2032-01-01', 'programmeStatus': 'SAMPLE', 'employer': learner.employer, 'manager': learner.line_manager, 'mentor': ''},
             answers={}, sectionStatus={}, sections=[b['source'][7:] for b in original['blocks'] if b.get('source', '').startswith('review:')],
             skillsRadar={'items': [], 'answered': 0, 'total': 0}, plrRecords=[], uln='')
+    if key == 'ilr':
+        # Make the synthetic ILR a full field-to-value preview rather than a
+        # mostly blank layout check. Explicit examples above retain their
+        # business meaning; every other active scalar binding receives a safe
+        # synthetic value of the right display type.
+        for ref, definition in seeds()['fields']['ilr'].items():
+            source = definition.get('source', ref)
+            if not source.startswith('document.') or source.startswith('document.signatures.'):
+                continue
+            parts = source.split('.')[1:]
+            target = data
+            for part in parts[:-1]:
+                target = target.setdefault(part, {})
+            if parts[-1] not in target:
+                target[parts[-1]] = (
+                    True if definition.get('format') == 'yesno'
+                    else '2030-01-01' if definition.get('format') == 'date'
+                    else 'SAMPLE'
+                )
     return learner, data
 
 

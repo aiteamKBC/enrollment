@@ -223,6 +223,10 @@ class EnrolmentUser(models.Model):
     # Last_audit mirror; it is text here because that is how Created_users was
     # originally provisioned, while Last_audit stores the same value as bigint.
     aptem_id = models.TextField(db_column="aptem_id", null=True, blank=True)
+    # Provider-assigned ILR LearnRefNumber. The column already exists in the
+    # enrolment database; keeping it separate from Aptem's integration id avoids
+    # silently turning an external system identifier into an official ILR key.
+    reference_number = models.TextField(db_column="Reference_number", null=True, blank=True)
 
     # The coach this learner is assigned to, on the enrolment side. The coach
     # workspace itself scopes on Learner.learners.coach_email -- these are the

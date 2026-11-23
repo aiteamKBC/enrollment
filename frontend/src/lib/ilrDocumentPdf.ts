@@ -27,6 +27,7 @@ const CONTENT_W = PAGE_W - MARGIN_X * 2;
 const LABEL_W = 88;
 
 export interface IlrLearnerDetails {
+  learnerReferenceNumber?: string;
   uln?: string;
   familyName?: string;
   givenNames?: string;
@@ -48,10 +49,13 @@ export interface IlrLearnerDetails {
   employmentStatus?: string;
   employmentStartDate?: string;
   dateStatusApplies?: string;
+  agreementIdentifier?: string;
   jobTitle?: string;
   edrsErn?: string;
   selfEmployed?: boolean | null;
   fullTimeEducationPrior?: boolean | null;
+  workingHoursPerWeek?: string;
+  // Retained only for historical ILR snapshots rendered by the legacy path.
   contractedHoursPerWeek?: string;
   isSmallEmployer?: boolean | null;
 }

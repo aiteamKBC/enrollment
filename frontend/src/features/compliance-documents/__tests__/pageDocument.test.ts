@@ -4,6 +4,42 @@ import { contentFor, keys, payloadFor } from './fixtures';
 import { renderManagedDocument } from '../render';
 
 describe('safe full-page editing and rendering', () => {
+  it.each([
+    ['populated', '37.50', '37.50'],
+    ['zero', 0, '0'],
+    ['false', false, 'Yes [ ]   No [X]'],
+    ['empty', '', ''],
+    ['missing', undefined, ''],
+  ] as const)('keeps %s binding values consistent between the editor and PDF', (_case, raw, expected) => {
+    const value = payloadFor('ilr', true);
+    const key = 'document.learnerDetails.workingHoursPerWeek';
+    value.template.content.blocks = [{ id: 'working-hours', type: 'field', label: 'Working hours per week', value: `{{${key}}}` }];
+    if (raw === undefined) delete value.template.fields[key];
+    else value.template.fields[key] = raw;
+    const page = documentPages(value.template.content)[0];
+    const dom = document.createElement('div');
+    dom.innerHTML = pageHtml(page, value.template.content, value.data);
+    expect(dom.querySelector('tbody td:last-child')?.textContent).toBe(expected);
+    expect(dom.textContent).not.toContain(`{{${key}}}`);
+    const output = renderManagedDocument(value.template, value.data)!.output();
+    expect(output).not.toContain(`{{${key}}}`);
+    if (expected) expect(output).toContain(expected);
+  });
+  it('renders the future ILR seed with working hours and without retired employment rows', () => {
+    const value = payloadFor('ilr', true);
+    value.template.fields['document.learnerDetails.workingHoursPerWeek'] = '37.50';
+    const html = documentPages(value.template.content).map((page) => pageHtml(page, value.template.content, value.data)).join('');
+    const dom = document.createElement('div'); dom.innerHTML = html;
+    expect(dom.textContent).toContain('Working hours per week');
+    expect(dom.textContent).toContain('37.50');
+    expect(dom.textContent).not.toContain('Contracted hours per week');
+    expect(dom.textContent).not.toContain('Is small employer');
+    const output = renderManagedDocument(value.template, value.data)!.output();
+    expect(output).toContain('Working hours per week');
+    expect(output).toContain('37.50');
+    expect(output).not.toContain('Contracted hours per week');
+    expect(output).not.toContain('Is small employer');
+  });
   it('retains the existing document-title override after rich-text editing', () => {
     const value = payloadFor('apprenticeship-agreement', true), template = value.template;
     template.content.title = 'Approved replacement title';

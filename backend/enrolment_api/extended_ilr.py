@@ -39,6 +39,13 @@ from .wizard_steps import (
 )
 from .learner_profile_fields import clean_profile, transport_profile, without_profile_fields
 from .wizard_layout import LayoutError, project_custom_fields, read_version, record_layout_progress
+from .employment_status_history import (
+    HISTORY_KEY,
+    append_record,
+    apply_effective,
+    staff_record_for_write,
+    strip_staff_fields,
+)
 
 KINDS = {"apprenticeship": EnrolmentUser, "commercial": CommercialUser}
 
@@ -140,7 +147,11 @@ def read_extended_ilr(kind, learner_id, learner_name, show_signed_snapshot=False
     # draft snapshot, so it is read from there and handed back alongside.
     details = read_ilr_details(kind, int(learner_id))
     if details is not None:
-        payload["draft"] = {**(payload.get("draft") or {}), ILR_DETAILS_KEY: details}
+        history = (payload.get("draft") or {}).get(HISTORY_KEY) or []
+        payload["draft"] = {
+            **(payload.get("draft") or {}),
+            ILR_DETAILS_KEY: apply_effective(details, history),
+        }
     if kind == 'apprenticeship' and show_signed_snapshot:
         snapshot = signed_snapshot(int(learner_id))
         payload['meta']['ilrFinalisedAt'] = snapshot.get('finalisedAt', '') if snapshot else ''
@@ -274,6 +285,10 @@ def extended_ilr(request, kind, learner_id):
 
         account = getattr(request, 'login_account', None)
         learner_write = bool(account and account.role == 'learner' and kind == 'apprenticeship')
+        if learner_write and draft is not None and isinstance(draft.get(ILR_DETAILS_KEY), dict):
+            # Never accept staff-owned funding identifiers back from a learner's
+            # browser, including a stale copy returned by an earlier GET.
+            draft = {**draft, ILR_DETAILS_KEY: strip_staff_fields(draft[ILR_DETAILS_KEY])}
         finalise = body.get('finalizeIlr') is True
         if finalise and not learner_write:
             return _error('Only the apprenticeship learner can finalise their ILR.', 403)
@@ -355,6 +370,19 @@ def extended_ilr(request, kind, learner_id):
                 if draft is not None:
                     stored_row = ExtendedIlr.objects.filter(learner_kind=kind, learner_id=learner_id).first()
                     previous = (stored_row.wizard_draft or {}) if stored_row else {}
+                    history = previous.get(HISTORY_KEY) or []
+                    if not learner_write and isinstance(draft.get(ILR_DETAILS_KEY), dict):
+                        try:
+                            managed_record = staff_record_for_write(
+                                draft[ILR_DETAILS_KEY], learner, history
+                            )
+                            history = append_record(history, managed_record)
+                        except ValueError as exc:
+                            return _error(str(exc), 400)
+                    # Reserved, append-only server data survives every whole
+                    # draft replacement. It is not a learner layout item.
+                    if history or HISTORY_KEY in previous:
+                        draft = {**draft, HISTORY_KEY: history}
                     stored = previous
                     if 'skillsRadar' in draft and 'skillsRadar' not in stored:
                         from .skills_radar.service import read_legacy_radar
@@ -429,7 +457,12 @@ def extended_ilr(request, kind, learner_id):
         if 'draft' in response and draft is not None:
             stored = response['draft'] or {}
             if ILR_DETAILS_KEY in draft:
-                stored = {**stored, ILR_DETAILS_KEY: draft[ILR_DETAILS_KEY]}
+                stored = {
+                    **stored,
+                    ILR_DETAILS_KEY: apply_effective(
+                        draft[ILR_DETAILS_KEY], stored.get(HISTORY_KEY) or []
+                    ),
+                }
             if profile:
                 stored = {**stored, 'personalDetails': {**(stored.get('personalDetails') or {}),
                                                        **transport_profile(profile)}}

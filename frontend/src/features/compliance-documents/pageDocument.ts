@@ -28,7 +28,8 @@ function inline(value: string, data?: Record<string, any>): string {
   return value.split(/(\{\{[A-Za-z0-9_.-]+\}\})/g).map((part) => {
     const key = part.match(/^\{\{(.+)\}\}$/)?.[1];
     if (!key) return escapeHtml(part).replaceAll('\n', '<br>');
-    return `<span contenteditable="false" data-field-key="${escapeHtml(key)}" class="rounded bg-violet-50 px-1 text-violet-800" title="${escapeHtml(part)}">${escapeHtml(data?.template ? substitute(part, data.template) || part : part)}</span>`;
+    const resolved = data?.template ? substitute(part, data.template) : part;
+    return `<span contenteditable="false" data-field-key="${escapeHtml(key)}" class="rounded bg-violet-50 px-1 text-violet-800" title="${escapeHtml(part)}">${escapeHtml(resolved)}</span>`;
   }).join('');
 }
 function rich(runs: TextRun[], data?: Record<string, any>, themed = false): string {
