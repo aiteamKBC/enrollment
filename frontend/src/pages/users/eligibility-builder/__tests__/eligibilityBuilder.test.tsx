@@ -140,10 +140,15 @@ function renderBuilder() {
 const publishedLayout = () => publishEligibilityLayout.mock.calls[0][0] as EligibilityLayout;
 
 async function publish() {
-  fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Publish layout/ }));
   const dialog = await screen.findByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: /^Publish$/ }));
   await waitFor(() => expect(success).toHaveBeenCalled());
+}
+
+function selectCopiedVersion(version: number) {
+  fireEvent.click(screen.getByRole('combobox', { name: 'Copy from an earlier published version' }));
+  fireEvent.click(screen.getByRole('option', { name: new RegExp(`^v${version}\\b`) }));
 }
 
 describe('builder page', () => {
@@ -164,7 +169,7 @@ describe('builder page', () => {
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Discard changes' })).toBeDisabled();
     expect(saveEligibilityDraft).not.toHaveBeenCalled();
-    fireEvent.change(selector, { target: { value: '4' } });
+    selectCopiedVersion(4);
     fireEvent.click(screen.getByRole('button', { name: 'Copy to editor' }));
     await waitFor(() => expect(screen.getByText(/Editing an unsaved copy of v4/)).toBeInTheDocument());
     expect(saveEligibilityDraft).not.toHaveBeenCalled();
@@ -174,7 +179,7 @@ describe('builder page', () => {
     expect(within(screen.getByRole('navigation', { name: 'Form sections' })).getByRole('button', { name: 'Personal Details' })).toBeInTheDocument();
     expect(archiveEligibilityDraft).not.toHaveBeenCalled();
 
-    fireEvent.change(selector, { target: { value: '4' } });
+    selectCopiedVersion(4);
     fireEvent.click(screen.getByRole('button', { name: 'Copy to editor' }));
     await waitFor(() => expect(screen.getByText(/Editing an unsaved copy of v4/)).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -192,7 +197,8 @@ describe('builder page', () => {
       versions: [{ version: 4, status: 'archived', publishedAt: '', publishedBy: 'Admin' }] });
     fetchEligibilityVersion.mockResolvedValue({ version: 4, layout: earlier });
     renderBuilder();
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Copy from an earlier published version' }), { target: { value: '4' } });
+    await screen.findByRole('combobox', { name: 'Copy from an earlier published version' });
+    selectCopiedVersion(4);
     fireEvent.click(screen.getByRole('button', { name: 'Copy to editor' }));
     await waitFor(() => expect(screen.getByText(/Editing an unsaved copy of v4/)).toBeInTheDocument());
     await publish();
@@ -206,7 +212,8 @@ describe('builder page', () => {
       draft: { id: 10, layout: live, updatedAt: '', updatedBy: '' },
       versions: [{ version: 4, status: 'archived', publishedAt: '', publishedBy: 'Admin' }] });
     renderBuilder();
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Copy from an earlier published version' }), { target: { value: '4' } });
+    await screen.findByRole('combobox', { name: 'Copy from an earlier published version' });
+    selectCopiedVersion(4);
     expect(screen.getByRole('button', { name: 'Copy to editor' })).toBeDisabled();
     expect(saveEligibilityDraft).not.toHaveBeenCalled();
     expect(screen.getByText(/Editing saved draft/)).toBeInTheDocument();
@@ -248,7 +255,7 @@ describe('builder page', () => {
     for (const name of ['Form heading', 'Personal Details', 'Employment', 'Residency']) {
       expect(within(nav).getByRole('button', { name: new RegExp(`^${name}`) })).toBeInTheDocument();
     }
-    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Publish layout/ })).toBeDisabled();
   });
 
   it('never lets the questions that identify the applicant be removed or hidden', async () => {
@@ -441,7 +448,7 @@ describe('builder page', () => {
 
     expect(screen.queryByText('New — answer stored in JSONB')).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Asked when “Please provide your residency status?” is Other' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Publish layout/ }));
     expect(within(await screen.findByRole('dialog')).getByText(/New question answers will be saved/)).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
     await waitFor(() => expect(success).toHaveBeenCalled());
@@ -460,7 +467,7 @@ describe('builder page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Removed from this section \(1\)/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
     expect(screen.getByRole('button', { name: 'Remove Phone Number' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Publish changes/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Publish layout/ })).toBeDisabled();
   });
 
   it('publishes a required choice question with an eligibility rule', async () => {
@@ -479,7 +486,7 @@ describe('builder page', () => {
     await user.click(within(editor).getByRole('button', { name: /Add question/ }));
     expect(screen.getByText('Eligibility rule — Yes pass')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove Can you attend?' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Publish layout/ }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
     await waitFor(() => expect(success).toHaveBeenCalled());
     expect(sectionItems(publishedLayout(), 'residency').at(-1)).toMatchObject({
@@ -508,7 +515,7 @@ describe('builder page', () => {
     renderBuilder();
     await screen.findByRole('textbox', { name: 'Section name' });
     fireEvent.change(screen.getByRole('textbox', { name: 'Section name' }), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Publish layout/ }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Every section needs a name.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: /^Publish$/ })).toBeDisabled();
@@ -520,7 +527,7 @@ describe('builder page', () => {
     renderBuilder();
     await screen.findByRole('textbox', { name: 'Section name' });
     fireEvent.click(screen.getByRole('button', { name: 'Remove Phone Number' }));
-    fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Publish layout/ }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
     await waitFor(() => expect(error).toHaveBeenCalledWith('Could not publish the eligibility form', expect.stringContaining('Someone else')));
     expect(screen.getByText('You have unpublished changes.')).toBeInTheDocument();

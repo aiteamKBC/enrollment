@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
+import { SelectMenu } from '@/components/feature/SelectField';
 import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
@@ -254,18 +255,22 @@ export default function EligibilityBuilderPage() {
         {!loading && !loadError && layout && (
           <>
             <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-foreground-200 bg-background-50 p-4">
-              <label className="flex min-w-[16rem] flex-1 flex-col gap-1 text-[12px] font-medium text-foreground-700">
-                Copy from an earlier published version
-                <select className={inputClass} value={sourceVersion ?? ''} disabled={publishing}
-                  onChange={(e) => setSourceVersion(e.target.value ? Number(e.target.value) : null)}>
-                  <option value="">Select a version...</option>
-                  {versions.filter((entry) => entry.version !== version).map((entry) => (
-                    <option key={entry.version} value={entry.version}>
-                      v{entry.version}{entry.publishedAt ? ` · ${new Date(entry.publishedAt).toLocaleDateString('en-GB')}` : ''}{entry.publishedBy ? ` · ${entry.publishedBy}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="flex min-w-[16rem] flex-1 flex-col gap-1 text-[12px] font-medium text-foreground-700">
+                <span id="eligibility-copy-version-label">Copy from an earlier published version</span>
+                <SelectMenu
+                  value={sourceVersion?.toString() ?? ''}
+                  onChange={(value) => setSourceVersion(value ? Number(value) : null)}
+                  options={versions.filter((entry) => entry.version !== version).map((entry) => ({
+                    value: String(entry.version),
+                    label: `v${entry.version}${entry.publishedAt ? ` · ${new Date(entry.publishedAt).toLocaleDateString('en-GB')}` : ''}${entry.publishedBy ? ` · ${entry.publishedBy}` : ''}`,
+                  }))}
+                  placeholder="Select a version..."
+                  ariaLabelledBy="eligibility-copy-version-label"
+                  disabled={publishing}
+                  searchable={false}
+                  size="sm"
+                />
+              </div>
               <button type="button" className={btnSecondary} disabled={sourceVersion === null || publishing || draftId !== null} onClick={copyVersion}>
                 <AppIcon className="ri-file-copy-line" />Copy to editor
               </button>
