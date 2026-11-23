@@ -8,20 +8,16 @@ import logging
 
 from django.db import DatabaseError, IntegrityError, connections, transaction
 from django.http import JsonResponse
-from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 
 from learner_api.models import EnrolmentUser
-from login.identity import AccountError, ensure_account
-from login.models import Invitation
 from login.permissions import require_access
 from login.security import client_ip, user_agent
-from login.services import invite_subject
 
 from . import eligibility_form as form
-from .eligibility_invitation import learner_fields
-from .eligibility_link import CONN, TABLE, mark_activated
+from .eligibility_invitation import has_account
+from .eligibility_link import CONN, TABLE, dispatch
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +65,7 @@ def eligibility_exception(request, application_id):
                 if application.get("eligible") is not False:
                     return _error("Only a saved ineligible application can receive an exception.", 409)
                 candidate = _candidate(str(application.get("work_email") or "").strip())
-                cursor.execute(f"SELECT learner_id, override_reason, activation_verified_at FROM {TABLE} WHERE application_id=%s", [application_id])
+                cursor.execute(f"SELECT learner_id, override_reason, accepted_at FROM {TABLE} WHERE application_id=%s", [application_id])
                 link = cursor.fetchone()
             return JsonResponse({"existingLearner": {
                 "id": str(candidate.pk), "name": candidate.username, "email": candidate.email,
@@ -106,48 +102,28 @@ def eligibility_exception(request, application_id):
             if not cursor.fetchone():
                 return _error("Eligibility exception storage is not installed yet.", 503)
             candidate = _candidate(email)
+            if candidate or has_account(email):
+                return _error("An account already exists for this email. Resolve that account before sending an application invitation.", 409)
             cursor.execute(f"SELECT learner_id, override_reason FROM {TABLE} WHERE application_id=%s", [application_id])
             link = cursor.fetchone()
-            if link and (candidate is None or int(link[0]) != candidate.pk):
-                return _error("This application is already linked to a different learner.", 409)
-            if candidate:
-                cursor.execute(f"SELECT application_id FROM {TABLE} WHERE learner_id=%s", [candidate.pk])
-                prior = cursor.fetchone()
-                if prior and int(prior[0]) != application_id:
-                    return _error("This learner is already linked to another eligibility application.", 409)
-            learner = candidate or EnrolmentUser.all_learners.create(**learner_fields(application))
-            login, _ = ensure_account("learner", learner.pk, subject=learner)
-            if login.subject_type != "learner" or login.subject_id != learner.pk or not login.is_active:
-                raise ValueError("The email belongs to another or suspended account. Resolve it before linking.")
+            if link and link[0] is not None:
+                return _error("This application is already linked to a learner.", 409)
             if link is None:
-                cursor.execute(f"INSERT INTO {TABLE} (application_id, learner_id, override_approved_at, "
-                               "override_approved_by_account_id, override_reason) VALUES (%s,%s,now(),%s,%s)",
-                               [application_id, learner.pk, account.pk, reason.strip()])
-            elif not link[1]:
-                cursor.execute(f"UPDATE {TABLE} SET override_approved_at=now(), "
+                cursor.execute(f"INSERT INTO {TABLE} (application_id, override_approved_at, "
+                               "override_approved_by_account_id, override_reason) VALUES (%s,now(),%s,%s)",
+                               [application_id, account.pk, reason.strip()])
+            else:
+                cursor.execute(f"UPDATE {TABLE} SET override_approved_at=COALESCE(override_approved_at,now()), "
                                "override_approved_by_account_id=%s, override_reason=%s WHERE application_id=%s",
                                [account.pk, reason.strip(), application_id])
-
-        if login.has_password:
-            mark_activated(login)
-            return JsonResponse({"learnerId": str(learner.pk), "invitation": "alreadyActivated",
-                                 "message": "The existing account is ready for onboarding."})
-        if Invitation.objects.filter(account=login, sent_at__isnull=False,
-                                     used_at__isnull=True, expires_at__gt=timezone.now()).exists():
-            return JsonResponse({"learnerId": str(learner.pk), "invitation": "alreadySent"})
-        result = invite_subject("learner", learner.pk, subject=learner, inviter=account,
-                                invited_by=f"eligibility exception {application_id}",
-                                ip=client_ip(request), user_agent=user_agent(request))
-        with connections[CONN].cursor() as cursor:
-            cursor.execute(f"UPDATE {TABLE} SET invitation_status=%s, invitation_error=%s WHERE application_id=%s",
-                           ["sent" if result["emailSent"] else "failed", str(result.get("error") or "")[:500] or None, application_id])
-        return JsonResponse({"learnerId": str(learner.pk),
-                             "invitation": "sent" if result["emailSent"] else "notSent",
-                             "message": "Invitation sent." if result["emailSent"] else
-                                        "Learner linked, but the invitation was not sent. Retry from Accounts."})
+        outcome = dispatch(application_id, ip=client_ip(request), user_agent=user_agent(request))
+        return JsonResponse({"learnerId": None,
+                             "invitation": "sent" if outcome == "invited" else "notSent",
+                             "message": "Invitation sent. The account will be created on acceptance." if outcome == "invited" else
+                                        "Exception saved. Invitation delivery is pending; retry from this application."})
     except ValueError as exc:
         return _error(str(exc), 409)
-    except (AccountError, IntegrityError) as exc:
+    except IntegrityError as exc:
         logger.warning("Eligibility exception could not link application %s: %s", application_id, type(exc).__name__)
         return _error("The learner could not be linked. Check the account and try again.", 409)
     except DatabaseError:

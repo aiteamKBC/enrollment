@@ -58,43 +58,34 @@ class ExceptionTests(SimpleTestCase):
             'work_email': 'sam@example.test', 'date_of_birth': '2001-04-23'})
         self.assertEqual(fields['date_of_birth'], '2001-04-23')
 
-    def test_approval_preserves_screening_and_links_new_learner(self):
+    def test_approval_preserves_screening_and_stages_invitation(self):
         application = {'id': 42, 'eligible': False, 'work_email': 'sam@example.test'}
         cursor = Cursor([(application,), (1,), None])
-        learner = SimpleNamespace(pk=812)
-        login = SimpleNamespace(subject_type='learner', subject_id=812, is_active=True, has_password=False)
         request = self.factory.post('/enrolment_api/eligibility-applications/42/exception/',
             data=json.dumps({'reason': 'Employer evidence was checked by Admissions',
                              'confirmEmail': 'sam@example.test'}), content_type='application/json')
         request.COOKIES['enrollment_csrftoken'] = 'a' * 32
         request.META['HTTP_X_CSRFTOKEN'] = 'a' * 32
         with patch.object(api, '_candidate', return_value=None), \
-             patch.object(api.EnrolmentUser.all_learners, 'create', return_value=learner) as create, \
-             patch.object(api, 'learner_fields', return_value={'email': 'sam@example.test'}), \
-             patch.object(api, 'ensure_account', return_value=(login, True)), \
-             patch.object(api.Invitation.objects, 'filter', return_value=SimpleNamespace(exists=lambda: False)), \
-             patch.object(api, 'invite_subject', return_value={'emailSent': True, 'error': None}) as invite:
+             patch.object(api, 'has_account', return_value=False), \
+             patch.object(api, 'dispatch', return_value='invited') as invite:
             response = self.invoke(request, cursor)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(json.loads(response.content)['invitation'], 'sent')
-        create.assert_called_once_with(email='sam@example.test')
         invite.assert_called_once()
         self.assertTrue(any('INSERT INTO enrolment.eligibility_learner_links' in sql and
-            values == [42, 812, 7, 'Employer evidence was checked by Admissions']
+            values == [42, 7, 'Employer evidence was checked by Admissions']
             for sql, values in cursor.statements))
         self.assertFalse(any('UPDATE enrolment.eligibility_form' in sql for sql, _ in cursor.statements))
 
-    def test_accepted_link_advances_only_the_learner_status(self):
+    def test_accepted_link_records_acceptance_without_advancing_status(self):
         cursor = Cursor([(links.TABLE,), (812,)])
         connection = SimpleNamespace(cursor=lambda: cursor)
-        queryset = MagicMock()
         with patch.object(links, 'connections', {'enrolment': connection}), \
-             patch.object(links.transaction, 'atomic', lambda **_: nullcontext()), \
-             patch('learner_api.models.EnrolmentUser.all_learners.filter', return_value=queryset) as selected:
+             patch.object(links.transaction, 'atomic', lambda **_: nullcontext()):
             links.mark_activated(SimpleNamespace(subject_type='learner', subject_id=812))
-        selected.assert_called_once_with(pk=812)
-        queryset.filter.assert_called_once()
-        queryset.filter.return_value.update.assert_called_once_with(programme_status='Onboarding')
+        self.assertTrue(any('accepted_at=COALESCE' in sql and values == [812]
+                            for sql, values in cursor.statements))
 
     def test_old_signed_reviews_cannot_promote_a_fresh_learner(self):
         learner = SimpleNamespace(programme_status='Fresh user', save=MagicMock())
@@ -114,6 +105,7 @@ class ExceptionTests(SimpleTestCase):
         # a learner id, so this exercises the same status branch as bootstrap.
         query = MagicMock()
         with patch.object(enrolment_auth, '_may_access', return_value=True), \
+             patch.object(links, 'may_enter_onboarding', return_value=False), \
              patch('learner_api.models.EnrolmentUser.all_learners.filter', return_value=query):
             query.values.return_value.first.return_value = {'learner_type': 'apprenticeship', 'programme_status': 'Fresh user'}
             response = protected(request, learner_id=812)

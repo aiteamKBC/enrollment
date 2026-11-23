@@ -4,6 +4,7 @@ Call within the same enrolment transaction that creates the learner. The
 representative is a company contact, not the learner's line manager.
 """
 import re
+from difflib import SequenceMatcher
 
 from django.db import connections
 
@@ -15,18 +16,25 @@ def _clean(value):
 
 
 def _key(value):
-    return _clean(value).casefold()
+    return re.sub(r"[^0-9a-z]+", " ", _clean(value).lower()).strip()
 
 
 def _postcode(value):
     return re.sub(r"\s+", "", str(value or "")).upper()
 
 
+def _postcode_area(value):
+    """Outward UK postcode: same area is a review hint, never an auto-link."""
+    compact = _postcode(value)
+    return compact[:-3] if len(compact) > 3 else compact
+
+
 def resolve_application_organisation(row):
     """Reuse one unambiguous company/office, or create it; never guess a match.
 
-    Company name plus postcode narrows the candidates. Address values must not
-    conflict, and multiple compatible candidates require staff resolution.
+    Exact normalised name plus full postcode is the only automatic match.
+    Similar names in the same postcode area create a separate profile flagged
+    for staff review. Street and contact details never decide identity.
     The transaction advisory lock serialises two simultaneous applications for
     the same company/office while the first one is being created.
     """
@@ -42,37 +50,21 @@ def resolve_application_organisation(row):
         "county": _clean(row.get("employer_county")),
     }
     with connections["enrolment"].cursor() as cursor:
-        cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s), hashtext(%s))", [name.casefold(), postcode])
-    candidates = [
-        org for org in Organisation.objects.filter(name__iexact=name)
-        if _key(org.name) == _key(name) and _postcode(org.post_code) == postcode
-    ]
-    compatible = [org for org in candidates if all(
-        not _key(getattr(org, attr)) or not _key(value) or _key(getattr(org, attr)) == _key(value)
-        for attr, value in submitted.items()
-    )]
-    if len(compatible) > 1 or (candidates and not compatible):
-        raise ValueError("Employer organisation match needs staff review; no learner or invitation was created.")
-    if compatible:
-        org = compatible[0]
-        # Existing organisation records are authoritative. In particular, one
-        # applicant's representative must not replace a company contact. Fill
-        # missing address/contact details only when the profile has none.
-        updates = []
-        for attr, value in (
-            *submitted.items(),
-            ("contact_name", _clean(row.get("representative_name"))),
-            ("contact_email", _clean(row.get("representative_email"))),
-        ):
-            if value and not _clean(getattr(org, attr)):
-                setattr(org, attr, value)
-                updates.append(attr)
-        if updates:
-            org.save(update_fields=[*updates, "updated_at"])
-        return org
+        cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s), hashtext(%s))", [_key(name), postcode])
+    active = list(Organisation.objects.filter(merged_into_organisation_id__isnull=True))
+    exact = [org for org in active if _key(org.name) == _key(name)
+             and _postcode(org.post_code) == postcode]
+    if len(exact) > 1:
+        raise ValueError("Multiple exact organisation matches need staff review.")
+    if exact:
+        return exact[0]
+    possible = [org.pk for org in active
+                if _postcode_area(org.post_code) == _postcode_area(postcode)
+                and SequenceMatcher(None, _key(org.name), _key(name)).ratio() >= 0.8]
     return Organisation.objects.create(
         name=name, post_code=postcode, country="United Kingdom",
         **submitted,
         contact_name=_clean(row.get("representative_name")),
         contact_email=_clean(row.get("representative_email")),
+        potential_match_ids=possible,
     )

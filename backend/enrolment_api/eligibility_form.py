@@ -28,7 +28,7 @@ What the form asks
 The questions come from the layout published in the "Edit eligibility form"
 builder (eligibility_layout.py): which built-in questions are asked and whether
 they are required, the answer lists of the choice questions, and any custom
-questions, each with its own ``custom_*`` column. With nothing published the
+questions. New answers live together in ``answers`` JSONB. With nothing published the
 form asks FIELDS as they stand. An answer the form does not ask is stored as
 NULL. First name, surname and work email identify the applicant, so they are
 always asked.
@@ -53,10 +53,10 @@ evidence for approval.
 
 Invitation
 ----------
-An applicant who passes the applicable preliminary screening is created as an
-apprenticeship learner and emailed the set-password invitation
+An applicant who passes the applicable preliminary screening is emailed the
+set-password invitation. Their learner and login account are created on acceptance
 (eligibility_invitation.py). The response's ``outcome`` tells the page what
-happened: "invited", "invitePending" (created, but the email could not be sent;
+happened: "invited", "invitePending" (the email could not be sent;
 staff can re-send it), "existingAccount" (the address already has an account:
 sign in or use Forgot password), "notEligible", or a technical invitation retry.
 New completed screenings have boolean eligibility. Lookup failures are HTTP
@@ -1161,15 +1161,26 @@ def save_screened_application(row, reasons, request):
     Only a new row's response receipt is updated; historical applications never
     acquire a fingerprint. Invitation failures may retry against the same row.
     """
-    custom = [column for column in row if CUSTOM_COLUMN_RE.match(column)]
-    columns = list(INSERT_COLUMNS + (WORKPLACE_COLUMNS if workplace_enabled() else ()) + SCREENING_COLUMNS + leaving_date_columns(row)) + custom
-    names = [f'"{column}"' for column in columns]
+    metadata = ("first_name", "surname", "work_email", "layout_version", "eligible",
+                "ineligible_reason", "assessment_status", "assessment_reason",
+                "submission_fingerprint", "submission_response")
+    answers = {key: value for key, value in row.items() if key not in metadata}
     with transaction.atomic(using=CONN):
         with connections[CONN].cursor() as cursor:
             cursor.execute(
-                f"INSERT INTO enrolment.{TABLE} ({', '.join(names)}) VALUES ({', '.join(['%s'] * len(names))}) "
+                "SELECT programme_id FROM curriculum.programmes WHERE lower(btrim(name))=lower(btrim(%s))",
+                [row.get("programme") or ""],
+            )
+            matches = cursor.fetchall()
+            if len(matches) != 1:
+                raise DatabaseError("The selected programme is unavailable or ambiguous.")
+            cursor.execute(
+                f'''INSERT INTO enrolment.{TABLE}
+                    (first_name, surname, work_email, layout_version, eligible, ineligible_reason,
+                     assessment_status, assessment_reason, submission_fingerprint, answers, programme_id)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s) '''
                 "ON CONFLICT (submission_fingerprint) DO NOTHING RETURNING id",
-                [row.get(column) for column in columns],
+                [row.get(key) for key in metadata[:-1]] + [json.dumps(answers, default=str), matches[0][0]],
             )
             inserted = cursor.fetchone()
             if inserted:

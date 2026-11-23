@@ -414,7 +414,7 @@ def _check_employer_id(fields, existing=None):
     org_id = fields.get("organisation_id", getattr(existing, "organisation_id", None))
     if org_id is not None:
         organisation = Organisation.objects.filter(pk=org_id).first()
-        if organisation is None:
+        if organisation is None or organisation.merged_into_organisation_id is not None:
             raise ValidationError(f"Unknown organisationId: {org_id}")
         fields["organization"] = organisation.name
         fields["employer"] = organisation.name

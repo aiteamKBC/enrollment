@@ -78,6 +78,11 @@ class FakeCursor:
     def fetchone(self):
         return (41,)
 
+    def fetchall(self):
+        if self.executed and 'FROM curriculum.programmes' in self.executed[-1][0]:
+            return [('PROG-ME-L4',)]
+        return []
+
     def __enter__(self):
         return self
 
@@ -406,16 +411,15 @@ class SubmitApplicationTests(SimpleTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(json.loads(response.content),
                          {"submitted": True, "eligible": True, "reasons": [], "outcome": "invited"})
-        self.assertEqual(len(cursor.executed), 2)  # application and durable receipt
-        sql, params = cursor.executed[0]
+        self.assertEqual(len(cursor.executed), 3)  # programme lookup, application and receipt
+        sql, params = cursor.executed[1]
         self.assertTrue(sql.startswith("INSERT INTO enrolment.eligibility_form ("))
-        # Only the form's own columns: the client cannot set id, timestamps or anything else.
-        self.assertIn(f"({', '.join(ef.INSERT_COLUMNS + ef.SCREENING_COLUMNS)})", sql.replace('"', ''))
-        self.assertEqual(len(params), len(ef.INSERT_COLUMNS + ef.SCREENING_COLUMNS))
-        stored = dict(zip(ef.INSERT_COLUMNS, params))
+        self.assertIn('answers, programme_id', sql)
+        self.assertEqual(len(params), 11)
+        stored = self.stored(cursor)
         self.assertEqual(stored["programme"], "Associate Project Manager Level 4")
         self.assertIsNone(stored["not_previously_completed_programme"])
-        self.assertEqual(stored["start_date_with_employer"], date(2020, 9, 1))
+        self.assertEqual(stored["start_date_with_employer"], "2020-09-01")
         self.assertEqual(stored["job_title"], "Marketing Executive")
         # Each postcode is saved as written, with where it is.
         self.assertEqual(stored["postcode"], "EX1 2MP")
@@ -443,9 +447,9 @@ class SubmitApplicationTests(SimpleTestCase):
                 self.assertIs(body["eligible"], expected)
                 self.assertEqual(len(body["reasons"]), 0 if expected else 1)
                 self.assertEqual(body["outcome"], "invited" if expected else "notEligible")
-                sql, params = cursor.executed[0]
-                self.assertIn(item["column"], sql)
-                self.assertEqual(params[-1], answer)
+                sql, params = cursor.executed[1]
+                self.assertIn('answers', sql)
+                self.assertEqual(json.loads(params[-2])[item["column"]], answer)
         response, cursor = self.post({**application(custom={item["key"]: "Forged"}), "layoutVersion": 10})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(json.loads(response.content)["fields"], {item["key"]: "Choose one of the listed options."})
@@ -454,17 +458,24 @@ class SubmitApplicationTests(SimpleTestCase):
     def submitted(self, body):
         response, cursor = self.post(body)
         self.assertEqual(response.status_code, 201)
-        return json.loads(response.content), dict(zip(ef.INSERT_COLUMNS, cursor.executed[0][1]))
+        return json.loads(response.content), self.stored(cursor)
+
+    def stored(self, cursor):
+        params = cursor.executed[1][1]
+        metadata = ('first_name', 'surname', 'work_email', 'layout_version',
+                    'eligible', 'ineligible_reason', 'assessment_status',
+                    'assessment_reason', 'submission_fingerprint')
+        return {**dict(zip(metadata, params[:9])), **json.loads(params[-2])}
 
     def test_expected_leaving_date_is_inserted_when_provided_and_omitted_otherwise(self):
         response, cursor = self.post(application(fullTimeEducationPrior=True, expectedLeavingDate="2027-06-30"))
         self.assertEqual(response.status_code, 201)
-        sql, params = cursor.executed[0]
-        self.assertIn("expected_leaving_date", sql)
-        self.assertEqual(params[-1], date(2027, 6, 30))
+        sql, params = cursor.executed[1]
+        self.assertIn("answers", sql)
+        self.assertEqual(json.loads(params[-2])["expected_leaving_date"], "2027-06-30")
         response, cursor = self.post(application(fullTimeEducationPrior=False, expectedLeavingDate="2027-06-30"))
         self.assertEqual(response.status_code, 201)
-        self.assertNotIn("expected_leaving_date", cursor.executed[0][0])
+        self.assertIsNone(self.stored(cursor).get("expected_leaving_date"))
 
     def test_invalid_residential_postcodes_are_field_errors_without_saving(self):
         for value, message in (("ss", postcode_lookup.INVALID_POSTCODE), ("ZZ9 9ZZ", postcode_lookup.UNKNOWN_POSTCODE)):
@@ -521,15 +532,15 @@ class SubmitApplicationTests(SimpleTestCase):
         self.assertEqual(json.loads(response.content)["fields"], {"employerPostcode": ef.EMPLOYER_POSTCODE_UNAVAILABLE})
         self.assertEqual(cursor.executed, [])
 
-    def test_custom_answers_are_inserted_into_their_columns(self):
+    def test_custom_answers_are_inserted_into_jsonb(self):
         layout = layout_with(extra=[question("cf_years", "number", required=True)])
         self.published.return_value = (4, layout)
         response, cursor = self.post(application(layoutVersion=4, custom={"cf_years": 2}))
         self.assertEqual(response.status_code, 201, response.content)
-        sql, params = cursor.executed[0]
-        self.assertIn('"custom_years"', sql)
-        self.assertEqual(params[-1], Decimal("2"))
-        self.assertEqual(params[ef.INSERT_COLUMNS.index("layout_version")], 4)
+        sql, params = cursor.executed[1]
+        self.assertIn('answers', sql)
+        self.assertEqual(json.loads(params[-2])["custom_years"], "2")
+        self.assertEqual(params[3], 4)
 
     def test_answers_to_an_older_form_are_refused_so_the_page_can_reload_it(self):
         self.published.return_value = (5, layout_with())
@@ -676,7 +687,7 @@ class GateTests(SimpleTestCase):
             neighbour = self.client.get("/enrolment_api/wizard-layout/")
             builder = self.client.get("/enrolment_api/eligibility-form-layout/")
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(len(cursor.executed), 2)
+        self.assertEqual(len(cursor.executed), 3)
         self.assertEqual(lookup.status_code, 200)
         self.assertEqual(json.loads(lookup.content)["district"], "Exeter")
         # The rest of the app is still closed to the same anonymous caller.

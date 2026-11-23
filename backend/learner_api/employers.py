@@ -20,7 +20,8 @@ or admin session (``@staff_only(writes_only=True)``). Django's CSRF middleware
 is exempted because these are JSON endpoints; cross-site protection is the
 ``X-Requested-With`` header plus the SameSite=Lax session cookie.
 """
-from django.db import DatabaseError
+from django.db import DatabaseError, transaction
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 
@@ -55,7 +56,7 @@ def _resolve_groups(ids):
     """
     if not ids:
         return {}
-    rows = Organisation.objects.filter(pk__in=ids).values_list("pk", "name")
+    rows = Organisation.objects.filter(pk__in=ids, merged_into_organisation_id__isnull=True).values_list("pk", "name")
     return {pk: (name or "").strip() for pk, name in rows}
 
 
@@ -73,6 +74,8 @@ def organisations(request):
         status = (request.GET.get("status") or "").strip()
         try:
             qs = Organisation.objects.all()
+            if request.GET.get("includeMerged") != "1":
+                qs = qs.filter(merged_into_organisation_id__isnull=True)
             if search:
                 qs = qs.filter(name__icontains=search)
             if status:
@@ -132,6 +135,8 @@ def organisation_detail(request, pk):
         return JsonResponse(to_organisation_row(org))
 
     if request.method in ("PATCH", "PUT"):
+        if org.merged_into_organisation_id is not None:
+            return _error("This organisation was merged. Edit its active target.", 409)
         try:
             payload = _parse_body(request)
             fields = write_organisation_fields(payload)
@@ -152,6 +157,55 @@ def organisation_detail(request, pk):
         return JsonResponse(to_organisation_row(org))
 
     return _error("Method not allowed.", 405)
+
+
+@csrf_exempt
+@staff_only()
+def merge_organisation(request, pk):
+    """Merge a source profile into an active target without erasing its history."""
+    if request.method != "POST":
+        return _error("Method not allowed.", 405)
+    actor = getattr(request, "login_account", None)
+    if actor is None or actor.role != "admin":
+        return _error("Only an admin can merge organisations.", 403)
+    try:
+        payload = _parse_body(request)
+        target_id = int(payload.get("targetOrganisationId"))
+    except (ValueError, TypeError, ValidationError):
+        return _error("targetOrganisationId must identify an organisation.", 400)
+    if pk == target_id:
+        return _error("An organisation cannot be merged into itself.", 400)
+    try:
+        with transaction.atomic(using="enrolment"):
+            locked = {
+                org.pk: org for org in Organisation.objects.select_for_update()
+                .filter(pk__in=[pk, target_id]).order_by("pk")
+            }
+            source, target = locked.get(pk), locked.get(target_id)
+            if source is None or target is None:
+                return _error("Organisation not found.", 404)
+            if source.merged_into_organisation_id or target.merged_into_organisation_id:
+                return _error("Both organisations must be active.", 409)
+            # Keep the source row as an audit trail. A learner's ID is the
+            # authoritative association; text labels are refreshed alongside it.
+            reassigned = EnrolmentUser.all_learners.filter(organisation_id=pk).update(
+                organisation_id=target_id, organization=target.name, employer=target.name,
+            )
+            for emp in Employer.objects.filter(employer_group_ids__contains=pk):
+                ids = [int(i) for i in emp.employer_group_ids or []]
+                ids = list(dict.fromkeys(target_id if i == pk else i for i in ids))
+                emp.employer_group_ids = ids
+                names = _resolve_groups(ids)
+                emp.employer_group_names = [names.get(i, "") for i in ids]
+                emp.save(update_fields=["employer_group_ids", "employer_group_names", "updated_at"])
+            source.merged_into_organisation_id = target_id
+            source.merged_at = timezone.now()
+            source.merged_by_account_id = actor.pk
+            source.save(update_fields=["merged_into_organisation_id", "merged_at", "merged_by_account_id", "updated_at"])
+        return JsonResponse({"source": to_organisation_row(source),
+                             "target": to_organisation_row(target), "learnersReassigned": reassigned})
+    except DatabaseError as exc:
+        return _error(f"Database error: {exc}", 502)
 
 
 def _resync_group_names(org):

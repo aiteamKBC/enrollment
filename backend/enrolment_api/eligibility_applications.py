@@ -32,7 +32,7 @@ UNAVAILABLE = "Eligibility applications could not be loaded. Please try again."
 
 def _projection(columns, *, outcome=False):
     # Only server-owned identifiers reach SQL. Never SELECT * into an API.
-    pairs = [f"'{key}', to_jsonb(a)->'{key}'" for key in columns]
+    pairs = [f"'{key}', COALESCE(a.answers->'{key}', to_jsonb(a)->'{key}')" for key in columns]
     if outcome:
         pairs.append("'invitation_outcome', to_jsonb(a)->'submission_response'->'outcome'")
     # PostgreSQL limits a function call to 100 arguments (two per key/value).
@@ -80,7 +80,8 @@ def eligibility_applications(request):
     if search:
         # Literal, case-insensitive substring search: % and _ are not wildcards.
         clauses.append("strpos(lower(concat_ws(' ', a.first_name, a.surname, a.work_email, "
-                       "a.employer_name, a.employer_postcode, to_jsonb(a)->>'main_workplace_postcode')), lower(%s)) > 0")
+                       "a.answers->>'employer_name', a.answers->>'employer_postcode', "
+                       "a.answers->>'main_workplace_postcode')), lower(%s)) > 0")
         params.append(search)
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
     try:
