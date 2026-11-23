@@ -147,7 +147,7 @@ async function publish() {
 }
 
 describe('builder page', () => {
-  it('copies an earlier published version into the saved draft and can return to the live form', async () => {
+  it('opens an earlier version without saving, discards it, then saves and archives an explicit draft', async () => {
     const live = defaultLayout();
     const earlier = defaultLayout();
     earlier.sections[0].title = 'Earlier Personal Details';
@@ -162,24 +162,49 @@ describe('builder page', () => {
     renderBuilder();
     const selector = await screen.findByRole('combobox', { name: 'Copy from an earlier published version' });
     fireEvent.change(selector, { target: { value: '4' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Copy to draft' }));
-    await waitFor(() => expect(saveEligibilityDraft).toHaveBeenCalledWith({ ...earlier, copiedFromVersion: 4 }, 9, null));
-    expect(within(screen.getByRole('navigation', { name: 'Form sections' })).getByRole('button', { name: 'Earlier Personal Details' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy to editor' }));
+    await waitFor(() => expect(screen.getByText(/Editing an unsaved copy of v4/)).toBeInTheDocument());
+    expect(saveEligibilityDraft).not.toHaveBeenCalled();
     expect(publishEligibilityLayout).not.toHaveBeenCalled();
+    expect(within(screen.getByRole('navigation', { name: 'Form sections' })).getByRole('button', { name: 'Earlier Personal Details' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect(within(screen.getByRole('navigation', { name: 'Form sections' })).getByRole('button', { name: 'Personal Details' })).toBeInTheDocument();
+    expect(archiveEligibilityDraft).not.toHaveBeenCalled();
+
+    fireEvent.change(selector, { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Copy to editor' }));
+    await waitFor(() => expect(screen.getByText(/Editing an unsaved copy of v4/)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(saveEligibilityDraft).toHaveBeenCalledWith(expect.objectContaining({ copiedFromVersion: 4 }), 9, null));
     fireEvent.click(screen.getByRole('button', { name: 'Archive draft & return to published' }));
     await waitFor(() => expect(archiveEligibilityDraft).toHaveBeenCalledWith(9, 10));
     expect(within(screen.getByRole('navigation', { name: 'Form sections' })).getByRole('button', { name: 'Personal Details' })).toBeInTheDocument();
   });
 
-  it('keeps the existing draft when the admin cancels copying another version', async () => {
+  it('publishes a copied version directly without first saving a draft', async () => {
+    const live = defaultLayout();
+    const earlier = defaultLayout();
+    earlier.sections[0].title = 'Earlier Personal Details';
+    fetchEligibilityLayout.mockResolvedValue({ layout: live, version: 9,
+      versions: [{ version: 4, status: 'archived', publishedAt: '', publishedBy: 'Admin' }] });
+    fetchEligibilityVersion.mockResolvedValue({ version: 4, layout: earlier });
+    renderBuilder();
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Copy from an earlier published version' }), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Copy to editor' }));
+    await waitFor(() => expect(screen.getByText(/Editing an unsaved copy of v4/)).toBeInTheDocument());
+    await publish();
+    expect(saveEligibilityDraft).not.toHaveBeenCalled();
+    expect(publishedLayout()).toEqual(expect.objectContaining({ copiedFromVersion: 4 }));
+  });
+
+  it('requires archiving an existing saved draft before copying another version', async () => {
     const live = defaultLayout();
     fetchEligibilityLayout.mockResolvedValue({ layout: live, version: 9,
       draft: { id: 10, layout: live, updatedAt: '', updatedBy: '' },
       versions: [{ version: 4, status: 'archived', publishedAt: '', publishedBy: 'Admin' }] });
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderBuilder();
     fireEvent.change(await screen.findByRole('combobox', { name: 'Copy from an earlier published version' }), { target: { value: '4' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Copy to draft' }));
+    expect(screen.getByRole('button', { name: 'Copy to editor' })).toBeDisabled();
     expect(saveEligibilityDraft).not.toHaveBeenCalled();
     expect(screen.getByText(/Editing saved draft/)).toBeInTheDocument();
   });
