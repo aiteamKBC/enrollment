@@ -168,6 +168,7 @@ export function buildRows(ilr: IlrForm, board: EnrolmentBoard, texts?: Record<st
   rows.push({ kind: 'text', label: w('xilr.ehcp.label', IlrText.ehcp), value: ai?.ehcp ?? '' });
   rows.push({ kind: 'note', text: w('xilr.ehcp.use', IlrText.ehcpUse) });
   rows.push({ kind: 'yesno', label: w('xilr.over50Percent.label', IlrText.over50PercentEngland), value: ilr.declarations.over50PercentEngland });
+  rows.push({ kind: 'note', text: `Check the date-effective National Minimum Wage rates at ${IlrText.wageRateLink}.` });
   rows.push({ kind: 'text', label: w('xilr.wageRate.label', IlrText.wageRateBand), value: ilr.declarations.wageRateBand });
   rows.push({ kind: 'yesno', label: w('xilr.knownByOtherName.label', IlrText.knownByOtherName), value: ilr.declarations.knownByOtherName });
   if (ilr.declarations.knownByOtherName === true) {
@@ -365,9 +366,11 @@ export async function buildIlrPdf(ilr: IlrForm, board: EnrolmentBoard, texts?: R
 
   doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(60, 60, 60);
   for (const p of [
-    'I confirm my agreement to share my Personal Learning Record (PLR) information with Kent Business College and other relevant bodies.',
-    'I understand that my programme is supported and funded by the Department of Education (DfE) on behalf of the Secretary of State. I am happy to be contacted by the relevant funding authorities in connection with this programme.',
-    'I confirm all the information completed in this Application for learning document is accurate.',
+    'I confirm that, to the best of my knowledge, the information I have provided to Kent Business College in connection with my application, enrolment and apprenticeship is complete and accurate. I understand that I should notify Kent Business College promptly if any relevant information changes.',
+    'I understand that Kent Business College may access my Personal Learning Record (PLR), where available, for purposes connected with my education and training, including verifying my previous qualifications and achievements and supporting the assessment of prior learning.',
+    "I understand that my apprenticeship is subject to the applicable apprenticeship funding rules and is funded through my employer's apprenticeship service account and/or government funding, depending on the employer's levy status and the applicable funding arrangements, as set out in the Contract of Service.",
+    'I understand that relevant government departments or their authorised agents may contact me in connection with the administration, assurance, research or evaluation of my apprenticeship, where permitted by law.',
+    'By signing this declaration, I confirm that the statements above are correct and that I understand them.',
   ]) {
     const lines = doc.splitTextToSize(p, PAGE_W - MARGIN_X * 2) as string[];
     need(lines.length * 4.4 + 3);

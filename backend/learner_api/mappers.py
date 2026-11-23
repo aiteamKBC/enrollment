@@ -154,6 +154,7 @@ def to_edit_fields(u):
         # on it, because two employers can share a name.
         "employerId": u.employer_id,
         "organisationId": getattr(u, "organisation_id", None),
+        "learnerReferenceNumber": _s(getattr(u, "reference_number", "")),
         "organization": _s(u.organization),
         "lineManager": _s(u.line_manager),
         "learnerType": _s(getattr(u, "learner_type", "")) or "apprenticeship",
@@ -605,6 +606,7 @@ WRITABLE_FIELDS = {
     "employer": "employer",
     "organization": "organization",
     "reference": "organization",
+    "learnerReferenceNumber": "reference_number",
     "lineManager": "line_manager",
     "onboardingStatus": "onboarding_status",
     "onboardingCompleted": "onboarding_completed",
@@ -905,6 +907,12 @@ def write_fields(payload, *, require_create=False):
         if key in payload:
             val = payload[key]
             fields[attr] = None if val is None else str(val).strip()
+    if "learnerReferenceNumber" in payload:
+        reference = _s(payload.get("learnerReferenceNumber"))
+        if reference and not re.fullmatch(r"[A-Za-z0-9 ]{1,12}", reference):
+            raise ValidationError(
+                "Learner Reference Number must be 1-12 letters, numbers or spaces."
+            )
     for key, attr in APTEM_BOOL_FIELDS.items():
         if key in payload:
             fields[attr] = _bool_or_none(payload[key])
@@ -1460,6 +1468,14 @@ def write_organisation_fields(payload, *, require_create=False):
         if key in payload:
             val = payload[key]
             fields[attr] = None if val is None else str(val).strip()
+    if "edrsErnNumber" in payload:
+        employer_identifier = _s(payload.get("edrsErnNumber"))
+        if employer_identifier and not re.fullmatch(r"[0-9]{9}", employer_identifier):
+            raise ValidationError("EDRS/ERN number must contain exactly 9 digits.")
+    if "apprenticeshipAgreementId" in payload:
+        agreement = _s(payload.get("apprenticeshipAgreementId"))
+        if agreement and not re.fullmatch(r"[A-Za-z0-9]{1,7}", agreement):
+            raise ValidationError("Apprenticeship agreement id must be 1-7 alphanumeric characters.")
     if "workingHours" in payload:
         fields["working_hours"] = _working_hours(payload["workingHours"])
     # A boolean, so it bypasses the string-coercing loop above.

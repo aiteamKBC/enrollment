@@ -103,6 +103,14 @@ const SECTIONS: SectionDef[] = [
       { name: 'phone', label: 'Mobile', type: 'tel', placeholder: 'NNN NNNN NNNN or +NNN NNN NNN NNNN' },
       { name: 'dob', label: 'Date of birth', type: 'date' },
       { name: 'niNumber', label: 'National Insurance number', type: 'text', placeholder: 'AB123456A' },
+      {
+        name: 'learnerReferenceNumber',
+        label: 'Learner Reference Number',
+        type: 'text',
+        phase: 'edit',
+        placeholder: '1-12 letters or numbers',
+        hint: 'Provider-assigned ILR reference. Must be unique, persistent and must not contain personal information.',
+      },
     ],
   },
   {
@@ -420,6 +428,7 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       preferredName: formData.preferredName,
       gender: formData.gender,
       niNumber: formData.niNumber,
+      learnerReferenceNumber: formData.learnerReferenceNumber,
       postcode: formData.postcode,
       addressLine1: formData.addressLine1,
       addressLine2: formData.addressLine2,

@@ -83,6 +83,15 @@ describe('supplied purple reference PDF design', () => {
     for(const text of ['Historical signature reproduced from Revision R1','does not record approval','Historical Signer','HEADER-END','FOOTER-END'])expect(output).toContain(text);
     expect(JSON.stringify(value)).toBe(before);
   });
+  it('adds a real PDF link annotation for an HTTPS URL without changing its visible wording', () => {
+    const value=payloadFor('ilr',true); value.template.content.designTheme='purple-reference-v2';
+    const url='https://www.gov.uk/national-minimum-wage-rates';
+    value.template.content.blocks=[{id:'link',type:'paragraph',text:`Check the rates at ${url}.`}];
+    const output=renderManagedDocument(value.template,value.data)!.output();
+    expect(output).toContain('/Subtype /Link');
+    expect(output).toContain(`/URI (${url})`);
+    expect(output).toContain('(.)');
+  });
 });
 
 if(process.env.PURPLE_REFERENCE_ARTIFACTS)it('writes all eight real short/long PDF previews and a measured multi-module Training Plan',async()=>{

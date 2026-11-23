@@ -6,7 +6,8 @@ import type { BlockStyle, IssuedTemplate, TextRun } from './types';
 
 type Kind = 'paragraph' | 'heading' | 'subheading' | 'title' | 'declaration' | 'list' | 'signature-detail';
 type Colour = readonly [number, number, number];
-type Piece = { text: string; width: number; size: number; bold: boolean; italic: boolean; underline: boolean };
+type Piece = { text: string; width: number; size: number; bold: boolean; italic: boolean; underline: boolean; link?: string };
+const CLICKABLE_URLS = new Set(['https://www.gov.uk/national-minimum-wage-rates']);
 export interface PdfBounds { x: number; width: number; top: number; bottom: number; getY: () => number; setY: (y: number) => void; page: () => void; room: (height: number) => void }
 
 /** Presentation only. Native rows, answers, calculations and signing data are
@@ -32,7 +33,7 @@ export function lavenderPainter(doc: jsPDF, template: IssuedTemplate, b: PdfBoun
       if (width + part.width > limit && line.length) flush();
       if (!line.length && /^\s+$/.test(part.text)) return;
       const previous = line.at(-1);
-      if (previous && previous.size === part.size && previous.bold === part.bold && previous.italic === part.italic && previous.underline === part.underline) { previous.text += part.text; previous.width += part.width; }
+      if (previous && previous.size === part.size && previous.bold === part.bold && previous.italic === part.italic && previous.underline === part.underline && previous.link === part.link) { previous.text += part.text; previous.width += part.width; }
       else line.push({ ...part });
       width += part.width;
     };
@@ -41,9 +42,16 @@ export function lavenderPainter(doc: jsPDF, template: IssuedTemplate, b: PdfBoun
       const value = latin(interpolate ? substitute(run.text, template) : run.text);
       for (const token of value.split(/(\n|[^\S\n]+|[^\s]+)/).filter(Boolean)) {
         if (token === '\n') { flush(); continue; }
-        font(p); const tokenWidth = doc.getTextWidth(token);
-        if (tokenWidth <= maxWidth - indent) add({ ...p, text: token, width: tokenWidth });
-        else for (const char of token) { font(p); add({ ...p, text: char, width: doc.getTextWidth(char) }); }
+        const candidate = token.replace(/[.,;:!?]+$/, '');
+        const url = CLICKABLE_URLS.has(candidate) ? candidate : '';
+        const suffix = url ? token.slice(url.length) : '';
+        const addToken = (text: string, link?: string) => {
+          font(p); const tokenWidth = doc.getTextWidth(text);
+          if (tokenWidth <= maxWidth - indent) add({ ...p, text, width: tokenWidth, link });
+          else for (const char of text) { font(p); add({ ...p, text: char, width: doc.getTextWidth(char), link }); }
+        };
+        addToken(url || token, url || undefined);
+        if (suffix) addToken(suffix);
       }
     }
     if (line.length) flush();
@@ -64,6 +72,7 @@ export function lavenderPainter(doc: jsPDF, template: IssuedTemplate, b: PdfBoun
       const baseline = top + Math.max(baseSize, ...parts.map(p => p.size)) * .352778 * .85;
       for (const part of parts) {
         font(part, colour); doc.text(part.text, x, baseline);
+        if (part.link) doc.link(x, top, part.width, height, { url: part.link });
         if (part.underline) doc.setDrawColor(...rgb(colour)).setLineWidth(.18).line(x, baseline + .6, x + part.width, baseline + .6);
         x += part.width;
       }

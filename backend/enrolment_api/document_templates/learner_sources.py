@@ -85,6 +85,11 @@ def employment_details(learner):
     return _wizard_ilr_details(learner.pk)
 
 
+def working_hours_per_week(details):
+    """The wizard's saved working-hours value, without changing its meaning."""
+    return _s(getattr(details, 'working_hours_per_week', None))
+
+
 def employer_postcode(learner, employer_answers):
     # The contact's personal address is not the employing company's address.
     from enrolment_api.ilr_employer_details import organisation_for_learner
