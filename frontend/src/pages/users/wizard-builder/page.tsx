@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DragEvent } from 'react';
 import { SuitabilityAdmin } from '@/features/programme-suitability/SuitabilityAdmin';
 import { ModulesAdmin } from '@/features/programme-suitability/modules/ModulesAdmin';
 import { CatalogueAdmin } from '@/features/programme-suitability/skills-radar/catalogue/CatalogueAdmin';
@@ -556,8 +557,11 @@ function StepEditor({
       <ol
         className="space-y-2 p-5"
         aria-label={`Items on ${step.label}`}
-        onDragOver={(e) => e.preventDefault()}
+        onDragOver={(e) => {
+          if (draggedKey) e.preventDefault();
+        }}
         onDrop={(e) => {
+          if (!draggedKey) return;
           e.preventDefault();
           setDraggedKey(null);
         }}
@@ -566,21 +570,16 @@ function StepEditor({
         {shown.map((item) => (
           <li
             key={item.key}
-            draggable={editing !== item.key}
-            onDragStart={(e) => {
-              setDraggedKey(item.key);
-              e.dataTransfer.effectAllowed = 'move';
-              e.dataTransfer.setData('text/plain', item.key);
-            }}
-            onDragEnd={() => setDraggedKey(null)}
             onDragOver={(e) => {
+              if (!draggedKey) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
             }}
             onDrop={(e) => {
+              if (!draggedKey) return;
               e.preventDefault();
               e.stopPropagation();
-              const sourceKey = draggedKey || e.dataTransfer.getData('text/plain');
+              const sourceKey = draggedKey;
               if (sourceKey && sourceKey !== item.key) {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const placeAfter = typeof e.clientY === 'number' && e.clientY > rect.top + rect.height / 2;
@@ -601,6 +600,12 @@ function StepEditor({
                 item={item}
                 edit={edit}
                 onEdit={() => setEditing(item.key)}
+                onDragStart={(e) => {
+                  setDraggedKey(item.key);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', item.key);
+                }}
+                onDragEnd={() => setDraggedKey(null)}
                 onDuplicate={() => {
                   const result = duplicateItem(layout, step.slug, item.key);
                   if (!result) return;
@@ -653,6 +658,8 @@ function ItemRow({
   item,
   edit,
   onEdit,
+  onDragStart,
+  onDragEnd,
   onDuplicate,
 }: {
   layout: WizardLayout;
@@ -660,6 +667,8 @@ function ItemRow({
   item: LayoutItem;
   edit: (fn: (l: WizardLayout) => WizardLayout) => void;
   onEdit: () => void;
+  onDragStart: (e: DragEvent<HTMLButtonElement>) => void;
+  onDragEnd: () => void;
   onDuplicate: () => void;
 }) {
   const def = builtinDef(item);
@@ -689,9 +698,9 @@ function ItemRow({
 
   return (
     <div className="flex overflow-hidden rounded-xl border border-foreground-100 bg-background-50">
-      <span className="flex w-14 shrink-0 cursor-grab items-center justify-center border-r border-foreground-100 bg-background-100/40 text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
+      <button type="button" draggable onDragStart={onDragStart} onDragEnd={onDragEnd} className="flex w-14 shrink-0 cursor-grab select-none items-center justify-center border-r border-foreground-100 bg-background-100/40 text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
         <AppIcon className="ri-drag-move-2-line text-[20px]" />
-      </span>
+      </button>
       <div className="min-w-0 flex-1 px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
