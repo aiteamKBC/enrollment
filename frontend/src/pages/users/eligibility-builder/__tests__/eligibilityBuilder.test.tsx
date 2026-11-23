@@ -161,6 +161,9 @@ describe('builder page', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderBuilder();
     const selector = await screen.findByRole('combobox', { name: 'Copy from an earlier published version' });
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Discard changes' })).toBeDisabled();
+    expect(saveEligibilityDraft).not.toHaveBeenCalled();
     fireEvent.change(selector, { target: { value: '4' } });
     fireEvent.click(screen.getByRole('button', { name: 'Copy to editor' }));
     await waitFor(() => expect(screen.getByText(/Editing an unsaved copy of v4/)).toBeInTheDocument());
@@ -436,7 +439,7 @@ describe('builder page', () => {
     await user.click(within(editor).getByRole('checkbox', { name: 'Other' }));
     await user.click(within(editor).getByRole('button', { name: /Add question/ }));
 
-    expect(screen.getByText('New — answer stored in JSONB')).toBeInTheDocument();
+    expect(screen.queryByText('New — answer stored in JSONB')).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Asked when “Please provide your residency status?” is Other' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
     expect(within(await screen.findByRole('dialog')).getByText(/New question answers will be saved/)).toBeInTheDocument();

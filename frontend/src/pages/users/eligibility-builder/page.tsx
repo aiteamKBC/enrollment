@@ -643,7 +643,6 @@ function ItemRow({
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {note ? 'Information' : item.builtin ? 'Standard question' : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
-            {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — answer stored in JSONB</span>}
             {removalProtected && (
               <span
                 className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"
