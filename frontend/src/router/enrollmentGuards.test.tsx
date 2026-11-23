@@ -30,6 +30,10 @@ it('sends Fresh apprentices to the waiting page without starting the wizard', as
   expect(await screen.findByRole('heading', { name: 'Waiting for onboarding' })).toBeInTheDocument();
   expect(state.welcome).not.toHaveBeenCalled(); expect(state.session).not.toHaveBeenCalled();
 });
+it('lets an activated Fresh apprentice start the wizard', async () => {
+  state.board.mockResolvedValue({ programme: { status: 'Fresh user', onboardingAuthorized: true } }); open();
+  expect(await screen.findByRole('heading', { name: 'Wizard entry' })).toBeInTheDocument();
+});
 it('sends Onboarding apprentices to the wizard without a Welcome API gate', async () => {
   state.board.mockResolvedValue({ programme: { status: 'Onboarding' } }); open();
   expect(await screen.findByRole('heading', { name: 'Wizard entry' })).toBeInTheDocument();
@@ -42,6 +46,13 @@ it('blocks a direct wizard URL while the apprentice is Fresh', async () => {
   </Routes></MemoryRouter>);
   expect(await screen.findByRole('heading', { name: 'Waiting for onboarding' })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Wizard entry' })).not.toBeInTheDocument();
+});
+it('allows an activated Fresh apprentice to open the wizard directly', async () => {
+  state.board.mockResolvedValue({ programme: { status: 'Fresh user', onboardingAuthorized: true } });
+  render(<MemoryRouter initialEntries={['/learner/onboarding']}><Routes>
+    <Route path="/learner/onboarding" element={<LearnerOnboardingGate><h1>Wizard entry</h1></LearnerOnboardingGate>} />
+  </Routes></MemoryRouter>);
+  expect(await screen.findByRole('heading', { name: 'Wizard entry' })).toBeInTheDocument();
 });
 it('redirects an old apprenticeship Welcome bookmark without rendering either step', async () => {
   state.board.mockResolvedValue({ programme: { status: 'Onboarding' } });
