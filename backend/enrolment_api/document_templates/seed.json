@@ -1033,6 +1033,12 @@
           "level": 2
         },
         {
+          "id": "ilr-row-2",
+          "type": "field",
+          "label": "Learner Reference Number",
+          "value": "{{document.learnerDetails.learnerReferenceNumber}}"
+        },
+        {
           "id": "ilr-row-3",
           "type": "field",
           "label": "ULN",
@@ -1171,6 +1177,12 @@
           "value": "{{document.learnerDetails.dateStatusApplies}}"
         },
         {
+          "id": "ilr-agreement-identifier",
+          "type": "field",
+          "label": "Agreement Identifier",
+          "value": "{{document.learnerDetails.agreementIdentifier}}"
+        },
+        {
           "id": "ilr-row-26",
           "type": "field",
           "label": "Job title",
@@ -1197,14 +1209,8 @@
         {
           "id": "ilr-row-30",
           "type": "field",
-          "label": "Contracted hours per week",
-          "value": "{{document.learnerDetails.contractedHoursPerWeek}}"
-        },
-        {
-          "id": "ilr-row-31",
-          "type": "field",
-          "label": "Is small employer",
-          "value": "{{document.learnerDetails.isSmallEmployer}}"
+          "label": "Working hours per week",
+          "value": "{{document.learnerDetails.workingHoursPerWeek}}"
         },
         {
           "id": "ilr-row-32",
@@ -1441,6 +1447,28 @@
           "level": 2
         },
         {
+          "id": "ilr-residence-full-time-education",
+          "type": "field",
+          "label": "Please confirm that your ordinary residence in the UK for the last 3 years has not been mainly or wholly for the purpose of full-time education.",
+          "value": "{{document.answers.additionalInformation.residenceNotForFullTimeEducation}}"
+        },
+        {
+          "id": "ilr-ehcp-sharing-note",
+          "type": "paragraph",
+          "text": "I understand that if my EHCP status affects apprenticeship funding, employer co-investment, or any related employer payment, Kent Business College may need to inform my employer that a funding exemption or adjustment applies. Kent Business College will only share the minimum necessary information and will not share my full EHCP document with my employer unless there is a clear lawful reason and I have given my explicit consent."
+        },
+        {
+          "id": "ilr-ehcp-answer",
+          "type": "field",
+          "label": "Do you currently have an Education, Health and Care Plan EHCP issued by a local authority?",
+          "value": "{{document.answers.additionalInformation.ehcp}}"
+        },
+        {
+          "id": "ilr-ehcp-use-note",
+          "type": "paragraph",
+          "text": "This EHCP information helps us confirm any funding eligibility, reasonable adjustments and learning support needs. You may be asked to provide evidence. We will handle this information confidentially and only share it where necessary, lawful and proportionate."
+        },
+        {
           "id": "ilr-row-71",
           "type": "field",
           "label": "Are you aged between 16 and 18?",
@@ -1497,13 +1525,18 @@
         {
           "id": "ilr-row-80",
           "type": "field",
-          "label": "Could you confirm whether you expect to spend more than 50% of your working hours in England?",
+          "label": "Could you confirm whether you expect to spend more than 50% of your working hours in England? (The measure of 50% should exclude any time expected to be spent outside of England in remote and/or hybrid working)",
           "value": "{{document.answers.declarations.over50PercentEngland}}"
+        },
+        {
+          "id": "ilr-minimum-wage-note",
+          "type": "paragraph",
+          "text": "Check the date-effective National Minimum Wage rates at https://www.gov.uk/national-minimum-wage-rates."
         },
         {
           "id": "ilr-row-81",
           "type": "field",
-          "label": "Please confirm your \"current wage rate per hour\" is equal to or higher than:",
+          "label": "Please confirm your \"current wage rate per hour\" is equal to or higher than the applicable minimum wage rate:",
           "value": "{{document.answers.declarations.wageRateBand}}"
         },
         {
@@ -1511,6 +1544,11 @@
           "type": "field",
           "label": "Have you ever been known by any other name?",
           "value": "{{document.answers.declarations.knownByOtherName}}"
+        },
+        {
+          "id": "ilr-plr-explanation",
+          "type": "paragraph",
+          "text": "Your personal learning record (PLR) is a permanent online record of your qualifications and achievements. Your Training Provider needs to access your PLR records to identify if you have any qualifications that could be considered as Recognised Prior Learning or exemptions."
         },
         {
           "id": "ilr-row-83",
@@ -1527,17 +1565,27 @@
         {
           "id": "ilr-learning-declaration-0",
           "type": "paragraph",
-          "text": "I confirm my agreement to share my Personal Learning Record (PLR) information with Kent Business College and other relevant bodies."
+          "text": "I confirm that, to the best of my knowledge, the information I have provided to Kent Business College in connection with my application, enrolment and apprenticeship is complete and accurate. I understand that I should notify Kent Business College promptly if any relevant information changes."
         },
         {
           "id": "ilr-learning-declaration-1",
           "type": "paragraph",
-          "text": "I understand that my programme is supported and funded by the Department of Education (DfE) on behalf of the Secretary of State. I am happy to be contacted by the relevant funding authorities in connection with this programme."
+          "text": "I understand that Kent Business College may access my Personal Learning Record (PLR), where available, for purposes connected with my education and training, including verifying my previous qualifications and achievements and supporting the assessment of prior learning."
         },
         {
           "id": "ilr-learning-declaration-2",
           "type": "paragraph",
-          "text": "I confirm all the information completed in this Application for learning document is accurate."
+          "text": "I understand that my apprenticeship is subject to the applicable apprenticeship funding rules and is funded through my employer's apprenticeship service account and/or government funding, depending on the employer's levy status and the applicable funding arrangements, as set out in the Contract of Service."
+        },
+        {
+          "id": "ilr-learning-declaration-3",
+          "type": "paragraph",
+          "text": "I understand that relevant government departments or their authorised agents may contact me in connection with the administration, assurance, research or evaluation of my apprenticeship, where permitted by law."
+        },
+        {
+          "id": "ilr-learning-declaration-4",
+          "type": "paragraph",
+          "text": "By signing this declaration, I confirm that the statements above are correct and that I understand them."
         },
         {
           "id": "signature-learner",
@@ -3034,6 +3082,12 @@
         "group": "Document",
         "format": "text"
       },
+      "document.learnerDetails.learnerReferenceNumber": {
+        "key": "document.learnerDetails.learnerReferenceNumber",
+        "label": "Learner Reference Number",
+        "group": "Document",
+        "format": "text"
+      },
       "document.learnerDetails.postcodePriorToEnrolment": {
         "key": "document.learnerDetails.postcodePriorToEnrolment",
         "label": "Postcode prior to enrolment",
@@ -3088,6 +3142,12 @@
         "group": "Document",
         "format": "date"
       },
+      "document.learnerDetails.agreementIdentifier": {
+        "key": "document.learnerDetails.agreementIdentifier",
+        "label": "Agreement Identifier",
+        "group": "Document",
+        "format": "text"
+      },
       "document.learnerDetails.jobTitle": {
         "key": "document.learnerDetails.jobTitle",
         "label": "Job title",
@@ -3112,17 +3172,11 @@
         "group": "Document",
         "format": "yesno"
       },
-      "document.learnerDetails.contractedHoursPerWeek": {
-        "key": "document.learnerDetails.contractedHoursPerWeek",
-        "label": "Contracted hours per week",
+      "document.learnerDetails.workingHoursPerWeek": {
+        "key": "document.learnerDetails.workingHoursPerWeek",
+        "label": "Working hours per week",
         "group": "Document",
         "format": "text"
-      },
-      "document.learnerDetails.isSmallEmployer": {
-        "key": "document.learnerDetails.isSmallEmployer",
-        "label": "Is small employer",
-        "group": "Document",
-        "format": "yesno"
       },
       "document.answers.contact.byPost": {
         "key": "document.answers.contact.byPost",
@@ -3292,6 +3346,18 @@
         "group": "Document",
         "format": "yesno"
       },
+      "document.answers.additionalInformation.residenceNotForFullTimeEducation": {
+        "key": "document.answers.additionalInformation.residenceNotForFullTimeEducation",
+        "label": "Residence not mainly for full-time education",
+        "group": "Document",
+        "format": "text"
+      },
+      "document.answers.additionalInformation.ehcp": {
+        "key": "document.answers.additionalInformation.ehcp",
+        "label": "Education, Health and Care Plan (EHCP)",
+        "group": "Document",
+        "format": "text"
+      },
       "document.answers.understanding.programmeUnderstanding": {
         "key": "document.answers.understanding.programmeUnderstanding",
         "label": "What is your understanding of the programme you are applying for?",
@@ -3354,13 +3420,13 @@
       },
       "document.answers.declarations.over50PercentEngland": {
         "key": "document.answers.declarations.over50PercentEngland",
-        "label": "Could you confirm whether you expect to spend more than 50% of your working hours in England?",
+        "label": "More than 50% of working hours in England (excluding remote/hybrid time outside England)",
         "group": "Document",
         "format": "yesno"
       },
       "document.answers.declarations.wageRateBand": {
         "key": "document.answers.declarations.wageRateBand",
-        "label": "Please confirm your \"current wage rate per hour\" is equal to or higher than:",
+        "label": "Current wage rate band against the applicable minimum wage rate",
         "group": "Document",
         "format": "text"
       },

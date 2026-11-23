@@ -179,7 +179,7 @@ def derive_content(learner, *, activities=False):
     employer_block = answers.get("employer") if isinstance(answers.get("employer"), dict) else {}
 
     weeks = _weeks_between(start, practical_end)
-    from enrolment_api.document_templates.learner_sources import employment_details, programme_level
+    from enrolment_api.document_templates.learner_sources import employment_details, programme_level, working_hours_per_week
     ilr_details = employment_details(learner)
 
     programme = {
@@ -203,7 +203,7 @@ def derive_content(learner, *, activities=False):
         "employerName": _s(learner.employer) or _s(employer_block.get("organisationName")),
         "deliveryAddress": _employer_address(learner) or _s(employer_block.get("address")),
         "jobTitle": _s(getattr(ilr_details, 'job_title', '')),
-        "workingHoursPerWeek": _s(getattr(ilr_details, 'working_hours_per_week', None)),
+        "workingHoursPerWeek": working_hours_per_week(ilr_details),
         "lineManager": _s(learner.line_manager) or _s(employer_block.get("lineManagerName")),
         "lineManagerTitle": "",
         "startDateWithEmployer": _iso(getattr(ilr_details, 'employment_start_date', None)),

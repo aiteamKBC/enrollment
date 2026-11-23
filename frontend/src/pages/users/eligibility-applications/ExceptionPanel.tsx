@@ -31,10 +31,9 @@ export function ExceptionPanel({ applicationId, email }: { applicationId: string
     setError(''); setResult(''); setSaving(true);
     try {
       const outcome = await approveEligibilityException(applicationId, reason.trim(), confirmedEmail.trim());
-      setResult(outcome.message || (outcome.invitation === 'alreadySent'
-        ? 'The learner is linked and an invitation has already been sent.' : 'The learner is linked.'));
+      setResult(outcome.message || 'Exception saved.');
       setPreview(current => current && { ...current, linkedLearnerId: outcome.learnerId,
-        overrideReason: reason.trim(), activationVerified: outcome.invitation === 'alreadyActivated' });
+        overrideReason: reason.trim(), activationVerified: false });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not approve the exception.');
     } finally {
@@ -51,14 +50,14 @@ export function ExceptionPanel({ applicationId, email }: { applicationId: string
       {preview && <div className="mt-4 space-y-3">
         {preview.linkedLearnerId && <p className="text-sm">Linked learner ID: {preview.linkedLearnerId}{preview.activationVerified ? ' · Account activated' : ' · Awaiting activation'}</p>}
         <p className="text-sm">{preview.existingLearner
-          ? `Existing apprenticeship learner: ${preview.existingLearner.name} (${preview.existingLearner.email}). This account will be linked.`
-          : 'No learner has this email. A new apprenticeship learner will be created and linked.'}</p>
+          ? `Existing apprenticeship learner: ${preview.existingLearner.name} (${preview.existingLearner.email}). Resolve the existing account before approving an exception.`
+          : 'The learner and login account will be created when the invitation is accepted.'}</p>
         {!result && <form onSubmit={approve} className="space-y-3">
           <div><label htmlFor="exception-reason" className="mb-1 block text-sm font-medium">Reason for exception</label>
             <textarea id="exception-reason" className={inputClass} rows={3} minLength={10} maxLength={1000} required value={reason} onChange={e => setReason(e.target.value)} /></div>
           <div><label htmlFor="exception-email" className="mb-1 block text-sm font-medium">Confirm applicant email: {email}</label>
             <input id="exception-email" className={inputClass} type="email" autoComplete="off" required value={confirmedEmail} onChange={e => setConfirmedEmail(e.target.value)} /></div>
-          <button type="submit" className={btnPrimary} disabled={saving || reason.trim().length < 10 || confirmedEmail.trim().toLowerCase() !== email.trim().toLowerCase()}>
+          <button type="submit" className={btnPrimary} disabled={saving || !!preview.existingLearner || reason.trim().length < 10 || confirmedEmail.trim().toLowerCase() !== email.trim().toLowerCase()}>
             {saving ? 'Saving…' : 'Approve exception and invite learner'}
           </button>
         </form>}

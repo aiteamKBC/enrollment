@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { clearAllCachedResources } from '@/api/cachedRequest';
-import { analyseSuitabilityRplEvidence, fetchSuitabilityRplIssuedDocuments, fetchSuitabilityRplSignatures, saveSuitabilityRplReport, signSuitabilityRplReport, SuitabilityRplRequestError } from '../suitabilityRplReport';
+import { analyseSuitabilityRplEvidence, fetchSuitabilityRplIssuedDocuments, fetchSuitabilityRplSignatures, previewSuitabilityRplReport, saveSuitabilityRplReport, signSuitabilityRplReport, SuitabilityRplRequestError } from '../suitabilityRplReport';
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
   status,
@@ -61,6 +61,24 @@ it('preserves gateway status so finalisation can reconcile a committed write', a
     rplJustification: 'Full programme', rplReviewed: true, cvExtractionAcknowledged: false,
     cvExtractionAcknowledgementReason: '', reductions: [], revision: 9, finalise: true,
   })).rejects.toMatchObject({ status: 502 } as Partial<SuitabilityRplRequestError>);
+});
+
+it('uses the canonical server PDF endpoint for draft preview data', async () => {
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => url.includes('enrollment-csrf')
+    ? json({ csrfToken: 'synthetic-csrf' })
+    : new Response('%PDF-1.7\ncanonical', { status: 200, headers: { 'Content-Type': 'application/pdf' } }));
+  vi.stubGlobal('fetch', fetcher);
+  const payload = {
+    relevantPriorLearning: false, reductionJustified: false, assessorEvidenceReview: '', noReductionReason: '',
+    suitabilityOutcome: 'suitable' as const, finalSummary: 'Proceed.', suitabilityJustification: 'Suitable.', suitabilityReviewed: true,
+    rplJustification: 'Full programme.', rplReviewed: true, reductions: [], revision: 2, finalise: false,
+  };
+  const pdf = await previewSuitabilityRplReport('apprenticeship', '1601', payload);
+  expect(pdf.type).toContain('application/pdf');
+  const request = fetcher.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+  expect(request?.[0]).toContain('/suitability-rpl/preview-pdf/');
+  expect((request?.[1] as RequestInit).headers).toMatchObject({ 'X-CSRFToken': 'synthetic-csrf' });
+  expect(JSON.parse(String((request?.[1] as RequestInit).body))).toMatchObject({ finalSummary: 'Proceed.', revision: 2 });
 });
 
 it('reads and posts signatures against the immutable issued report URL', async () => {

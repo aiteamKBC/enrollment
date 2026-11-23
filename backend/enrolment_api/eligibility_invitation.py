@@ -1,20 +1,7 @@
-"""Turn an eligible apprenticeship application into a learner with an invitation.
+"""Stage an invitation for an eligible application without creating an account.
 
-Called by the public eligibility form (eligibility_form.submit_application)
-once initial screening finds the applicant eligible. It creates the
-apprenticeship learner in enrolment."Created_users" from the answers, provisions
-their login account and emails the set-password invitation
-(login.services.invite_eligible_applicant).
-
-An address that already has a learner record or a login account is never
-re-created or re-invited: the applicant is told to sign in, or to use Forgot
-password, which sends a learner who never set a password their invitation
-(login.services.request_password_link). That also means the form sends any one
-address at most one invitation.
-
-The application programme stays on the application only. Enrolment programme
-selection and delivery placement remain independent. For linked applications,
-account and provenance commit together before invitation delivery is attempted.
+The learner and login account are created together when the invitation is
+accepted. Existing addresses are not re-created by public submissions.
 """
 import logging
 
@@ -75,7 +62,7 @@ def learner_fields(row):
 
 
 def invite_applicant(row, *, application_id=None, ip=None, user_agent=None):
-    """Create the learner for an eligible application and invite them.
+    """Invite an eligible applicant without creating their learner account yet.
 
     Returns one of the outcomes above. Never raises: the application itself is
     already saved, so a failure here is reported, not thrown.
@@ -85,53 +72,19 @@ def invite_applicant(row, *, application_id=None, ip=None, user_agent=None):
     ):
         return "pendingAssessment" if row.get("assessment_status") == "pending_assessment" else "notEligible"
 
-    from learner_api.learner_progression import advance_learner
-    from learner_api.models import EnrolmentUser
-    from login.identity import AccountError
-    from login.services import invite_eligible_applicant
-
     try:
         if has_account(row["work_email"]):
             return EXISTING_ACCOUNT
         with transaction.atomic(using="enrolment"):
-            from .organisation_matching import resolve_application_organisation
-
-            organisation = resolve_application_organisation(row)
-            fields = learner_fields(row)
-            fields["organisation_id"] = organisation.pk
-            fields["organization"] = organisation.name
-            learner = EnrolmentUser.all_learners.create(**fields)
-            if application_id is not None:
-                from login.identity import ensure_account
-                from . import eligibility_link
-                account, created = ensure_account('learner', learner.pk, subject=learner)
-                if not created or account.subject_type != 'learner' or account.subject_id != learner.pk:
-                    # Never claim a different existing identity on an email match.
-                    raise IntegrityError('Eligibility identity already exists')
-                eligibility_link.add_link(application_id, learner.pk)
-                result = {'outcome': INVITE_PENDING}
-                def deliver():
-                    result['outcome'] = eligibility_link.dispatch(application_id, ip=ip, user_agent=user_agent)
-                transaction.on_commit(deliver, using='enrolment')
-        if application_id is not None:
-            return result['outcome']
+            from . import eligibility_link
+            eligibility_link.add_link(application_id, None)
+            result = {'outcome': INVITE_PENDING}
+            def deliver():
+                result['outcome'] = eligibility_link.dispatch(application_id, ip=ip, user_agent=user_agent)
+            transaction.on_commit(deliver, using='enrolment')
+        return result['outcome']
     except IntegrityError:
-        # The unique email index: the same address was submitted twice at once.
         return EXISTING_ACCOUNT
-    except (DatabaseError, AccountError, ValueError):
-        logger.exception("Could not create the learner for an eligible application")
+    except (DatabaseError, ValueError):
+        logger.exception("Could not stage an eligibility invitation")
         return RETRY_LATER
-
-    advance_learner(learner)
-    try:
-        sent, detail = invite_eligible_applicant(learner, ip=ip, user_agent=user_agent)
-    except (AccountError, DatabaseError):
-        logger.exception("Could not invite learner %s from the eligibility form", learner.id)
-        return INVITE_PENDING
-    if detail == "existing-account":
-        return EXISTING_ACCOUNT
-    if not sent:
-        logger.warning("Invitation for learner %s from the eligibility form was not sent: %s", learner.id, detail)
-        return INVITE_PENDING
-    logger.info("Learner %s created and invited from the eligibility form", learner.id)
-    return INVITED

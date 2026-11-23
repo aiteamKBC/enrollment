@@ -11,6 +11,7 @@ import { COUNTRY_OPTIONS } from '@/lib/countries';
 import { StepItems, type ItemRenderer } from '../layout/StepItems';
 import { useStepTitle } from '../layout/useLayout';
 import { useText } from '../layout/textsContext';
+import { useAuth } from '@/hooks/useAuth.helpers';
 import { RichText } from '../layout/RichText';
 import type { IlrLearnerDetails as IlrLearnerDetailsState } from '../../types';
 import EnrolmentSignature from './EnrolmentSignature';
@@ -64,12 +65,14 @@ function displayDate(value: string): string {
 }
 
 export default function IlrLearnerDetails() {
+  const { auth } = useAuth();
   const { userId, isCommercial, draft, setSection, board, layout, ilrFinalisedAt, ilrLegacyReadOnly, readOnly } = useWizard();
   const locked = Boolean((ilrFinalisedAt || ilrLegacyReadOnly) && !isCommercial && !readOnly);
   const title = useStepTitle('ilr-details', 'ILR');
   const t = useText();
   const missing = useMissingCheck();
   const d = draft.ilrDetails;
+  const isStaff = auth.account?.role === 'staff' || auth.account?.role === 'admin';
   const set = (patch: Partial<IlrLearnerDetailsState>) => setSection('ilrDetails', { ...d, ...patch });
 
   const [record, setRecord] = useState<IlrLearnerRecord | null>(null);
@@ -380,6 +383,12 @@ export default function IlrLearnerDetails() {
     'ild.employmentStatus': ({ required }) => (
       <>
         <LabeledSelect label={t('ild.employmentStatus.label')} missingKey="Employment status" required={required} value={d.employmentStatus} options={labels(EMPLOYMENT_STATUS_OPTIONS)} onChange={changeEmploymentStatus} />
+        {isStaff && <LabeledInput
+          label="Date Status Applies"
+          type="date"
+          value={d.dateStatusApplies ?? ''}
+          onChange={(value) => set({ dateStatusApplies: value })}
+        />}
         {inPaidEmployment && (
           <>
             <LabeledInput
@@ -392,6 +401,15 @@ export default function IlrLearnerDetails() {
             />
             <LabeledInput label={t('ild.employmentStatus.jobTitle')} value={d.jobTitle ?? ''} onChange={(v) => set({ jobTitle: v })} />
             <YesNoRadio legend={t('ild.employmentStatus.selfEmployed')} name="ilr-self-employed" value={d.selfEmployed ?? null} onChange={(v) => set({ selfEmployed: v })} />
+            {isStaff && <>
+              <LabeledInput
+                label="Agreement Identifier"
+                value={d.agreementIdentifier ?? ''}
+                onChange={(value) => set({ agreementIdentifier: value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7) })}
+              />
+              <LabeledInput label="EDRS/ERN number (from organisation)" value={d.edrsErn ?? ''} onChange={noop} readOnly />
+              <p className="mb-4 text-[12px] text-foreground-600">These official ILR values are staff-managed. If Agreement Identifier is blank, the valid value on the linked organisation is used. A new effective date creates a new history record; earlier records are not overwritten.</p>
+            </>}
           </>
         )}
       </>

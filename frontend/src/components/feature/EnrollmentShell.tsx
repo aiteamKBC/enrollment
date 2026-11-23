@@ -47,7 +47,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
     ['/users', 'Users'], ['/users/eligibility-applications', 'Eligibility Applications'],
     ['/users/eligibility-builder', 'Eligibility Form Builder'], ['/users/wizard-builder', 'Enrolment Form Builder'],
     ...((isAdmin || auth.account?.role === 'admin') ? [['/users/programme-structure', 'Programme Structure']] : []),
-    ['/users/compliance-documents', 'Documents'], ...(auth.account?.role === 'admin' ? [['/admin/suitability-rpl-report', 'Report Templates']] : []),
+    ['/users/compliance-documents', 'Documents'],
     ['/users/coach-directory', 'Coach Directory'], ['/users/first-sessions', 'First-Session Bookings'], ['/lms', 'Open LMS'],
     ...(auth.account && hasOwnEnrolment(auth.account) ? [['/learner/home?self=1', 'My enrolment']] : []),
   ];

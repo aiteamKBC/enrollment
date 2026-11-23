@@ -154,6 +154,7 @@ def to_edit_fields(u):
         # on it, because two employers can share a name.
         "employerId": u.employer_id,
         "organisationId": getattr(u, "organisation_id", None),
+        "learnerReferenceNumber": _s(getattr(u, "reference_number", "")),
         "organization": _s(u.organization),
         "lineManager": _s(u.line_manager),
         "learnerType": _s(getattr(u, "learner_type", "")) or "apprenticeship",
@@ -428,6 +429,7 @@ def to_board(u):
     # learner_api.models, so a top-level import would be circular.
     from .board_wizard import fmt_date, merge_wizard_sections, record_address, saved_signature
     from programme_suitability.home_cohort import home_cohort_for_board
+    from enrolment_api.eligibility_link import may_enter_onboarding
 
     home_cohort = home_cohort_for_board(u)
     resolved_home = home_cohort if home_cohort and home_cohort['status'] == 'resolved' else {}
@@ -498,6 +500,10 @@ def to_board(u):
             "cohort": resolved_home.get('name') or _s(u.cohort),
             "homeCohort": home_cohort,
             "status": programme_status(u) or DEFAULT_PROGRAMME_STATUS,
+            "onboardingAuthorized": (may_enter_onboarding(u.pk)
+                if str(getattr(u, 'learner_type', '')).lower() == 'apprenticeship'
+                and (programme_status(u) or DEFAULT_PROGRAMME_STATUS).lower() == 'fresh user'
+                else True),
             # Cohort dates, matched from curriculum.cohort_authoring_details.
             # apprenticeship_end_date is the learner's own override and only
             # applies when it's set, so the cohort end date is the fallback.
@@ -605,6 +611,7 @@ WRITABLE_FIELDS = {
     "employer": "employer",
     "organization": "organization",
     "reference": "organization",
+    "learnerReferenceNumber": "reference_number",
     "lineManager": "line_manager",
     "onboardingStatus": "onboarding_status",
     "onboardingCompleted": "onboarding_completed",
@@ -905,6 +912,12 @@ def write_fields(payload, *, require_create=False):
         if key in payload:
             val = payload[key]
             fields[attr] = None if val is None else str(val).strip()
+    if "learnerReferenceNumber" in payload:
+        reference = _s(payload.get("learnerReferenceNumber"))
+        if reference and not re.fullmatch(r"[A-Za-z0-9 ]{1,12}", reference):
+            raise ValidationError(
+                "Learner Reference Number must be 1-12 letters, numbers or spaces."
+            )
     for key, attr in APTEM_BOOL_FIELDS.items():
         if key in payload:
             fields[attr] = _bool_or_none(payload[key])
@@ -1404,6 +1417,9 @@ def to_organisation_row(o):
     """An organisation, shaped for the list table and the Employer Group picker."""
     return {
         "id": str(o.id),
+        "mergedIntoOrganisationId": str(o.merged_into_organisation_id) if o.merged_into_organisation_id else None,
+        "mergedAt": o.merged_at.isoformat() if o.merged_at else None,
+        "potentialMatchIds": o.potential_match_ids or [],
         "status": _s(o.status),
         "name": _s(o.name),
         "owner": _s(o.owner),
@@ -1460,6 +1476,14 @@ def write_organisation_fields(payload, *, require_create=False):
         if key in payload:
             val = payload[key]
             fields[attr] = None if val is None else str(val).strip()
+    if "edrsErnNumber" in payload:
+        employer_identifier = _s(payload.get("edrsErnNumber"))
+        if employer_identifier and not re.fullmatch(r"[0-9]{9}", employer_identifier):
+            raise ValidationError("EDRS/ERN number must contain exactly 9 digits.")
+    if "apprenticeshipAgreementId" in payload:
+        agreement = _s(payload.get("apprenticeshipAgreementId"))
+        if agreement and not re.fullmatch(r"[A-Za-z0-9]{1,7}", agreement):
+            raise ValidationError("Apprenticeship agreement id must be 1-7 alphanumeric characters.")
     if "workingHours" in payload:
         fields["working_hours"] = _working_hours(payload["workingHours"])
     # A boolean, so it bypasses the string-coercing loop above.

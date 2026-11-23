@@ -172,10 +172,12 @@ class EligibilityApplicationsTests(SimpleTestCase):
         self.assertNotIn("SELECT *", sql)
         self.assertTrue(all(not guard.called for guard in self.guards))
 
-    def test_projection_tolerates_legacy_schema_and_limits_json_function_arguments(self):
+    def test_projection_reads_answers_from_jsonb_without_legacy_fallback(self):
         projection = api._projection(api.DETAIL_COLUMNS, outcome=True)
         self.assertIn("to_jsonb(a)->'assessment_status'", projection)
-        self.assertNotIn("a.assessment_status", projection)
+        self.assertIn("a.answers->'employer_name'", projection)
+        self.assertNotIn("COALESCE(a.answers", projection)
+        self.assertNotIn("to_jsonb(a)->'employer_name'", projection)
         self.assertIn(" || ", projection)
         self.cursor = ReadCursor([{**PENDING, "assessment_status": None, "workplace_arrangement": None,
                                    "eligible": True, "invitation_outcome": None}])

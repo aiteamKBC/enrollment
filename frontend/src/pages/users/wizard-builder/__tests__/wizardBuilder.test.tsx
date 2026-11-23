@@ -128,7 +128,7 @@ const dragFieldBefore = (sourceLabel: string, targetLabel: string) => {
   const source = screen.getByText(sourceLabel).closest('li')!;
   const target = screen.getByText(targetLabel).closest('li')!;
   const dataTransfer = { effectAllowed: '', dropEffect: '', setData: vi.fn(), getData: vi.fn(() => sourceLabel) };
-  fireEvent.dragStart(source, { dataTransfer });
+  fireEvent.dragStart(within(source).getByRole('button', { name: `Drag ${sourceLabel} to reorder` }), { dataTransfer });
   fireEvent.drop(target, { dataTransfer });
 };
 
@@ -492,7 +492,13 @@ describe('the builder page', () => {
     const source = screen.getAllByText('Copy me')[1].closest('li')!;
     const target = screen.getByText('CV upload').closest('li')!;
     const dataTransfer = { effectAllowed: '', dropEffect: '', setData: vi.fn(), getData: vi.fn(() => source.querySelector('p')?.textContent ?? '') };
-    fireEvent.dragStart(source, { dataTransfer });
+    const handle = within(source).getByRole('button', { name: 'Drag Copy me to reorder' });
+    expect(source).not.toHaveAttribute('draggable');
+    expect(handle).toHaveAttribute('draggable', 'true');
+    fireEvent.dragStart(source.querySelector('p')!, { dataTransfer });
+    expect(dataTransfer.setData).not.toHaveBeenCalled();
+    fireEvent.dragStart(handle, { dataTransfer });
+    expect(dataTransfer.setData).toHaveBeenCalledWith('text/plain', expect.any(String));
     fireEvent.drop(target, { dataTransfer });
     expect(Array.from(list.querySelectorAll(':scope > li')).findIndex((li) => li.textContent?.includes('Copy me')))
       .toBeLessThan(Array.from(list.querySelectorAll(':scope > li')).findIndex((li) => li.textContent?.includes('CV upload')));

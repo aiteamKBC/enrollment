@@ -70,6 +70,8 @@ export interface EligibilityLayout {
   texts?: Record<string, string>;
   /** Staff-only HTML for the eligible applicant's activation email introduction. */
   activationEmailHtml?: string;
+  /** Staff draft metadata; removed when the layout is published. */
+  copiedFromVersion?: number;
 }
 
 /** What the layout endpoints return. `layout` is null until one is published; the public one carries no names. */
@@ -79,4 +81,13 @@ export interface EligibilityLayoutResponse {
   version: number | null;
   updatedAt?: string;
   updatedBy?: string;
+  draft?: { id: number; layout: EligibilityLayout; updatedAt: string; updatedBy: string } | null;
+  versions?: EligibilityPublishedVersion[];
+}
+
+export interface EligibilityPublishedVersion {
+  version: number;
+  status: 'published' | 'archived';
+  publishedAt: string;
+  publishedBy: string;
 }

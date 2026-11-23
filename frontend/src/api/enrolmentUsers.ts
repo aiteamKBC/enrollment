@@ -48,6 +48,8 @@ export const PROGRAMME_STATUS_OPTIONS = [
  * in backend/learner_api/mappers.py).
  */
 export interface AptemUserFields {
+  /** Staff-assigned ILR LearnRefNumber; never derived from Aptem or a database id. */
+  learnerReferenceNumber?: string;
   title?: string;
   preferredName?: string;
   gender?: string;

@@ -27,13 +27,10 @@ slots in layout["texts"]; which slots exist is the frontend registry's business
 (pages/apprenticeship-application/layout/registry.ts), so only their shape is
 checked here.
 
-Each custom question gets a custom_* column in enrolment.eligibility_form, added
-by the publish in the same transaction as the layout row, so a layout can never
-name a column that does not exist. The server chooses every column name, and a
-question keeps its column and type once published: removing it only hides it,
-and a layout that leaves a published question out gets it back, hidden. Heading
-and description blocks are stored in the layout JSON and do not collect answers.
-Nothing here ever drops a column.
+Each custom question keeps a stable custom_* answer key in the application's
+answers JSONB object. Publishing never adds a per-question SQL column. Removing
+a question hides it from later forms without deleting historical answers.
+Heading and description blocks are stored in layout JSON and collect no answer.
 
 Publishing is for staff with enrolment access (auth.py). The public form reads
 the layout in force through the public endpoint, which carries no names.
@@ -159,7 +156,8 @@ def read_current(cursor):
     if cursor.fetchone()[0] is None:
         return None
     cursor.execute(
-        f'SELECT id, "Layout", "Created_at", "Created_by" FROM enrolment."{LAYOUT_TABLE}" ORDER BY id DESC LIMIT 1'
+        f'''SELECT id, "Layout", "Created_at", "Created_by" FROM enrolment."{LAYOUT_TABLE}"
+            WHERE status='published' ORDER BY id DESC LIMIT 1'''
     )
     row = cursor.fetchone()
     if row is None:
@@ -170,19 +168,72 @@ def read_current(cursor):
     return row[0], layout, row[2], row[3]
 
 
+def read_draft(cursor):
+    cursor.execute(
+        f'''SELECT id, "Layout", updated_at, updated_by FROM enrolment."{LAYOUT_TABLE}"
+            WHERE status='draft' ORDER BY id DESC LIMIT 1'''
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    layout = json.loads(row[1]) if isinstance(row[1], str) else row[1]
+    return {"id": row[0], "layout": layout, **_workplace_feature(),
+            "updatedAt": row[2].isoformat() if row[2] else "", "updatedBy": row[3] or ""}
+
+
+def list_published_versions(cursor):
+    """List only versions that were published; archived drafts are not history."""
+    cursor.execute(
+        f'''SELECT id, status, published_at, "Created_by"
+            FROM enrolment."{LAYOUT_TABLE}"
+            WHERE status='published' OR (status='archived' AND published_at IS NOT NULL)
+            ORDER BY id DESC'''
+    )
+    return [{"version": row[0], "status": row[1],
+             "publishedAt": row[2].isoformat() if row[2] else "",
+             "publishedBy": row[3] or ""} for row in cursor.fetchall()]
+
+
+def read_published_version(cursor, version):
+    """Read an immutable published layout, including one since archived."""
+    cursor.execute(
+        f'''SELECT id, "Layout", status FROM enrolment."{LAYOUT_TABLE}"
+            WHERE id=%s AND (status='published' OR (status='archived' AND published_at IS NOT NULL))''',
+        [version],
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    layout = json.loads(row[1]) if isinstance(row[1], str) else row[1]
+    return {"version": row[0], "layout": layout, "status": row[2], **_workplace_feature()}
+
+
+def _copied_source(cursor, raw):
+    """Resolve private draft provenance before normalizing historical fields."""
+    if not isinstance(raw, dict) or "copiedFromVersion" not in raw:
+        return None
+    version = raw["copiedFromVersion"]
+    if type(version) is not int or version <= 0:
+        raise LayoutError("Invalid copied version.")
+    saved = read_published_version(cursor, version)
+    if saved is None:
+        raise LayoutError("The copied published version is unavailable.")
+    return saved["layout"]
+
+
 def activation_email_for_application(application_id=None):
     """Use the submitted version's email, or the latest published email for legacy forms."""
     with connections[CONN].cursor() as cursor:
         if application_id is None:
             cursor.execute(
                 f'''SELECT "Layout"->>'activationEmailHtml' FROM enrolment."{LAYOUT_TABLE}"
-                    WHERE "Layout" ? 'activationEmailHtml' ORDER BY id DESC LIMIT 1'''
+                    WHERE status='published' AND "Layout" ? 'activationEmailHtml' ORDER BY id DESC LIMIT 1'''
             )
         else:
             cursor.execute(
                 f'''SELECT COALESCE(l."Layout"->>'activationEmailHtml',
                     (SELECT "Layout"->>'activationEmailHtml' FROM enrolment."{LAYOUT_TABLE}"
-                     WHERE "Layout" ? 'activationEmailHtml' ORDER BY id DESC LIMIT 1))
+                     WHERE status='published' AND "Layout" ? 'activationEmailHtml' ORDER BY id DESC LIMIT 1))
                     FROM enrolment.eligibility_form AS a
                     LEFT JOIN enrolment."{LAYOUT_TABLE}" AS l ON l.id = a.layout_version
                     WHERE a.id = %s''',
@@ -640,7 +691,7 @@ def _check_locked(sections):
                 raise LayoutError(f"'{item['label']}' affects eligibility, so it must stay on the form.")
 
 
-def normalize_layout(raw, previous):
+def normalize_layout(raw, previous, historical=None):
     """Validate `raw` against the previous layout and assign storage.
 
     Returns (layout, columns): the cleaned layout to store, and the custom
@@ -656,6 +707,10 @@ def normalize_layout(raw, previous):
 
     raw = structured_address_layout(raw)
     prev_custom = custom_questions(previous)
+    # A copy of an older published version may contain questions removed from
+    # the current form. Reuse their original keys so stored answers still match.
+    for key, item in custom_questions(historical).items():
+        prev_custom.setdefault(key, item)
     prev_sections = {
         s.get("slug") for s in (previous or {}).get("sections") or [] if isinstance(s, dict) and not s.get("builtin")
     }
@@ -743,18 +798,6 @@ def normalize_layout(raw, previous):
 # ── views ────────────────────────────────────────────────────────────────────
 
 
-def ensure_layout_table(cursor):
-    cursor.execute("CREATE SCHEMA IF NOT EXISTS enrolment")
-    cursor.execute(
-        f'''CREATE TABLE IF NOT EXISTS enrolment."{LAYOUT_TABLE}" (
-            id           bigserial PRIMARY KEY,
-            "Layout"     jsonb NOT NULL,
-            "Created_by" text,
-            "Created_at" timestamptz NOT NULL DEFAULT now()
-        )'''
-    )
-
-
 def public_eligibility_form_layout(request):
     """The form in force, for /apprenticeship_application. No sign-in, no names."""
     if request.method != "GET":
@@ -779,10 +822,25 @@ def eligibility_form_layout(request):
         return _error("Method not allowed.", 405)
     try:
         with connections[CONN].cursor() as cursor:
-            return JsonResponse(_payload(read_current(cursor)))
+            return JsonResponse({**_payload(read_current(cursor)), "draft": read_draft(cursor),
+                                 "versions": list_published_versions(cursor)})
     except DatabaseError as exc:
         logger.warning("Could not read the eligibility form layout: %s", exc)
         return _error("Could not load the eligibility form.", 502)
+
+
+@enrolment_login_required
+def eligibility_form_layout_version(request, version):
+    """Fetch an earlier published version for copying into the editable draft."""
+    if request.method != "GET":
+        return _error("Method not allowed.", 405)
+    try:
+        with connections[CONN].cursor() as cursor:
+            saved = read_published_version(cursor, version)
+    except DatabaseError:
+        logger.exception("Could not load eligibility form version %s", version)
+        return _error("Could not load the eligibility form version.", 503)
+    return JsonResponse(saved) if saved else _error("Published version not found.", 404)
 
 
 @enrolment_login_required
@@ -810,7 +868,6 @@ def publish_eligibility_form_layout(request):
     try:
         with transaction.atomic(using=CONN):
             with connections[CONN].cursor() as cursor:
-                ensure_layout_table(cursor)
                 # One publish at a time, so two admins cannot both pass the
                 # version check below and the later one silently win.
                 cursor.execute(f'LOCK TABLE enrolment."{LAYOUT_TABLE}" IN SHARE ROW EXCLUSIVE MODE')
@@ -822,20 +879,85 @@ def publish_eligibility_form_layout(request):
                         "Reload the builder to see their changes, then make yours again.",
                         409,
                     )
-                layout, columns = normalize_layout(body.get("layout"), current[1] if current else None)
-                form.ensure_table(cursor)
-                form.upgrade_table(cursor)
-                form.add_custom_columns(cursor, columns)
+                raw_layout = body.get("layout")
+                historical = _copied_source(cursor, raw_layout)
+                layout, _columns = normalize_layout(raw_layout, current[1] if current else None, historical)
+                # Custom answers live in eligibility_form.answers JSONB; publishing
+                # never adds one SQL column per question.
                 cursor.execute(
-                    f'INSERT INTO enrolment."{LAYOUT_TABLE}" ("Layout", "Created_by") VALUES (%s::jsonb, %s) '
+                    f'''UPDATE enrolment."{LAYOUT_TABLE}" SET status='archived', archived_at=now(),
+                        updated_at=now(), updated_by=%s WHERE status='published' ''',
+                    [_actor(request)],
+                )
+                cursor.execute(
+                    f'''UPDATE enrolment."{LAYOUT_TABLE}" SET status='archived', archived_at=now(),
+                        updated_at=now(), updated_by=%s WHERE status='draft' ''', [_actor(request)]
+                )
+                cursor.execute(
+                    f'''INSERT INTO enrolment."{LAYOUT_TABLE}" ("Layout", "Created_by", status, published_at)
+                        VALUES (%s::jsonb, %s, 'published', now()) '''
                     'RETURNING id, "Created_at"',
                     [json.dumps(layout), _actor(request)],
                 )
                 version, created_at = cursor.fetchone()
     except LayoutError as exc:
         return _error(str(exc), 400)
-    except DatabaseError as exc:
-        logger.warning("Could not publish the eligibility form layout: %s", exc)
-        return _error(f"Could not publish the eligibility form: {exc}", 502)
+    except DatabaseError:
+        logger.exception("Could not publish the eligibility form layout")
+        return _error("Could not publish the eligibility form. Please try again.", 502)
 
     return JsonResponse(_payload((version, layout, created_at, _actor(request))))
+
+
+@enrolment_login_required
+@csrf_exempt
+def eligibility_form_draft(request):
+    """Save or archive the one editable draft; published rows stay immutable."""
+    if request.method not in ("PUT", "DELETE"):
+        return _error("Method not allowed.", 405)
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return _error("Missing X-Requested-With header.", 403)
+    if len(request.body) > MAX_LAYOUT_BYTES:
+        return _error("Layout too large.", 413)
+    try:
+        body = json.loads(request.body or b'{}')
+        if not isinstance(body, dict):
+            raise ValueError("Invalid draft request.")
+        draft_id = body.get("draftId")
+        if draft_id is not None and (type(draft_id) is not int or draft_id <= 0):
+            raise ValueError("Invalid draft version.")
+        base_version = body.get("baseVersion")
+        if base_version is not None and (type(base_version) is not int or base_version <= 0):
+            raise ValueError("Invalid published version.")
+        with transaction.atomic(using=CONN), connections[CONN].cursor() as cursor:
+            cursor.execute(f'LOCK TABLE enrolment."{LAYOUT_TABLE}" IN SHARE ROW EXCLUSIVE MODE')
+            current = read_current(cursor)
+            draft = read_draft(cursor)
+            if (current[0] if current else None) != base_version or (draft["id"] if draft else None) != draft_id:
+                return _error("The form changed since you opened it. Reload before saving.", 409)
+            if request.method == "DELETE":
+                if draft:
+                    cursor.execute(f'''UPDATE enrolment."{LAYOUT_TABLE}" SET status='archived', archived_at=now(),
+                        updated_at=now(), updated_by=%s WHERE id=%s AND status='draft' ''',
+                        [_actor(request), draft_id])
+                return JsonResponse({"draft": None})
+            raw_layout = body.get("layout")
+            historical = _copied_source(cursor, raw_layout)
+            layout, _ = normalize_layout(raw_layout, current[1] if current else None, historical)
+            if historical is not None:
+                layout["copiedFromVersion"] = raw_layout["copiedFromVersion"]
+            if draft:
+                cursor.execute(f'''UPDATE enrolment."{LAYOUT_TABLE}" SET "Layout"=%s::jsonb,
+                    updated_at=now(), updated_by=%s WHERE id=%s AND status='draft' ''',
+                    [json.dumps(layout), _actor(request), draft_id])
+            else:
+                cursor.execute(f'''INSERT INTO enrolment."{LAYOUT_TABLE}"
+                    ("Layout", "Created_by", status, updated_at, updated_by)
+                    VALUES (%s::jsonb, %s, 'draft', now(), %s)''',
+                    [json.dumps(layout), _actor(request), _actor(request)])
+            return JsonResponse({"draft": read_draft(cursor)})
+    except (ValueError, LayoutError) as exc:
+        return _error(str(exc), 400)
+    except DatabaseError:
+        logger.exception("Could not save the eligibility form draft")
+        return _error("Could not save the eligibility form draft.", 503)

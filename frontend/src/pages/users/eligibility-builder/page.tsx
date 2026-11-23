@@ -5,7 +5,7 @@ import { AppIcon } from '@/components/feature/AppIcon';
 import './eligibilityBuilder.css';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
-import { fetchEligibilityLayout, publishEligibilityLayout } from '@/api/eligibilityFormLayout';
+import { archiveEligibilityDraft, fetchEligibilityLayout, fetchEligibilityVersion, publishEligibilityLayout, saveEligibilityDraft } from '@/api/eligibilityFormLayout';
 import {
   BUILTIN_ITEMS,
   ITEM_TEXT_SLOTS,
@@ -19,7 +19,7 @@ import {
   textFor,
 } from '@/pages/apprenticeship-application/layout/registry';
 import { builtinOptions, isLocked, isRemovalProtected, itemLabel, resolveLayout, sectionDescription } from '@/pages/apprenticeship-application/layout/resolve';
-import { QUESTION_TYPES, type EligibilityItem, type EligibilityLayout, type EligibilitySection } from '@/pages/apprenticeship-application/layout/types';
+import { QUESTION_TYPES, type EligibilityItem, type EligibilityLayout, type EligibilityPublishedVersion, type EligibilitySection } from '@/pages/apprenticeship-application/layout/types';
 import { btnPrimary, btnSecondary, iconBtn, inputClass } from '../components/ui';
 import { TextEditor } from '../wizard-builder/TextEditor';
 import { OptionsEditor } from './OptionsEditor';
@@ -31,7 +31,6 @@ import {
   moveItem,
   moveItemToSection,
   moveSection,
-  pendingColumns,
   problems,
   removeItem,
   saveCustomQuestion,
@@ -55,10 +54,8 @@ const clone = (layout: EligibilityLayout): EligibilityLayout => JSON.parse(JSON.
  * The "Edit eligibility form" builder, for the public form at
  * /apprenticeship_application.
  *
- * Edits a copy of the published layout and publishes it in one go. Publishing
- * is what applicants see from then on, and is where the server adds a column
- * to enrolment.eligibility_form for each new question. Nothing is ever
- * dropped: removing a question hides it and keeps its column and answers.
+ * Edits a draft of the public form. Publishing creates an immutable version.
+ * Answers to new questions are stored in eligibility_form.answers JSONB.
  */
 export default function EligibilityBuilderPage() {
   const { success, error } = useToast();
@@ -68,6 +65,11 @@ export default function EligibilityBuilderPage() {
   const [updatedAt, setUpdatedAt] = useState('');
   const [updatedBy, setUpdatedBy] = useState('');
   const [published, setPublished] = useState<EligibilityLayout | null>(null);
+  const [savedLayout, setSavedLayout] = useState<EligibilityLayout | null>(null);
+  const [draftId, setDraftId] = useState<number | null>(null);
+  const [versions, setVersions] = useState<EligibilityPublishedVersion[]>([]);
+  const [sourceVersion, setSourceVersion] = useState<number | null>(null);
+  const [copiedFromVersion, setCopiedFromVersion] = useState<number | null>(null);
   const [layout, setLayout] = useState<EligibilityLayout | null>(null);
   const [selected, setSelected] = useState<string>('');
   const [editing, setEditing] = useState<string | 'new' | null>(null);
@@ -84,7 +86,13 @@ export default function EligibilityBuilderPage() {
         if (cancelled) return;
         const resolved = resolveLayout(res.layout, res.workplaceEnabled === true);
         setPublished(resolved);
-        setLayout(clone(resolved));
+        const initial = res.draft ? resolveLayout(res.draft.layout, res.workplaceEnabled === true) : resolved;
+        setLayout(clone(initial));
+        setSavedLayout(clone(initial));
+        setDraftId(res.draft?.id ?? null);
+        setVersions(res.versions ?? []);
+        setSourceVersion(null);
+        setCopiedFromVersion(initial.copiedFromVersion ?? null);
         setVersion(res.version);
         setUpdatedAt(res.updatedAt ?? '');
         setUpdatedBy(res.updatedBy ?? '');
@@ -96,14 +104,15 @@ export default function EligibilityBuilderPage() {
   }, [reloadToken]);
 
   const dirty = useMemo(() => Boolean(layout && published && JSON.stringify(layout) !== JSON.stringify(published)), [layout, published]);
+  const unsaved = useMemo(() => Boolean(layout && savedLayout && JSON.stringify(layout) !== JSON.stringify(savedLayout)), [layout, savedLayout]);
 
   // Unpublished edits are easy to lose by navigating away; ask first.
   useEffect(() => {
-    if (!dirty) return;
+    if (!unsaved) return;
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  }, [unsaved]);
 
   const edit = useCallback((fn: (l: EligibilityLayout) => EligibilityLayout) => setLayout((l) => (l ? fn(l) : l)), []);
 
@@ -115,7 +124,12 @@ export default function EligibilityBuilderPage() {
       const resolved = resolveLayout(saved.layout, saved.workplaceEnabled === true);
       setPublished(resolved);
       setLayout(clone(resolved));
+      setSavedLayout(clone(resolved));
       setVersion(saved.version);
+      setDraftId(null);
+      setCopiedFromVersion(null);
+      setSourceVersion(null);
+      fetchEligibilityLayout().then((res) => setVersions(res.versions ?? [])).catch(() => {});
       setUpdatedAt(saved.updatedAt ?? '');
       setUpdatedBy(saved.updatedBy ?? '');
       // A new section's temporary slug is replaced by the server's.
@@ -127,6 +141,74 @@ export default function EligibilityBuilderPage() {
     } finally {
       setPublishing(false);
     }
+  };
+
+  const saveDraft = async () => {
+    if (!layout) return;
+    setPublishing(true);
+    try {
+      const saved = await saveEligibilityDraft(layout, version, draftId);
+      setDraftId(saved.draft?.id ?? null);
+      if (saved.draft) {
+        const resolved = resolveLayout(saved.draft.layout, saved.workplaceEnabled === true);
+        setLayout(clone(resolved));
+        setSavedLayout(clone(resolved));
+      }
+      success('Draft saved', 'Applicants continue to see the published form.');
+    } catch (e) {
+      error('Could not save draft', e instanceof Error ? e.message : 'Unexpected error');
+    } finally { setPublishing(false); }
+  };
+
+  const archiveDraft = async () => {
+    if (draftId === null || !published) return;
+    if (unsaved && !window.confirm('This will discard your unsaved edits and archive the saved draft. Return to the published form?')) return;
+    setPublishing(true);
+    try {
+      await archiveEligibilityDraft(version, draftId);
+      setDraftId(null);
+      setCopiedFromVersion(null);
+      setSourceVersion(null);
+      setLayout(clone(published));
+      setSavedLayout(clone(published));
+      success('Draft archived', 'The published form remains available.');
+    } catch (e) {
+      error('Could not archive draft', e instanceof Error ? e.message : 'Unexpected error');
+    } finally { setPublishing(false); }
+  };
+
+  const copyVersion = async () => {
+    if (sourceVersion === null || !published) return;
+    const warning = draftId !== null
+      ? 'This will replace the saved draft with a copy of the selected published version. The current published form and submitted applications will stay unchanged. Continue?'
+      : unsaved
+        ? 'This will discard your unsaved edits and save a copy of the selected published version as the draft. Continue?'
+        : 'Save a copy of this earlier version as the draft? The current published form will stay unchanged.';
+    if (!window.confirm(warning)) return;
+    setPublishing(true);
+    try {
+      const source = await fetchEligibilityVersion(sourceVersion);
+      const copy = clone(source.layout);
+      copy.copiedFromVersion = sourceVersion;
+      // Historical layouts may predate the editable email. Keep the current
+      // published template so a restored form can still be published safely.
+      if (!copy.activationEmailHtml && published.activationEmailHtml) {
+        copy.activationEmailHtml = published.activationEmailHtml;
+      }
+      const saved = await saveEligibilityDraft(copy, version, draftId);
+      if (!saved.draft) throw new Error('The server did not return the saved draft.');
+      const resolved = resolveLayout(saved.draft.layout, saved.workplaceEnabled === true);
+      setDraftId(saved.draft.id);
+      setLayout(clone(resolved));
+      setSavedLayout(clone(resolved));
+      setSelected(PAGE);
+      setEditing(null);
+      setCopiedFromVersion(sourceVersion);
+      setSourceVersion(null);
+      success('Version copied to draft', 'The published form is unchanged. Review the draft before publishing it as a new version.');
+    } catch (e) {
+      error('Could not copy version', e instanceof Error ? e.message : 'Unexpected error');
+    } finally { setPublishing(false); }
   };
 
   const section = layout?.sections.find((s) => s.slug === selected) ?? null;
@@ -146,6 +228,7 @@ export default function EligibilityBuilderPage() {
         </section>
         <div className="eb-publication-row">
           <div className="eb-version-slot">{!loading && !loadError && layout && (<p className="text-[12px] text-foreground-500" aria-live="polite">
+              {draftId !== null && <span className="mr-2 font-medium text-primary-700">Editing saved draft &middot; </span>}
               {dirty ? (
                 <span className="font-medium text-amber-700"><AppIcon className="ri-edit-circle-line mr-1 inline" />You have unpublished changes.</span>
               ) : version ? (
@@ -158,9 +241,15 @@ export default function EligibilityBuilderPage() {
               <Link className={btnSecondary} to="/apprenticeship_application" target="_blank" rel="noopener noreferrer">
                 <AppIcon className="ri-external-link-line" />Open the form
               </Link>
-              <button type="button" className={btnSecondary} disabled={!dirty || publishing} onClick={() => published && setLayout(clone(published))}>
+              <button type="button" className={btnSecondary} disabled={!unsaved || publishing} onClick={() => savedLayout && setLayout(clone(savedLayout))}>
                 <AppIcon className="ri-arrow-go-back-line" />Discard changes
               </button>
+              <button type="button" className={btnSecondary} disabled={!unsaved || publishing} onClick={saveDraft}>
+                <AppIcon className="ri-save-line" />Save draft
+              </button>
+              {draftId !== null && <button type="button" className={btnSecondary} disabled={publishing} onClick={archiveDraft}>
+                <AppIcon className="ri-archive-line" />Archive draft &amp; return to published
+              </button>}
               <button type="button" className={btnPrimary} disabled={!dirty || publishing} onClick={() => setConfirming(true)}>
                 <AppIcon className="ri-upload-cloud-2-line" />Publish changes
               </button>
@@ -177,8 +266,30 @@ export default function EligibilityBuilderPage() {
 
         {!loading && !loadError && layout && (
           <>
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-foreground-200 bg-background-50 p-4">
+              <label className="flex min-w-[16rem] flex-1 flex-col gap-1 text-[12px] font-medium text-foreground-700">
+                Copy from an earlier published version
+                <select className={inputClass} value={sourceVersion ?? ''} disabled={publishing}
+                  onChange={(e) => setSourceVersion(e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">Select a version...</option>
+                  {versions.filter((entry) => entry.version !== version).map((entry) => (
+                    <option key={entry.version} value={entry.version}>
+                      v{entry.version}{entry.publishedAt ? ` · ${new Date(entry.publishedAt).toLocaleDateString('en-GB')}` : ''}{entry.publishedBy ? ` · ${entry.publishedBy}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" className={btnSecondary} disabled={sourceVersion === null || publishing} onClick={copyVersion}>
+                <AppIcon className="ri-file-copy-line" />Copy to draft
+              </button>
+              <p className="w-full text-[12px] text-foreground-500">
+                {copiedFromVersion !== null ? `Editing a draft copied from v${copiedFromVersion}. Publish changes to make it the live form, or archive the draft to return to the current published form.` :
+                  'The selected version is copied into the saved draft. The live form stays unchanged until you publish.'}
+              </p>
+            </div>
 
             <div className="eb-workspace flex flex-col gap-4 lg:flex-row lg:items-start">
+
               <SectionList
                 layout={layout}
                 selected={selected}
@@ -469,7 +580,7 @@ function SectionEditor({
               ))}
             </ul>
           )}
-          <p className="mt-2 text-[11px] text-foreground-400">Removed questions keep their database column and every answer already given; restoring one brings them back.</p>
+          <p className="mt-2 text-[11px] text-foreground-400">Removed questions keep every answer already given; restoring one brings it back.</p>
         </div>
       )}
     </section>
@@ -531,7 +642,7 @@ function ItemRow({
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {note ? 'Information' : item.builtin ? 'Standard question' : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
-            {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — adds a column when published</span>}
+            {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — answer stored in JSONB</span>}
             {removalProtected && (
               <span
                 className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"
@@ -648,7 +759,6 @@ function ItemRow({
 }
 
 function PublishDialog({ layout, publishing, onCancel, onConfirm }: { layout: EligibilityLayout; publishing: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const columns = pendingColumns(layout);
   const issues = problems(layout);
   const confirmRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -665,14 +775,7 @@ function PublishDialog({ layout, publishing, onCancel, onConfirm }: { layout: El
           Everyone who opens the form from now on sees these changes. Applications already submitted are not changed;
           anyone part-way through is asked to check their answers before submitting.
         </p>
-        {columns.length > 0 && (
-          <div className="mt-3 rounded-lg border border-foreground-100 bg-background-100/60 p-3 text-[12px] text-foreground-700">
-            <p className="font-medium">New database columns ({columns.length}) will be added to enrolment.eligibility_form:</p>
-            <ul className="mt-1 list-disc pl-5">
-              {columns.map((c, i) => <li key={`${c.label}-${i}`}>{c.label} <span className="text-foreground-400">({TYPE_LABEL[c.type] ?? c.type})</span></li>)}
-            </ul>
-          </div>
-        )}
+        <p className="mt-3 text-[12px] text-foreground-600">New question answers will be saved in the application answers record.</p>
         {issues.length > 0 && (
           <ul role="alert" className="mt-3 list-disc space-y-0.5 rounded-lg border border-red-200 bg-red-50 py-2 pl-7 pr-3 text-[12px] text-red-700">
             {issues.map((issue) => <li key={issue}>{issue}</li>)}

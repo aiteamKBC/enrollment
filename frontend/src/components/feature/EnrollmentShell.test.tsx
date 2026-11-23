@@ -1,5 +1,5 @@
 import { MemoryRouter } from 'react-router-dom';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceShell } from './WorkspaceShell';
@@ -45,7 +45,7 @@ describe('Admin navigation', () => {
 
   it.each([
     '/users', '/users/compliance-documents', '/users/programme-structure',
-    '/admin/suitability-rpl-report', '/users/eligibility-applications',
+    '/users/eligibility-builder', '/users/eligibility-applications',
   ])('uses the shared admin chrome and correct active link on %s', path => {
     auth.account.role = 'admin';
     const { container } = renderShell(path);
@@ -73,5 +73,23 @@ describe('Admin navigation', () => {
     expect(screen.getByRole('menuitem', { name: 'Account Settings' })).toHaveAttribute('href', '/profile');
     await user.keyboard('{Escape}');
     expect(control).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('keeps the staff navigation order without the retired Report Templates link', () => {
+    auth.account.role = 'admin';
+    renderShell();
+    const links = within(screen.getByRole('navigation', { name: 'Enrolment navigation' })).getAllByRole('link');
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Users', '/users'],
+      ['Eligibility Applications', '/users/eligibility-applications'],
+      ['Eligibility Form Builder', '/users/eligibility-builder'],
+      ['Enrolment Form Builder', '/users/wizard-builder'],
+      ['Programme Structure', '/users/programme-structure'],
+      ['Documents', '/users/compliance-documents'],
+      ['Coach Directory', '/users/coach-directory'],
+      ['First-Session Bookings', '/users/first-sessions'],
+      ['Open LMS', '/lms'],
+    ]);
+    expect(screen.queryByRole('link', { name: /report templates/i })).not.toBeInTheDocument();
   });
 });

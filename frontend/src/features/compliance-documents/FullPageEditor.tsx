@@ -29,7 +29,11 @@ export function FullPageEditor({ content, fields, data, presentationTheme, onCha
   const settingsMargins = content.pageLayout?.margins || (branded ? BRANDED_PURPLE.margins : themed ? palette.margins : { top: 20, right: 18, bottom: 20, left: 18 });
   const margins = branded ? editorMargins(content, brand, index + 1) : settingsMargins;
   const checkOverflow = () => { if (surface.current) setOverflow(surface.current.scrollHeight > (branded ? surface.current.clientHeight : (297 - margins.top - margins.bottom) * 96 / 25.4) + 4); };
-  const snapshotKey = JSON.stringify(page.blocks) + content.title + content.designTheme + presentationTheme + JSON.stringify(data?.signatures) + JSON.stringify(data?.signatureProvenance);
+  const renderKey = (blocks: DocumentTemplate['blocks']) => JSON.stringify({
+    blocks, title: content.title, designTheme: content.designTheme, presentationTheme,
+    fields: data?.template?.fields, signatures: data?.signatures, signatureProvenance: data?.signatureProvenance,
+  });
+  const snapshotKey = renderKey(page.blocks);
   const formatting = selectedFormatting.snapshot === snapshotKey && selectedFormatting.page === index ? selectedFormatting.values : {};
   useEffect(() => {
     if (!surface.current || rendered.current === snapshotKey) return;
@@ -50,7 +54,7 @@ export function FullPageEditor({ content, fields, data, presentationTheme, onCha
     try {
       const blocks = readPage(surface.current, page); const next = pages.map((p, i) => i === index ? { ...p, blocks } : p);
       if (branded) decorateBrandedContent(surface.current);
-      rendered.current = JSON.stringify(blocks) + content.title + content.designTheme + presentationTheme + JSON.stringify(data?.signatures) + JSON.stringify(data?.signatureProvenance);
+      rendered.current = renderKey(blocks);
       emit(fromPages(content, next)); setProblem(''); checkOverflow();
     } catch (e) { setProblem((e as Error).message); surface.current.innerHTML = pageHtml(page, displayContent, data); if (branded) decorateBrandedContent(surface.current); }
   };

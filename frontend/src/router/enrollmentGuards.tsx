@@ -40,7 +40,7 @@ export function LearnerStart() {
       if (kind === 'apprenticeship') {
         const board = await fetchEnrolmentBoard(id);
         const status = (board.programme.status || '').toLowerCase();
-        if (status === 'fresh user') return '/learner/pending';
+        if (status === 'fresh user') return board.programme.onboardingAuthorized ? '/learner/onboarding' : '/learner/pending';
         if (status === 'onboarding') return '/learner/onboarding';
       }
       const session = await fetchLearnerFirstSession(kind, id);
@@ -67,7 +67,7 @@ export function LearnerOnboardingGate({ children }: { children: ReactNode }) {
     let cancelled = false;
     setState('checking');
     fetchEnrolmentBoard(id).then(board => {
-      if (!cancelled) setState((board.programme.status || '').toLowerCase() === 'fresh user' ? 'pending' : 'allowed');
+      if (!cancelled) setState((board.programme.status || '').toLowerCase() === 'fresh user' && !board.programme.onboardingAuthorized ? 'pending' : 'allowed');
     }).catch(() => { if (!cancelled) setState('error'); });
     return () => { cancelled = true; };
   }, [auth.account?.role, kind, id]);

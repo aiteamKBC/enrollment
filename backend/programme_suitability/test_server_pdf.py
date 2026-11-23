@@ -1,18 +1,32 @@
 import re
+from decimal import Decimal
+from io import BytesIO
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 from pypdf import PdfReader
 
-from .server_pdf import render_finalised_report
+from .server_pdf import SECTION_TITLES, render_finalised_report, render_report
 
 
 class ServerSuitabilityPdfTests(SimpleTestCase):
+    def test_finalised_entry_point_delegates_to_the_canonical_renderer(self):
+        report = SimpleNamespace()
+        with patch('programme_suitability.server_pdf.render_report', return_value=b'%PDF-canonical') as renderer:
+            self.assertEqual(render_finalised_report(report), b'%PDF-canonical')
+        renderer.assert_called_once_with(report)
+
     def test_render_uses_finalised_snapshot_and_excludes_private_metadata(self):
         report = SimpleNamespace(
+            status='finalised', report_version=2, revision=3, finalised_at='2026-01-01',
             report_reference='RPL-TEST-1',
             relevant_prior_learning=False,
             reduction_justified=False,
+            assessor_evidence_review='Saved assessor evidence review.',
+            no_reduction_reason='',
+            suitability_outcome='suitable',
+            final_summary='Proceed with the full programme.',
             suitability_reviewed_at='2026-01-01',
             suitability_justification='Approved suitability narrative.',
             rpl_reviewed_at='2026-01-01',
@@ -24,16 +38,173 @@ class ServerSuitabilityPdfTests(SimpleTestCase):
                 'programmeSuitability': {'responses': [{'group': 'Role', 'selectedOptions': [{'label': 'Campaign planning'}]}]},
                 'skillsRadar': {'summary': [{'label': 'Communication', 'score': 7, 'answered': 2, 'total': 2}]},
                 'trainingPlan': {'plannedHours': 368.25},
-                'evidence': {'cv': {'status': 'provided', 'extractedText': 'PRIVATE-CV-SECRET'}, 'qualifications': {'items': []}},
+                'evidence': {'cv': {'status': 'provided', 'experience': 'Saved role experience.', 'extractedText': 'PRIVATE-CV-SECRET'}, 'qualifications': {'items': []}},
             },
             reductions=SimpleNamespace(all=lambda: []),
         )
         pdf = render_finalised_report(report)
         self.assertTrue(pdf.startswith(b'%PDF-'))
-        text = '\n'.join(page.extract_text() or '' for page in PdfReader(__import__('io').BytesIO(pdf)).pages)
-        for heading in ('Section 01', 'Section 02', 'Section 03', 'Section 04', 'Section 05', 'Section 06'):
+        text = '\n'.join(page.extract_text() or '' for page in PdfReader(BytesIO(pdf)).pages)
+        for heading in SECTION_TITLES:
             self.assertIn(heading, text)
+        self.assertIn('Kent Business College', text)
+        self.assertIn('FINALISED', text)
         self.assertIn('Approved suitability narrative.', text)
         self.assertIn('Approved RPL narrative.', text)
+        self.assertIn('Saved assessor evidence review.', text)
+        self.assertIn('Proceed with the full programme.', text)
         self.assertNotIn('PRIVATE-CV-SECRET', text)
         self.assertNotRegex(text, re.compile(r'(?i)(extractedText|rplAiMetadata|suitabilityAiMetadata)'))
+
+    def test_pending_draft_does_not_imply_an_approved_training_plan(self):
+        for relevant, justified in ((None, None), (True, None)):
+            with self.subTest(relevant=relevant):
+                report = SimpleNamespace(
+                    status='draft', source_snapshot={'trainingPlan': {'plannedHours': 200.35}},
+                    relevant_prior_learning=relevant, reduction_justified=justified,
+                )
+                text = self.pdf_text(report)
+                self.assertIn('RPL decision pending', text)
+                self.assertIn('200.35 hours Pending decision Pending decision', text)
+                self.assertNotIn('Full standard Training Plan', text)
+                self.assertNotIn('No RPL reduction was approved', text)
+
+    def test_no_reduction_retains_the_full_plan_only_when_recorded(self):
+        for relevant, expected in ((False, 'No relevant prior learning'),
+                                   (True, 'Relevant prior learning - no training reduction justified')):
+            with self.subTest(relevant=relevant):
+                report = SimpleNamespace(
+                    status='finalised', source_snapshot={'trainingPlan': {'plannedHours': 200}},
+                    relevant_prior_learning=relevant, reduction_justified=False,
+                    no_reduction_reason='Verified evidence does not justify a reduction.',
+                )
+                text = self.pdf_text(report)
+                self.assertIn(expected, text)
+                self.assertIn('Full standard Training Plan retained. No RPL reduction was approved.', text)
+                self.assertIn('200 hours 0 hours 200 hours', text)
+
+        report.status = 'draft'
+        text = self.pdf_text(report)
+        self.assertIn('If finalised, the recorded decision would retain the full standard Training Plan.', text)
+        self.assertNotIn('Full standard Training Plan retained', text)
+
+    def test_approved_reduction_has_programme_totals_and_module_breakdown(self):
+        rows = [
+            SimpleNamespace(module_title='Applied knowledge', planned_hours=Decimal('50'),
+                            reduced_hours=Decimal('12.25'), ksb_codes=['K1'], evidence='Verified certificate.'),
+            SimpleNamespace(module_title='Professional skills', planned_hours=Decimal('20'),
+                            reduced_hours=Decimal('0.05'), ksb_codes=['S3'], evidence='Verified portfolio.'),
+        ]
+        report = SimpleNamespace(
+            status='finalised', source_snapshot={'trainingPlan': {'plannedHours': 200.35}},
+            relevant_prior_learning=True, reduction_justified=True, reductions=SimpleNamespace(all=lambda: rows),
+        )
+        text = self.pdf_text(report)
+        self.assertIn('Relevant prior learning - training reduction approved', text)
+        self.assertIn('200.35 hours 12.3 hours 188.05 hours', text)
+        self.assertIn('Applied knowledge 50 hours 12.25 hours 37.75 hours K1 Verified certificate.', text)
+        self.assertIn('Professional skills 20 hours 0.05 hours 19.95 hours S3 Verified portfolio.', text)
+
+        report.status = 'draft'
+        text = self.pdf_text(report)
+        self.assertIn('Relevant prior learning - training reduction proposed', text)
+        self.assertIn('PROPOSED RPL REDUCTION', text)
+        self.assertNotIn('training reduction approved', text)
+
+    def test_zero_or_missing_programme_hours_are_distinct(self):
+        report = SimpleNamespace(status='finalised', relevant_prior_learning=False, reduction_justified=False)
+        for planned, expected in ((0, '0 hours 0 hours 0 hours'),
+                                  (None, 'Not available 0 hours Not available')):
+            with self.subTest(planned=planned):
+                report.source_snapshot = {'trainingPlan': {'plannedHours': planned}}
+                self.assertIn(expected, self.pdf_text(report))
+
+    def test_saved_pathway_and_distinct_original_declarations(self):
+        report = SimpleNamespace(status='draft', source_snapshot={'programmeSuitability': {'pathway': 'project-management'}})
+        text = self.pdf_text(report)
+        self.assertIn('PROGRAMME SUITABILITY PATHWAY Project Management', text)
+        for statement in (
+            'I have reviewed the evidence and approve the recorded assessment and training recommendation.',
+            'The assessment and its outcome have been discussed with me, and I acknowledge this record.',
+            'I have discussed the assessment and support the recorded programme recommendation.',
+            'The parties confirm that they have reviewed this exact report version.',
+            'Electronic signatures are recorded against the immutable issued PDF and its checksum.',
+        ):
+            self.assertIn(statement, text)
+
+        report.source_snapshot = {'programmeSuitability': {'pathway': '  '}}
+        self.assertNotIn('PROGRAMME SUITABILITY PATHWAY', self.pdf_text(report))
+
+    @staticmethod
+    def pdf_text(report):
+        pages = PdfReader(BytesIO(render_report(report))).pages
+        return ' '.join(' '.join(p.extract_text() or '' for p in pages).split())
+
+    def test_radar_draws_saved_scores_to_scale_and_keeps_evidence_below(self):
+        report = SimpleNamespace(status='finalised', source_snapshot={'skillsRadar': {
+            'scaleMaximum': 5,
+            'items': [{'description': name, 'score': score} for name, score in (
+                ('Communication', 4), ('Teamwork', 4), ('Planning', 3),
+                ('Leadership', 2), ('Problem solving', 3), ('Digital skills', 4),
+            )],
+        }})
+        pdf = render_report(report)
+        self.assertEqual(pdf, render_finalised_report(report))
+        pages = PdfReader(BytesIO(pdf)).pages
+        radar_page = next(page for page in pages if 'SKILLS RADAR & AVAILABLE EVIDENCE' in page.extract_text())
+        text = radar_page.extract_text()
+        for value in ('04', 'AUTOMATIC VALUES', 'COMPETENCY', 'SCORE', 'Communication', 'Digital skills', '4/5', '3/5', '2/5'):
+            self.assertIn(value, text)
+        self.assertLess(text.index('independently prove prior learning'), text.index(SECTION_TITLES[4]))
+        # Five vector grid rings and the saved-score polygon have six sides each.
+        operations = [op for _, op in radar_page.get_contents().operations]
+        hexagon = [b'm', *([b'l'] * 5), b'h']
+        self.assertGreaterEqual(sum(operations[i:i + len(hexagon)] == hexagon for i in range(len(operations))), 6)
+
+    def test_missing_radar_scores_do_not_become_zero_values(self):
+        report = SimpleNamespace(source_snapshot={'skillsRadar': {
+            'scaleMaximum': 9,
+            'items': [{'code': 'B1', 'score': 7}, {'code': 'K1', 'score': None}, {'code': 'S1', 'score': 0}],
+        }})
+        pages = PdfReader(BytesIO(render_report(report))).pages
+        text = next(text for page in pages if 'SKILLS RADAR PREVIEW' in (text := page.extract_text()))
+        self.assertIn('7/9', text)
+        self.assertIn('N/A', text)
+        self.assertNotIn('0/9', text)
+
+    def test_long_report_paginates_without_losing_approved_sections(self):
+        report = SimpleNamespace(
+            status='draft', report_reference='DRAFT', report_version=1, revision=4,
+            finalised_at=None, practical_start_date='', relevant_prior_learning=False,
+            reduction_justified=False, assessor_evidence_review='Reviewed evidence.',
+            no_reduction_reason='', suitability_outcome='suitable', final_summary='Proceed.',
+            suitability_reviewed_at='2026-01-01', suitability_justification='Suitable.',
+            rpl_reviewed_at='2026-01-01', rpl_justification=('Long approved RPL narrative. ' * 400) + 'Narrative conclusion.',
+            source_snapshot={
+                'learner': {'name': 'Long Report Learner'},
+                'programme': {'name': 'Marketing Executive Level 4'},
+                'programmeUnderstanding': [
+                    {'question': f'Question {index}', 'answer': ('Long saved response ' * 700) if index == 0 else ('A saved response ' * 12)}
+                    for index in range(8)
+                ],
+                'programmeSuitability': {'responses': [{'group': f'Group {index}', 'answers': [f'Answer {index}', 'Second answer']} for index in range(30)]},
+                'skillsRadar': {
+                    'summary': [{'label': 'Knowledge', 'score': 7, 'answered': 60, 'total': 60}],
+                    'items': [{'code': f'K{index}', 'description': 'A saved skills radar item with descriptive content.', 'score': index % 9} for index in range(60)],
+                },
+                'evidence': {'cv': {'status': 'provided', 'documents': [{'filename': 'cv.pdf'}]}, 'qualifications': {'items': []}, 'plr': {'message': 'Not available'}},
+                'trainingPlan': {'plannedHours': 368},
+            },
+            reductions=SimpleNamespace(all=lambda: []),
+        )
+        pdf = render_finalised_report(report)
+        reader = PdfReader(BytesIO(pdf))
+        text = '\n'.join(page.extract_text() or '' for page in reader.pages)
+        self.assertGreater(len(reader.pages), 4)
+        for heading in SECTION_TITLES:
+            self.assertIn(heading, text)
+        self.assertIn('Group 29', text)
+        self.assertIn('K59', text)
+        self.assertIn('Narrative conclusion.', ' '.join(text.split()))
+        self.assertEqual(text.count('SKILLS RADAR & AVAILABLE EVIDENCE'), 1)
+        self.assertIn('All saved items are listed below the evidence.', text)

@@ -414,7 +414,7 @@ def _check_employer_id(fields, existing=None):
     org_id = fields.get("organisation_id", getattr(existing, "organisation_id", None))
     if org_id is not None:
         organisation = Organisation.objects.filter(pk=org_id).first()
-        if organisation is None:
+        if organisation is None or organisation.merged_into_organisation_id is not None:
             raise ValidationError(f"Unknown organisationId: {org_id}")
         fields["organization"] = organisation.name
         fields["employer"] = organisation.name
@@ -429,6 +429,20 @@ def _check_employer_id(fields, existing=None):
         raise ValidationError(f"Unknown employerId: {employer_id}")
     if org_id is not None and str(org_id) not in {str(value) for value in employer.employer_group_ids or []}:
         raise ValidationError("The selected manager is not linked to this organisation.")
+
+
+def _check_learner_reference(fields, existing=None):
+    """Friendly uniqueness guard; the reviewed partial index closes races."""
+    reference = _s(fields.get("reference_number"))
+    if not reference:
+        return
+    matches = EnrolmentUser.all_learners.using("enrolment").filter(
+        reference_number__iexact=reference
+    )
+    if existing is not None:
+        matches = matches.exclude(pk=existing.pk)
+    if matches.exists():
+        raise ValidationError("Learner Reference Number is already assigned to another learner.")
 
 
 def _profile_is_apprenticeship(profile):
@@ -751,6 +765,7 @@ def enrolment_users(request):
         try:
             payload = _parse_body(request)
             fields = write_fields(payload, require_create=True)
+            _check_learner_reference(fields)
             _check_employer_id(fields)
         except ValidationError as exc:
             return _error(str(exc), 400)
@@ -981,6 +996,7 @@ def enrolment_user_detail(request, pk):
                         pk, ", ".join(rejected),
                     )
             fields = write_fields(payload)
+            _check_learner_reference(fields, user)
             if "coach_name" in fields or "coach_email" in fields:
                 fields.update(resolve_coach_assignment(
                     fields.get("coach_name", ""),

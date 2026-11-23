@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 const OUTCOME_LABELS: Record<string, string> = {
   pendingAssessment: 'Pending assessment — no invitation', invited: 'Invitation sent',
-  invitePending: 'Account created; invitation email not sent', existingAccount: 'Existing account',
+  invitePending: 'Invitation email pending; no account created yet', existingAccount: 'Existing account',
   retryLater: 'Technical retry required', notEligible: 'Not eligible — no invitation',
 };
 const show = (value: unknown) => value == null || value === '' ? 'Not recorded' : typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value);

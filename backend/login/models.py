@@ -221,7 +221,10 @@ class Invitation(models.Model):
         on_delete=models.DO_NOTHING,
         db_column="Account_id",
         related_name="invitations",
+        null=True, blank=True,
     )
+    eligibility_application_id = models.BigIntegerField(db_column="Eligibility_application_id", null=True, blank=True)
+    eligibility_accepted_at = models.DateTimeField(db_column="Eligibility_accepted_at", null=True, blank=True)
 
     token_hash = models.CharField(db_column="Token_hash", max_length=64, unique=True)
     email = models.TextField(db_column="Email")

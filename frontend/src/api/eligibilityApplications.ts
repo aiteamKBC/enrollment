@@ -54,7 +54,7 @@ export function fetchEligibilityException(id: string): Promise<EligibilityExcept
 }
 
 export async function approveEligibilityException(id: string, reason: string, confirmEmail: string): Promise<{
-  learnerId: string; invitation: 'sent' | 'notSent' | 'alreadySent' | 'alreadyActivated'; message?: string;
+  learnerId: string | null; invitation: 'sent' | 'notSent'; message?: string;
 }> {
   const csrfToken = (await prefetchAssessmentSecurity()).csrfToken;
   const response = await fetch(`${BASE}${encodeURIComponent(id)}/exception/`, {

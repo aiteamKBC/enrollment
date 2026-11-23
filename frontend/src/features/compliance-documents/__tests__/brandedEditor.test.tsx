@@ -16,6 +16,21 @@ function Editor({ initial, presentationTheme }: { initial: DocumentTemplate; pre
     <output data-testid="saved-content">{JSON.stringify(content)}</output></>;
 }
 describe('editable KBC/DfE document presentation', () => {
+  it('refreshes resolved field chips when only document binding values change', () => {
+    const value = payloadFor('ilr', true);
+    const key = 'document.learnerDetails.workingHoursPerWeek';
+    const content = value.template.content;
+    content.blocks = [{ id: 'working-hours', type: 'field', label: 'Working hours per week', value: `{{${key}}}` }];
+    value.template.fields[key] = '20.00';
+    const onChange = () => undefined;
+    const view = render(<FullPageEditor content={content} fields={[]} data={value.data} onChange={onChange} />);
+    expect(screen.getByRole('textbox', { name: 'Document page 1' })).toHaveTextContent('20.00');
+    const nextTemplate = { ...value.template, fields: { ...value.template.fields, [key]: '37.50' } };
+    const nextData = { ...value.data, template: nextTemplate };
+    view.rerender(<FullPageEditor content={content} fields={[]} data={nextData} onChange={onChange} />);
+    expect(screen.getByRole('textbox', { name: 'Document page 1' })).toHaveTextContent('37.50');
+    expect(screen.getByRole('textbox', { name: 'Document page 1' })).not.toHaveTextContent('20.00');
+  });
   it.each(keys)('uses the branded canvas for %s without adding branding to saved blocks', key => {
     const content = contentFor(key); content.designTheme = 'purple-reference-v2';
     const before = JSON.stringify(content);

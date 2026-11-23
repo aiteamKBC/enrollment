@@ -126,6 +126,7 @@ export interface SuitabilityRplReport {
   sourceSnapshot: SuitabilityRplEvidence;
   sourceVersions: Record<string, unknown>;
   sourceSnapshotHash: string;
+  trainingHours: { originalHours: number | null; reductionHours: number; remainingHours: number | null };
   reductions: SuitabilityRplReduction[];
   createdAt: string;
   updatedAt: string;
@@ -137,6 +138,7 @@ export interface SuitabilityRplState {
   evidence: SuitabilityRplEvidence;
   sourceVersions: Record<string, unknown>;
   context: { key: string; programmeId: string; programmeName: string; enrolmentReference: string; practicalStartDate: string };
+  contextError?: string | null;
   history: Array<{ id: string; reportReference: string; programmeName: string; status: string; reportVersion: number; amendmentReason: string; parentReportId: string | null; finalisedAt: string | null }>;
   aiEnabled: boolean;
 }
@@ -254,6 +256,18 @@ async function readJson<T>(response: Response): Promise<T> {
   return data as T;
 }
 
+async function readPdf(response: Response): Promise<Blob> {
+  if (!response.ok) {
+    const text = await response.text();
+    let message = `The report PDF request failed (${response.status}).`;
+    try { message = (JSON.parse(text) as { error?: string }).error || message; } catch { /* use status message */ }
+    throw new SuitabilityRplRequestError(message, response.status);
+  }
+  const blob = await response.blob();
+  if (!blob.type.includes('pdf')) throw new Error('The report service returned an invalid PDF.');
+  return blob;
+}
+
 export async function fetchSuitabilityRplReport(kind: LearnerKind, learnerId: string, signal?: AbortSignal) {
   return readJson<SuitabilityRplState>(await fetch(base(kind, learnerId), {
     credentials: 'include', cache: 'no-store', signal,
@@ -262,8 +276,21 @@ export async function fetchSuitabilityRplReport(kind: LearnerKind, learnerId: st
 
 export async function saveSuitabilityRplReport(kind: LearnerKind, learnerId: string, payload: SuitabilityRplSavePayload) {
   const { csrfToken } = await prefetchAssessmentSecurity();
-  return readJson<{ report: SuitabilityRplReport; aiEnabled: boolean }>(await fetch(base(kind, learnerId), {
+  return readJson<{ report: SuitabilityRplReport } & Pick<SuitabilityRplState, 'history' | 'aiEnabled'>>(await fetch(base(kind, learnerId), {
     method: 'PUT', credentials: 'include', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+    body: JSON.stringify(payload),
+  }));
+}
+
+export async function previewSuitabilityRplReport(
+  kind: LearnerKind,
+  learnerId: string,
+  payload: SuitabilityRplSavePayload,
+) {
+  const { csrfToken } = await prefetchAssessmentSecurity();
+  return readPdf(await fetch(`${base(kind, learnerId)}preview-pdf/`, {
+    method: 'POST', credentials: 'include', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
     body: JSON.stringify(payload),
   }));

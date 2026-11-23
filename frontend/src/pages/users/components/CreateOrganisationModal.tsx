@@ -86,9 +86,9 @@ const SECTIONS: SectionDef[] = [
         name: 'edrsErnNumber',
         label: 'EDRS/ERN number',
         type: 'text',
-        hint: 'Missing EDRS/ERN number is a funding issue and may result in learner being removed from the claim',
+        hint: 'Official Employer Identifier: exactly 9 digits. Use 999999999 only where the ILR rules genuinely permit it.',
       },
-      { name: 'apprenticeshipAgreementId', label: 'Apprenticeship agreement id', type: 'text' },
+      { name: 'apprenticeshipAgreementId', label: 'Apprenticeship agreement id', type: 'text', hint: 'Official AgreemId default for this employer relationship: 1-7 alphanumeric characters.' },
     ],
   },
   {

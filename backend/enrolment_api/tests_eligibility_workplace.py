@@ -21,9 +21,16 @@ class ReceiptCursor(FakeCursor):
 
     def execute(self, sql, params=None):
         super().execute(sql, params)
+        if 'FROM curriculum.programmes' in sql:
+            return
         if sql.startswith("INSERT"):
-            optional = ("expected_leaving_date",) if '"expected_leaving_date"' in sql else ()
-            row = dict(zip(ef.INSERT_COLUMNS + ef.WORKPLACE_COLUMNS + ef.SCREENING_COLUMNS + optional, params))
+            row = {
+                **json.loads(params[-2]),
+                **dict(zip(("first_name", "surname", "work_email", "layout_version", "eligible",
+                            "ineligible_reason", "assessment_status", "assessment_reason",
+                            "submission_fingerprint"), params[:9])),
+                "programme_id": params[-1], "submission_response": None,
+            }
             key = row["submission_fingerprint"]
             if key in self.rows:
                 self.result = None
@@ -67,7 +74,11 @@ class WorkplacePreviewTests(SimpleTestCase):
         request = self.factory.post(URL, data=json.dumps(body), content_type="application/json", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
         with patch.object(ef, "connections", {ef.CONN: SimpleNamespace(cursor=lambda: cursor)}):
             response = ef.submit_application(request)
-        stored = dict(zip(ef.INSERT_COLUMNS + ef.WORKPLACE_COLUMNS, cursor.executed[0][1])) if cursor.executed else None
+        inserted = next((params for sql, params in cursor.executed if sql.startswith("INSERT")), None)
+        stored = ({**json.loads(inserted[-2]), **dict(zip(("first_name", "surname", "work_email",
+                   "layout_version", "eligible", "ineligible_reason", "assessment_status",
+                   "assessment_reason", "submission_fingerprint"), inserted[:9]))}
+                  if inserted else None)
         return response, json.loads(response.content), cursor, stored
 
     def test_same_derives_employer_geography_and_discards_forged_or_stale_values(self):
@@ -247,9 +258,9 @@ class WorkplacePreviewTests(SimpleTestCase):
     def test_disabled_preview_accepts_legacy_payload_and_never_references_new_columns(self):
         response, _data, cursor, _row = self.post(workplaceEnabled=True, workplaceArrangement="forged", mainWorkplacePostcode="ss")
         self.assertEqual(response.status_code, 201)
-        sql, params = cursor.executed[0]
-        self.assertEqual(len(params), len(ef.INSERT_COLUMNS + ef.SCREENING_COLUMNS))
-        self.assertTrue(all(column not in sql for column in ef.WORKPLACE_COLUMNS))
+        sql, params = next((sql, params) for sql, params in cursor.executed if sql.startswith("INSERT"))
+        self.assertIn('answers', sql)
+        self.assertFalse(any(json.loads(params[-2]).get(column) for column in ef.WORKPLACE_COLUMNS))
         self.assertEqual(el._workplace_feature(), {})
 
     @override_settings(DEBUG=False)
@@ -258,7 +269,9 @@ class WorkplacePreviewTests(SimpleTestCase):
         self.assertEqual(el._workplace_feature(), {})
         response, _data, cursor, _row = self.post(workplaceArrangement=None)
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(len(cursor.executed[0][1]), len(ef.INSERT_COLUMNS + ef.SCREENING_COLUMNS))
+        sql, params = next((sql, params) for sql, params in cursor.executed if sql.startswith("INSERT"))
+        self.assertIn('answers', sql)
+        self.assertFalse(any(json.loads(params[-2]).get(column) for column in ef.WORKPLACE_COLUMNS))
 
     def test_old_published_layout_is_restored_without_modifying_the_original(self):
         layout = layout_with()
@@ -279,13 +292,15 @@ class WorkplacePreviewTests(SimpleTestCase):
         fresh = (root / "database" / "schema.sql").read_text()
         sql = " ".join(line for line in upgrade.splitlines() if not line.lstrip().startswith("--"))
         self.assertNotRegex(sql, r"(?i)\b(UPDATE|DELETE|INSERT|DROP COLUMN|DROP TABLE|DEFAULT)\b")
-        for column, definition in ef.WORKPLACE_COLUMN_DEFINITIONS + ef.SCREENING_COLUMN_DEFINITIONS:
-            self.assertIn(f"{column} {definition}", " ".join(fresh.split()))
+        for column, _definition in ef.WORKPLACE_COLUMN_DEFINITIONS:
+            if column not in {"assessment_status", "assessment_reason"}:
+                self.assertNotIn(f"{column} text", " ".join(fresh.split()))
+        self.assertIn("answers jsonb", fresh)
         for column, definition in ef.SCREENING_COLUMN_DEFINITIONS:
             self.assertIn(f"ADD COLUMN IF NOT EXISTS {column} {definition}", " ".join(sql.split()))
         cursor = FakeCursor()
         ef.upgrade_table(cursor)
-        self.assertEqual(sum("ADD COLUMN IF NOT EXISTS" in statement for statement, _params in cursor.executed), len(ef.ADDED_COLUMNS) + 9)
+        self.assertEqual(sum("ADD COLUMN IF NOT EXISTS" in statement for statement, _params in cursor.executed), len(ef.ADDED_COLUMNS))
 
     def test_arrangement_country_and_hours_matrix(self):
         for arrangement in ef.WORKPLACE_ARRANGEMENTS:
@@ -492,7 +507,7 @@ class WorkplacePreviewTests(SimpleTestCase):
         self.assertEqual(self.post(cursor=cursor, **changes)[0].status_code, 201)
         self.assertEqual(len(cursor.rows), 1)
         stored = next(iter(cursor.rows.values()))
-        self.assertEqual(stored["expected_leaving_date"].isoformat(), "2027-06-30")
+        self.assertEqual(stored["expected_leaving_date"], "2027-06-30")
         self.assertEqual(stored["assessment_status"], ef.NOT_ELIGIBLE)
         self.invite.assert_not_called()
 

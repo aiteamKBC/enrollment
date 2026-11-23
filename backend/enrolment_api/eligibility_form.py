@@ -20,15 +20,14 @@ The table is created and brought up to date by
 anyone on the internet can call it; if the table is missing it says the form is
 unavailable rather than pretending to save.
 
-Choice answers are stored as their labels, the way the enrolment wizard stores
-``Employment_status``, so the table reads plainly when queried.
+Choice answers are stored as their labels in ``answers`` JSONB.
 
 What the form asks
 ------------------
 The questions come from the layout published in the "Edit eligibility form"
 builder (eligibility_layout.py): which built-in questions are asked and whether
 they are required, the answer lists of the choice questions, and any custom
-questions, each with its own ``custom_*`` column. With nothing published the
+questions. New answers live together in ``answers`` JSONB. With nothing published the
 form asks FIELDS as they stand. An answer the form does not ask is stored as
 NULL. First name, surname and work email identify the applicant, so they are
 always asked.
@@ -53,10 +52,10 @@ evidence for approval.
 
 Invitation
 ----------
-An applicant who passes the applicable preliminary screening is created as an
-apprenticeship learner and emailed the set-password invitation
+An applicant who passes the applicable preliminary screening is emailed the
+set-password invitation. Their learner and login account are created on acceptance
 (eligibility_invitation.py). The response's ``outcome`` tells the page what
-happened: "invited", "invitePending" (created, but the email could not be sent;
+happened: "invited", "invitePending" (the email could not be sent;
 staff can re-send it), "existingAccount" (the address already has an account:
 sign in or use Forgot password), "notEligible", or a technical invitation retry.
 New completed screenings have boolean eligibility. Lookup failures are HTTP
@@ -578,30 +577,13 @@ POSTCODES = {
 }
 LOCATION_COLUMNS = tuple(column for _postcode, *location in POSTCODES.values() for column in location)
 
-#: Columns added since the table was first created (see upgrade_table).
-ADDED_COLUMNS = tuple((column, "text") for column in LOCATION_COLUMNS + ADDRESS_COLUMNS) + (
-    ("start_date_with_employer", "date"),
-    ("job_title", "text"),
-    ("country_of_residence", "text"),
-    ("nationality", "text"),
-    ("resident_prev_3_years", "boolean"),
-    ("years_in_uk", "text"),
-    ("full_time_education_prior", "boolean"),
-    ("expected_leaving_date", "date"),
-    ("layout_version", "bigint"),
-    ("eligible", "boolean"),
-    ("ineligible_reason", "text"),
+#: Persistent submission metadata. Question and derived-location values live in answers JSONB.
+ADDED_COLUMNS = (
+    ("layout_version", "bigint"), ("eligible", "boolean"), ("ineligible_reason", "text"),
+    ("assessment_status", "text"), ("assessment_reason", "text"),
+    ("submission_fingerprint", "text"), ("submission_response", "jsonb"),
+    ("answers", "jsonb NOT NULL DEFAULT '{}'::jsonb"), ("programme_id", "varchar(64)"),
 )
-
-#: Phase 1 columns: the disabled preview must work before its schema is applied.
-#: Enabled preview submissions append WORKPLACE_COLUMNS, before custom columns.
-# Omit a blank new date from INSERTs so older databases still accept unchanged
-# applications until the prepared additive upgrade has been applied.
-INSERT_COLUMNS = tuple(column for column in COLUMNS if column != "expected_leaving_date") + LOCATION_COLUMNS + ("layout_version", "eligible", "ineligible_reason")
-
-
-def leaving_date_columns(row):
-    return ("expected_leaving_date",) if row.get("expected_leaving_date") is not None else ()
 
 #: How each looked-up postcode is named in an ineligibility reason.
 POSTCODE_NAMES = {"postcode": "Your postcode", "employerPostcode": "Your employer's postcode"}
@@ -631,64 +613,26 @@ def ensure_table(cursor):
             first_name                        text NOT NULL,
             surname                           text NOT NULL,
             work_email                        text NOT NULL,
-            phone_number                      text,
-            full_address                      text,
-            postcode                          text,
-            postcode_country                  text,
-            postcode_region                   text,
-            postcode_district                 text,
-            date_of_birth                     date,
-            employment_status                 text,
-            start_date_with_employer           date,
-            job_title                          text,
-            majority_hours_in_england         boolean,
-            employer_name                     text,
-            employer_address                  text,
-            employer_postcode                 text,
-            employer_postcode_country         text,
-            employer_postcode_region          text,
-            employer_postcode_district        text,
-            representative_name               text,
-            representative_email              text,
-            lives_in_uk                       boolean,
-            residence_not_for_education       boolean,
-            residency_status                  text,
-            country_of_residence              text,
-            nationality                       text,
-            resident_prev_3_years              boolean,
-            years_in_uk                        text,
-            full_time_education_prior         boolean,
-            expected_leaving_date             date,
-            programme                         text,
-            attended_funded_training          boolean,
-            funded_training_completed_on      date,
-            not_previously_completed_programme boolean,
             layout_version                    bigint,
             eligible                          boolean,
             ineligible_reason                 text,
             submitted_at                      timestamptz NOT NULL DEFAULT now(),
-            {', '.join(f'{column} text' for column in ADDRESS_COLUMNS)},
-            {', '.join(f'{column} {definition}' for column, definition in WORKPLACE_COLUMN_DEFINITIONS + SCREENING_COLUMN_DEFINITIONS)},
+            {', '.join(f'{column} {definition}' for column, definition in WORKPLACE_COLUMN_DEFINITIONS[-2:] + SCREENING_COLUMN_DEFINITIONS)},
+            answers                           jsonb NOT NULL DEFAULT '{{}}'::jsonb,
+            programme_id                      varchar(64),
+            CONSTRAINT eligibility_answers_object CHECK (jsonb_typeof(answers) = 'object'),
             CONSTRAINT eligibility_assessment_consistency CHECK ({ASSESSMENT_CONSISTENCY})
         )"""
     )
 
 
 def upgrade_table(cursor):
-    """Bring a table created before the builder up to date.
-
-    Adds the columns introduced since, and lets every answer the builder can
-    remove be NULL. Idempotent. Never drops a column or touches a row.
-    """
+    """Add missing submission metadata without recreating retired answer columns."""
     for column, sql_type in ADDED_COLUMNS:
         cursor.execute(f"ALTER TABLE enrolment.{TABLE} ADD COLUMN IF NOT EXISTS {column} {sql_type}")
-    if workplace_enabled():
-        for column, definition in WORKPLACE_COLUMN_DEFINITIONS + SCREENING_COLUMN_DEFINITIONS:
-            cursor.execute(f"ALTER TABLE enrolment.{TABLE} ADD COLUMN IF NOT EXISTS {column} {definition}")
-        upgrade_assessment_constraints(cursor)
-    for key, column, *_rest in FIELDS:
-        if key not in LOCKED:
-            cursor.execute(f"ALTER TABLE enrolment.{TABLE} ALTER COLUMN {column} DROP NOT NULL")
+    cursor.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS eligibility_submission_fingerprint_unique "
+                   f"ON enrolment.{TABLE} (submission_fingerprint)")
+    upgrade_assessment_constraints(cursor)
 
 
 def upgrade_assessment_constraints(cursor):
@@ -699,20 +643,15 @@ def upgrade_assessment_constraints(cursor):
         ("eligibility_assessment_status_check", "assessment_status IN ('provisional_eligible', 'pending_assessment', 'not_eligible')"),
         ("eligibility_assessment_reason_length", "char_length(assessment_reason) BETWEEN 1 AND 1000"),
         ("eligibility_assessment_consistency", ASSESSMENT_CONSISTENCY),
+        ("eligibility_answers_object", "jsonb_typeof(answers) = 'object'"),
+        ("eligibility_submission_fingerprint_check", "submission_fingerprint ~ '^[0-9a-f]{64}$'"),
+        ("eligibility_submission_response_check", "jsonb_typeof(submission_response) = 'object'"),
     ):
         cursor.execute(f"""DO $$ BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'enrolment.{TABLE}'::regclass AND conname = '{name}') THEN
                 ALTER TABLE enrolment.{TABLE} ADD CONSTRAINT {name} CHECK ({expression});
             END IF;
         END $$""")
-
-
-def add_custom_columns(cursor, columns):
-    """Add the columns of custom questions, {column: sql_type}. Idempotent; never drops."""
-    for column, sql_type in columns.items():
-        if not CUSTOM_COLUMN_RE.match(column) or sql_type not in CUSTOM_SQL_TYPES.values():
-            raise ValueError(f"Refusing custom column {column!r} {sql_type!r}.")
-        cursor.execute(f'ALTER TABLE enrolment.{TABLE} ADD COLUMN IF NOT EXISTS "{column}" {sql_type}')
 
 
 def _clean_text(value, limit):
@@ -1161,15 +1100,26 @@ def save_screened_application(row, reasons, request):
     Only a new row's response receipt is updated; historical applications never
     acquire a fingerprint. Invitation failures may retry against the same row.
     """
-    custom = [column for column in row if CUSTOM_COLUMN_RE.match(column)]
-    columns = list(INSERT_COLUMNS + (WORKPLACE_COLUMNS if workplace_enabled() else ()) + SCREENING_COLUMNS + leaving_date_columns(row)) + custom
-    names = [f'"{column}"' for column in columns]
+    metadata = ("first_name", "surname", "work_email", "layout_version", "eligible",
+                "ineligible_reason", "assessment_status", "assessment_reason",
+                "submission_fingerprint", "submission_response")
+    answers = {key: value for key, value in row.items() if key not in metadata}
     with transaction.atomic(using=CONN):
         with connections[CONN].cursor() as cursor:
             cursor.execute(
-                f"INSERT INTO enrolment.{TABLE} ({', '.join(names)}) VALUES ({', '.join(['%s'] * len(names))}) "
+                "SELECT programme_id FROM curriculum.programmes WHERE lower(btrim(name))=lower(btrim(%s))",
+                [row.get("programme") or ""],
+            )
+            matches = cursor.fetchall()
+            if len(matches) != 1:
+                raise DatabaseError("The selected programme is unavailable or ambiguous.")
+            cursor.execute(
+                f'''INSERT INTO enrolment.{TABLE}
+                    (first_name, surname, work_email, layout_version, eligible, ineligible_reason,
+                     assessment_status, assessment_reason, submission_fingerprint, answers, programme_id)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s) '''
                 "ON CONFLICT (submission_fingerprint) DO NOTHING RETURNING id",
-                [row.get(column) for column in columns],
+                [row.get(key) for key in metadata[:-1]] + [json.dumps(answers, default=str), matches[0][0]],
             )
             inserted = cursor.fetchone()
             if inserted:
