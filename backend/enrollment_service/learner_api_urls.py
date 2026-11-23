@@ -54,6 +54,7 @@ urlpatterns = [
     path('employers/options/', employers.employer_options, name='employer-options'),
     path('organisations/', employers.organisations, name='organisations'),
     path('organisations/<int:pk>/', employers.organisation_detail, name='organisation-detail'),
+    path('organisations/<int:pk>/merge/', employers.merge_organisation, name='organisation-merge'),
     path('employers/', employers.employers, name='employers'),
     path('employer-portal/<int:employer_id>/documents/', employer_portal.employer_portal_documents, name='employer-portal-documents'),
     path('employer-portal/<int:employer_id>/learner/<str:kind>/<int:learner_id>/documents/<str:document_kind>/<str:document_id>/', employer_portal.employer_document_preview, name='employer-document-preview'),

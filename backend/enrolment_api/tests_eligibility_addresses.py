@@ -120,8 +120,9 @@ class StructuredAddressTests(SimpleTestCase):
         schema = (root / "database/schema.sql").read_text(encoding="utf-8")
         table = re.search(r"CREATE TABLE enrolment\.eligibility_form \((.*?)\n\);", schema, re.S)[1]
         for column in form.ADDRESS_COLUMNS:
-            self.assertIn(f"    {column} text,", table)
-            self.assertIn((column, "text"), form.ADDED_COLUMNS)
+            self.assertNotIn(f"    {column} text,", table)
+            self.assertNotIn((column, "text"), form.ADDED_COLUMNS)
+        self.assertIn("answers jsonb", table)
 
 
 class LegacyAddressLayoutTests(SimpleTestCase):

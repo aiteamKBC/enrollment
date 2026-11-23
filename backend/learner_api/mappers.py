@@ -429,6 +429,7 @@ def to_board(u):
     # learner_api.models, so a top-level import would be circular.
     from .board_wizard import fmt_date, merge_wizard_sections, record_address, saved_signature
     from programme_suitability.home_cohort import home_cohort_for_board
+    from enrolment_api.eligibility_link import may_enter_onboarding
 
     home_cohort = home_cohort_for_board(u)
     resolved_home = home_cohort if home_cohort and home_cohort['status'] == 'resolved' else {}
@@ -499,6 +500,10 @@ def to_board(u):
             "cohort": resolved_home.get('name') or _s(u.cohort),
             "homeCohort": home_cohort,
             "status": programme_status(u) or DEFAULT_PROGRAMME_STATUS,
+            "onboardingAuthorized": (may_enter_onboarding(u.pk)
+                if str(getattr(u, 'learner_type', '')).lower() == 'apprenticeship'
+                and (programme_status(u) or DEFAULT_PROGRAMME_STATUS).lower() == 'fresh user'
+                else True),
             # Cohort dates, matched from curriculum.cohort_authoring_details.
             # apprenticeship_end_date is the learner's own override and only
             # applies when it's set, so the cohort end date is the fallback.
@@ -1412,6 +1417,9 @@ def to_organisation_row(o):
     """An organisation, shaped for the list table and the Employer Group picker."""
     return {
         "id": str(o.id),
+        "mergedIntoOrganisationId": str(o.merged_into_organisation_id) if o.merged_into_organisation_id else None,
+        "mergedAt": o.merged_at.isoformat() if o.merged_at else None,
+        "potentialMatchIds": o.potential_match_ids or [],
         "status": _s(o.status),
         "name": _s(o.name),
         "owner": _s(o.owner),

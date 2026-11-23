@@ -1,4 +1,5 @@
 """New provenance/security/prefill boundaries; all persistence/mail mocked."""
+import json
 from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -6,6 +7,27 @@ from django.test import SimpleTestCase
 from enrolment_api import eligibility_invitation as invite, eligibility_link as links, eligibility_prefill as prefill
 from enrolment_api.tests_eligibility_invitation import ROW
 from login import services
+
+
+class JsonbSourceTests(SimpleTestCase):
+    def test_verified_application_prefills_from_answers_without_legacy_columns(self):
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (
+            json.dumps({'date_of_birth': '2001-04-23', 'employer_name': 'Example Ltd',
+                        'employer_postcode': 'ME14 1XQ', 'representative_email': 'rep@example.test'}),
+            'Sam', 'Example', 'sam@example.test', 41, 2, True, None, None, '{}',
+        )
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value = cursor
+        with patch.object(links, 'connections', {'enrolment': connection}), \
+             patch.object(links, 'available', return_value=True):
+            source = links.verified_application(812)
+        sql = cursor.execute.call_args.args[0]
+        self.assertIn('a.answers', sql)
+        self.assertNotIn('to_jsonb(a)', sql)
+        self.assertEqual(source['date_of_birth'], '2001-04-23')
+        self.assertEqual(source['first_name'], 'Sam')
+        self.assertEqual(source['employer_postcode'], 'ME14 1XQ')
 
 
 class PrefillTests(SimpleTestCase):

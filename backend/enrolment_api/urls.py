@@ -26,6 +26,8 @@ urlpatterns = [
     path('public/postcode-lookup/', postcode_lookup.postcode_lookup, name='public-postcode-lookup'),
     # The eligibility form builder: the published layout and its publish (enrolment staff)
     path('eligibility-form-layout/', eligibility_layout.eligibility_form_layout, name='eligibility-form-layout'),
+    path('eligibility-form-layout/versions/<int:version>/', eligibility_layout.eligibility_form_layout_version, name='eligibility-form-layout-version'),
+    path('eligibility-form-layout/draft/', eligibility_layout.eligibility_form_draft, name='eligibility-form-layout-draft'),
     path('eligibility-form-layout/publish/', eligibility_layout.publish_eligibility_form_layout, name='eligibility-form-layout-publish'),
     # Extended ILR questionnaire (kind: apprenticeship | commercial)
     path('extended-ilr/<str:kind>/<int:learner_id>/', extended_ilr.extended_ilr, name='extended-ilr'),

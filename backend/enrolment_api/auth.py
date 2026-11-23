@@ -245,7 +245,9 @@ def enrolment_login_required(view):
             if (str(learner.get("learner_type") or "apprenticeship").strip().casefold() == "apprenticeship"
                     and str(learner.get("programme_status") or DEFAULT_PROGRAMME_STATUS).strip().casefold()
                     == DEFAULT_PROGRAMME_STATUS.casefold()):
-                return JsonResponse({"error": "Onboarding is not available yet."}, status=403)
+                from .eligibility_link import may_enter_onboarding
+                if not may_enter_onboarding(account.subject_id):
+                    return JsonResponse({"error": "Onboarding is not available yet."}, status=403)
 
         return view(request, *args, **kwargs)
 

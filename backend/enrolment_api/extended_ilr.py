@@ -403,6 +403,11 @@ def extended_ilr(request, kind, learner_id):
                     learner_id=learner_id,
                     defaults=defaults,
                 )
+                # Opening the wizard does not advance a Fresh learner. The
+                # first committed draft save does, in the same transaction.
+                if learner_write and draft is not None and learner.programme_status == 'Fresh user':
+                    learner.programme_status = 'Onboarding'
+                    learner.save(update_fields=['programme_status'])
                 # Same transaction as the document, so the queryable per-step
                 # tables can never disagree with the draft they came from.
                 if draft is not None:

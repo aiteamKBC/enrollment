@@ -16,10 +16,16 @@ const success = vi.fn();
 const error = vi.fn();
 vi.mock("@/hooks/useToast.helpers", () => ({ useToast: () => ({ success, error }) }));
 const fetchEligibilityLayout = vi.fn();
+const fetchEligibilityVersion = vi.fn();
 const publishEligibilityLayout = vi.fn();
+const saveEligibilityDraft = vi.fn();
+const archiveEligibilityDraft = vi.fn();
 vi.mock('@/api/eligibilityFormLayout', () => ({
   fetchEligibilityLayout: (...args: unknown[]) => fetchEligibilityLayout(...args),
+  fetchEligibilityVersion: (...args: unknown[]) => fetchEligibilityVersion(...args),
   publishEligibilityLayout: (...args: unknown[]) => publishEligibilityLayout(...args),
+  saveEligibilityDraft: (...args: unknown[]) => saveEligibilityDraft(...args),
+  archiveEligibilityDraft: (...args: unknown[]) => archiveEligibilityDraft(...args),
 }));
 
 import EligibilityBuilderPage from '../page';
@@ -141,6 +147,43 @@ async function publish() {
 }
 
 describe('builder page', () => {
+  it('copies an earlier published version into the saved draft and can return to the live form', async () => {
+    const live = defaultLayout();
+    const earlier = defaultLayout();
+    earlier.sections[0].title = 'Earlier Personal Details';
+    fetchEligibilityLayout.mockResolvedValue({ layout: live, version: 9, versions: [
+      { version: 9, status: 'published', publishedAt: '', publishedBy: 'Admin' },
+      { version: 4, status: 'archived', publishedAt: '', publishedBy: 'Admin' },
+    ] });
+    fetchEligibilityVersion.mockResolvedValue({ version: 4, layout: earlier });
+    saveEligibilityDraft.mockResolvedValue({ draft: { id: 10, layout: { ...earlier, copiedFromVersion: 4 }, updatedAt: '', updatedBy: '' } });
+    archiveEligibilityDraft.mockResolvedValue({ draft: null });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderBuilder();
+    const selector = await screen.findByRole('combobox', { name: 'Copy from an earlier published version' });
+    fireEvent.change(selector, { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Copy to draft' }));
+    await waitFor(() => expect(saveEligibilityDraft).toHaveBeenCalledWith({ ...earlier, copiedFromVersion: 4 }, 9, null));
+    expect(within(screen.getByRole('navigation', { name: 'Form sections' })).getByRole('button', { name: 'Earlier Personal Details' })).toBeInTheDocument();
+    expect(publishEligibilityLayout).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Archive draft & return to published' }));
+    await waitFor(() => expect(archiveEligibilityDraft).toHaveBeenCalledWith(9, 10));
+    expect(within(screen.getByRole('navigation', { name: 'Form sections' })).getByRole('button', { name: 'Personal Details' })).toBeInTheDocument();
+  });
+
+  it('keeps the existing draft when the admin cancels copying another version', async () => {
+    const live = defaultLayout();
+    fetchEligibilityLayout.mockResolvedValue({ layout: live, version: 9,
+      draft: { id: 10, layout: live, updatedAt: '', updatedBy: '' },
+      versions: [{ version: 4, status: 'archived', publishedAt: '', publishedBy: 'Admin' }] });
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderBuilder();
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Copy from an earlier published version' }), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Copy to draft' }));
+    expect(saveEligibilityDraft).not.toHaveBeenCalled();
+    expect(screen.getByText(/Editing saved draft/)).toBeInTheDocument();
+  });
+
   it('publishes edited activation email HTML with the form layout', async () => {
     fetchEligibilityLayout.mockResolvedValue({ layout: { ...defaultLayout(), activationEmailHtml: '<p>{{greeting}} Welcome.</p>' }, version: 10 });
     renderBuilder();
@@ -368,10 +411,10 @@ describe('builder page', () => {
     await user.click(within(editor).getByRole('checkbox', { name: 'Other' }));
     await user.click(within(editor).getByRole('button', { name: /Add question/ }));
 
-    expect(screen.getByText('New — adds a column when published')).toBeInTheDocument();
+    expect(screen.getByText('New — answer stored in JSONB')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Asked when “Please provide your residency status?” is Other' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Publish changes/ }));
-    expect(within(await screen.findByRole('dialog')).getByText(/Which visa do you hold\?/)).toBeInTheDocument();
+    expect(within(await screen.findByRole('dialog')).getByText(/New question answers will be saved/)).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Publish$/ }));
     await waitFor(() => expect(success).toHaveBeenCalled());
     const added = sectionItems(publishedLayout(), 'residency').at(-1)!;

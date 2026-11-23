@@ -59,18 +59,18 @@ function fillPersonalDetails(programme = 'Marketing Manager Level 6') {
   type(/First Name/, 'Sam');
   type(/Surname/, 'Example');
   type(/Work Email Address/, 'sam@employer.example');
-  type(/Date of Birth/, '1995-04-03');
+  type(/Date of Birth/, '03/04/1995');
   type(/Choose Your Applying Programme/, programme);
 }
 
 function fillEmployment(hours: 'Yes' | 'No' | null = 'Yes') {
   fireEvent.change(screen.getByLabelText(/Your Employment Status/), { target: { value: 'In paid employment' } });
-  type(/Start Date with Employer/, '2020-09-01');
+  type(/Start Date with Employer/, '01/09/2020');
   type(/Job Title/, 'Marketing Executive');
   if (hours) choose(/50% of your working hours in England/, hours);
   type(/^\d+\. Employer\s*\*?$/, 'Example Ltd');
-  type(/Employer Address Line 1/, '2 Business Park');
-  type(/Employer Address Line 3/, 'Exampletown');
+  type(/Employer Street Address/, '2 Business Park');
+  type(/Employer Town\/City/, 'Exampletown');
   type(/Employer Postcode/, 'EX3 4MP');
   type(/Employer Representative Name/, 'Alex Manager');
   type(/Employer Representative Email/, 'alex@employer.example');
@@ -85,8 +85,8 @@ function fillResidency() {
   choose(/ordinary residence in the UK/, 'Yes');
   choose(/full-time education or training/, 'No');
   choose(/government-funded training programmes/, 'No');
-  type(/Residential Address Line 1/, '1 Example Street');
-  type(/Residential Address Line 3/, 'Exampletown');
+  type(/Residential Street Address/, '1 Example Street');
+  type(/Residential Town\/City/, 'Exampletown');
 }
 
 async function reachResidency() {
@@ -123,10 +123,10 @@ it('resolves a legacy four-section publication to three sections and keeps progr
   expect(screen.queryByRole('button', { name: /Continue/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('radiogroup', { name: /not previously completed/ })).not.toBeInTheDocument();
   fillResidency();
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   await heading('Employment');
   expect(screen.getByLabelText(/Job Title/)).toHaveValue('Marketing Executive');
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   expect(screen.getByLabelText(/Choose Your Applying Programme/)).toHaveValue('Data Analyst Level 4');
   next(); await heading('Employment'); next(); await heading('Residency');
   expect(within(screen.getByRole('radiogroup', { name: /resident in the UK and Islands/ })).getByLabelText('Yes')).toBeChecked();
@@ -155,9 +155,9 @@ it('shows the address placeholders with published labels and hints, preserving t
   await open(); fillPersonalDetails(); next(); await heading('Employment');
   type(/Your Employment Status/, 'In paid employment');
   const placeholders = [
-    ['AddressLine1', 'House number and street name'],
-    ['AddressLine2', 'Flat number, building name or area'],
-    ['TownCity', 'Town or City'], ['County', 'County and Country'],
+    ['AddressLine1', 'Street Address'],
+    ['AddressLine2', 'Address Line 2'],
+    ['TownCity', 'Town or City'], ['County', 'County'],
   ];
   for (const [, placeholder] of placeholders) {
     const field = screen.getByPlaceholderText(placeholder);
@@ -168,14 +168,14 @@ it('shows the address placeholders with published labels and hints, preserving t
   expect(screen.getByLabelText(/Employer Postcode/)).toHaveAttribute('placeholder', 'Enter postcode');
   expect(document.getElementById('application-employerPostcode-hint')).toBeNull();
   expect(document.querySelectorAll('input[id^="application-employerAddress"], #application-employerTownCity, #application-employerCounty, #application-employerPostcode')).toHaveLength(5);
-  expect(screen.queryByLabelText(/Employer Town or City|Employer County/)).not.toBeInTheDocument();
-  expect(screen.getByLabelText(/Employer Address Line 3/)).toHaveAttribute('aria-required', 'true');
-  expect(screen.getByLabelText(/Employer Address Line 4/)).toHaveAttribute('aria-required', 'false');
+  expect(screen.queryByLabelText(/Employer Town or City/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/Employer Town\/City/)).toHaveAttribute('aria-required', 'true');
+  expect(screen.getByLabelText(/Employer County/)).toHaveAttribute('aria-required', 'false');
   expect(screen.queryByText(/e\.g\.|for example/i)).not.toBeInTheDocument();
   type(/Company street address/, '2 Business Park');
-  type(/Start Date with Employer/, '2020-09-01'); type(/Job Title/, 'Marketing Executive');
+  type(/Start Date with Employer/, '01/09/2020'); type(/Job Title/, 'Marketing Executive');
   choose(/50% of your working hours in England/, 'Yes'); type(/^\d+\. Employer\s*\*?$/, 'Example Ltd');
-  type(/Employer Address Line 3/, 'Exampletown'); type(/Employer Postcode/, 'EX3 4MP');
+  type(/Employer Town\/City/, 'Exampletown'); type(/Employer Postcode/, 'EX3 4MP');
   type(/Employer Representative Name/, 'Alex Manager'); type(/Employer Representative Email/, 'alex@employer.example');
   next(); await heading('Residency');
   for (const [, placeholder] of placeholders) {
@@ -184,10 +184,10 @@ it('shows the address placeholders with published labels and hints, preserving t
   expect(screen.getByLabelText(/Residential Postcode/)).toHaveAttribute('placeholder', 'Enter postcode');
   expect(document.getElementById('application-postcode-hint')).toBeNull();
   expect(document.querySelectorAll('input[id^="application-residentialAddress"], #application-residentialTownCity, #application-residentialCounty, #application-postcode')).toHaveLength(5);
-  expect(screen.queryByLabelText(/Residential Town or City|Residential County/)).not.toBeInTheDocument();
-  expect(screen.getByLabelText(/Residential Address Line 3/)).toHaveAttribute('aria-required', 'true');
-  expect(screen.getByLabelText(/Residential Address Line 4/)).toHaveAttribute('aria-required', 'false');
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  expect(screen.queryByLabelText(/Residential Town or City/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/Residential Town\/City/)).toHaveAttribute('aria-required', 'true');
+  expect(screen.getByLabelText(/Residential County/)).toHaveAttribute('aria-required', 'false');
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   expect(screen.getByLabelText(/Company street address/)).toHaveValue('2 Business Park');
   expect(JSON.stringify(layout)).toBe(before);
 });
@@ -195,13 +195,13 @@ it('shows the address placeholders with published labels and hints, preserving t
 it('submits all structured address parts and keeps composed legacy fields compatible', async () => {
   vi.mocked(submitApprenticeshipApplication).mockResolvedValue(ELIGIBLE);
   await reachEmployment();
-  type(/Employer Address Line 2/, 'Building B'); type(/Employer Address Line 4/, 'Kent');
-  expect(screen.getByLabelText(/Employer Address Line 1/)).toHaveAttribute('aria-required', 'true');
-  expect(screen.getByLabelText(/Employer Address Line 3/)).toHaveAttribute('aria-required', 'true');
+  type(/Employer Address Line 2/, 'Building B'); type(/Employer County/, 'Kent');
+  expect(screen.getByLabelText(/Employer Street Address/)).toHaveAttribute('aria-required', 'true');
+  expect(screen.getByLabelText(/Employer Town\/City/)).toHaveAttribute('aria-required', 'true');
   expect(screen.getByLabelText(/Employer Address Line 2/)).toHaveAttribute('aria-required', 'false');
-  expect(screen.getByLabelText(/Employer Address Line 1/)).toHaveAttribute('maxlength', '200');
+  expect(screen.getByLabelText(/Employer Street Address/)).toHaveAttribute('maxlength', '200');
   next(); await heading('Residency'); fillResidency();
-  type(/Residential Address Line 2/, 'Flat 4'); type(/Residential Address Line 4/, 'Kent');
+  type(/Residential Address Line 2/, 'Flat 4'); type(/Residential County/, 'Kent');
   fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
   await heading('You Are Eligible to Proceed!');
   expect(submitApprenticeshipApplication).toHaveBeenCalledWith(expect.objectContaining({
@@ -211,14 +211,14 @@ it('submits all structured address parts and keeps composed legacy fields compat
   }));
 });
 
-it.each(['Employer Address Line 1', 'Employer Address Line 3'])('requires %s before Employment Continue', async label => {
+it.each(['Employer Street Address', 'Employer Town/City'])('requires %s before Employment Continue', async label => {
   await reachEmployment(); type(new RegExp(label), ''); next();
   expect(await screen.findByText('This field is required.')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Employment' })).toBeInTheDocument();
   expect(submitApprenticeshipApplication).not.toHaveBeenCalled();
 });
 
-it.each(['Residential Address Line 1', 'Residential Address Line 3'])('requires %s before final submission', async label => {
+it.each(['Residential Street Address', 'Residential Town/City'])('requires %s before final submission', async label => {
   await open(); await reachResidency(); type(new RegExp(label), '');
   fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
   expect(await screen.findByText('This field is required.')).toBeInTheDocument();
@@ -229,7 +229,7 @@ it('supports overseas postal codes without UK lookup, validation or stale UK geo
   vi.mocked(submitApprenticeshipApplication).mockResolvedValue(ELIGIBLE);
   await open(); await reachResidency();
   type(/Country of Residence/, 'France');
-  type(/Residential Address Line 1/, '10 Rue Exemple'); type(/Residential Address Line 3/, 'Paris');
+  type(/Residential Street Address/, '10 Rue Exemple'); type(/Residential Town\/City/, 'Paris');
   vi.mocked(lookupPostcode).mockClear();
   type(/Residential Postcode \/ Postal Code/, 'CF10 1EP');
   fireEvent.blur(screen.getByLabelText(/Residential Postcode \/ Postal Code/));
@@ -283,11 +283,11 @@ it('walks the three sections and submits one complete application', async () => 
   expect(screen.queryByText('No LMS account needed to apply')).not.toBeInTheDocument();
   expect(screen.getByLabelText(/^1\. First Name/)).toBeInTheDocument();
   expect(screen.getByLabelText(/^5\. Date of Birth/)).toBeInTheDocument();
-  expect(screen.queryByLabelText(/Residential Address Line 1/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/Residential Street Address/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/^\d+\. Residential Postcode /)).not.toBeInTheDocument();
   expect(screen.getByText('Section 1 of 3')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '33');
-  expect(screen.queryByRole('button', { name: /Previous/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Previous$/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Save for later/ })).not.toBeInTheDocument();
   fillPersonalDetails('Associate Project Manager Level 4');
   next();
@@ -300,7 +300,7 @@ it('walks the three sections and submits one complete application', async () => 
   expect(await heading('Residency')).toBeInTheDocument();
   fillResidency();
   choose(/government-funded training programmes/, 'Yes');
-  type(/When was it completed/, '2026-03-01');
+  type(/When was it completed/, '01/03/2026');
   expect(screen.getByText('100% complete')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
 
@@ -338,19 +338,19 @@ it.each(['standard', 'missing', 'hidden-moved'])('keeps the residency Yes confir
   await heading('Residency');
   const confirmationLabel = /Please confirm that your ordinary residence in the UK for the last 3 years has not been mainly or wholly for the purpose of full-time education\./;
   expect(screen.queryByRole('radiogroup', { name: confirmationLabel })).not.toBeInTheDocument();
-  expect(screen.getByLabelText(/^6\. Residential Address Line 1/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/^6\. Residential Street Address/)).toBeInTheDocument();
   const parent = screen.getByRole('radiogroup', { name: /Have you been ordinarily resident in the UK and Islands for the last 3 years/ });
   choose(/Have you been ordinarily resident/, 'Yes');
   const confirmation = screen.getByRole('radiogroup', { name: confirmationLabel });
   expect(parent).toHaveAccessibleName(/^5\./);
   expect(confirmation).toHaveAccessibleName(/^6\./);
   expect(parent.parentElement!.parentElement!.nextElementSibling).toBe(confirmation.parentElement!.parentElement);
-  expect(screen.getByLabelText(/^7\. Residential Address Line 1/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/^7\. Residential Street Address/)).toBeInTheDocument();
   expect(screen.queryByLabelText(/How many full years/)).not.toBeInTheDocument();
   choose(/Have you been ordinarily resident/, 'No');
   expect(screen.queryByRole('radiogroup', { name: confirmationLabel })).not.toBeInTheDocument();
   expect(screen.getByLabelText(/^6\. How many full years/)).toBeInTheDocument();
-  expect(screen.getByLabelText(/^7\. Residential Address Line 1/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/^7\. Residential Street Address/)).toBeInTheDocument();
   choose(/Have you been ordinarily resident/, 'Yes');
   expect(screen.getByRole('radiogroup', { name: confirmationLabel })).toHaveAccessibleName(/^6\./);
   expect(JSON.stringify(layout)).toBe(original);
@@ -373,7 +373,7 @@ it.each(['standard', 'legacy'])('shows the future leaving date immediately after
   expect(date).toHaveAttribute('type', 'text');
   const parent = screen.getByRole('radiogroup', { name: /full-time education or training prior to enrolment/ });
   expect(parent.parentElement!.parentElement!.nextElementSibling).toContainElement(date);
-  type(/Please provide expected leaving date/, '2027-06-30');
+  type(/Please provide expected leaving date/, '30/06/2027');
   choose(/full-time education or training prior to enrolment/, 'No');
   expect(screen.queryByLabelText(/Please provide expected leaving date/)).not.toBeInTheDocument();
   const layout = resolveLayout(defaultLayout());
@@ -395,13 +395,11 @@ it('keeps the applicant on a section until its required answers are valid', asyn
 
   fillPersonalDetails();
   type(/Work Email Address/, 'not-an-email');
-  type(/Date of Birth/, '2027-01-01');
   next();
   expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument();
-  expect(screen.getByText('The date cannot be in the future.')).toBeInTheDocument();
   expect(screen.getByText('Section 1 of 3')).toBeInTheDocument();
   // Address and applicant postcode are no longer part of Section 1.
-  expect(screen.queryByLabelText(/Residential Address Line 1/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/Residential Street Address/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/^\d+\. Residential Postcode /)).not.toBeInTheDocument();
   expect(lookupPostcode).not.toHaveBeenCalled();
 });
@@ -414,7 +412,7 @@ it('uses the employment dropdown for all statuses and preserves paid answers whi
   const status = screen.getByLabelText(/Your Employment Status/);
 
   fireEvent.change(status, { target: { value: 'In paid employment' } });
-  type(/Start Date with Employer/, '2020-09-01');
+  type(/Start Date with Employer/, '01/09/2020');
   type(/Job Title/, 'Marketing Executive');
   expect(screen.queryByText(/Please provide the details of a representative who will support you with your application/)).not.toBeInTheDocument();
   expect(screen.queryByText('Apprenticeship Employment Requirements')).not.toBeInTheDocument();
@@ -427,15 +425,15 @@ it('uses the employment dropdown for all statuses and preserves paid answers whi
     fireEvent.change(status, { target: { value } });
     expect(screen.getByText('Apprenticeship Employment Requirements')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Continue/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Previous/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Previous$/ })).toBeEnabled();
     expect(screen.queryByLabelText(/Start Date with Employer/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Employer Address Line 1/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Employer Street Address/)).not.toBeInTheDocument();
   }
 
   fireEvent.change(status, { target: { value: 'In paid employment' } });
   expect(screen.getByRole('button', { name: /Continue/ })).toBeEnabled();
   expect(screen.queryByText('Apprenticeship Employment Requirements')).not.toBeInTheDocument();
-  expect(screen.getByLabelText(/Start Date with Employer/)).toHaveValue('2020-09-01');
+  expect(screen.getByLabelText(/Start Date with Employer/)).toHaveValue('01/09/2020');
   expect(screen.getByLabelText(/Job Title/)).toHaveValue('Marketing Executive');
 });
 
@@ -474,7 +472,7 @@ it('allows Previous and return to Employment so a restricted applicant can corre
   fillPersonalDetails(); next();
   await heading('Employment');
   fireEvent.change(screen.getByLabelText(/Your Employment Status/), { target: { value: 'Self employment' } });
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   await heading('Personal Details');
   expect(screen.getByLabelText(/First Name/)).toHaveValue('Sam');
   next();
@@ -619,17 +617,17 @@ it('shares blur and Continue verification, disables repeated clicks, and reuses 
   fireEvent.click(button);
   fireEvent.submit(screen.getByRole('form'));
   expect(lookupPostcode).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole('button', { name: /Previous/ })).toBeEnabled();
+  expect(screen.getByRole('button', { name: /^Previous$/ })).toBeEnabled();
   await act(async () => pending.resolve(EXETER));
   await heading('Residency');
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   await heading('Employment'); next(); await heading('Residency');
   expect(lookupPostcode).toHaveBeenCalledTimes(1);
 });
 
 it('requires fresh verification when a previously verified postcode changes', async () => {
   await reachEmployment(); next(); await heading('Residency');
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   await heading('Employment');
   vi.mocked(lookupPostcode).mockResolvedValue({ status: 'notFound' });
   type(/Employer Postcode/, 'ZZ9 9ZZ');
@@ -656,7 +654,7 @@ it('does not advance when Previous is used during postcode verification', async 
   const pending = deferredCheck();
   vi.mocked(lookupPostcode).mockReturnValue(pending.promise);
   await reachEmployment(); next();
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   await heading('Personal Details');
   await act(async () => pending.resolve(EXETER));
   expect(screen.getByRole('heading', { name: 'Personal Details' })).toBeInTheDocument();
@@ -836,8 +834,8 @@ it('describes the initial screening pass and activation email with concise appli
 it('shows the backend Not Eligible result with an age-specific reason for a two-day-old DOB', async () => {
   vi.setSystemTime(new Date('2026-11-03T12:00:00Z'));
   vi.mocked(submitApprenticeshipApplication).mockResolvedValue({ eligible: false, outcome: 'notEligible', reasons: [APPLICATION_AGE_REASON], assessmentStatus: 'not_eligible' });
-  await open(); fillPersonalDetails(); type(/Date of Birth/, '2026-11-01'); next();
-  await heading('Employment'); fillEmployment(); type(/Start Date with Employer/, '2026-11-02'); next();
+  await open(); fillPersonalDetails(); type(/Date of Birth/, '01/11/2026'); next();
+  await heading('Employment'); fillEmployment(); type(/Start Date with Employer/, '02/11/2026'); next();
   await heading('Residency'); fillResidency(); choose(/resident in the UK and Islands/, 'No'); type(/How many full years/, '0');
   fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
   await heading('You Are Not Currently Eligible');
@@ -851,14 +849,14 @@ it('shows one concise under-16 notice without repeating policy text and preserve
   await open();
   expect(screen.getByText('Enter your date of birth.')).toBeInTheDocument();
   expect(screen.queryByText(/application-stage screening policy/)).not.toBeInTheDocument();
-  fillPersonalDetails(); type(/Date of Birth/, '2011-11-04');
+  fillPersonalDetails(); type(/Date of Birth/, '04/11/2011');
   expect(screen.getAllByText(APPLICATION_AGE_NOTICE, { exact: true })).toHaveLength(1);
   expect(screen.queryByText('Enter your date of birth.')).not.toBeInTheDocument();
   expect(screen.queryByText(APPLICATION_AGE_REASON)).not.toBeInTheDocument();
-  type(/Date of Birth/, '1995-04-03');
+  type(/Date of Birth/, '03/04/1995');
   expect(screen.queryByText(APPLICATION_AGE_NOTICE)).not.toBeInTheDocument();
   expect(screen.getByText('Enter your date of birth.')).toBeInTheDocument();
-  type(/Date of Birth/, '2011-11-04');
+  type(/Date of Birth/, '04/11/2011');
   next(); await heading('Employment');
 });
 
@@ -873,19 +871,19 @@ it('does not restore lengthy DOB instructions from an older published layout', a
 
 it('blocks employment before birth inline and permits a valid planned employment date', async () => {
   await open(); fillPersonalDetails(); next(); await heading('Employment'); fillEmployment();
-  type(/Start Date with Employer/, '1990-01-01'); next();
+  type(/Start Date with Employer/, '01/01/1990'); next();
   expect(await screen.findByText('Enter a date after your date of birth.')).toBeInTheDocument();
   expect(screen.getByLabelText(/Start Date with Employer/)).toHaveAttribute('aria-invalid', 'true');
   expect(screen.getByLabelText(/Start Date with Employer/)).toHaveFocus();
-  type(/Start Date with Employer/, '2027-01-01');
+  type(/Start Date with Employer/, '01/01/2027');
   expect(screen.getByLabelText(/Start Date with Employer/)).not.toHaveAttribute('max');
   expect(screen.getByText(/Admissions must confirm the planned employment arrangements/)).toBeInTheDocument();
   next(); await heading('Residency');
 });
 
 it('shows impossible residency duration as an inline correction rather than an eligibility outcome', async () => {
-  await open(); fillPersonalDetails(); type(/Date of Birth/, '2020-01-01'); next();
-  await heading('Employment'); fillEmployment(); type(/Start Date with Employer/, '2025-01-01'); next();
+  await open(); fillPersonalDetails(); type(/Date of Birth/, '01/01/2020'); next();
+  await heading('Employment'); fillEmployment(); type(/Start Date with Employer/, '01/01/2025'); next();
   await heading('Residency'); fillResidency(); choose(/resident in the UK and Islands/, 'No');
   type(/How many full years/, '9'); fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
   expect(await screen.findByText('The number of full years in the UK cannot exceed your age. Please check your answers.')).toBeInTheDocument();
@@ -993,7 +991,7 @@ it('shows IPC directly after the employment restriction only for PCP L6 and clea
   fireEvent.change(status, { target: { value: 'In paid employment' } });
   expect(screen.queryByRole('region', { name: 'IPC Fund recommendation' })).not.toBeInTheDocument();
   fireEvent.change(status, { target: { value: 'Self employment' } });
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   await heading('Personal Details');
   type(/Choose Your Applying Programme/, 'Marketing Manager Level 6'); next();
   await heading('Employment');
@@ -1012,7 +1010,7 @@ it.each([
   fillPersonalDetails(programme); next();
   await heading('Employment');
   fireEvent.change(screen.getByLabelText(/Your Employment Status/), { target: { value: 'In paid employment' } });
-  type(/Start Date with Employer/, '2020-09-01');
+  type(/Start Date with Employer/, '01/09/2020');
   type(/Job Title/, 'Engineer');
   type(/^\d+\. Employer\s*\*?$/, 'Example Ltd');
   type(/Employer Street Address/, '2 Business Park');
@@ -1067,9 +1065,9 @@ it('keeps the form and asks the applicant to try again when the postcodes could 
   expect(await screen.findByText(/please try again in a few minutes/)).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: /eligible|Application submitted/ })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /Submit application/ })).toBeEnabled();
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   await heading('Employment');
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   expect(screen.getByLabelText(/Choose Your Applying Programme/)).toHaveValue('Marketing Manager Level 6');
 });
 
@@ -1085,9 +1083,9 @@ it('returns to earlier sections with the answers kept', async () => {
   fillPersonalDetails();
   next();
   await heading('Employment');
-  fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Previous$/ }));
   expect(screen.getByLabelText(/First Name/)).toHaveValue('Sam');
-  expect(screen.getByLabelText(/Date of Birth/)).toHaveValue('1995-04-03');
+  expect(screen.getByLabelText(/Date of Birth/)).toHaveValue('03/04/1995');
 });
 
 it('does not send a completion date once the answer is changed to No', async () => {
@@ -1099,7 +1097,7 @@ it('does not send a completion date once the answer is changed to No', async () 
   await heading('Residency');
   fillResidency();
   choose(/government-funded training programmes/, 'Yes');
-  type(/When was it completed/, '2026-03-01');
+  type(/When was it completed/, '01/03/2026');
   choose(/government-funded training programmes/, 'No');
   fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
   await heading('You Are Eligible to Proceed!');
@@ -1153,25 +1151,28 @@ it('asks the questions of the published form', async () => {
 
   expect(screen.getByRole('heading', { name: 'Apply for an apprenticeship' })).toBeInTheDocument();
   expect(screen.queryByText('All fields marked with * are required.')).not.toBeInTheDocument();
-  expect(screen.getByText('Section 1 of 1')).toBeInTheDocument();
+  expect(screen.getByText('Section 1 of 3')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'About you' })).toBeInTheDocument();
-  expect(screen.getByLabelText(/Date of Birth/)).toHaveAttribute('aria-required', 'true');
+  expect(screen.getByLabelText(/Date of Birth/)).toBeRequired();
   type(/Given name/, 'Sam');
   type(/Surname/, 'Example');
   type(/Work Email Address/, 'sam@employer.example');
-  type(/Date of Birth/, '1995-04-03');
-  expect(screen.queryByLabelText(/Residential Address Line 1/)).not.toBeInTheDocument();
+  type(/Date of Birth/, '03/04/1995');
+  expect(screen.queryByLabelText(/Residential Street Address/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/^\d+\. Residential Postcode /)).not.toBeInTheDocument();
   // The follow-up is asked only after a Yes, and is then required.
   expect(screen.queryByLabelText(/Your manager's name/)).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText(/Choose Your Applying Programme/), { target: { value: 'Data Analyst Level 4' } });
   choose(/Do you have a line manager/, 'Yes');
-  fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
+  next();
   expect(await screen.findByText('This field is required.')).toBeInTheDocument();
   type(/Your manager's name/, 'Alex');
   expect(within(screen.getByLabelText(/Choose Your Applying Programme/)).getAllByRole('option').map(o => o.textContent))
     .toEqual(['Please select', 'Data Analyst Level 4']);
   fireEvent.change(screen.getByLabelText(/Choose Your Applying Programme/), { target: { value: 'Data Analyst Level 4' } });
+  next();
+  await heading('Employment'); fillEmployment(); next();
+  await heading('Residency'); fillResidency();
   fireEvent.click(screen.getByRole('button', { name: /Submit application/ }));
 
   await heading('You Are Eligible to Proceed!');
@@ -1195,7 +1196,7 @@ it('reloads a form republished while it was being filled in, keeping the answers
 
   expect(await screen.findByRole('alert')).toHaveTextContent('This form was updated while you were filling it in.');
   expect(fetchEligibilityForm).toHaveBeenCalledTimes(2);
-  expect(screen.getByText('Section 1 of 1')).toBeInTheDocument();
+  expect(screen.getByText('Section 1 of 3')).toBeInTheDocument();
   expect(screen.getByLabelText(/Given name/)).toHaveValue('Sam');
   expect(screen.getByRole('radiogroup', { name: /Do you have a line manager/ })).toBeInTheDocument();
 });

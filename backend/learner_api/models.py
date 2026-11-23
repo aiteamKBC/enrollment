@@ -1614,6 +1614,10 @@ class Organisation(models.Model):
     """
 
     id = models.AutoField(primary_key=True, db_column="id")
+    merged_into_organisation_id = models.IntegerField(db_column="Merged_into_organisation_id", null=True, blank=True)
+    merged_at = models.DateTimeField(db_column="Merged_at", null=True, blank=True)
+    merged_by_account_id = models.BigIntegerField(db_column="Merged_by_account_id", null=True, blank=True)
+    potential_match_ids = SafeJSONField(db_column="Potential_match_ids", default=list, blank=True)
 
     status = models.TextField(db_column="Status", null=True, blank=True)
     name = models.TextField(db_column="Name", null=True, blank=True)

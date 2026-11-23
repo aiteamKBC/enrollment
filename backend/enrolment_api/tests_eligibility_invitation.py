@@ -1,5 +1,4 @@
-"""An eligible applicant on the public eligibility form becomes a learner and is
-invited to set their password; anyone else is not.
+"""An eligible public application stages an invitation, without an account.
 
 SimpleTestCase throughout: the learner table, the login account and the mail
 transport are all stubbed, so no query reaches a database and no email is sent.
@@ -69,7 +68,7 @@ class SubmitInvitesTests(SimpleTestCase):
         response, data, cursor = self.post(application())
         self.assertEqual(response.status_code, 201)
         self.assertEqual(data, {"submitted": True, "eligible": True, "reasons": [], "outcome": "invited"})
-        self.assertEqual(len(cursor.executed), 2)  # application plus durable response receipt
+        self.assertEqual(len(cursor.executed), 3)  # programme lookup, application, receipt
         self.invite.assert_called_once()
         row = self.invite.call_args.args[0]
         self.assertEqual((row["work_email"], row["eligible"]), ("sam@employer.example", True))
@@ -91,7 +90,7 @@ class SubmitInvitesTests(SimpleTestCase):
         _response, data, cursor = self.post(application(postcode="EH1 1YZ"))
         self.assertEqual(data["outcome"], "notEligible")
         self.assertEqual(data["reasons"], ["Your postcode (EH1 1YZ) is outside England (Scotland)."])
-        self.assertEqual(len(cursor.executed), 2)
+        self.assertEqual(len(cursor.executed), 3)
         self.invite.assert_not_called()
 
     def test_postcodes_that_could_not_be_checked_invite_nobody(self):
@@ -141,7 +140,7 @@ class SubmitInvitesTests(SimpleTestCase):
         self.assertIs(data["eligible"], False)
         self.assertEqual(data["outcome"], "notEligible")
         self.assertIn("50%", data["reasons"][0])
-        self.assertEqual(len(cursor.executed), 2)
+        self.assertEqual(len(cursor.executed), 3)
         self.invite.assert_not_called()
 
     def test_invalid_answers_invite_nobody(self):
@@ -180,57 +179,40 @@ class LearnerFieldsTests(SimpleTestCase):
 class InviteApplicantTests(SimpleTestCase):
     def setUp(self):
         self.has_account = started(self, ei, "has_account", return_value=False)
-        started(self, ei, "transaction", new=SimpleNamespace(atomic=lambda using=None: nullcontext()))
-        self.learners = started(self, EnrolmentUser, "all_learners", new=MagicMock())
-        self.learner = SimpleNamespace(id=812)
-        self.learners.create.return_value = self.learner
-        from learner_api import learner_progression
+        started(self, ei, "transaction", new=SimpleNamespace(
+            atomic=lambda using=None: nullcontext(),
+            on_commit=lambda callback, **_: callback(),
+        ))
+        from enrolment_api import eligibility_link
+        self.add_link = started(self, eligibility_link, "add_link")
+        self.dispatch = started(self, eligibility_link, "dispatch", return_value=ei.INVITED)
 
-        self.advance = started(self, learner_progression, "advance_learner")
-        self.send = started(self, services, "invite_eligible_applicant", return_value=(True, None))
-
-    def test_creates_the_learner_and_sends_the_invitation(self):
-        self.assertEqual(ei.invite_applicant(ROW, ip="203.0.113.5", user_agent="UA"), ei.INVITED)
-        created = dict(self.learners.create.call_args.kwargs)
-        expected = ei.learner_fields(ROW)
-        # Stamped with the time of creation.
-        created.pop("enrolled_time_and_user"), expected.pop("enrolled_time_and_user")
-        self.assertEqual(created, expected)
-        self.advance.assert_called_once_with(self.learner)
-        self.send.assert_called_once_with(self.learner, ip="203.0.113.5", user_agent="UA")
+    def test_stages_an_invitation_without_creating_an_account(self):
+        self.assertEqual(ei.invite_applicant(ROW, application_id=42,
+                         ip="203.0.113.5", user_agent="UA"), ei.INVITED)
+        self.add_link.assert_called_once_with(42, None)
+        self.dispatch.assert_called_once_with(42, ip="203.0.113.5", user_agent="UA")
 
     def test_an_address_with_an_account_is_neither_created_nor_invited(self):
         self.has_account.return_value = True
         self.assertEqual(ei.invite_applicant(ROW), ei.EXISTING_ACCOUNT)
-        self.learners.create.assert_not_called()
-        self.send.assert_not_called()
+        self.add_link.assert_not_called()
+        self.dispatch.assert_not_called()
 
     def test_the_same_address_submitted_twice_at_once_is_an_existing_account(self):
-        self.learners.create.side_effect = IntegrityError("duplicate key")
-        self.assertEqual(ei.invite_applicant(ROW), ei.EXISTING_ACCOUNT)
-        self.send.assert_not_called()
+        self.add_link.side_effect = IntegrityError("duplicate key")
+        self.assertEqual(ei.invite_applicant(ROW, application_id=42), ei.EXISTING_ACCOUNT)
+        self.dispatch.assert_not_called()
 
-    def test_a_learner_that_could_not_be_created_asks_for_a_retry(self):
-        self.learners.create.side_effect = DatabaseError("boom")
+    def test_a_link_that_could_not_be_created_asks_for_a_retry(self):
+        self.add_link.side_effect = DatabaseError("boom")
         with self.assertLogs("enrolment_api.eligibility_invitation", level="ERROR"):
-            self.assertEqual(ei.invite_applicant(ROW), ei.RETRY_LATER)
-        self.send.assert_not_called()
+            self.assertEqual(ei.invite_applicant(ROW, application_id=42), ei.RETRY_LATER)
+        self.dispatch.assert_not_called()
 
     def test_an_email_that_could_not_be_sent_is_pending_not_invited(self):
-        self.send.return_value = (False, "not-configured: no mail credentials")
-        with self.assertLogs("enrolment_api.eligibility_invitation", level="WARNING"):
-            self.assertEqual(ei.invite_applicant(ROW), ei.INVITE_PENDING)
-
-    def test_an_account_failure_after_creation_is_pending(self):
-        from login.identity import AccountError
-
-        self.send.side_effect = AccountError("Another learner account already uses this address.")
-        with self.assertLogs("enrolment_api.eligibility_invitation", level="ERROR"):
-            self.assertEqual(ei.invite_applicant(ROW), ei.INVITE_PENDING)
-
-    def test_an_address_that_already_signs_in_is_reported_as_an_existing_account(self):
-        self.send.return_value = (False, "existing-account")
-        self.assertEqual(ei.invite_applicant(ROW), ei.EXISTING_ACCOUNT)
+        self.dispatch.return_value = ei.INVITE_PENDING
+        self.assertEqual(ei.invite_applicant(ROW, application_id=42), ei.INVITE_PENDING)
 
 
 class HasAccountTests(SimpleTestCase):

@@ -31,6 +31,9 @@ class FakeCursor:
     def fetchone(self):
         return self.results.pop(0) if self.results else None
 
+    def fetchall(self):
+        return self.results.pop(0) if self.results else []
+
     def __enter__(self):
         return self
 
@@ -478,16 +481,50 @@ class NormalizeLayoutTests(SimpleTestCase):
         self.assertEqual(layout["texts"], {"firstName.label": "Given name"})
 
 
-class TableTests(SimpleTestCase):
-    def test_custom_columns_are_added_without_dropping_anything(self):
-        cursor = FakeCursor()
-        ef.add_custom_columns(cursor, {"custom_years": "numeric"})
-        self.assertEqual(cursor.executed, [('ALTER TABLE enrolment.eligibility_form ADD COLUMN IF NOT EXISTS "custom_years" numeric', None)])
+class PublishedVersionHistoryTests(SimpleTestCase):
+    def test_history_lists_published_rows_but_excludes_archived_drafts(self):
+        now = datetime(2026, 11, 23, tzinfo=timezone.utc)
+        cursor = FakeCursor([[(13, 'published', now, 'Admin'), (11, 'archived', now, 'Other')]])
+        versions = el.list_published_versions(cursor)
+        self.assertEqual([entry['version'] for entry in versions], [13, 11])
+        self.assertEqual(versions[1]['publishedBy'], 'Other')
+        self.assertIn("published_at IS NOT NULL", cursor.executed[0][0])
+        self.assertNotIn('"Layout"', cursor.executed[0][0])
 
-    def test_unsafe_custom_columns_are_refused(self):
-        for columns in ({'custom_a" text; DROP TABLE x; --': "text"}, {"first_name": "text"}, {"custom_a": "text; DROP"}):
-            with self.assertRaises(ValueError):
-                ef.add_custom_columns(FakeCursor(), columns)
+    def test_archived_published_layout_can_be_copied_but_drafts_cannot(self):
+        original = standard_layout()
+        cursor = FakeCursor([(11, original, 'archived'), None])
+        self.assertEqual(el.read_published_version(cursor, 11)['layout'], original)
+        self.assertIsNone(el.read_published_version(cursor, 12))
+        self.assertEqual(cursor.executed[0][1], [11])
+        self.assertIn("published_at IS NOT NULL", cursor.executed[0][0])
+
+    def test_copy_preserves_historical_custom_question_identifiers(self):
+        previous = standard_layout()
+        historical = with_items(standard_layout(), 'residency', {
+            'key': 'cf_original', 'column': 'custom_original', 'builtin': False,
+            'hidden': False, 'label': 'Renamed question', 'type': 'text', 'required': False,
+        })
+        historical['copiedFromVersion'] = 4
+        restored, _ = el.normalize_layout(historical, previous, historical)
+        field = item(restored, 'cf_original')
+        self.assertEqual(field['column'], 'custom_original')
+        self.assertNotIn('copiedFromVersion', restored)
+
+    def test_only_staff_can_fetch_a_historical_layout(self):
+        request = RequestFactory().get('/enrolment_api/eligibility-form-layout/versions/11/')
+        request.login_account = SimpleNamespace(is_active=True, role='learner', subject_id=41, subject_type='learner')
+        request.user = SimpleNamespace(is_authenticated=False)
+        with patch.dict(os.environ, {'ENROLMENT_API_REQUIRE_AUTH': '1'}), patch.object(el, 'connections') as conns:
+            self.assertEqual(el.eligibility_form_layout_version(request, 11).status_code, 404)
+            conns.__getitem__.assert_not_called()
+
+
+class TableTests(SimpleTestCase):
+    def test_custom_questions_do_not_add_sql_columns(self):
+        cursor = FakeCursor()
+        ef.upgrade_table(cursor)
+        self.assertFalse(any('custom_' in sql for sql, _ in cursor.executed))
 
 
 class PublishViewTests(SimpleTestCase):
@@ -507,7 +544,7 @@ class PublishViewTests(SimpleTestCase):
         with patch.object(el, "connections", FakeConnections(cursor)):
             return el.publish_eligibility_form_layout(request)
 
-    def test_publishes_a_new_version_and_adds_its_columns(self):
+    def test_publishes_a_new_version_without_adding_answer_columns(self):
         now = datetime(2026, 10, 15, tzinfo=timezone.utc)
         # to_regclass (exists), latest row (none yet), INSERT ... RETURNING
         cursor = FakeCursor([("x",), None, (3, now)])
@@ -518,11 +555,8 @@ class PublishViewTests(SimpleTestCase):
         self.assertEqual(data["version"], 3)
         self.assertEqual(item(data["layout"], "cf_years_in_role")["column"], "custom_years_in_role")
         sql = [s for s, _ in cursor.executed]
-        self.assertIn('ALTER TABLE enrolment.eligibility_form ADD COLUMN IF NOT EXISTS "custom_years_in_role" numeric', sql)
-        # Brings the table up to date first, and never drops anything.
-        self.assertTrue(any(s.startswith("CREATE TABLE IF NOT EXISTS enrolment.eligibility_form") for s in sql))
-        self.assertIn("ALTER TABLE enrolment.eligibility_form ADD COLUMN IF NOT EXISTS layout_version bigint", sql)
-        self.assertFalse(any("DROP COLUMN" in s or "DROP TABLE" in s for s in sql))
+        self.assertFalse(any("ALTER TABLE enrolment.eligibility_form" in s for s in sql))
+        self.assertTrue(any("status='published'" in s for s in sql))
         self.assertTrue(sql[-1].startswith('INSERT INTO enrolment."Eligibility_Form_Layouts"'))
 
     def test_refuses_when_someone_else_published_first(self):

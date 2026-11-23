@@ -2,22 +2,19 @@
 application (/apprenticeship_application):
 
   * enrolment.eligibility_form, where each submission is saved: created if
-    missing; otherwise missing structured address, employment, residency, expected leaving date,
-    postcode-location and layout_version columns are
-    added and every answer the eligibility form builder can remove is allowed
-    to be NULL (first name, surname and work email stay NOT NULL);
+    missing; otherwise missing submission metadata and answers JSONB are added.
+    Question answers, addresses and derived locations live in answers JSONB;
+    first name, surname and work email remain required identity columns.
   * enrolment."Eligibility_Form_Layouts", where the builder publishes the form.
 
 Idempotent, and additive only: no column, table or row is dropped or changed.
-Run once per environment before this release serves the form -- the public
-endpoint never runs DDL itself, and its insert writes the new columns.
+The public endpoint never runs DDL itself. Historical additive migrations are
+kept separately; this command does not recreate retired per-question columns.
 
     python manage.py apply_eligibility_form_table            # apply
     python manage.py apply_eligibility_form_table --dry-run  # execute DDL, then roll back
 
-For the eight-column submission repair alone, use the separately reviewed
-database/eligibility_submission_fields.sql. Neither path belongs in a public
-request. --dry-run still acquires database locks; use only an approved database.
+--dry-run still acquires database locks; use only an approved database.
 """
 from django.core.management.base import BaseCommand
 from django.db import connections, transaction

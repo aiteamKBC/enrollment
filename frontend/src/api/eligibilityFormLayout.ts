@@ -37,6 +37,10 @@ export function fetchEligibilityLayout(): Promise<EligibilityLayoutResponse> {
   return send<EligibilityLayoutResponse>(`${BASE}/`);
 }
 
+export function fetchEligibilityVersion(version: number): Promise<{ version: number; layout: EligibilityLayout; workplaceEnabled?: boolean }> {
+  return send(`${BASE}/versions/${version}/`);
+}
+
 /**
  * Publish a new layout. `baseVersion` is the version the editor started from:
  * the server refuses (409) when someone else published in between, rather than
@@ -47,5 +51,19 @@ export function publishEligibilityLayout(layout: EligibilityLayout, baseVersion:
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ layout, baseVersion }),
+  });
+}
+
+export function saveEligibilityDraft(layout: EligibilityLayout, baseVersion: number | null, draftId: number | null): Promise<EligibilityLayoutResponse> {
+  return send<EligibilityLayoutResponse>(`${BASE}/draft/`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ layout, baseVersion, draftId }),
+  });
+}
+
+export function archiveEligibilityDraft(baseVersion: number | null, draftId: number): Promise<{ draft: null }> {
+  return send<{ draft: null }>(`${BASE}/draft/`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ baseVersion, draftId }),
   });
 }

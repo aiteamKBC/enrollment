@@ -177,6 +177,40 @@ def send_invitation(account, *, invited_by=None, ip=None, user_agent=None, intro
     return invitation, sent, detail
 
 
+def send_eligibility_invitation(application_id, *, email, display_name, ip=None, user_agent=None):
+    """Send a set-password link tied to an application, before an account exists."""
+    from enrolment_api.eligibility_layout import activation_email_for_application
+
+    intro_html = activation_email_for_application(application_id)
+    if not intro_html:
+        return None, False, "activation-email-template-unavailable"
+    with transaction.atomic(using="enrolment"):
+        Invitation.objects.filter(eligibility_application_id=application_id,
+                                  used_at__isnull=True).update(used_at=timezone.now())
+        token = generate_token()
+        invitation = Invitation.objects.create(
+            account=None, eligibility_application_id=application_id,
+            token_hash=hash_token(token), email=email,
+            expires_at=timezone.now() + INVITATION_TTL,
+            invited_by=f"eligibility application {application_id}", created_ip=ip,
+        )
+    subject, html, plain = email_azure.invitation_message(
+        display_name=display_name, link=invitation_link(token),
+        expires_days=INVITATION_TTL.days, intro_html=intro_html,
+    )
+    sent, detail = email_azure.send_mail(
+        to=email, subject=subject, html_body=html, text_body=plain,
+        save_to_sent=True,
+    )
+    invitation.sent_at = timezone.now() if sent else None
+    invitation.send_error = None if sent else detail
+    invitation.save(update_fields=["sent_at", "send_error"])
+    record(EVENT_INVITE_SENT, email=email, succeeded=sent,
+           reason=None if sent else (detail or "send-failed")[:200], ip=ip,
+           user_agent=user_agent)
+    return invitation, sent, detail
+
+
 class TokenError(ValueError):
     """Raised when a token is unknown, already used, or expired."""
 
@@ -201,6 +235,16 @@ def peek_invitation(token):
     fail early on a dead link, rather than only discovering it on submit.
     """
     invitation = _load_token(Invitation, token)
+    if invitation.account is None and invitation.eligibility_application_id is not None:
+        from django.db import connections
+        with connections["enrolment"].cursor() as cursor:
+            cursor.execute("SELECT first_name, surname FROM enrolment.eligibility_form WHERE id=%s",
+                           [invitation.eligibility_application_id])
+            row = cursor.fetchone()
+        if row is None:
+            raise TokenError("This link is invalid or has expired. Please request a new one.")
+        return {"email": invitation.email, "displayName": " ".join(part for part in row if part),
+                "role": "learner", "expiresAt": invitation.expires_at.isoformat()}
     return {
         "email": invitation.account.email,
         "displayName": invitation.account.display_name,
@@ -214,6 +258,9 @@ def accept_invitation(token, new_password, *, ip=None, user_agent=None):
     """Redeem an invitation: set the first password and activate the account."""
     invitation = _load_token(Invitation, token, lock=True)
     account = invitation.account
+
+    if account is None and invitation.eligibility_application_id is not None:
+        account = _accept_eligibility_account(invitation)
 
     validate_password_strength(
         new_password, email=account.email, display_name=account.display_name
@@ -232,7 +279,12 @@ def accept_invitation(token, new_password, *, ip=None, user_agent=None):
     )
 
     invitation.used_at = timezone.now()
-    invitation.save(update_fields=["used_at"])
+    if invitation.eligibility_application_id is not None:
+        invitation.account = account
+        invitation.eligibility_accepted_at = invitation.used_at
+        invitation.save(update_fields=["account", "eligibility_accepted_at", "used_at"])
+    else:
+        invitation.save(update_fields=["used_at"])
     from enrolment_api.eligibility_link import mark_activated
     mark_activated(account)
 
@@ -248,6 +300,52 @@ def accept_invitation(token, new_password, *, ip=None, user_agent=None):
         ip=ip,
         user_agent=user_agent,
     )
+    return account
+
+
+def _accept_eligibility_account(invitation):
+    """Create learner and account inside the acceptance transaction."""
+    import json
+    from django.db import connections
+    from enrolment_api.eligibility_invitation import learner_fields
+    from enrolment_api.organisation_matching import resolve_application_organisation
+    from learner_api.models import EnrolmentUser
+    from .identity import ensure_account
+
+    with connections["enrolment"].cursor() as cursor:
+        cursor.execute("SELECT a.answers, a.first_name, a.surname, a.work_email, a.eligible "
+                       "FROM enrolment.eligibility_form a WHERE a.id=%s FOR UPDATE",
+                       [invitation.eligibility_application_id])
+        found = cursor.fetchone()
+        if not found:
+            raise TokenError("This link is invalid or has expired. Please request a new one.")
+        answers = json.loads(found[0]) if isinstance(found[0], str) else found[0]
+        row = {**(answers or {}), "first_name": found[1], "surname": found[2],
+               "work_email": found[3], "eligible": found[4]}
+        cursor.execute("""SELECT learner_id, override_approved_at, invitation_id
+            FROM enrolment.eligibility_learner_links WHERE application_id=%s FOR UPDATE""",
+                       [invitation.eligibility_application_id])
+        link = cursor.fetchone()
+        if (not link or link[0] is not None or link[2] != invitation.pk
+                or not (row.get("eligible") is True or link[1] is not None)
+                or row.get("work_email", "").casefold() != invitation.email.casefold()):
+            raise TokenError("This link is invalid or has expired. Please request a new one.")
+    from enrolment_api.eligibility_invitation import has_account
+    if has_account(invitation.email):
+        raise TokenError("An account already exists for this email. Contact admissions.")
+    org = resolve_application_organisation(row)
+    fields = learner_fields(row)
+    fields.update(organisation_id=org.pk, organization=org.name)
+    learner = EnrolmentUser.all_learners.create(**fields)
+    account, created = ensure_account("learner", learner.pk, subject=learner)
+    if not created or account.subject_type != "learner" or account.subject_id != learner.pk:
+        raise TokenError("An account already exists for this email. Contact admissions.")
+    with connections["enrolment"].cursor() as cursor:
+        cursor.execute("""UPDATE enrolment.eligibility_learner_links
+            SET learner_id=%s WHERE application_id=%s AND learner_id IS NULL""",
+                       [learner.pk, invitation.eligibility_application_id])
+        if cursor.rowcount != 1:
+            raise TokenError("This link is invalid or has expired. Please request a new one.")
     return account
 
 

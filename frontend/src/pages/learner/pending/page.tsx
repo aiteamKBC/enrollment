@@ -16,7 +16,7 @@ export default function PendingOnboarding() {
     setChecking(true); setMessage('');
     try {
       const board = await fetchEnrolmentBoard(id);
-      if ((board.programme.status || '').toLowerCase() !== 'fresh user') {
+      if ((board.programme.status || '').toLowerCase() !== 'fresh user' || board.programme.onboardingAuthorized) {
         navigate('/learner/onboarding', { replace: true });
       } else {
         setMessage('Your enrolment is still being prepared. Please check again later.');
