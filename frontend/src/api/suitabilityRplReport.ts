@@ -126,6 +126,7 @@ export interface SuitabilityRplReport {
   sourceSnapshot: SuitabilityRplEvidence;
   sourceVersions: Record<string, unknown>;
   sourceSnapshotHash: string;
+  trainingHours: { originalHours: number | null; reductionHours: number; remainingHours: number | null };
   reductions: SuitabilityRplReduction[];
   createdAt: string;
   updatedAt: string;
@@ -275,7 +276,7 @@ export async function fetchSuitabilityRplReport(kind: LearnerKind, learnerId: st
 
 export async function saveSuitabilityRplReport(kind: LearnerKind, learnerId: string, payload: SuitabilityRplSavePayload) {
   const { csrfToken } = await prefetchAssessmentSecurity();
-  return readJson<{ report: SuitabilityRplReport; aiEnabled: boolean }>(await fetch(base(kind, learnerId), {
+  return readJson<{ report: SuitabilityRplReport } & Pick<SuitabilityRplState, 'history' | 'aiEnabled'>>(await fetch(base(kind, learnerId), {
     method: 'PUT', credentials: 'include', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
     body: JSON.stringify(payload),

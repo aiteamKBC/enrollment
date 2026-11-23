@@ -35,6 +35,7 @@ from .configuration import PROGRAMMES as SUITABILITY_PROGRAMMES
 from .models import Assessment, SuitabilityCvExtraction, SuitabilityRplDocumentSignature, SuitabilityRplReduction, SuitabilityRplReport
 from .cv_extraction import CvExtractionError, extract_approved_cv
 from .server_pdf import render_finalised_report, render_report
+from .training_hours import training_hours_summary
 
 MAX_TEXT = 20_000
 QUESTION_ONE = 'What is your understanding of the programme you are applying for?'
@@ -727,6 +728,11 @@ def build_source_snapshot(learner, kind, assessment, context):
 def _report_json(report):
     if report is None:
         return None
+    reductions = list(report.reductions.all())
+    snapshot = report.source_snapshot if isinstance(report.source_snapshot, dict) else {}
+    training = snapshot.get('trainingPlan')
+    planned = training.get('plannedHours') if isinstance(training, dict) else None
+    hours = training_hours_summary(planned, (row.reduced_hours for row in reductions))
     return {
         'id': str(report.pk), 'status': report.status, 'reportReference': report.report_reference,
         'reportVersion': report.report_version, 'revision': report.revision,
@@ -758,12 +764,13 @@ def _report_json(report):
         'cvEvidenceVersion': {'documentId': report.cv_source_document_id, 'container': report.cv_source_container, 'blobName': report.cv_source_blob_name, 'sha256': report.cv_source_blob_hash, 'extractorVersion': report.cv_extractor_version},
         'sourceSnapshot': report.source_snapshot, 'sourceVersions': report.source_versions,
         'sourceSnapshotHash': report.source_snapshot_hash,
+        'trainingHours': {key: float(value) if value is not None else None for key, value in hours.items()},
         'reductions': [
             {'id': str(row.pk), 'moduleId': row.module_id, 'moduleTitle': row.module_title,
              'plannedHours': float(row.planned_hours), 'reducedHours': float(row.reduced_hours),
              'ksbCodes': row.ksb_codes or [], 'evidence': row.evidence,
              'assessorComments': row.assessor_comments}
-            for row in report.reductions.all()
+            for row in reductions
         ],
         'createdAt': report.created_at.isoformat() if report.created_at else None,
         'updatedAt': report.updated_at.isoformat() if report.updated_at else None,
@@ -1014,6 +1021,22 @@ def _current_report(kind, learner_id, context):
     ).first()
 
 
+def _report_history(kind, learner_id):
+    history = list(SuitabilityRplReport.objects.filter(learner_kind=kind, learner_id=learner_id)
+                   .values('id', 'report_reference', 'programme_name', 'status', 'report_version', 'amendment_reason', 'parent_report_id', 'finalised_at').order_by('-report_version', '-updated_at')[:20])
+    for item in history:
+        item['id'] = str(item['id'])
+        item['reportReference'] = item.pop('report_reference')
+        item['programmeName'] = item.pop('programme_name')
+        item['reportVersion'] = item.pop('report_version')
+        item['amendmentReason'] = item.pop('amendment_reason')
+        parent_id = item.pop('parent_report_id')
+        item['parentReportId'] = str(parent_id) if parent_id is not None else None
+        finalised_at = item.pop('finalised_at')
+        item['finalisedAt'] = finalised_at.isoformat() if finalised_at is not None else None
+    return history
+
+
 @require_role('admin')
 @csrf_protect
 def suitability_rpl_report(request, kind, learner_id):
@@ -1027,7 +1050,8 @@ def suitability_rpl_report(request, kind, learner_id):
     try:
         if request.method == 'PUT':
             report = _save_report(request, learner, kind, context, assessment, _read_body(request))
-            return JsonResponse({'report': _report_json(report), 'aiEnabled': bool(getattr(settings, 'SUITABILITY_RPL_AI_ENABLED', False))})
+            return JsonResponse({'report': _report_json(report), 'history': _report_history(kind, learner_id),
+                                 'aiEnabled': bool(getattr(settings, 'SUITABILITY_RPL_AI_ENABLED', False))})
         context_error = None
         try:
             report = _current_report(kind, learner_id, context)
@@ -1037,21 +1061,11 @@ def suitability_rpl_report(request, kind, learner_id):
             snapshot, versions = report.source_snapshot, report.source_versions
         else:
             snapshot, versions = build_source_snapshot(learner, kind, assessment, context)
-        history = list(SuitabilityRplReport.objects.filter(learner_kind=kind, learner_id=learner_id)
-                       .values('id', 'report_reference', 'programme_name', 'status', 'report_version', 'amendment_reason', 'parent_report_id', 'finalised_at').order_by('-report_version', '-updated_at')[:20])
-        for item in history:
-            item['id'] = str(item['id'])
-            item['reportReference'] = item.pop('report_reference')
-            item['programmeName'] = item.pop('programme_name')
-            item['reportVersion'] = item.pop('report_version')
-            item['amendmentReason'] = item.pop('amendment_reason')
-            item['parentReportId'] = str(item.pop('parent_report_id')) if item.get('parent_report_id') else None
-            item['finalisedAt'] = item.pop('finalised_at').isoformat() if item['finalised_at'] else None
         public_context = {key: value for key, value in context.items() if not key.startswith('_')}
         if report is not None:
             public_context['key'] = report.context_key
         return JsonResponse({'report': _report_json(report), 'evidence': snapshot, 'sourceVersions': versions,
-                             'context': public_context, 'contextError': context_error, 'history': history,
+                             'context': public_context, 'contextError': context_error, 'history': _report_history(kind, learner_id),
                              'aiEnabled': bool(getattr(settings, 'SUITABILITY_RPL_AI_ENABLED', False))})
     except ReportContextConflict as exc:
         return JsonResponse({'error': str(exc)}, status=409)
@@ -1205,7 +1219,7 @@ def issue_suitability_rpl_report(request, kind, learner_id):
             'signatureRoles': REPORT_SIGNATURE_ROLES,
             'signingStatus': 'pending',
             'pdfTrust': 'server-rendered-v1',
-            'rendererVersion': 'suitability-rpl-canonical-v3',
+            'rendererVersion': 'suitability-rpl-canonical-v4',
             'originalPdfVersion': 4,
         }
         with transaction.atomic(using=document_service.database()):

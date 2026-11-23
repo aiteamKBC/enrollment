@@ -67,6 +67,7 @@ function formFromReport(report: SuitabilityRplReport | null): FormState {
 function decisionOf(form: FormState): Decision {
   if (form.relevantPriorLearning === null) return 'undecided';
   if (form.relevantPriorLearning === false) return 'none';
+  if (form.reductionJustified === null) return 'undecided';
   return form.reductionJustified ? 'relevant-with-reduction' : 'legacy-relevant-no-reduction';
 }
 
@@ -86,6 +87,11 @@ function shortRplReason(value: string) {
 function reportFilename(learnerName: string, reportReference?: string) {
   const stem = [learnerName, reportReference].filter(Boolean).join('-') || 'Draft';
   return `Suitability-and-RPL-${stem.replace(/[^a-z0-9_-]+/gi, '-').replace(/-+/g, '-')}.pdf`;
+}
+
+function issuedSigningLabel(document: SuitabilityRplIssuedDocument) {
+  if (document.fullySigned) return 'Fully signed';
+  return document.signingEnabled ? 'Awaiting signatures' : 'Electronic signing unavailable';
 }
 
 const panel = 'rounded-2xl border border-foreground-200/70 bg-background-50';
@@ -120,6 +126,11 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   const [rplAnalysis, setRplAnalysis] = useState<{ recommendation: RplAnalysisRecommendation; metadata: RplAnalysisMetadata } | null>(null);
   const loadSequence = useRef(0);
 
+  const refreshIssuedDocuments = useCallback(async (sequence: number, signal?: AbortSignal) => {
+    const issued = await fetchSuitabilityRplIssuedDocuments(kind, learnerId);
+    if (sequence === loadSequence.current && !signal?.aborted) setIssuedDocuments(issued.documents);
+  }, [kind, learnerId]);
+
   const load = useCallback(async (signal?: AbortSignal) => {
     const sequence = ++loadSequence.current;
     setLoading(true);
@@ -136,8 +147,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       setHistory(state.history);
       setContextError(state.contextError ?? null);
       setRplAnalysis(null);
-      const issued = await fetchSuitabilityRplIssuedDocuments(kind, learnerId).catch(() => null);
-      if (sequence === loadSequence.current && !signal?.aborted && issued) setIssuedDocuments(issued.documents);
+      await refreshIssuedDocuments(sequence, signal).catch(() => null);
     } catch (cause) {
       if (sequence === loadSequence.current && !(cause instanceof DOMException && cause.name === 'AbortError')) {
         setError(cause instanceof Error ? cause.message : 'Could not load the report.');
@@ -145,7 +155,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
     } finally {
       if (sequence === loadSequence.current) setLoading(false);
     }
-  }, [kind, learnerId]);
+  }, [kind, learnerId, refreshIssuedDocuments]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -170,15 +180,20 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   const cvNeedsAttention = ['failed', 'unsupported', 'stale'].includes(cvExtractionStatus);
   const modules = evidence?.trainingPlan.modules || [];
   const selectedIds = useMemo(() => new Set(form.reductions.map((row) => row.moduleId)), [form.reductions]);
-  const totalReduction = form.reductions.reduce((sum, row) => sum + (Number(row.reducedHours) || 0), 0);
-  const adjustedHours = evidence?.trainingPlan.plannedHours == null ? null : evidence.trainingPlan.plannedHours - totalReduction;
+  const savedHours = report?.reductions.length === form.reductions.length &&
+    form.reductions.every((row, index) => row.reducedHours === report.reductions[index].reducedHours)
+    ? report.trainingHours : undefined;
+  const originalHours = savedHours ? savedHours.originalHours : evidence?.trainingPlan.plannedHours ?? null;
+  const totalReduction = savedHours?.reductionHours ??
+    form.reductions.reduce((sum, row) => sum + (Number(row.reducedHours) || 0), 0);
+  const adjustedHours = savedHours ? savedHours.remainingHours : originalHours === null ? null : originalHours - totalReduction;
   const analysisStale = !!rplAnalysis && !!report && (
     rplAnalysis.metadata.sourceSnapshotHash !== report.sourceSnapshotHash
     || (!!rplAnalysis.metadata.cvEvidenceVersion.sha256 && rplAnalysis.metadata.cvEvidenceVersion.sha256 !== report.cvEvidenceVersion.sha256)
   );
   const reportStateLabel = locked ? 'Finalised & locked' : 'Draft in progress';
   const signatureStateLabel = currentIssued
-    ? (currentIssued.fullySigned ? 'Fully signed' : 'Awaiting signatures')
+    ? issuedSigningLabel(currentIssued)
     : (locked ? 'Ready to issue' : 'Signatures available after issue');
   const rplDecisionLabel = decision === 'none'
     ? 'No relevant prior learning'
@@ -203,34 +218,51 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
     }));
   };
 
+  const applySavedReport = (result: { report: SuitabilityRplReport } & Pick<SuitabilityRplState, 'history' | 'aiEnabled'>) => {
+    setReport(result.report);
+    setEvidence(result.report.sourceSnapshot);
+    setForm(formFromReport(result.report));
+    setAiEnabled(result.aiEnabled);
+    setHistory(result.history);
+  };
+
+  const refreshSigningStatus = async (sequence: number) => {
+    try {
+      await refreshIssuedDocuments(sequence);
+    } catch {
+      if (sequence === loadSequence.current) {
+        setError('The report was saved, but signing status could not be refreshed.');
+      }
+    }
+  };
+
   const save = async (finalise = false) => {
     if (locked) return;
     if (finalise && !window.confirm('Finalise this report? Its approved snapshot and assessment will become read-only.')) return;
     setWorking(finalise ? 'finalise' : 'save');
     setError('');
     setNotice('');
+    const sequence = loadSequence.current;
     try {
       const result = await saveSuitabilityRplReport(kind, learnerId, {
         ...form,
         revision: report?.revision || 0,
         finalise,
       });
-      setReport(result.report);
-      setEvidence(result.report.sourceSnapshot);
-      setForm(formFromReport(result.report));
-      setAiEnabled(result.aiEnabled);
+      if (sequence !== loadSequence.current) return;
+      applySavedReport(result);
       setNotice(finalise ? 'Report finalised. The approved snapshot is now locked.' : 'Draft saved.');
+      await refreshSigningStatus(sequence);
     } catch (cause) {
+      if (sequence !== loadSequence.current) return;
       if (finalise && cause instanceof SuitabilityRplRequestError && [502, 503, 504].includes(cause.status)) {
         try {
           const state = await fetchSuitabilityRplReport(kind, learnerId);
+          if (sequence !== loadSequence.current) return;
           if (state.report?.status === 'finalised') {
-            setEvidence(state.report.sourceSnapshot || state.evidence);
-            setReport(state.report);
-            setForm(formFromReport(state.report));
-            setAiEnabled(state.aiEnabled);
-            setHistory(state.history);
+            applySavedReport({ ...state, report: state.report });
             setNotice('Report finalised. The approved snapshot is now locked.');
+            await refreshSigningStatus(sequence);
             return;
           }
         } catch {
@@ -248,12 +280,16 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
     const amendmentReason = window.prompt('Why is an amended version required?')?.trim();
     if (!amendmentReason) return;
     setWorking('amend'); setError(''); setNotice('');
+    const sequence = loadSequence.current;
     try {
       const result = await saveSuitabilityRplReport(kind, learnerId, { ...form, revision: 0, newVersion: true, amendmentReason, finalise: false });
-      setReport(result.report); setEvidence(result.report.sourceSnapshot); setForm(formFromReport(result.report));
-      setAiEnabled(result.aiEnabled); setNotice(`Version ${result.report.reportVersion} created as an editable draft.`);
-      try { setIssuedDocuments((await fetchSuitabilityRplIssuedDocuments(kind, learnerId)).documents); } catch { /* Existing issued links remain available from the previous load. */ }
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create the amended version.'); }
+      if (sequence !== loadSequence.current) return;
+      applySavedReport(result);
+      setNotice(`Version ${result.report.reportVersion} created as an editable draft.`);
+      await refreshSigningStatus(sequence);
+    } catch (cause) {
+      if (sequence === loadSequence.current) setError(cause instanceof Error ? cause.message : 'Could not create the amended version.');
+    }
     finally { setWorking(null); }
   };
 
@@ -262,12 +298,9 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
     setError('');
     setNotice('');
     try {
-      let saved = report;
-      if (!saved) {
+      if (!report) {
         const result = await saveSuitabilityRplReport(kind, learnerId, { ...form, revision: 0, finalise: false });
-        saved = result.report;
-        setReport(saved);
-        setEvidence(saved.sourceSnapshot);
+        applySavedReport(result);
       }
       const result = await generateSuitabilityRplJustification(kind, learnerId, type);
       setReport(result.report);
@@ -285,12 +318,9 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
     setError('');
     setNotice('');
     try {
-      let saved = report;
-      if (!saved) {
+      if (!report) {
         const result = await saveSuitabilityRplReport(kind, learnerId, { ...form, revision: 0, finalise: false });
-        saved = result.report;
-        setReport(saved);
-        setEvidence(saved.sourceSnapshot);
+        applySavedReport(result);
       }
       const result = await analyseSuitabilityRplEvidence(kind, learnerId);
       setRplAnalysis(result);
@@ -405,7 +435,15 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
           const document = issuedDocuments.find((candidate) => candidate.reportId === item.id && candidate.reportVersion === item.reportVersion);
           const isCurrent = item.id === report?.id;
           return <article key={item.id} aria-current={isCurrent ? 'true' : undefined} className={`rounded-xl border p-3 ${isCurrent ? 'border-primary-200 bg-primary-50/80' : 'border-foreground-200 bg-white'}`}>
-            <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-semibold text-foreground-900">Version {item.reportVersion} <span className="font-normal text-foreground-500">{item.status === 'finalised' ? 'Finalised' : 'Draft'}</span></p>{isCurrent && <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-700">Current version</p>}{item.finalisedAt && <p className="mt-1 text-xs text-foreground-500">Finalised {new Date(item.finalisedAt).toLocaleDateString('en-GB')}</p>}</div>{document && <a className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-foreground-200 bg-white px-2.5 py-2 text-xs font-semibold text-foreground-700 transition hover:border-primary-300 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300" href={document.pdfUrl} target="_blank" rel="noreferrer"><FileSearch size={13} />View PDF</a>}</div>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground-900">Version {item.reportVersion} <span className="font-normal text-foreground-500">{item.status === 'finalised' ? 'Finalised' : 'Draft'}</span></p>
+                {isCurrent && <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-700">Current version</p>}
+                {item.finalisedAt && <p className="mt-1 text-xs text-foreground-500">Finalised {new Date(item.finalisedAt).toLocaleDateString('en-GB')}</p>}
+                {document && <p className="mt-1 text-xs text-foreground-500">{issuedSigningLabel(document)}</p>}
+              </div>
+              {document && <a className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-foreground-200 bg-white px-2.5 py-2 text-xs font-semibold text-foreground-700 transition hover:border-primary-300 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300" href={document.pdfUrl} target="_blank" rel="noreferrer"><FileSearch size={13} />View PDF</a>}
+            </div>
             {item.amendmentReason && <p className="mt-2 text-xs leading-5 text-foreground-500">{item.amendmentReason}</p>}
           </article>;
         })}
@@ -513,7 +551,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
           const module = modules.find((item) => item.moduleId === row.moduleId);
           return <article key={row.moduleId} className="rounded-xl bg-background-100 p-4"><div className="flex items-start justify-between gap-3"><div><h4 className="font-semibold text-foreground-900">{module?.title || row.moduleTitle}</h4><p className="mt-1 text-xs text-foreground-500">Planned: {module?.plannedHours ?? row.plannedHours ?? 'Not available'} hours · Module ID: {row.moduleId}</p></div><button type="button" aria-label={`Remove ${module?.title || row.moduleTitle}`} disabled={locked} className="rounded-lg p-2 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:opacity-50" onClick={() => setForm((current) => ({ ...current, reductions: current.reductions.filter((_, i) => i !== index) }))}><Trash2 size={16} /></button></div><div className="mt-3"><label><span className={label}>Hours to reduce</span><input className={input} type="number" min="0.01" step="0.25" max={module?.plannedHours ?? undefined} disabled={locked} value={row.reducedHours} onChange={(event) => updateReduction(index, { reducedHours: event.target.value === '' ? '' : Number(event.target.value) })} /></label></div>{module?.ksbCodes.length ? <fieldset className="mt-3"><legend className={label}>Mapped KSBs (optional)</legend><div className="mt-2 flex flex-wrap gap-2">{module.ksbCodes.map((code) => <label key={code} className="rounded-lg border border-foreground-200 bg-white px-2.5 py-1.5 text-xs"><input type="checkbox" disabled={locked} className="mr-1.5 accent-primary-700" checked={row.ksbCodes.includes(code)} onChange={(event) => updateReduction(index, { ksbCodes: event.target.checked ? [...row.ksbCodes, code] : row.ksbCodes.filter((item) => item !== code) })} />{code}</label>)}</div></fieldset> : null}</article>;
         })}{!form.reductions.length && <div className="rounded-xl border border-dashed border-foreground-300 px-4 py-8 text-center text-sm text-foreground-500"><Plus className="mx-auto mb-2" size={19} />Select one or more modules from the saved Training Plan.</div>}</div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">{[['Original hours', evidence.trainingPlan.plannedHours ?? 'Not available'], ['Approved reduction', totalReduction], ['Remaining hours', adjustedHours ?? 'Not available']].map(([heading, value]) => <div key={heading} className="rounded-xl bg-primary-50 p-3"><p className={label}>{heading}</p><p className="mt-1 text-lg font-semibold text-primary-900">{value}</p></div>)}</div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">{[['Original hours', originalHours ?? 'Not available'], [locked ? 'Approved reduction' : 'Proposed reduction', totalReduction], [locked ? 'Remaining hours' : 'Projected remaining hours', adjustedHours ?? 'Not available']].map(([heading, value]) => <div key={heading} className="rounded-xl bg-primary-50 p-3"><p className={label}>{heading}</p><p className="mt-1 text-lg font-semibold text-primary-900">{value}</p></div>)}</div>
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"><strong>Programme cost</strong><p className="mt-1">Authorised pricing/funding rules and the original agreed price are not available in this evidence snapshot. Cost adjustment remains pending authorised assessment; no proportional reduction is calculated here.</p></div>
       </section>}
 

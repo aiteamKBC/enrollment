@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -54,6 +55,90 @@ class ServerSuitabilityPdfTests(SimpleTestCase):
         self.assertIn('Proceed with the full programme.', text)
         self.assertNotIn('PRIVATE-CV-SECRET', text)
         self.assertNotRegex(text, re.compile(r'(?i)(extractedText|rplAiMetadata|suitabilityAiMetadata)'))
+
+    def test_pending_draft_does_not_imply_an_approved_training_plan(self):
+        for relevant, justified in ((None, None), (True, None)):
+            with self.subTest(relevant=relevant):
+                report = SimpleNamespace(
+                    status='draft', source_snapshot={'trainingPlan': {'plannedHours': 200.35}},
+                    relevant_prior_learning=relevant, reduction_justified=justified,
+                )
+                text = self.pdf_text(report)
+                self.assertIn('RPL decision pending', text)
+                self.assertIn('200.35 hours Pending decision Pending decision', text)
+                self.assertNotIn('Full standard Training Plan', text)
+                self.assertNotIn('No RPL reduction was approved', text)
+
+    def test_no_reduction_retains_the_full_plan_only_when_recorded(self):
+        for relevant, expected in ((False, 'No relevant prior learning'),
+                                   (True, 'Relevant prior learning - no training reduction justified')):
+            with self.subTest(relevant=relevant):
+                report = SimpleNamespace(
+                    status='finalised', source_snapshot={'trainingPlan': {'plannedHours': 200}},
+                    relevant_prior_learning=relevant, reduction_justified=False,
+                    no_reduction_reason='Verified evidence does not justify a reduction.',
+                )
+                text = self.pdf_text(report)
+                self.assertIn(expected, text)
+                self.assertIn('Full standard Training Plan retained. No RPL reduction was approved.', text)
+                self.assertIn('200 hours 0 hours 200 hours', text)
+
+        report.status = 'draft'
+        text = self.pdf_text(report)
+        self.assertIn('If finalised, the recorded decision would retain the full standard Training Plan.', text)
+        self.assertNotIn('Full standard Training Plan retained', text)
+
+    def test_approved_reduction_has_programme_totals_and_module_breakdown(self):
+        rows = [
+            SimpleNamespace(module_title='Applied knowledge', planned_hours=Decimal('50'),
+                            reduced_hours=Decimal('12.25'), ksb_codes=['K1'], evidence='Verified certificate.'),
+            SimpleNamespace(module_title='Professional skills', planned_hours=Decimal('20'),
+                            reduced_hours=Decimal('0.05'), ksb_codes=['S3'], evidence='Verified portfolio.'),
+        ]
+        report = SimpleNamespace(
+            status='finalised', source_snapshot={'trainingPlan': {'plannedHours': 200.35}},
+            relevant_prior_learning=True, reduction_justified=True, reductions=SimpleNamespace(all=lambda: rows),
+        )
+        text = self.pdf_text(report)
+        self.assertIn('Relevant prior learning - training reduction approved', text)
+        self.assertIn('200.35 hours 12.3 hours 188.05 hours', text)
+        self.assertIn('Applied knowledge 50 hours 12.25 hours 37.75 hours K1 Verified certificate.', text)
+        self.assertIn('Professional skills 20 hours 0.05 hours 19.95 hours S3 Verified portfolio.', text)
+
+        report.status = 'draft'
+        text = self.pdf_text(report)
+        self.assertIn('Relevant prior learning - training reduction proposed', text)
+        self.assertIn('PROPOSED RPL REDUCTION', text)
+        self.assertNotIn('training reduction approved', text)
+
+    def test_zero_or_missing_programme_hours_are_distinct(self):
+        report = SimpleNamespace(status='finalised', relevant_prior_learning=False, reduction_justified=False)
+        for planned, expected in ((0, '0 hours 0 hours 0 hours'),
+                                  (None, 'Not available 0 hours Not available')):
+            with self.subTest(planned=planned):
+                report.source_snapshot = {'trainingPlan': {'plannedHours': planned}}
+                self.assertIn(expected, self.pdf_text(report))
+
+    def test_saved_pathway_and_distinct_original_declarations(self):
+        report = SimpleNamespace(status='draft', source_snapshot={'programmeSuitability': {'pathway': 'project-management'}})
+        text = self.pdf_text(report)
+        self.assertIn('PROGRAMME SUITABILITY PATHWAY Project Management', text)
+        for statement in (
+            'I have reviewed the evidence and approve the recorded assessment and training recommendation.',
+            'The assessment and its outcome have been discussed with me, and I acknowledge this record.',
+            'I have discussed the assessment and support the recorded programme recommendation.',
+            'The parties confirm that they have reviewed this exact report version.',
+            'Electronic signatures are recorded against the immutable issued PDF and its checksum.',
+        ):
+            self.assertIn(statement, text)
+
+        report.source_snapshot = {'programmeSuitability': {'pathway': '  '}}
+        self.assertNotIn('PROGRAMME SUITABILITY PATHWAY', self.pdf_text(report))
+
+    @staticmethod
+    def pdf_text(report):
+        pages = PdfReader(BytesIO(render_report(report))).pages
+        return ' '.join(' '.join(p.extract_text() or '' for p in pages).split())
 
     def test_radar_draws_saved_scores_to_scale_and_keeps_evidence_below(self):
         report = SimpleNamespace(status='finalised', source_snapshot={'skillsRadar': {

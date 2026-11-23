@@ -8,11 +8,14 @@ and are never passed through this renderer again.
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from functools import partial
 from io import BytesIO
 from math import cos, isfinite, pi, sin
 from pathlib import Path
 from xml.sax.saxutils import escape
+
+from .training_hours import training_hours_summary
 
 
 SECTION_TITLES = (
@@ -53,10 +56,13 @@ def _hours(value, fallback='Not available'):
     if value in (None, ''):
         return fallback
     try:
-        number = float(value)
-    except (TypeError, ValueError):
+        number = Decimal(str(value))
+    except InvalidOperation:
         return _text(value, fallback)
-    return f'{number:g} hours'
+    if not number.is_finite():
+        return fallback
+    display = format(number, 'f')
+    return f"{display.rstrip('0').rstrip('.') if '.' in display else display} hours"
 
 
 def _safe_dict(value):
@@ -125,7 +131,7 @@ def render_report(report) -> bytes:
     def p(value, style=body, fallback=''):
         return Paragraph(escape(_text(value, fallback)).replace('\n', '<br/>'), style)
 
-    def section(number, heading, note):
+    def section(number, heading, note, content=()):
         number_style = ParagraphStyle('rpl-section-number', parent=label, fontSize=9, leading=11, alignment=TA_CENTER, textColor=ink)
         number_box = Table([[p(f'{number:02d}', number_style)]], colWidths=[9.7 * mm], rowHeights=[8.4 * mm], cornerRadii=[5] * 4, style=TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), purple_wash), ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -138,6 +144,7 @@ def render_report(report) -> bytes:
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
             ])),
             Spacer(1, 5 * mm if number == 4 else 2.5 * mm),
+            *content,
         ])
 
     def data_table(headings, rows, widths, *, first_column_bold=False):
@@ -309,6 +316,9 @@ def render_report(report) -> bytes:
     story += [data_table(('QUESTION', 'RECORDED RESPONSE'), understanding_rows or [('Programme understanding', 'No saved response')], [68 * mm, 106 * mm])]
 
     story += [section(3, SECTION_TITLES[2], 'Assessment evidence')]
+    pathway = _text(suitability.get('pathway'))
+    if pathway:
+        story += narrative('Programme Suitability Pathway', pathway.replace('-', ' ').replace('_', ' ').title())
     suitability_rows = []
     for item in _safe_list(suitability.get('responses')):
         if not isinstance(item, dict):
@@ -362,22 +372,51 @@ def render_report(report) -> bytes:
              item.get('score') if _radar_score(item.get('score'), scale) is not None else 'Not answered') for item in items
         ], [24 * mm, 118 * mm, 32 * mm])]
 
-    story += [CondPageBreak(35 * mm), section(6, SECTION_TITLES[5], 'Admin decision')]
-    relevant = getattr(report, 'relevant_prior_learning', None); reduction = relevant is True and getattr(report, 'reduction_justified', None) is True
-    decision = ('Relevant Prior Learning - Training Reduction Approved' if reduction else 'Relevant Prior Learning - No Training Reduction Approved' if relevant is True else 'No Relevant Prior Learning - Full Standard Training Plan' if relevant is False else 'RPL decision not recorded')
-    story += narrative('Assessor-recorded decision', decision)
+    relevant = getattr(report, 'relevant_prior_learning', None)
+    justified = getattr(report, 'reduction_justified', None)
+    finalised = status == 'FINALISED'
+    reduction = relevant is True and justified is True
+    no_reduction = relevant is False or (relevant is True and justified is False)
+    if reduction:
+        decision = 'Relevant prior learning - training reduction approved' if finalised else 'Relevant prior learning - training reduction proposed'
+        impact = ('The remaining programme hours reflect the approved RPL reduction.' if finalised else
+                  'If finalised, the proposed reduction would reduce the programme hours shown below.')
+    elif no_reduction:
+        decision = 'No relevant prior learning' if relevant is False else 'Relevant prior learning - no training reduction justified'
+        impact = ('Full standard Training Plan retained. No RPL reduction was approved.' if finalised else
+                  'If finalised, the recorded decision would retain the full standard Training Plan.')
+    else:
+        decision = 'RPL decision pending'
+        impact = 'The training plan impact will be confirmed after the assessor records the RPL decision.'
+    rows = list(report.reductions.all()) if reduction else []
+    hours = training_hours_summary(training.get('plannedHours'), (row.reduced_hours for row in rows))
+    pending = not (reduction or no_reduction)
+    story += [section(6, SECTION_TITLES[5], 'Admin decision', [
+        *narrative('Assessor-recorded decision', decision),
+        *narrative('Training plan impact', impact),
+        data_table(
+            ('ORIGINAL PROGRAMME HOURS',
+             'APPROVED RPL REDUCTION' if finalised or pending else 'PROPOSED RPL REDUCTION',
+             'REMAINING PROGRAMME HOURS' if finalised or pending else 'PROJECTED REMAINING HOURS'),
+            [(_hours(hours['originalHours']),
+              'Pending decision' if pending else _hours(hours['reductionHours']),
+              'Pending decision' if pending else _hours(hours['remainingHours']))],
+            [58 * mm, 58 * mm, 58 * mm],
+        ),
+        Spacer(1, 2.5 * mm),
+    ])]
     story += narrative('Evidence reviewed by assessor', getattr(report, 'assessor_evidence_review', ''), 'Not recorded')
-    if relevant is True and not reduction:
-        story += narrative('Reason no training reduction was approved', getattr(report, 'no_reduction_reason', ''), 'Not recorded')
+    if relevant is True and justified is False:
+        reason_heading = 'Reason no training reduction was approved' if finalised else 'Reason no training reduction is proposed'
+        story += narrative(reason_heading, getattr(report, 'no_reduction_reason', ''), 'Not recorded')
     story += narrative('Approved RPL assessment justification', getattr(report, 'rpl_justification', ''), 'Awaiting assessor approval') if getattr(report, 'rpl_reviewed_at', None) else narrative('RPL assessment justification', '', 'Awaiting assessor approval')
     if reduction:
         reduction_rows = []
-        for row in getattr(report, 'reductions').all():
-            original = float(row.planned_hours); reduced = float(row.reduced_hours)
+        for row in rows:
+            original = row.planned_hours
+            reduced = row.reduced_hours
             reduction_rows.append((row.module_title, _hours(original), _hours(reduced), _hours(original - reduced), _text(row.ksb_codes, '—'), row.evidence))
         story += [data_table(('MODULE', 'ORIGINAL', 'REDUCTION', 'ADJUSTED', 'MAPPED KSBS', 'VERIFIED EVIDENCE'), reduction_rows, [43 * mm, 23 * mm, 23 * mm, 23 * mm, 25 * mm, 37 * mm])]
-    else:
-        story += narrative('Training plan adjustment', f'Full standard Training Plan. Original planned hours: {_hours(training.get("plannedHours"))}. No training reduction approved.')
 
     story += [CondPageBreak(34 * mm), section(7, SECTION_TITLES[6], 'Final assessment')]
     outcome_labels = {'not_assessed': 'Not assessed', 'suitable': 'Suitable', 'further_assessment': 'Further assessment required'}
@@ -389,18 +428,26 @@ def render_report(report) -> bytes:
     ], [53 * mm, 121 * mm], first_column_bold=True), Spacer(1, 2.5 * mm)]
     story += narrative('Final assessment rationale and recommendation', getattr(report, 'final_summary', ''), 'Not recorded')
 
-    story += [CondPageBreak(70 * mm), section(8, SECTION_TITLES[7], 'Assessor + learner + employer')]
-    story += [p('The parties confirm that they have reviewed this exact report version. Electronic signatures are recorded against the immutable issued PDF and its checksum.', small), Spacer(1, 3 * mm)]
     signatures = Table([
         [p('ASSESSOR / ADMIN', signature_title), p('LEARNER', signature_title), p('EMPLOYER / LINE MANAGER', signature_title)],
+        [
+            p('I have reviewed the evidence and approve the recorded assessment and training recommendation.', small),
+            p('The assessment and its outcome have been discussed with me, and I acknowledge this record.', small),
+            p('I have discussed the assessment and support the recorded programme recommendation.', small),
+        ],
         [p('Name:\n\nSignature:\n\nDate:', small), p('Name:\n\nSignature:\n\nDate:', small), p('Name:\n\nSignature:\n\nDate:', small)],
-    ], colWidths=[58 * mm, 58 * mm, 58 * mm], rowHeights=[10 * mm, 38 * mm])
+    ], colWidths=[58 * mm, 58 * mm, 58 * mm], rowHeights=[10 * mm, None, 38 * mm])
     signatures.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), purple_wash), ('BOX', (0, 0), (-1, -1), 0.45, purple_line),
         ('INNERGRID', (0, 0), (-1, -1), 0.35, purple_line), ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('LEFTPADDING', (0, 0), (-1, -1), 6), ('RIGHTPADDING', (0, 0), (-1, -1), 6), ('TOPPADDING', (0, 0), (-1, -1), 6),
     ]))
-    story += [signatures]
+    story += [section(8, SECTION_TITLES[7], 'Assessor + learner + employer', [
+        p('Each declaration is for the named party to make when signing.', small),
+        p('The parties confirm that they have reviewed this exact report version. Electronic signatures are recorded against the immutable issued PDF and its checksum.', small),
+        Spacer(1, 3 * mm),
+        signatures,
+    ])]
 
     output = BytesIO()
     # Match previews and issuance byte for byte for the same finalised revision.

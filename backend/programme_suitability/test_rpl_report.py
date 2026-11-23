@@ -251,6 +251,43 @@ class SuitabilityRplPersistenceTests(TestCase):
         self.assertIsNotNone(approved.suitability_reviewed_at)
 
 
+    def test_save_returns_server_totals_and_refreshed_version_history(self):
+        with patch('login.permissions.authenticate_request', return_value=self.request.login_account), \
+             patch('programme_suitability.rpl_report._learner', return_value=self.learner), \
+             patch('programme_suitability.rpl_report._programme_assessment', return_value=None), \
+             patch('programme_suitability.rpl_report._context', return_value=self.context_a), \
+             patch('programme_suitability.rpl_report.build_source_snapshot', return_value=(source_snapshot(), {})):
+            payload = base_payload(
+                relevantPriorLearning=True, reductionJustified=True,
+                reductions=[
+                    {'moduleId': 'module-a', 'reducedHours': 12.25},
+                    {'moduleId': 'module-b', 'reducedHours': 0.05},
+                ],
+            )
+
+            def save_via_view(body):
+                request = self.factory.put('/report/', data=json.dumps(body), content_type='application/json')
+                request._dont_enforce_csrf_checks = True
+                response = suitability_rpl_report(request, 'apprenticeship', 41)
+                self.assertEqual(response.status_code, 200, response.content)
+                return json.loads(response.content)
+
+            draft = save_via_view(payload)
+            final = save_via_view(dict(payload, revision=draft['report']['revision'], finalise=True))
+            amended = save_via_view(base_payload(newVersion=True, amendmentReason='New evidence available.'))
+            state = suitability_rpl_report(self.factory.get('/report/'), 'apprenticeship', 41)
+
+        self.assertEqual(draft['report']['trainingHours'],
+                         {'originalHours': 120, 'reductionHours': 12.3, 'remainingHours': 107.7})
+        self.assertEqual(final['report']['trainingHours'], draft['report']['trainingHours'])
+        self.assertEqual(final['history'][0]['id'], draft['report']['id'])
+        self.assertEqual(final['history'][0]['status'], 'finalised')
+        self.assertEqual([(row['reportVersion'], row['status']) for row in amended['history']],
+                         [(2, 'draft'), (1, 'finalised')])
+        self.assertEqual(amended['history'][0]['parentReportId'], final['report']['id'])
+        self.assertEqual(amended['history'], json.loads(state.content)['history'])
+
+
 def source_snapshot_hash(report):
     """Return the stored value to make the immutability assertion explicit."""
     report.refresh_from_db()

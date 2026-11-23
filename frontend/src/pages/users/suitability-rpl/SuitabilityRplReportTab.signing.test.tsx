@@ -10,6 +10,7 @@ import type {
 const api = vi.hoisted(() => ({
   fetchReport: vi.fn(),
   fetchIssued: vi.fn(),
+  save: vi.fn(),
   sign: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ vi.mock('@/api/suitabilityRplReport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/suitabilityRplReport')>()),
   fetchSuitabilityRplReport: api.fetchReport,
   fetchSuitabilityRplIssuedDocuments: api.fetchIssued,
+  saveSuitabilityRplReport: api.save,
   signSuitabilityRplReport: api.sign,
 }));
 
@@ -54,7 +56,9 @@ const report: SuitabilityRplReport = {
   suitabilityReviewedAt: '2026-11-15T10:00:00Z', suitabilityReviewedBy: 'Assessor', rplJustification: 'No relevant prior learning.', rplReviewed: true,
   rplReviewedAt: '2026-11-15T10:00:00Z', rplReviewedBy: 'Assessor', cvExtractionAcknowledged: false, cvExtractionAcknowledgedBy: null,
   cvExtractionAcknowledgedAt: null, cvEvidenceVersion: { documentId: '', container: '', blobName: '', sha256: '', extractorVersion: '' },
-  sourceSnapshot: evidence, sourceVersions: {}, sourceSnapshotHash: 'snapshot-2', reductions: [], createdAt: '2026-11-15T09:00:00Z',
+  sourceSnapshot: evidence, sourceVersions: {}, sourceSnapshotHash: 'snapshot-2',
+  trainingHours: { originalHours: 100, reductionHours: 0, remainingHours: 100 },
+  reductions: [], createdAt: '2026-11-15T09:00:00Z',
   updatedAt: '2026-11-15T10:00:00Z', finalisedAt: '2026-11-15T10:00:00Z',
 };
 
@@ -138,7 +142,7 @@ describe('Suitability & RPL assessor signing consent', () => {
     api.fetchReport.mockResolvedValue({ ...state, report: null, contextError, history: [older, state.history[0], unissued, mismatched] });
     api.fetchIssued.mockResolvedValue({ documents: [
       issued,
-      { ...issued, reportId: older.id, issueId: 'older-issue', pdfUrl: '/issued/older-issue/pdf/' },
+      { ...issued, reportId: older.id, issueId: 'older-issue', pdfUrl: '/issued/older-issue/pdf/', signingEnabled: false },
       { ...issued, reportId: mismatched.id, reportVersion: 3, issueId: 'wrong-version', pdfUrl: '/issued/wrong-version/pdf/' },
     ] });
 
@@ -147,9 +151,80 @@ describe('Suitability & RPL assessor signing consent', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(contextError);
     const [olderRow, currentRow, unissuedRow, mismatchedRow] = within(screen.getByRole('region', { name: 'Version history' })).getAllByRole('article');
     expect(within(olderRow).getByRole('link', { name: 'View PDF' })).toHaveAttribute('href', '/issued/older-issue/pdf/');
+    expect(within(olderRow).getByText('Electronic signing unavailable')).toBeVisible();
     expect(within(currentRow).getByRole('link', { name: 'View PDF' })).toHaveAttribute('href', issued.pdfUrl);
     expect(within(unissuedRow).queryByRole('link', { name: 'View PDF' })).not.toBeInTheDocument();
     expect(within(mismatchedRow).queryByRole('link', { name: 'View PDF' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Preview PDF' })).not.toBeInTheDocument();
+  });
+
+  it('updates version history after saving a new draft and after finalising it', async () => {
+    const draft = { ...report, status: 'draft' as const, finalisedAt: null };
+    const draftHistory = [{ ...state.history[0], status: 'draft', finalisedAt: null }];
+    api.fetchReport.mockResolvedValue({ ...state, report: null, history: [] });
+    api.fetchIssued.mockResolvedValue({ documents: [] });
+    api.save.mockResolvedValueOnce({ report: draft, aiEnabled: false, history: draftHistory })
+      .mockResolvedValueOnce({ report, aiEnabled: false, history: state.history });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<SuitabilityRplReportTab kind="apprenticeship" learnerId="20" learnerName="Sam Example" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Save draft' }));
+
+    const history = screen.getByRole('region', { name: 'Version history' });
+    const row = await within(history).findByRole('article');
+    expect(row).toHaveAttribute('aria-current', 'true');
+    expect(within(row).getByText('Draft')).toBeVisible();
+    expect(within(row).queryByRole('link', { name: 'View PDF' })).not.toBeInTheDocument();
+
+    const finalise = screen.getByRole('button', { name: 'Finalise report' });
+    await waitFor(() => expect(finalise).toBeEnabled());
+    fireEvent.click(finalise);
+    expect(await within(history).findByText('Finalised')).toBeVisible();
+  });
+
+  it('keeps the exact historical PDF and refreshes its signing status after creating an amended version', async () => {
+    const amended = { ...report, id: 'report-3', reportVersion: 3, revision: 1, parentReportId: report.id,
+      status: 'draft' as const, amendmentReason: 'New evidence', finalisedAt: null };
+    const amendedHistory = { ...state.history[0], id: amended.id, reportVersion: 3, status: 'draft',
+      parentReportId: report.id, amendmentReason: 'New evidence', finalisedAt: null };
+    api.save.mockResolvedValue({ report: amended, aiEnabled: false, history: [amendedHistory, ...state.history] });
+    api.fetchIssued.mockResolvedValueOnce({ documents: [issued] })
+      .mockResolvedValueOnce({ documents: [{ ...issued, fullySigned: true, signingStatus: 'signed' }] });
+    vi.spyOn(window, 'prompt').mockReturnValue('New evidence');
+
+    render(<SuitabilityRplReportTab kind="apprenticeship" learnerId="20" learnerName="Sam Example" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Create amended version' }));
+
+    const history = screen.getByRole('region', { name: 'Version history' });
+    expect(await within(history).findByText('Fully signed')).toBeVisible();
+    const [draftRow, signedRow] = within(history).getAllByRole('article');
+    expect(draftRow).toHaveAttribute('aria-current', 'true');
+    expect(within(draftRow).getByText(/Version 3/)).toBeVisible();
+    expect(within(draftRow).queryByRole('link', { name: 'View PDF' })).not.toBeInTheDocument();
+    expect(within(signedRow).getByRole('link', { name: 'View PDF' })).toHaveAttribute('href', issued.pdfUrl);
+    expect(api.save).toHaveBeenCalledWith('apprenticeship', '20', expect.objectContaining({
+      newVersion: true, amendmentReason: 'New evidence', finalise: false,
+    }));
+  });
+
+  it('displays programme totals calculated by the server for recorded reductions', async () => {
+    const reduced = {
+      ...report,
+      relevantPriorLearning: true,
+      reductionJustified: true,
+      sourceSnapshot: { ...evidence, trainingPlan: { ...evidence.trainingPlan, plannedHours: 200.35 } },
+      trainingHours: { originalHours: 200.35, reductionHours: 0.3, remainingHours: 200.05 },
+      reductions: [
+        { moduleId: 'a', reducedHours: 0.1, ksbCodes: [], evidence: '', assessorComments: '' },
+        { moduleId: 'b', reducedHours: 0.2, ksbCodes: [], evidence: '', assessorComments: '' },
+      ],
+    };
+    api.fetchReport.mockResolvedValue({ ...state, report: reduced });
+
+    render(<SuitabilityRplReportTab kind="apprenticeship" learnerId="20" learnerName="Sam Example" />);
+    const summary = await screen.findByRole('region', { name: 'Module reductions' });
+    for (const hours of ['200.35', '0.3', '200.05']) {
+      expect(within(summary).getByText(hours)).toBeVisible();
+    }
   });
 });
