@@ -254,6 +254,18 @@ async function readJson<T>(response: Response): Promise<T> {
   return data as T;
 }
 
+async function readPdf(response: Response): Promise<Blob> {
+  if (!response.ok) {
+    const text = await response.text();
+    let message = `The report PDF request failed (${response.status}).`;
+    try { message = (JSON.parse(text) as { error?: string }).error || message; } catch { /* use status message */ }
+    throw new SuitabilityRplRequestError(message, response.status);
+  }
+  const blob = await response.blob();
+  if (!blob.type.includes('pdf')) throw new Error('The report service returned an invalid PDF.');
+  return blob;
+}
+
 export async function fetchSuitabilityRplReport(kind: LearnerKind, learnerId: string, signal?: AbortSignal) {
   return readJson<SuitabilityRplState>(await fetch(base(kind, learnerId), {
     credentials: 'include', cache: 'no-store', signal,
@@ -264,6 +276,19 @@ export async function saveSuitabilityRplReport(kind: LearnerKind, learnerId: str
   const { csrfToken } = await prefetchAssessmentSecurity();
   return readJson<{ report: SuitabilityRplReport; aiEnabled: boolean }>(await fetch(base(kind, learnerId), {
     method: 'PUT', credentials: 'include', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+    body: JSON.stringify(payload),
+  }));
+}
+
+export async function previewSuitabilityRplReport(
+  kind: LearnerKind,
+  learnerId: string,
+  payload: SuitabilityRplSavePayload,
+) {
+  const { csrfToken } = await prefetchAssessmentSecurity();
+  return readPdf(await fetch(`${base(kind, learnerId)}preview-pdf/`, {
+    method: 'POST', credentials: 'include', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
     body: JSON.stringify(payload),
   }));

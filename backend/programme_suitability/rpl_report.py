@@ -8,10 +8,11 @@ import json
 import re
 import uuid
 from decimal import Decimal, InvalidOperation
+from types import SimpleNamespace
 
 from django.conf import settings
 from django.db import DatabaseError, connections, transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_protect
 
@@ -26,12 +27,13 @@ from login.permissions import require_role
 from login.permissions import login_required
 from enrolment_api import auth as enrolment_auth
 from enrolment_api.document_templates.models import IssuedTemplate, RenderHistory
+from enrolment_api.document_templates.pdf_artifacts import http_pdf
 from enrolment_api.document_templates import service as document_service
 
 from .configuration import PROGRAMMES as SUITABILITY_PROGRAMMES
 from .models import Assessment, SuitabilityCvExtraction, SuitabilityRplDocumentSignature, SuitabilityRplReduction, SuitabilityRplReport
 from .cv_extraction import CvExtractionError, extract_approved_cv
-from .server_pdf import render_finalised_report
+from .server_pdf import render_finalised_report, render_report
 
 MAX_TEXT = 20_000
 QUESTION_ONE = 'What is your understanding of the programme you are applying for?'
@@ -86,6 +88,10 @@ def _read_issue_request(request):
     if not isinstance(data, dict):
         raise ReportInputError('Provide a JSON object.')
     return data
+
+
+def _issue_source_id(report):
+    return f'report-{report.pk}-v{report.report_version}-r{report.revision}-server-v1'
 
 
 def _signature_issue(learner_id, issue_id):
@@ -349,8 +355,11 @@ def _context(learner, kind, assessment):
     programme_name = _s(learner.programme) or source_programme_id
     # Keep the historical context-key input unchanged so existing report rows
     # remain addressable, while displaying the approved Aptem fallback.
-    source_reference = _s(learner.reference_number)
-    reference = source_reference or _s(learner.aptem_id)
+    # ``EnrolmentUser`` does not expose a reference_number field.  Some legacy
+    # learner projections do, so keep supporting it without requiring the
+    # attribute on the canonical enrolment model.
+    source_reference = _s(getattr(learner, 'reference_number', ''))
+    reference = source_reference or _s(getattr(learner, 'aptem_id', ''))
     practical_start = _s(learner.learner_start_date) or _s(learner.start_date)
     raw = [kind, int(learner.pk), source_programme_id, programme_name, source_reference, practical_start]
     return {
@@ -1012,12 +1021,92 @@ def suitability_rpl_report(request, kind, learner_id):
 
 @require_role('admin')
 @csrf_protect
+def preview_suitability_rpl_report(request, kind, learner_id):
+    """Render a non-persistent preview through the canonical server pipeline."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    learner = _learner(kind, learner_id)
+    if learner is None:
+        return JsonResponse({'error': 'Learner not found.'}, status=404)
+    try:
+        assessment = _programme_assessment(learner_id)
+        context = _context(learner, kind, assessment)
+        saved = _current_report(kind, learner_id, context['key'])
+        if saved is not None and saved.status == SuitabilityRplReport.STATUS_FINALISED:
+            issue = IssuedTemplate.objects.filter(document_key=REPORT_DOCUMENT_KEY, source_id=_issue_source_id(saved)).first()
+            if issue is not None:
+                artifact = RenderHistory.objects.filter(issue=issue, payload__kind='suitability-rpl-issued-pdf-v1').first()
+                response = http_pdf(artifact, 'Suitability-and-RPL-Report')
+                return response if response is not None else JsonResponse({'error': 'This exact saved PDF is unavailable.'}, status=409)
+            pdf = render_finalised_report(saved)
+        else:
+            pdf = _render_draft_preview(request, learner, kind, assessment, context, saved)
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = 'inline; filename="Suitability-and-RPL-Report.pdf"'
+        response['Cache-Control'] = 'no-store'
+        return response
+    except ReportInputError as exc:
+        return JsonResponse({'error': str(exc)}, status=400)
+    except DatabaseError:
+        return JsonResponse({'error': 'The Suitability & RPL report store is unavailable.'}, status=503)
+    except Exception:
+        return JsonResponse({'error': 'The Suitability & RPL PDF could not be generated.'}, status=500)
+
+
+def _render_draft_preview(request, learner, kind, assessment, context, saved):
+    data = _read_body(request)
+    if saved is not None:
+        snapshot = saved.source_snapshot if isinstance(saved.source_snapshot, dict) else {}
+    else:
+        snapshot, _versions = build_source_snapshot(learner, kind, assessment, context)
+
+    relevant = _nullable_bool(data, 'relevantPriorLearning')
+    justified = _nullable_bool(data, 'reductionJustified')
+    reductions = _validated_reductions(data, snapshot, relevant, justified)
+    outcome = data.get('suitabilityOutcome', SuitabilityRplReport.SUITABILITY_NOT_ASSESSED)
+    if outcome not in dict(SuitabilityRplReport.SUITABILITY_CHOICES):
+        raise ReportInputError('Choose a valid suitability outcome.')
+    suitability_reviewed = data.get('suitabilityReviewed', False)
+    rpl_reviewed = data.get('rplReviewed', False)
+    if not isinstance(suitability_reviewed, bool) or not isinstance(rpl_reviewed, bool):
+        raise ReportInputError('Reviewed values must be true or false.')
+
+    reduction_rows = [SimpleNamespace(
+        module_id=item['moduleId'], module_title=item['moduleTitle'],
+        planned_hours=item['plannedHours'], reduced_hours=item['reducedHours'],
+        ksb_codes=item['ksbCodes'], evidence=item['evidence'],
+        assessor_comments=item['assessorComments'],
+    ) for item in reductions]
+    preview = SimpleNamespace(
+        status=getattr(saved, 'status', SuitabilityRplReport.STATUS_DRAFT),
+        report_reference=getattr(saved, 'report_reference', 'DRAFT'),
+        report_version=getattr(saved, 'report_version', 1),
+        revision=getattr(saved, 'revision', 0),
+        practical_start_date=context['practicalStartDate'],
+        source_snapshot=snapshot,
+        relevant_prior_learning=relevant,
+        reduction_justified=justified,
+        assessor_evidence_review=_text(data, 'assessorEvidenceReview'),
+        no_reduction_reason=_text(data, 'noReductionReason'),
+        suitability_outcome=outcome,
+        final_summary=_text(data, 'finalSummary'),
+        suitability_justification=_text(data, 'suitabilityJustification'),
+        suitability_reviewed_at=timezone.now() if suitability_reviewed else None,
+        rpl_justification=_text(data, 'rplJustification'),
+        rpl_reviewed_at=timezone.now() if rpl_reviewed else None,
+        finalised_at=getattr(saved, 'finalised_at', None),
+        reductions=SimpleNamespace(all=lambda: reduction_rows),
+    )
+    return render_report(preview)
+
+
+@require_role('admin')
+@csrf_protect
 def issue_suitability_rpl_report(request, kind, learner_id):
     """Store one immutable, server-rendered PDF for a finalised report revision.
 
-    Browser-generated bytes remain preview-only.  The issued artifact is built
-    from the frozen report snapshot in Django and is therefore the only PDF
-    eligible for electronic signatures.
+    Existing artifacts are returned before rendering so a renderer upgrade can
+    never overwrite or reinterpret an already-issued historical PDF.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
@@ -1042,13 +1131,19 @@ def issue_suitability_rpl_report(request, kind, learner_id):
             return JsonResponse({'error': 'The report changed before issuance. Reload the finalised report and retry.'}, status=409)
         if not report.suitability_reviewed_at or not report.rpl_reviewed_at:
             return JsonResponse({'error': 'Both approved justifications are required before issuance.'}, status=409)
+        source_id = _issue_source_id(report)
+        existing = IssuedTemplate.objects.filter(document_key=REPORT_DOCUMENT_KEY, source_id=source_id).first()
+        if existing is not None:
+            stored = RenderHistory.objects.filter(issue=existing, payload__kind='suitability-rpl-issued-pdf-v1').first()
+            if stored is None or not stored.payload.get('sha256'):
+                return JsonResponse({'error': 'This report revision is already issued and immutable.'}, status=409)
+            return JsonResponse({'issued': True, 'issueId': str(existing.pk), 'sha256': stored.payload['sha256'], 'alreadyIssued': True, 'signingEnabled': True})
         try:
             pdf = render_finalised_report(report)
         except Exception as exc:
             raise DatabaseError('The trusted report PDF could not be generated. No document was issued.') from exc
         sha256 = hashlib.sha256(pdf).hexdigest()
         encoded = base64.b64encode(pdf).decode()
-        source_id = f'report-{report.pk}-v{report.report_version}-r{report.revision}-server-v1'
         snapshot = {
             'dynamic': True,
             'documentKey': REPORT_DOCUMENT_KEY,
@@ -1062,16 +1157,16 @@ def issue_suitability_rpl_report(request, kind, learner_id):
             'signatureRoles': REPORT_SIGNATURE_ROLES,
             'signingStatus': 'pending',
             'pdfTrust': 'server-rendered-v1',
-            'rendererVersion': 'suitability-rpl-server-v1',
-            'originalPdfVersion': 3,
+            'rendererVersion': 'suitability-rpl-canonical-v3',
+            'originalPdfVersion': 4,
         }
         with transaction.atomic(using=document_service.database()):
             existing = IssuedTemplate.objects.filter(document_key=REPORT_DOCUMENT_KEY, source_id=source_id).first()
             if existing is not None:
                 stored = RenderHistory.objects.filter(issue=existing, payload__kind='suitability-rpl-issued-pdf-v1').first()
-                if stored is None or stored.payload.get('sha256') != sha256:
+                if stored is None or not stored.payload.get('sha256'):
                     return JsonResponse({'error': 'This report revision is already issued and immutable.'}, status=409)
-                return JsonResponse({'issued': True, 'issueId': str(existing.pk), 'sha256': sha256, 'alreadyIssued': True, 'signingEnabled': True})
+                return JsonResponse({'issued': True, 'issueId': str(existing.pk), 'sha256': stored.payload['sha256'], 'alreadyIssued': True, 'signingEnabled': True})
             issue = IssuedTemplate.objects.create(
                 document_key=REPORT_DOCUMENT_KEY,
                 source_id=source_id,

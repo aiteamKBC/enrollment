@@ -762,6 +762,30 @@ class RplEvidenceAnalysisTests(SimpleTestCase):
 
 class SuitabilityRplEvidenceMappingTests(SimpleTestCase):
     @patch('programme_suitability.rpl_report.programme_for', return_value='ME_L4')
+    def test_context_accepts_actual_enrolment_model_without_reference_number(self, _programme_for_mock):
+        from learner_api.models import EnrolmentUser
+
+        learner = EnrolmentUser(pk=71, programme='Marketing Executive Level 4', aptem_id='APT-71')
+        self.assertFalse(hasattr(learner, 'reference_number'))
+        context = _context(learner, 'apprenticeship', None)
+        self.assertEqual(context['enrolmentReference'], 'APT-71')
+        self.assertEqual(context['programmeId'], 'ME_L4')
+
+    @patch('programme_suitability.rpl_report.programme_for', return_value='ME_L4')
+    def test_context_uses_aptem_reference_when_canonical_learner_has_no_reference_number(
+        self, _programme_for_mock,
+    ):
+        learner = SimpleNamespace(
+            pk=70, programme='Marketing Executive Level 4', aptem_id='APT-70',
+            learner_start_date='', start_date='2026-09-01',
+        )
+
+        context = _context(learner, 'apprenticeship', None)
+
+        self.assertEqual(context['enrolmentReference'], 'APT-70')
+        self.assertEqual(context['programmeId'], 'ME_L4')
+
+    @patch('programme_suitability.rpl_report.programme_for', return_value='ME_L4')
     def test_reference_number_and_aptem_fallback_do_not_expose_other_ids(self, _programme_for_mock):
         learner = SimpleNamespace(
             pk=71, programme='Marketing Executive Level 4', reference_number='', aptem_id='APT-71',

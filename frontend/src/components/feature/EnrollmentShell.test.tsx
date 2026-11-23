@@ -41,4 +41,10 @@ describe('Admin navigation', () => {
     renderShell();
     expect(screen.queryByRole('link', { name: 'Programme Structure' })).not.toBeInTheDocument();
   });
+
+  it('does not expose the retired Report templates page', () => {
+    auth.account.role = 'admin';
+    renderShell();
+    expect(screen.queryByRole('link', { name: 'Report templates' })).not.toBeInTheDocument();
+  });
 });

@@ -101,6 +101,94 @@ class ReportIssuanceTests(SimpleTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(history_manager.create.call_args.kwargs['payload']['sha256'], hashlib.sha256(b'%PDF-1.7\ncanonical\n%%EOF').hexdigest())
 
+    def test_existing_historical_pdf_is_returned_without_regeneration(self):
+        existing = SimpleNamespace(pk='historical-issue')
+        stored = SimpleNamespace(payload={'sha256': 'historical-sha'})
+        issued_manager = MagicMock()
+        issued_manager.filter.return_value.first.return_value = existing
+        history_manager = MagicMock()
+        history_manager.filter.return_value.first.return_value = stored
+        with patch('login.permissions.authenticate_request', return_value=self.admin), \
+             patch.object(rpl_report, '_learner', return_value=self.learner), \
+             patch.object(rpl_report.SuitabilityRplReport, 'objects', self.report_manager()), \
+             patch.object(rpl_report, 'render_finalised_report', side_effect=AssertionError('Historical PDF must not regenerate')), \
+             patch.object(rpl_report.IssuedTemplate, 'objects', issued_manager), \
+             patch.object(rpl_report.RenderHistory, 'objects', history_manager):
+            response = rpl_report.issue_suitability_rpl_report(
+                self.request({'reportId': 7, 'reportRevision': 3, 'reportVersion': 1}),
+                'apprenticeship', 1601,
+            )
+        payload = json.loads(response.content)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['alreadyIssued'])
+        self.assertEqual(payload['sha256'], 'historical-sha')
+
+    def test_draft_preview_uses_canonical_server_renderer_without_persisting(self):
+        saved = SimpleNamespace(
+            status='draft', report_reference='RPL-DRAFT', report_version=1, revision=2,
+            finalised_at=None, source_snapshot={'trainingPlan': {'available': False}},
+        )
+        request = self.factory.post(
+            '/enrolment_api/programme-suitability/apprenticeship/1601/suitability-rpl/preview-pdf/',
+            data=json.dumps({
+                'relevantPriorLearning': False, 'reductionJustified': False,
+                'assessorEvidenceReview': '', 'noReductionReason': '',
+                'suitabilityOutcome': 'suitable', 'finalSummary': 'Proceed.',
+                'suitabilityJustification': 'Suitable.', 'suitabilityReviewed': True,
+                'rplJustification': 'Full programme.', 'rplReviewed': True,
+                'reductions': [],
+            }),
+            content_type='application/json',
+        )
+        request.login_account = self.admin
+        request._dont_enforce_csrf_checks = True
+        with patch('login.permissions.authenticate_request', return_value=self.admin), \
+             patch.object(rpl_report, '_learner', return_value=self.learner), \
+             patch.object(rpl_report, '_programme_assessment', return_value=None), \
+             patch.object(rpl_report, '_context', return_value={'key': 'context', 'practicalStartDate': ''}), \
+             patch.object(rpl_report, '_current_report', return_value=saved), \
+             patch.object(rpl_report, 'render_report', return_value=b'%PDF-1.7\ncanonical-preview\n%%EOF') as render:
+            response = rpl_report.preview_suitability_rpl_report(request, 'apprenticeship', 1601)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertEqual(response.content, b'%PDF-1.7\ncanonical-preview\n%%EOF')
+        self.assertEqual(render.call_count, 1)
+        preview = render.call_args.args[0]
+        self.assertEqual(preview.source_snapshot, saved.source_snapshot)
+        self.assertEqual(preview.final_summary, 'Proceed.')
+
+    def test_finalised_preview_renders_the_saved_report_instead_of_browser_edits(self):
+        with patch('login.permissions.authenticate_request', return_value=self.admin), \
+             patch.object(rpl_report, '_learner', return_value=self.learner), \
+             patch.object(rpl_report, '_programme_assessment', return_value=None), \
+             patch.object(rpl_report, '_context', return_value={'key': 'context'}), \
+             patch.object(rpl_report, '_current_report', return_value=self.report), \
+             patch.object(rpl_report.IssuedTemplate, 'objects') as issued, \
+             patch.object(rpl_report, 'render_finalised_report', return_value=b'%PDF-finalised') as render:
+            issued.filter.return_value.first.return_value = None
+            response = rpl_report.preview_suitability_rpl_report(self.request({'finalSummary': 'Browser edit'}), 'apprenticeship', 1601)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.content, b'%PDF-finalised')
+        render.assert_called_once_with(self.report)
+
+    def test_finalised_preview_serves_existing_issued_pdf_without_rendering(self):
+        pdf = b'%PDF-historical'
+        artifact = SimpleNamespace(payload={'pdf': base64.b64encode(pdf).decode()})
+        with patch('login.permissions.authenticate_request', return_value=self.admin), \
+             patch.object(rpl_report, '_learner', return_value=self.learner), \
+             patch.object(rpl_report, '_programme_assessment', return_value=None), \
+             patch.object(rpl_report, '_context', return_value={'key': 'context'}), \
+             patch.object(rpl_report, '_current_report', return_value=self.report), \
+             patch.object(rpl_report.IssuedTemplate, 'objects') as issued, \
+             patch.object(rpl_report.RenderHistory, 'objects') as history, \
+             patch.object(rpl_report, 'render_finalised_report') as render:
+            issued.filter.return_value.first.return_value = SimpleNamespace(pk='issued-1')
+            history.filter.return_value.first.return_value = artifact
+            response = rpl_report.preview_suitability_rpl_report(self.request({}), 'apprenticeship', 1601)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.content, pdf)
+        render.assert_not_called()
+
     def test_report_revision_mismatch_cannot_issue_stale_pdf(self):
         with patch('login.permissions.authenticate_request', return_value=self.admin), \
              patch.object(rpl_report, '_learner', return_value=self.learner), \

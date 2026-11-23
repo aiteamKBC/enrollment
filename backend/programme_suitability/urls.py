@@ -12,6 +12,7 @@ urlpatterns = [
     path("defaults/", views.configuration_defaults, name="suitability-defaults"),
     path("preview/", views.preview, name="suitability-preview"),
     path('<str:kind>/<int:learner_id>/suitability-rpl/', rpl_report.suitability_rpl_report, name='suitability-rpl-report'),
+    path('<str:kind>/<int:learner_id>/suitability-rpl/preview-pdf/', rpl_report.preview_suitability_rpl_report, name='suitability-rpl-preview-pdf'),
     path('<str:kind>/<int:learner_id>/suitability-rpl/issue/', rpl_report.issue_suitability_rpl_report, name='suitability-rpl-issue'),
     path('<str:kind>/<int:learner_id>/suitability-rpl/issued/', rpl_report.suitability_rpl_issued_documents, name='suitability-rpl-issued-documents'),
     path('<str:kind>/<int:learner_id>/suitability-rpl/issued/<uuid:issue_id>/signatures/', rpl_report.suitability_rpl_signatures, name='suitability-rpl-signatures'),
