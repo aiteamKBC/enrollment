@@ -313,13 +313,15 @@ def _accept_eligibility_account(invitation):
     from .identity import ensure_account
 
     with connections["enrolment"].cursor() as cursor:
-        cursor.execute("SELECT to_jsonb(a) FROM enrolment.eligibility_form a WHERE a.id=%s FOR UPDATE",
+        cursor.execute("SELECT a.answers, a.first_name, a.surname, a.work_email, a.eligible "
+                       "FROM enrolment.eligibility_form a WHERE a.id=%s FOR UPDATE",
                        [invitation.eligibility_application_id])
         found = cursor.fetchone()
         if not found:
             raise TokenError("This link is invalid or has expired. Please request a new one.")
-        saved = json.loads(found[0]) if isinstance(found[0], str) else found[0]
-        row = {**saved, **(saved.get("answers") or {})}
+        answers = json.loads(found[0]) if isinstance(found[0], str) else found[0]
+        row = {**(answers or {}), "first_name": found[1], "surname": found[2],
+               "work_email": found[3], "eligible": found[4]}
         cursor.execute("""SELECT learner_id, override_approved_at, invitation_id
             FROM enrolment.eligibility_learner_links WHERE application_id=%s FOR UPDATE""",
                        [invitation.eligibility_application_id])

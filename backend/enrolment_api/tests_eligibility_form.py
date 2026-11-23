@@ -134,7 +134,7 @@ class CleanApplicationTests(SimpleTestCase):
         row, errors = ef.clean_application(application(title="Dr"), today=TODAY)
         self.assertEqual(errors, {})
         self.assertNotIn("title", row)
-        self.assertNotIn("title", ef.INSERT_COLUMNS)
+        self.assertNotIn("title", ef.COLUMNS)
 
     def test_a_complete_application_maps_every_answer_to_its_column(self):
         row, errors = ef.clean_application(application(), today=TODAY)
@@ -618,15 +618,9 @@ class TableTests(SimpleTestCase):
         schema = (root / "database/schema.sql").read_text(encoding="utf-8")
         ddl = re.search(r"CREATE TABLE enrolment\.eligibility_form \((.*?)\n\);", schema, re.S)[1]
         columns = dict(re.findall(r"^    (\w+) (\w+)", ddl, re.M))
-        self.assertTrue(set(ef.INSERT_COLUMNS) | set(ef.leaving_date_columns({"expected_leaving_date": True})) <= columns.keys())
-        for column, kind in ef.ADDED_COLUMNS:
-            self.assertEqual(columns[column], kind)
-        repair = (root / "database/eligibility_submission_fields.sql").read_text(encoding="utf-8")
-        repaired = dict(re.findall(r"ADD COLUMN IF NOT EXISTS (\w+) (\w+)", repair))
-        self.assertEqual(repaired, {column: kind for column, kind in ef.ADDED_COLUMNS if column in {
-            "start_date_with_employer", "job_title", "country_of_residence", "nationality",
-            "resident_prev_3_years", "years_in_uk", "full_time_education_prior", "expected_leaving_date",
-        }})
+        self.assertTrue({"id", "first_name", "surname", "work_email", "answers"} <= columns.keys())
+        self.assertNotIn("date_of_birth", columns)
+        self.assertNotIn("employer_name", columns)
 
     def test_ddl_creates_every_column_the_insert_writes(self):
         cursor = FakeCursor()
@@ -634,25 +628,22 @@ class TableTests(SimpleTestCase):
         statements = [sql for sql, _params in cursor.executed]
         self.assertEqual(statements[0], "CREATE SCHEMA IF NOT EXISTS enrolment")
         self.assertTrue(statements[1].startswith("CREATE TABLE IF NOT EXISTS enrolment.eligibility_form ("))
-        for column in ef.INSERT_COLUMNS:
+        for column in ("first_name", "surname", "work_email", "answers", "layout_version", "eligible"):
             self.assertIn(f" {column} ", statements[1])
         # Only the answers that identify the applicant are NOT NULL.
         for column in ("first_name", "surname", "work_email"):
             self.assertIn(f" {column} text NOT NULL,", statements[1])
-        self.assertIn(" date_of_birth date,", statements[1])
+        self.assertNotIn(" date_of_birth date,", statements[1])
         # Never alters or drops an existing table.
         self.assertFalse(any("DROP" in sql or "ALTER" in sql for sql in statements))
 
-    def test_upgrade_only_adds_columns_and_relaxes_not_null(self):
+    def test_upgrade_only_adds_metadata_and_constraints(self):
         cursor = FakeCursor()
         ef.upgrade_table(cursor)
         statements = [sql for sql, _params in cursor.executed]
         added = [sql for sql in statements if "ADD COLUMN IF NOT EXISTS" in sql]
-        relaxed = [sql for sql in statements if sql.endswith("DROP NOT NULL")]
-        self.assertEqual(len(added) + len(relaxed), len(statements))
         self.assertEqual(len(added), len(ef.ADDED_COLUMNS))
-        self.assertEqual(len(relaxed), len(ef.FIELDS) - len(ef.LOCKED))
-        self.assertFalse(any(column in sql for sql in relaxed for column in ("first_name", "surname", "work_email")))
+        self.assertFalse(any("date_of_birth" in sql or "employer_name" in sql for sql in statements))
 
 
 class GateTests(SimpleTestCase):

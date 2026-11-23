@@ -1,7 +1,7 @@
 """Staff-only, read-only access to saved eligibility screening applications.
 
 No runtime schema upgrades, re-screening, postcode calls or invitation actions.
-Explicit JSON projections tolerate missing additive columns on legacy tables;
+Explicit JSON projections read submitted answers from JSONB;
 internal submission fingerprints/receipts and unknown custom columns stay private.
 """
 import json
@@ -27,12 +27,17 @@ DETAIL_COLUMNS = tuple(dict.fromkeys(
 ))
 STATUSES = (form.PENDING_ASSESSMENT, form.PROVISIONAL_ELIGIBLE, form.NOT_ELIGIBLE, "legacy", "all")
 STATUS_SQL = "to_jsonb(a)->>'assessment_status'"
+METADATA_COLUMNS = frozenset({
+    "id", "first_name", "surname", "work_email", "submitted_at",
+    "assessment_status", "assessment_reason", "layout_version", "eligible", "ineligible_reason",
+})
 UNAVAILABLE = "Eligibility applications could not be loaded. Please try again."
 
 
 def _projection(columns, *, outcome=False):
     # Only server-owned identifiers reach SQL. Never SELECT * into an API.
-    pairs = [f"'{key}', COALESCE(a.answers->'{key}', to_jsonb(a)->'{key}')" for key in columns]
+    pairs = [f"'{key}', to_jsonb(a)->'{key}'" if key in METADATA_COLUMNS
+             else f"'{key}', a.answers->'{key}'" for key in columns]
     if outcome:
         pairs.append("'invitation_outcome', to_jsonb(a)->'submission_response'->'outcome'")
     # PostgreSQL limits a function call to 100 arguments (two per key/value).

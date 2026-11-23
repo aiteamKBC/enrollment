@@ -292,13 +292,15 @@ class WorkplacePreviewTests(SimpleTestCase):
         fresh = (root / "database" / "schema.sql").read_text()
         sql = " ".join(line for line in upgrade.splitlines() if not line.lstrip().startswith("--"))
         self.assertNotRegex(sql, r"(?i)\b(UPDATE|DELETE|INSERT|DROP COLUMN|DROP TABLE|DEFAULT)\b")
-        for column, definition in ef.WORKPLACE_COLUMN_DEFINITIONS + ef.SCREENING_COLUMN_DEFINITIONS:
-            self.assertIn(f"{column} {definition}", " ".join(fresh.split()))
+        for column, _definition in ef.WORKPLACE_COLUMN_DEFINITIONS:
+            if column not in {"assessment_status", "assessment_reason"}:
+                self.assertNotIn(f"{column} text", " ".join(fresh.split()))
+        self.assertIn("answers jsonb", fresh)
         for column, definition in ef.SCREENING_COLUMN_DEFINITIONS:
             self.assertIn(f"ADD COLUMN IF NOT EXISTS {column} {definition}", " ".join(sql.split()))
         cursor = FakeCursor()
         ef.upgrade_table(cursor)
-        self.assertEqual(sum("ADD COLUMN IF NOT EXISTS" in statement for statement, _params in cursor.executed), len(ef.ADDED_COLUMNS) + 9)
+        self.assertEqual(sum("ADD COLUMN IF NOT EXISTS" in statement for statement, _params in cursor.executed), len(ef.ADDED_COLUMNS))
 
     def test_arrangement_country_and_hours_matrix(self):
         for arrangement in ef.WORKPLACE_ARRANGEMENTS:

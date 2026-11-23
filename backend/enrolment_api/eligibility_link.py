@@ -36,7 +36,9 @@ def verified_application(learner_id):
     with connections[CONN].cursor() as cursor:
         if not available(cursor):
             return None
-        cursor.execute(f'''SELECT to_jsonb(a), to_jsonb(u) FROM {TABLE} l JOIN enrolment.eligibility_form a ON a.id=l.application_id
+        cursor.execute(f'''SELECT a.answers, a.first_name, a.surname, a.work_email, a.id, a.layout_version,
+            a.eligible, a.ineligible_reason, a.submitted_at, to_jsonb(u)
+            FROM {TABLE} l JOIN enrolment.eligibility_form a ON a.id=l.application_id
             JOIN enrolment."Created_users" u ON u.id=l.learner_id
             WHERE l.learner_id=%s AND l.accepted_at IS NOT NULL
             AND (a.eligible IS TRUE OR to_jsonb(l)->>'override_approved_at' IS NOT NULL)''', [learner_id])
@@ -44,11 +46,11 @@ def verified_application(learner_id):
     if not row:
         return None
     import json
-    result = json.loads(row[0]) if isinstance(row[0], str) else row[0]
-    # New submissions store answers in JSONB; historic rows can still expose
-    # their old columns until the retirement migration is complete.
-    result = {**result, **(result.get('answers') or {})}
-    result['_learner'] = json.loads(row[1]) if isinstance(row[1], str) else row[1]
+    answers = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+    result = {**(answers or {}), "first_name": row[1], "surname": row[2],
+              "work_email": row[3], "id": row[4], "layout_version": row[5],
+              "eligible": row[6], "ineligible_reason": row[7], "submitted_at": row[8]}
+    result['_learner'] = json.loads(row[9]) if isinstance(row[9], str) else row[9]
     return result
 
 

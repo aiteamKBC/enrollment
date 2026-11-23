@@ -521,15 +521,10 @@ class PublishedVersionHistoryTests(SimpleTestCase):
 
 
 class TableTests(SimpleTestCase):
-    def test_custom_columns_are_added_without_dropping_anything(self):
+    def test_custom_questions_do_not_add_sql_columns(self):
         cursor = FakeCursor()
-        ef.add_custom_columns(cursor, {"custom_years": "numeric"})
-        self.assertEqual(cursor.executed, [('ALTER TABLE enrolment.eligibility_form ADD COLUMN IF NOT EXISTS "custom_years" numeric', None)])
-
-    def test_unsafe_custom_columns_are_refused(self):
-        for columns in ({'custom_a" text; DROP TABLE x; --': "text"}, {"first_name": "text"}, {"custom_a": "text; DROP"}):
-            with self.assertRaises(ValueError):
-                ef.add_custom_columns(FakeCursor(), columns)
+        ef.upgrade_table(cursor)
+        self.assertFalse(any('custom_' in sql for sql, _ in cursor.executed))
 
 
 class PublishViewTests(SimpleTestCase):

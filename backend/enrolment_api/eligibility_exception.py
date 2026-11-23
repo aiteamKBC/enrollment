@@ -27,9 +27,9 @@ def _error(message, status):
 
 
 def _application(cursor, application_id):
-    cursor.execute(f"SELECT to_jsonb(a) FROM enrolment.{form.TABLE} a WHERE a.id=%s FOR UPDATE", [application_id])
+    cursor.execute(f"SELECT a.work_email, a.eligible FROM enrolment.{form.TABLE} a WHERE a.id=%s FOR UPDATE", [application_id])
     row = cursor.fetchone()
-    return (json.loads(row[0]) if isinstance(row[0], str) else row[0]) if row else None
+    return {"work_email": row[0], "eligible": row[1]} if row else None
 
 
 def _candidate(email):
@@ -57,11 +57,11 @@ def eligibility_exception(request, application_id):
     try:
         if request.method == "GET":
             with connections[CONN].cursor() as cursor:
-                cursor.execute(f"SELECT to_jsonb(a) FROM enrolment.{form.TABLE} a WHERE a.id=%s", [application_id])
+                cursor.execute(f"SELECT a.work_email, a.eligible FROM enrolment.{form.TABLE} a WHERE a.id=%s", [application_id])
                 result = cursor.fetchone()
                 if not result:
                     return _error("Application not found.", 404)
-                application = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+                application = {"work_email": result[0], "eligible": result[1]}
                 if application.get("eligible") is not False:
                     return _error("Only a saved ineligible application can receive an exception.", 409)
                 candidate = _candidate(str(application.get("work_email") or "").strip())

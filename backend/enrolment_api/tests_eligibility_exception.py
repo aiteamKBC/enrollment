@@ -59,8 +59,7 @@ class ExceptionTests(SimpleTestCase):
         self.assertEqual(fields['date_of_birth'], '2001-04-23')
 
     def test_approval_preserves_screening_and_stages_invitation(self):
-        application = {'id': 42, 'eligible': False, 'work_email': 'sam@example.test'}
-        cursor = Cursor([(application,), (1,), None])
+        cursor = Cursor([('sam@example.test', False), (1,), None])
         request = self.factory.post('/enrolment_api/eligibility-applications/42/exception/',
             data=json.dumps({'reason': 'Employer evidence was checked by Admissions',
                              'confirmEmail': 'sam@example.test'}), content_type='application/json')
