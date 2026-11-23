@@ -17,7 +17,7 @@ const selection: ProgrammeModuleSelection = { programme: 'PCP_L6', pathway: 'ope
   modulesByPathway: { operational: [...mandatoryIds(operational), 'planning-control', 'earned-value'], strategic: ['portfolio', 'pmi-pmo'] } };
 afterEach(() => { vi.unstubAllEnvs(); window.history.replaceState({}, '', '/'); });
 
-it('zooms one shared date scale, retains local choices and anchors the visible centre date', async () => {
+it('zooms one shared date scale with stacked informational lanes and anchors the visible centre date', async () => {
   const user = userEvent.setup();
   const { container } = render(<ModuleSchedulingPreview samplePreview programme={PROGRAMME_MODULES.PCP_L6} selection={selection}
     homeCohort={{ status: 'resolved', programmeId: 'PCP_L6', cohortId: 'home', name: 'Saved home', layoutVersion: 24 }} />);
@@ -30,8 +30,7 @@ it('zooms one shared date scale, retains local choices and anchors the visible c
   const bar = container.querySelector<HTMLElement>('[data-offering-id]')!;
   const position = bar.style.cssText;
   const dates = [bar.dataset.start, bar.dataset.end];
-  const select = screen.getAllByRole('button', { name: /Select sample/ })[0];
-  await user.click(select);
+  expect(screen.queryByRole('button', { name: /Select sample/ })).toBeNull();
   const minus = screen.getByRole('button', { name: 'Zoom out timeline' });
   const plus = screen.getByRole('button', { name: 'Zoom in timeline' });
   const reset = screen.getByRole('button', { name: 'Reset timeline zoom to 100%' });
@@ -43,14 +42,14 @@ it('zooms one shared date scale, retains local choices and anchors the visible c
   expect(parseFloat(canvas.style.getPropertyValue('--timeline-width'))).toBeCloseTo(baseWidth * .6);
   expect(bar.style.cssText).toBe(position);
   expect([bar.dataset.start, bar.dataset.end]).toEqual(dates);
-  expect(select).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByRole('button', { name: /Select sample/ })).toBeNull();
   expect(screen.getByText('Saved home')).toBeVisible();
   await user.click(reset);
   expect(canvas.style.getPropertyValue('--timeline-width')).toBe(`${baseWidth}px`);
   await user.click(plus); await user.click(plus);
   expect(plus).toBeDisabled(); expect(reset).toHaveTextContent('140%');
   expect(parseFloat(canvas.style.getPropertyValue('--timeline-width'))).toBeCloseTo(baseWidth * 1.4);
-  expect(select).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByRole('button', { name: /Select sample/ })).toBeNull();
 });
 
 it('requires explicit opt-in on localhost and cannot be enabled in production', () => {
@@ -69,30 +68,25 @@ it.each(['ME_L4', 'MM_L6', 'APM_L4'] as const)('%s retains fixed academics and o
   expect(screen.queryByText('START DATE')).toBeNull();
 });
 
-it('uses active-path mandatory and confirmed optional modules, never inactive-path modules; session changes are local', async () => {
+it('uses active-path mandatory and confirmed optional modules with one sticky title and separate offering lanes', () => {
   const saved = JSON.stringify(selection);
-  const user = userEvent.setup();
-  render(<ModuleSchedulingPreview samplePreview programme={PROGRAMME_MODULES.PCP_L6} selection={selection} />);
+  const { container } = render(<ModuleSchedulingPreview samplePreview programme={PROGRAMME_MODULES.PCP_L6} selection={selection} />);
   expect(screen.getAllByRole('heading', { name: 'Project Planning and Control (APMG Qualification)' })).toHaveLength(2);
   expect(screen.queryByRole('heading', { name: 'Portfolio Management (APMG)' })).toBeNull();
   expect(screen.queryByRole('heading', { name: 'PMI (PMO)' })).toBeNull();
   expect(screen.queryByRole('heading', { name: 'PMI-SP' })).toBeNull();
-  const g1 = screen.getByRole('button', { name: 'Select sample G1 session for Project Management Professional (PMP)' });
-  const g2 = screen.getByRole('button', { name: 'Select sample G2 session for Project Management Professional (PMP)' });
-  await user.click(g1); expect(g1).toHaveAttribute('aria-pressed', 'true');
-  await user.click(g2); expect(g2).toHaveAttribute('aria-pressed', 'true'); expect(g1).toHaveAttribute('aria-pressed', 'false');
-  expect(screen.getByRole('status')).toHaveTextContent('1 of 5');
+  expect(container.querySelectorAll('[data-module-label="pmp"]')).toHaveLength(1);
+  expect(container.querySelector('[data-academic-module-id="pmp"]')?.querySelectorAll('[data-offering-id]')).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: /Select sample/ })).toBeNull();
   expect(JSON.stringify(selection)).toBe(saved);
-  await user.click(screen.getByRole('button', { name: 'Reset preview' }));
-  expect(g2).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.queryByRole('button', { name: 'Reset preview' })).toBeNull();
 });
 
-it('clears sample choices when the active academic pathway changes', async () => {
-  const user = userEvent.setup();
+it('changes academic rows when the active pathway changes without offering selectors', () => {
   const { rerender } = render(<ModuleSchedulingPreview samplePreview programme={PROGRAMME_MODULES.PCP_L6} selection={selection} />);
-  await user.click(screen.getAllByRole('button', { name: /Select sample/ })[0]);
+  expect(screen.queryByRole('button', { name: /Select sample/ })).toBeNull();
   rerender(<ModuleSchedulingPreview samplePreview programme={PROGRAMME_MODULES.PCP_L6} selection={{ ...selection, pathway: 'strategic' }} />);
-  expect(screen.getByRole('status')).toHaveTextContent('0 of');
+  expect(screen.queryByRole('button', { name: /Select sample/ })).toBeNull();
   expect(screen.queryByRole('heading', { name: 'Earned Value Management (EVM)' })).toBeNull();
 });
 
@@ -110,7 +104,7 @@ it('integrates with the real card using one persisted home cohort, with no save 
   expect(screen.getAllByText('Saved February cohort')).toHaveLength(1);
   expect(screen.queryByRole('radiogroup', { name: /cohort/i })).toBeNull();
   expect(screen.queryByRole('combobox')).toBeNull();
-  await userEvent.click(screen.getAllByRole('button', { name: /Select sample G2/ })[0]);
+  expect(screen.queryByRole('button', { name: /Select sample G2/ })).toBeNull();
   expect(screen.getByText('Saved February cohort')).toBeVisible();
   expect(JSON.stringify(value.draft)).toBe(before);
   unmount();

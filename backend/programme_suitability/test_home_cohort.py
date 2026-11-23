@@ -1,9 +1,11 @@
 """Pure cohort display/identity checks: no environment loading or database I/O."""
 import copy
 import unittest
+from unittest.mock import patch
 from datetime import date
 
 from .home_cohort import resolve_home_cohort
+from .home_cohort import resolve_lms_home
 from .intake_calendar import resolve_intake
 from .programme_identity import CURRICULUM_PROGRAMME_IDS, find_structure_programme
 from .programme_structure import resolve_assigned_cohort
@@ -82,6 +84,50 @@ class HomeCohortTests(unittest.TestCase):
             self.assertEqual(result['status'], 'resolved')
             self.assertEqual(result['layoutVersion'], version)
             self.assertEqual(result['name'], 'February 2027 - Group A')
+
+
+class LmsHomeTests(unittest.TestCase):
+    def setUp(self):
+        self.reader = patch('enrollment_service.lms_readonly.get_assigned_cohort').start()
+        self.addCleanup(patch.stopall)
+        self.item = dict(programme_id='PROG-ME-L4', cohort_id='saved', cohort_name='Live cohort',
+                         group_id='g1', group_name='Live group', module_catalogue_id='m1',
+                         title='Live module', sessions_number=4, start_date=None, end_date=None)
+        self.reader.return_value = [self.item]
+
+    def resolve(self, **changes):
+        return resolve_lms_home(**dict(dict(programme_id='ME_L4', persisted_programme_id='PROG-ME-L4',
+                                            cohort_id='saved', group_id='g1'), **changes))
+
+    def test_live_names_and_undated_modules_are_read_without_publication_or_writes(self):
+        result = self.resolve()
+        self.reader.assert_called_once_with('PROG-ME-L4', 'saved', 'g1')
+        self.assertEqual(result['name'], 'Live cohort')
+        self.assertEqual(result['groupName'], 'Live group')
+        self.assertEqual(result['lmsModules'][0]['id'], 'm1')
+        self.assertIsNone(result['layoutVersion'])
+
+    def test_programme_mismatch_never_reads_another_programmes_cohort(self):
+        self.assertEqual(self.resolve(persisted_programme_id='PROG-MM-L6')['status'], 'pending')
+        self.reader.assert_not_called()
+
+    def test_no_cohort_wrong_ids_and_duplicate_modules_fail_closed(self):
+        for rows in [[], [{**self.item, 'cohort_id': 'other'}],
+                     [{**self.item, 'group_id': 'other'}], [self.item, self.item]]:
+            self.reader.return_value = rows
+            self.assertEqual(self.resolve()['status'], 'pending')
+
+    def test_missing_group_has_no_guessed_label(self):
+        self.reader.return_value = [{**self.item, 'module_catalogue_id': None, 'group_id': None}]
+        result = self.resolve(group_id=None)
+        self.assertEqual(result['status'], 'resolved')
+        self.assertIsNone(result['groupName'])
+        self.assertEqual(result['lmsModules'], [])
+
+    def test_reader_outage_is_safe_pending_metadata(self):
+        from enrollment_service.lms_readonly import LmsReadUnavailable
+        self.reader.side_effect = LmsReadUnavailable('read_failed')
+        self.assertEqual(self.resolve()['reason'], 'lms_unavailable')
 
 
 class ExistingIntakeBoundaryTests(unittest.TestCase):

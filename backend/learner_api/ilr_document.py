@@ -124,12 +124,18 @@ def _extended_ilr(learner_id):
 
 def derive_learner_details(learner):
     """Page 1 of the form. Blank where we hold no source, never guessed."""
+    from enrolment_api.document_templates.learner_sources import working_hours_per_week
+
     personal = _wizard_personal(learner.pk)
     rpl = _rpl_detail(learner.pk)
     # The ILR Learner Details step: the answers the record itself has no column
     # for. The record still wins wherever it holds a value.
     details = _wizard_ilr_details(learner.pk)
     plr = _wizard_plr(learner.pk)
+    extended = _extended_ilr(learner.pk)
+    from enrolment_api.employment_status_history import HISTORY_KEY, effective_record
+    history = ((getattr(extended, "wizard_draft", None) or {}).get(HISTORY_KEY) or [])
+    employment = effective_record(history)
 
     # The wizard's own name/DOB win: the learner entered them on their own
     # record, whereas the console row may carry a single display name.
@@ -147,6 +153,7 @@ def derive_learner_details(learner):
     ]
 
     return {
+        "learnerReferenceNumber": _s(getattr(learner, "reference_number", "")),
         "uln": _s(getattr(rpl, "uln", "")) or _s(getattr(plr, 'uln', '')),
         "familyName": last,
         "givenNames": first,
@@ -169,13 +176,18 @@ def derive_learner_details(learner):
         "longTermDisability": getattr(details, "long_term_disability", None),
         "priorAttainment": _s(getattr(rpl, "reported_attainment", ""))
         or _s(getattr(details, "highest_qualification", "")),
-        "employmentStatus": _s(getattr(details, "employment_status", "")),
+        "employmentStatus": _s(employment.get("employmentStatus")) or _s(getattr(details, "employment_status", "")),
         "employmentStartDate": _iso(getattr(details, "employment_start_date", None)),
-        "dateStatusApplies": "",
+        "dateStatusApplies": _s(employment.get("dateStatusApplies")),
+        "agreementIdentifier": _s(employment.get("agreementIdentifier")),
         "jobTitle": _s(getattr(details, "job_title", "")),
-        "edrsErn": "",
+        "edrsErn": _s(employment.get("employerIdentifier")),
         "selfEmployed": getattr(details, "self_employed", None),
         "fullTimeEducationPrior": getattr(details, "full_time_education", None),
+        "workingHoursPerWeek": working_hours_per_week(details),
+        # Historical templates used these keys. Keep their original blank
+        # semantics: working hours are not silently re-described as contracted
+        # hours, and the retired small-employer question has no current source.
         "contractedHoursPerWeek": "",
         "isSmallEmployer": None,
     }

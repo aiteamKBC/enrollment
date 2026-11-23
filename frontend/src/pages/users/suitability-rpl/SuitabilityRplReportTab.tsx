@@ -108,6 +108,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   const [form, setForm] = useState<FormState>(initialForm);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [history, setHistory] = useState<SuitabilityRplState['history']>([]);
+  const [contextError, setContextError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -123,6 +124,8 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
     const sequence = ++loadSequence.current;
     setLoading(true);
     setError('');
+    setContextError(null);
+    setIssuedDocuments([]);
     try {
       const state = await fetchSuitabilityRplReport(kind, learnerId, signal);
       if (sequence !== loadSequence.current || signal?.aborted) return;
@@ -131,8 +134,10 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
       setForm(formFromReport(state.report));
       setAiEnabled(state.aiEnabled);
       setHistory(state.history);
+      setContextError(state.contextError ?? null);
       setRplAnalysis(null);
-      try { setIssuedDocuments((await fetchSuitabilityRplIssuedDocuments(kind, learnerId)).documents); } catch { setIssuedDocuments([]); }
+      const issued = await fetchSuitabilityRplIssuedDocuments(kind, learnerId).catch(() => null);
+      if (sequence === loadSequence.current && !signal?.aborted && issued) setIssuedDocuments(issued.documents);
     } catch (cause) {
       if (sequence === loadSequence.current && !(cause instanceof DOMException && cause.name === 'AbortError')) {
         setError(cause instanceof Error ? cause.message : 'Could not load the report.');
@@ -391,6 +396,23 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
   };
 
   if (loading) return <div className={`${panel} flex min-h-52 items-center justify-center gap-3 p-8 text-sm text-foreground-500`}><Loader2 className="animate-spin" size={18} />Loading report evidence…</div>;
+  const versionHistory = (
+    <section className={`${panel} p-4 sm:p-5`} aria-labelledby="version-history-title">
+      <div className="flex items-center gap-2"><History className="text-primary-600" size={18} /><h3 id="version-history-title" className="font-heading text-lg font-semibold text-foreground-900">Version history</h3></div>
+      <div className="mt-3 space-y-2">
+        {history.length === 0 && <p className="rounded-xl bg-background-100 px-3 py-4 text-sm text-foreground-500">No saved versions yet.</p>}
+        {history.map((item) => {
+          const document = issuedDocuments.find((candidate) => candidate.reportId === item.id && candidate.reportVersion === item.reportVersion);
+          const isCurrent = item.id === report?.id;
+          return <article key={item.id} aria-current={isCurrent ? 'true' : undefined} className={`rounded-xl border p-3 ${isCurrent ? 'border-primary-200 bg-primary-50/80' : 'border-foreground-200 bg-white'}`}>
+            <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-semibold text-foreground-900">Version {item.reportVersion} <span className="font-normal text-foreground-500">{item.status === 'finalised' ? 'Finalised' : 'Draft'}</span></p>{isCurrent && <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-700">Current version</p>}{item.finalisedAt && <p className="mt-1 text-xs text-foreground-500">Finalised {new Date(item.finalisedAt).toLocaleDateString('en-GB')}</p>}</div>{document && <a className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-foreground-200 bg-white px-2.5 py-2 text-xs font-semibold text-foreground-700 transition hover:border-primary-300 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300" href={document.pdfUrl} target="_blank" rel="noreferrer"><FileSearch size={13} />View PDF</a>}</div>
+            {item.amendmentReason && <p className="mt-2 text-xs leading-5 text-foreground-500">{item.amendmentReason}</p>}
+          </article>;
+        })}
+      </div>
+    </section>
+  );
+  if (contextError) return <div className="space-y-4"><ErrorMessage>{contextError}</ErrorMessage>{versionHistory}</div>;
   if (!evidence) return <ErrorMessage>{error || 'The report evidence is unavailable.'}</ErrorMessage>;
 
   return (
@@ -522,20 +544,7 @@ export function SuitabilityRplReportTab({ kind, learnerId, learnerName }: {
             </div>
           </section>
 
-          <section className={`${panel} p-4 sm:p-5`} aria-labelledby="version-history-title">
-            <div className="flex items-center gap-2"><History className="text-primary-600" size={18} /><h3 id="version-history-title" className="font-heading text-lg font-semibold text-foreground-900">Version history</h3></div>
-            <div className="mt-3 space-y-2">
-              {history.length === 0 && <p className="rounded-xl bg-background-100 px-3 py-4 text-sm text-foreground-500">No saved versions yet.</p>}
-              {history.map((item) => {
-                const document = issuedDocuments.find((candidate) => candidate.reportId === item.id || candidate.reportVersion === item.reportVersion);
-                const isCurrent = item.id === report?.id;
-                return <article key={item.id} aria-current={isCurrent ? 'true' : undefined} className={`rounded-xl border p-3 ${isCurrent ? 'border-primary-200 bg-primary-50/80' : 'border-foreground-200 bg-white'}`}>
-                  <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-semibold text-foreground-900">Version {item.reportVersion} <span className="font-normal text-foreground-500">{item.status === 'finalised' ? 'Finalised' : 'Draft'}</span></p>{isCurrent && <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-700">Current version</p>}{item.finalisedAt && <p className="mt-1 text-xs text-foreground-500">Finalised {new Date(item.finalisedAt).toLocaleDateString('en-GB')}</p>}</div>{document && <a className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-foreground-200 bg-white px-2.5 py-2 text-xs font-semibold text-foreground-700 transition hover:border-primary-300 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300" href={document.pdfUrl} target="_blank" rel="noreferrer"><FileSearch size={13} />View PDF</a>}</div>
-                  {item.amendmentReason && <p className="mt-2 text-xs leading-5 text-foreground-500">{item.amendmentReason}</p>}
-                </article>;
-              })}
-            </div>
-          </section>
+          {versionHistory}
         </aside>
       </div>
 

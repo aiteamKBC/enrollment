@@ -49,6 +49,7 @@ export const enrollmentRoutes: RouteObject[] = [
     { path: '/users/first-sessions', element: <FirstSessions /> },
     { path: '/users/coach-directory', element: <CoachDirectory workspaceRole="compliance" /> },
     { path: '/users/:userId', element: <Board /> },
+    { path: '/users/:userId/reviews/:eventKey', element: <ReviewForm /> },
     { path: '/users/:userId/wizard', element: <LearnerOnboardingGate><Wizard /></LearnerOnboardingGate> },
     { path: '/users/:userId/wizard/:stepSlug', element: <LearnerOnboardingGate><Wizard /></LearnerOnboardingGate> },
     { path: '/learner/welcome', element: <WelcomeEntry><Welcome /></WelcomeEntry> },

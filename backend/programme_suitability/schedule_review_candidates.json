@@ -1,5 +1,5 @@
 {
-  "purpose": "Documented possible title aliases, displayed tentatively; not verified qualification equivalents or approvals. No offering IDs, dates or groups are configured here.",
+  "purpose": "Documented possible title aliases plus explicitly confirmed alternative module titles. Confirmation of a title never approves a booking. No offering IDs, dates or groups are configured here.",
   "source": "module_mapping_review.json; Phase 8 unapproved review",
   "programme_ids": {
     "ME_L4": "PROG-ME-L4",
@@ -33,6 +33,8 @@
       "pathway": null,
       "academic_id": "martech",
       "academic_title": "Marketing Technology (MarTech)",
+      "confirmed_titles": ["MarTech"],
+      "confirmed_title_source": "Administrator confirmation that MarTech and Marketing Technology (MarTech) identify the same module.",
       "titles": [
         "Martech",
         "Martech - Fri",

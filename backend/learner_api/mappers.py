@@ -154,6 +154,7 @@ def to_edit_fields(u):
         # on it, because two employers can share a name.
         "employerId": u.employer_id,
         "organisationId": getattr(u, "organisation_id", None),
+        "learnerReferenceNumber": _s(getattr(u, "reference_number", "")),
         "organization": _s(u.organization),
         "lineManager": _s(u.line_manager),
         "learnerType": _s(getattr(u, "learner_type", "")) or "apprenticeship",
@@ -427,7 +428,10 @@ def to_board(u):
     # Imported here, not at module scope: enrolment_api.models imports from
     # learner_api.models, so a top-level import would be circular.
     from .board_wizard import fmt_date, merge_wizard_sections, record_address, saved_signature
-    from programme_suitability.home_cohort import cohort_label_for_board
+    from programme_suitability.home_cohort import home_cohort_for_board
+
+    home_cohort = home_cohort_for_board(u)
+    resolved_home = home_cohort if home_cohort and home_cohort['status'] == 'resolved' else {}
 
     enrolled_at, enrolled_by = _split_enrolled(u.enrolled_time_and_user)
     saved_signature_value, saved_signature_date = saved_signature(u.id)
@@ -468,7 +472,7 @@ def to_board(u):
             "email": _s(u.email),
             "phone": _s(u.phone_number),
             "dob": fmt_date(u.date_of_birth),
-            "groupMembership": _s(u.group),
+            "groupMembership": (resolved_home.get('groupName') or 'Group pending') if resolved_home.get('source') == 'lms' else _s(u.group),
             "signatureUrl": None,
             "hasMandate": False,
             # What the learner already gave on their record (first sign-in, or
@@ -492,7 +496,8 @@ def to_board(u):
         "programme": {
             "type": "Delivery",
             "name": _s(u.programme),
-            "cohort": cohort_label_for_board(u, _s(u.cohort)),
+            "cohort": resolved_home.get('name') or _s(u.cohort),
+            "homeCohort": home_cohort,
             "status": programme_status(u) or DEFAULT_PROGRAMME_STATUS,
             # Cohort dates, matched from curriculum.cohort_authoring_details.
             # apprenticeship_end_date is the learner's own override and only
@@ -601,6 +606,7 @@ WRITABLE_FIELDS = {
     "employer": "employer",
     "organization": "organization",
     "reference": "organization",
+    "learnerReferenceNumber": "reference_number",
     "lineManager": "line_manager",
     "onboardingStatus": "onboarding_status",
     "onboardingCompleted": "onboarding_completed",
@@ -901,6 +907,12 @@ def write_fields(payload, *, require_create=False):
         if key in payload:
             val = payload[key]
             fields[attr] = None if val is None else str(val).strip()
+    if "learnerReferenceNumber" in payload:
+        reference = _s(payload.get("learnerReferenceNumber"))
+        if reference and not re.fullmatch(r"[A-Za-z0-9 ]{1,12}", reference):
+            raise ValidationError(
+                "Learner Reference Number must be 1-12 letters, numbers or spaces."
+            )
     for key, attr in APTEM_BOOL_FIELDS.items():
         if key in payload:
             fields[attr] = _bool_or_none(payload[key])
@@ -1456,6 +1468,14 @@ def write_organisation_fields(payload, *, require_create=False):
         if key in payload:
             val = payload[key]
             fields[attr] = None if val is None else str(val).strip()
+    if "edrsErnNumber" in payload:
+        employer_identifier = _s(payload.get("edrsErnNumber"))
+        if employer_identifier and not re.fullmatch(r"[0-9]{9}", employer_identifier):
+            raise ValidationError("EDRS/ERN number must contain exactly 9 digits.")
+    if "apprenticeshipAgreementId" in payload:
+        agreement = _s(payload.get("apprenticeshipAgreementId"))
+        if agreement and not re.fullmatch(r"[A-Za-z0-9]{1,7}", agreement):
+            raise ValidationError("Apprenticeship agreement id must be 1-7 alphanumeric characters.")
     if "workingHours" in payload:
         fields["working_hours"] = _working_hours(payload["workingHours"])
     # A boolean, so it bypasses the string-coercing loop above.

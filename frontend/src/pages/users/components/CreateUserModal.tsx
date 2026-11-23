@@ -90,7 +90,7 @@ const COUNTRY_OPTIONS = opts(ALL_COUNTRIES);
 // of creating somebody who could never sign in.
 const SECTIONS: SectionDef[] = [
   {
-    title: 'Identity',
+    title: 'Personal Information',
     icon: 'ri-user-line',
     fields: [
       { name: 'firstName', label: 'First name', type: 'text', required: true, placeholder: 'firstname', phase: 'create' },
@@ -103,6 +103,26 @@ const SECTIONS: SectionDef[] = [
       { name: 'phone', label: 'Mobile', type: 'tel', placeholder: 'NNN NNNN NNNN or +NNN NNN NNN NNNN' },
       { name: 'dob', label: 'Date of birth', type: 'date' },
       { name: 'niNumber', label: 'National Insurance number', type: 'text', placeholder: 'AB123456A' },
+      {
+        name: 'learnerReferenceNumber',
+        label: 'Learner Reference Number',
+        type: 'text',
+        phase: 'edit',
+        placeholder: '1-12 letters or numbers',
+        hint: 'Provider-assigned ILR reference. Must be unique, persistent and must not contain personal information.',
+      },
+    ],
+  },
+  {
+    title: 'Address',
+    icon: 'ri-map-pin-line',
+    fields: [
+      { name: 'addressLine1', label: 'Address 1', type: 'text' },
+      { name: 'addressLine2', label: 'Address 2', type: 'text' },
+      { name: 'townCity', label: 'Town/City', type: 'text' },
+      { name: 'county', label: 'County', type: 'text' },
+      { name: 'postcode', label: 'Postcode', type: 'text', placeholder: 'CT1 1AA' },
+      { name: 'country', label: 'Country', type: 'select', options: COUNTRY_OPTIONS },
     ],
   },
   {
@@ -153,27 +173,14 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
-    title: 'Address',
-    icon: 'ri-map-pin-line',
-    fields: [
-      { name: 'postcode', label: 'Postcode', type: 'text', placeholder: 'CT1 1AA' },
-      { name: 'addressLine1', label: 'Address 1', type: 'text' },
-      { name: 'addressLine2', label: 'Address 2', type: 'text' },
-      { name: 'townCity', label: 'Town/City', type: 'text' },
-      { name: 'county', label: 'County', type: 'text' },
-      { name: 'country', label: 'Country', type: 'select', options: COUNTRY_OPTIONS },
-    ],
-  },
-  {
     title: 'Delivery & employer',
     icon: 'ri-building-line',
     fields: [
+      { name: 'organisationId', label: 'Organisation', type: 'select', lookup: 'organisation' },
+      { name: 'employer', label: 'Manager', type: 'select', lookup: 'employer', hint: 'Optional. Only people linked to the selected organisation appear.' },
       // Required: the first session below is booked with this person, and a
       // learner cannot be enrolled without someone to hold it.
       { name: 'caseOwner', label: 'Case owner', type: 'select', lookup: 'caseOwner', required: true },
-      { name: 'coachEmail', label: 'Skills coach', type: 'select', lookup: 'skillsCoach', hint: 'Optional. Only staff with Coach access appear.' },
-      { name: 'organisationId', label: 'Organisation', type: 'select', lookup: 'organisation' },
-      { name: 'employer', label: 'Manager', type: 'select', lookup: 'employer', hint: 'Optional. Only people linked to the selected organisation appear.' },
       { name: 'mentor', label: 'Mentor', type: 'text' },
     ],
   },
@@ -221,6 +228,8 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   const [programmes, setProgrammes] = useState<string[]>([]);
   const [cohorts, setCohorts] = useState<string[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupLookupError, setGroupLookupError] = useState<string | null>(null);
   // Case owners come from Staff_users (positions Caseowner / Admin) — independent
   // of the programme cascade, so loaded once alongside programmes.
   const [caseOwners, setCaseOwners] = useState<string[]>([]);
@@ -330,10 +339,14 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   useEffect(() => {
     let cancelled = false;
     setGroups([]);
+    setGroupLookupError(null);
+    setGroupsLoading(false);
     if (!programme || !cohort) return;
+    setGroupsLoading(true);
     fetchGroups(programme, cohort)
       .then((rows) => { if (!cancelled) setGroups(rows); })
-      .catch((e: Error) => { if (!cancelled) setLookupError(e.message); });
+      .catch((e: Error) => { if (!cancelled) setGroupLookupError(e.message); })
+      .finally(() => { if (!cancelled) setGroupsLoading(false); });
     return () => { cancelled = true; };
   }, [programme, cohort]);
 
@@ -341,7 +354,7 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
   const lookupState = (level: Exclude<NonNullable<FieldDef['lookup']>, 'employer' | 'organisation' | 'skillsCoach'>) => {
     if (level === 'programme') return { values: programmes, disabled: false, waitingFor: '', empty: 'None available' };
     if (level === 'cohort') return { values: cohorts, disabled: !programme, waitingFor: 'programme', empty: 'None available' };
-    if (level === 'group') return { values: groups, disabled: !cohort, waitingFor: 'cohort', empty: 'None available' };
+    if (level === 'group') return { values: groups, disabled: !cohort || groupsLoading, waitingFor: cohort ? '' : 'cohort', empty: groupsLoading ? 'Loading groups...' : groupLookupError ? 'Unable to load groups' : 'None available' };
     return {
       values: caseOwners,
       disabled: false,
@@ -415,6 +428,7 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
       preferredName: formData.preferredName,
       gender: formData.gender,
       niNumber: formData.niNumber,
+      learnerReferenceNumber: formData.learnerReferenceNumber,
       postcode: formData.postcode,
       addressLine1: formData.addressLine1,
       addressLine2: formData.addressLine2,
@@ -730,9 +744,9 @@ export function CreateUserModal({ onClose, onCreated, editing, onSaved }: {
                 <h3 className="text-[12px] font-semibold uppercase tracking-wider text-foreground-600">{section.title}</h3>
               </header>
               <div className="divide-y divide-foreground-100">{fields.map(renderField)}</div>
-              {section.title === 'Programme' && lookupError && (
+              {section.title === 'Programme' && (lookupError || groupLookupError) && (
                 <p className="px-4 py-2 text-[11px] text-red-600 border-t border-foreground-100">
-                  <AppIcon className="ri-error-warning-line mr-1" />Could not load curriculum options: {lookupError}
+                  <AppIcon className="ri-error-warning-line mr-1" />Could not load curriculum options: {groupLookupError || lookupError}
                 </p>
               )}
               {section.title === 'Delivery & employer' && staffError && (

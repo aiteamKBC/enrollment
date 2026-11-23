@@ -389,6 +389,9 @@ def enrolment_review_form(request, kind, pk, event_key):
     if failure is not None:
         return failure
 
+    account = getattr(request, "login_account", None)
+    admin_mode = getattr(account, "role", None) in ("admin", "staff")
+
     if request.method == "GET":
         # Opening the form for the first time records when the review started, so
         # "issued (or booked) but never opened" is distinguishable from "in progress".
@@ -403,6 +406,8 @@ def enrolment_review_form(request, kind, pk, event_key):
                 logger.exception("enrolment_review_form: could not stamp started_at")
         return JsonResponse(_serialize_form(review, learner, event))
 
+    if request.method in ("PATCH", "POST") and not admin_mode:
+        return _error("Learners can review and sign an issued review but cannot edit its answers.", 403)
     if template_service.review_is_signed(review):
         return _error('This review has recorded signatures. Withdraw its existing signatures before changing answers; the previous signed rendering remains in history.', 409)
     from enrolment_api.document_templates.revisions import content_locked
@@ -456,7 +461,11 @@ def enrolment_review_form(request, kind, pk, event_key):
         if finish:
             review.form_completed = True
             review.form_completed_at = timezone.now()
-            review.status = EnrolmentReview.STATUS_COMPLETED
+            # Staff completion is still an unissued draft. Learner completion is
+            # no longer writable; the existing status is retained for legacy
+            # rows while the final issue action performs the transition.
+            if not admin_mode:
+                review.status = EnrolmentReview.STATUS_COMPLETED
         review.save()
     except DatabaseError as exc:
         logger.exception("enrolment_review_form: save failed")
@@ -742,7 +751,9 @@ def onboarding_review_slots(pk):
     slots = []
     for review_type in ONBOARDING_REVIEW_TYPES:
         row = current.get(review_type)
-        slot = {"type": review_type, "label": ONBOARDING_REVIEW_LABELS[review_type], "issued": row is not None}
+        issued = row is not None and row.status in (EnrolmentReview.STATUS_ISSUED, EnrolmentReview.STATUS_COMPLETED)
+        slot = {"type": review_type, "label": ONBOARDING_REVIEW_LABELS[review_type], "issued": issued,
+                "draft": bool(row is not None and not issued)}
         if row is not None:
             done, total = _progress(row)
             slot.update({
@@ -790,7 +801,12 @@ def onboarding_reviews(request, kind, pk):
         learner, failure = _learner_for(kind, pk)
         if failure is not None:
             return failure
-        return JsonResponse(_slots_payload(learner, kind, pk))
+        payload = _slots_payload(learner, kind, pk)
+        if getattr(getattr(request, "login_account", None), "role", None) not in ("admin", "staff"):
+            for slot in payload["reviews"]:
+                if slot.get("draft"):
+                    slot.pop("eventKey", None)
+        return JsonResponse(payload)
     except DatabaseError as exc:
         logger.exception("onboarding_reviews: lookup failed")
         return _error(f"Database error: {exc}", 502)
@@ -814,12 +830,28 @@ def issue_onboarding_review(request, kind, pk):
         return _error(f"Unknown review type: {review_type!r}.", 400)
 
     learner = None
+    action = payload.get("action", "prepare") if isinstance(payload, dict) else "prepare"
     try:
         learner, failure = _learner_for(kind, pk)
         if failure is not None:
             return failure
-        if review_type in _current_reviews(pk):
-            return JsonResponse({"error": "This review has already been issued.", **_slots_payload(learner, kind, pk)}, status=409)
+        existing = _current_reviews(pk).get(review_type)
+        if action == "finalize":
+            if existing is None:
+                return JsonResponse({"error": "Prepare the review before issuing it."}, status=409)
+            if not existing.form_completed:
+                return JsonResponse({"error": "Complete and save the review before issuing it."}, status=409)
+            if existing.status in (EnrolmentReview.STATUS_ISSUED, EnrolmentReview.STATUS_COMPLETED):
+                return JsonResponse({"error": "This review has already been issued.", **_slots_payload(learner, kind, pk)}, status=409)
+            with transaction.atomic(using='enrolment') if template_service.ready() else nullcontext():
+                existing.status = EnrolmentReview.STATUS_ISSUED
+                existing.booked_at = existing.booked_at or timezone.now()
+                existing.save(update_fields=["status", "booked_at", "updated_at"])
+                if template_service.ready():
+                    template_service.bind_review_issue(existing, learner)
+            return JsonResponse(_slots_payload(learner, kind, pk), status=200)
+        if existing is not None:
+            return JsonResponse({"error": "This review draft already exists.", **_slots_payload(learner, kind, pk)}, status=200)
         owner_email, owner_name, owner_id = _case_owner_record(learner)
         account = getattr(request, "login_account", None)
         issued_by = (getattr(account, "display_name", None) or getattr(account, "email", None) or "") if account else ""
@@ -837,7 +869,7 @@ def issue_onboarding_review(request, kind, pk):
                 coach_id=owner_id,
                 coach_name=owner_name,
                 coach_email=owner_email,
-                status=EnrolmentReview.STATUS_ISSUED,
+                status=EnrolmentReview.STATUS_BOOKED,
                 notes=f"Issued by {issued_by}" if issued_by else "Issued",
                 booked_at=timezone.now(),
             )

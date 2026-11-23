@@ -12,6 +12,14 @@ def snapshot_data(learner, content, template):
     from .revisions import required_roles
     from .learner_sources import date_warnings
     key = content['documentKey']
+    if key == 'training-plan':
+        from learner_api.training_plan_activities import new_content
+        content = new_content(content)
+        template = copy.deepcopy(template)
+        template['content'] = copy.deepcopy(content)
+        from .registry import digest
+        template['sourceContentHash'] = template.get('contentHash')
+        template['contentHash'] = digest(content)
     data = copy.deepcopy(learner_data(key, learner))
     roles = required_roles(key, data)
     for name in ('template', 'documentRevision', 'signatureProvenance', 'unansweredTemplate'):
@@ -23,7 +31,9 @@ def snapshot_data(learner, content, template):
     data['documentFieldValues'] = service.field_values(key, learner, data)
     data['documentTemplateSnapshot'] = copy.deepcopy(template)
     data['learnerDataSnapshot'] = True
-    data['bindingWarnings'] = date_warnings(learner)
+    overview = data.get('activitiesOverview')
+    data['bindingWarnings'] = ([*overview.get('blockers', []), *overview.get('warnings', [])]
+        if overview else date_warnings(learner))
     # Derivers legitimately return dates/Decimals; persist exactly their JSON form.
     return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
 

@@ -152,6 +152,17 @@ it('supports a new arbitrary pathway identifier and local credit totals without 
 });
 
 
+it('shows the live LMS placement alongside the preserved academic module configuration', async () => {
+  render(<Harness state={assessment('ME_L4')} homeCohort={{ status: 'resolved', source: 'lms', programmeId: 'ME_L4',
+    cohortId: 'lms-home', name: 'Live LMS cohort', layoutVersion: null, groupId: 'g1', groupName: 'Live LMS group',
+    lmsModules: [{ id: 'lms-m1', title: 'Live LMS delivery', sessions: 16, start: null, end: null }] }} />);
+  const panel = await screen.findByRole('region', { name: 'Assigned LMS modules' });
+  expect(within(panel).getByText('Live LMS delivery')).toBeVisible();
+  expect(within(panel).getByText('Cohort: Live LMS cohort · Group: Live LMS group')).toBeVisible();
+  expect(save).not.toHaveBeenCalled();
+  expect(changed).not.toHaveBeenCalled();
+});
+
 it.each([7, 11, 16, 20])('preserves the verbatim pinned cohort with the confirmed alternative programme (v%s)', async (version) => {
   render(<Harness state={assessment('ME_L4', 'MM_L6')} homeCohort={{ status: 'resolved', programmeId: 'ME_L4',
     cohortId: 'persisted-id', name: 'February 2027 - Group A', layoutVersion: version }} />);

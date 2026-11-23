@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type {
   SuitabilityRplEvidence,
   SuitabilityRplIssuedDocument,
@@ -128,5 +128,28 @@ describe('Suitability & RPL assessor signing consent', () => {
 
     expect(screen.getByRole('checkbox', { name: /I have reviewed this exact report version/ })).toBeEnabled();
     expect(screen.getByText('The exact issued PDF has been opened. You can now confirm consent.')).toBeVisible();
+  });
+
+  it('keeps exact historical PDFs visible without selecting a report in an ambiguous context', async () => {
+    const contextError = 'Multiple saved enrolment contexts match this learner. Confirm the learner reference.';
+    const older = { ...state.history[0], id: 'other-report', amendmentReason: 'Earlier enrolment' };
+    const unissued = { ...state.history[0], id: 'unissued-report', amendmentReason: 'Unissued enrolment' };
+    const mismatched = { ...state.history[0], id: 'different-version', amendmentReason: 'Wrong issued version' };
+    api.fetchReport.mockResolvedValue({ ...state, report: null, contextError, history: [older, state.history[0], unissued, mismatched] });
+    api.fetchIssued.mockResolvedValue({ documents: [
+      issued,
+      { ...issued, reportId: older.id, issueId: 'older-issue', pdfUrl: '/issued/older-issue/pdf/' },
+      { ...issued, reportId: mismatched.id, reportVersion: 3, issueId: 'wrong-version', pdfUrl: '/issued/wrong-version/pdf/' },
+    ] });
+
+    render(<SuitabilityRplReportTab kind="apprenticeship" learnerId="20" learnerName="Sam Example" />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(contextError);
+    const [olderRow, currentRow, unissuedRow, mismatchedRow] = within(screen.getByRole('region', { name: 'Version history' })).getAllByRole('article');
+    expect(within(olderRow).getByRole('link', { name: 'View PDF' })).toHaveAttribute('href', '/issued/older-issue/pdf/');
+    expect(within(currentRow).getByRole('link', { name: 'View PDF' })).toHaveAttribute('href', issued.pdfUrl);
+    expect(within(unissuedRow).queryByRole('link', { name: 'View PDF' })).not.toBeInTheDocument();
+    expect(within(mismatchedRow).queryByRole('link', { name: 'View PDF' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Preview PDF' })).not.toBeInTheDocument();
   });
 });

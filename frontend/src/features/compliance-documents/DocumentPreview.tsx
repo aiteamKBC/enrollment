@@ -4,7 +4,7 @@ import { btnSecondary } from '@/pages/users/components/ui';
 import type { PreviewResponse } from './types';
 import { previewPdf } from './previewPdf';
 
-export function DocumentPreview({ value, onClose, onReady, onContinue }: { value: PreviewResponse; onClose: () => void; onReady?: (value: PreviewResponse) => void; onContinue?: () => void }) {
+export function DocumentPreview({ value, onClose, onReady, onContinue, showDiagnostics = false }: { value: PreviewResponse; onClose: () => void; onReady?: (value: PreviewResponse) => void; onContinue?: () => void; showDiagnostics?: boolean }) {
   const [url, setUrl] = useState(''); const [error, setError] = useState('');
   useEffect(() => {
     let active = true; let objectUrl = '';
@@ -29,7 +29,7 @@ export function DocumentPreview({ value, onClose, onReady, onContinue }: { value
   </div>}>
     <p className={`mb-3 rounded-lg border p-3 text-sm ${value.sample ? 'border-amber-200 bg-amber-50' : 'border-primary-200 bg-primary-50'}`}>{value.notice}</p>
     {value.missingFields.length > 0 && <details className="mb-3 rounded-lg border border-amber-200 p-3 text-sm"><summary>{value.missingFields.length} unavailable or blank fields — shown blank in the document</summary><ul className="mt-2 list-inside list-disc">{value.missingFields.map((f) => <li key={f.field}>{f.label}</li>)}</ul></details>}
-    {!!value.bindingWarnings?.length && <div role="alert" className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"><p>Check learner dates before issuing this document.</p><ul className="mt-2 list-inside list-disc">{value.bindingWarnings.map(warning=><li key={`${warning.field}:${warning.code}`}>{warning.field}: {warning.message}</li>)}</ul></div>}
+    {showDiagnostics && !!value.bindingWarnings?.length && <div role="alert" className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"><p>Check learner dates before issuing this document.</p><ul className="mt-2 list-inside list-disc">{value.bindingWarnings.map(warning=><li key={`${warning.field}:${warning.code}`}>{warning.field}: {warning.message}</li>)}</ul></div>}
     {error && <p role="alert" className="text-red-700">Could not render preview: {error}</p>}
     {!url && !error && <p role="status">Loading document…</p>}
     {url && <iframe title="Document PDF preview" className="h-[70vh] w-full rounded-lg border" src={url} onError={() => setError('Your browser could not display the PDF. Use Open in new tab to review it.')} />}

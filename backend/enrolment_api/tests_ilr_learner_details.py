@@ -275,7 +275,9 @@ class IlrDocumentTests(SimpleTestCase):
         )
         with patch.object(ilr_document, "_wizard_personal", return_value=None), \
                 patch.object(ilr_document, "_rpl_detail", return_value=None), \
-                patch.object(ilr_document, "_wizard_ilr_details", return_value=details):
+                patch.object(ilr_document, "_wizard_ilr_details", return_value=details), \
+                patch.object(ilr_document, "_wizard_plr", return_value=None), \
+                patch.object(ilr_document, "_extended_ilr", return_value=None):
             out = ilr_document.derive_learner_details(learner)
 
         self.assertEqual(out["yearsAtAddress"], "Since birth")
@@ -305,7 +307,9 @@ class IlrDocumentTests(SimpleTestCase):
         )
         with patch.object(ilr_document, "_wizard_personal", return_value=None), \
                 patch.object(ilr_document, "_rpl_detail", return_value=None), \
-                patch.object(ilr_document, "_wizard_ilr_details", return_value=details):
+                patch.object(ilr_document, "_wizard_ilr_details", return_value=details), \
+                patch.object(ilr_document, "_wizard_plr", return_value=None), \
+                patch.object(ilr_document, "_extended_ilr", return_value=None):
             out = ilr_document.derive_learner_details(learner)
 
         self.assertEqual(out["nationalInsuranceNumber"], "CD 98 76 54 A")

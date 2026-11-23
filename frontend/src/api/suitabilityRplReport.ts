@@ -137,6 +137,7 @@ export interface SuitabilityRplState {
   evidence: SuitabilityRplEvidence;
   sourceVersions: Record<string, unknown>;
   context: { key: string; programmeId: string; programmeName: string; enrolmentReference: string; practicalStartDate: string };
+  contextError?: string | null;
   history: Array<{ id: string; reportReference: string; programmeName: string; status: string; reportVersion: number; amendmentReason: string; parentReportId: string | null; finalisedAt: string | null }>;
   aiEnabled: boolean;
 }

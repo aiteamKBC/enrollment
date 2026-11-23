@@ -172,6 +172,20 @@ def create_draft(key, source_id, learner, actor, base_id=None, *, mode='edit', r
             if existing.base_id == base.pk and not blank_documents.is_blank(existing): return existing
             raise RevisionLocked('A draft from another version is open. Use Continue editing, or finalise or delete that draft before editing this exact version.')
         data = payload(base)
+        edit_content = copy.deepcopy(base.content)
+        if key == 'training-plan' and not creating:
+            # Only a newly requested revision is upgraded. Earlier R1/finalized
+            # artifacts and an existing administrator draft are never refreshed.
+            from .learner_documents import snapshot_data
+            snapshot = copy.deepcopy(base.data.get('documentTemplateSnapshot', issue.template_snapshot))
+            snapshot['content'] = edit_content
+            previous = data
+            data = snapshot_data(learner, edit_content, snapshot)
+            edit_content = copy.deepcopy(data['documentTemplateSnapshot']['content'])
+            # Existing keep/sign-again rules still identify historical evidence;
+            # they never certify approval of the new activities snapshot.
+            data['signatures'] = copy.deepcopy(previous.get('signatures', {}))
+            data['marks'] = copy.deepcopy(previous.get('marks', {}))
         from .pdf_artifacts import enabled, BRAND
         if enabled(): data['documentPresentationTheme'] = BRAND
         number = (Revision.objects.filter(issue=issue).aggregate(n=Max('number'))['n'] or 1) + 1
@@ -181,6 +195,7 @@ def create_draft(key, source_id, learner, actor, base_id=None, *, mode='edit', r
                 snapshot = service.applicable(key, learner)
                 content = copy.deepcopy(snapshot['content'])
                 data = snapshot_data(learner, content, snapshot)
+                content = copy.deepcopy(data['documentTemplateSnapshot']['content'])
             elif mode == 'template':
                 snapshot = service.applicable(key, learner)
                 content = blank_documents.unanswered_content(snapshot['content'])
@@ -207,7 +222,7 @@ def create_draft(key, source_id, learner, actor, base_id=None, *, mode='edit', r
                 inherited = data.get('signatureProvenance', {}).get(role)
                 provenance[role] = inherited or {'sourceRevisionId': str(base.pk), 'sourceRevision': base.number,
                     'name': state.get('name', ''), 'signedAt': state.get('signedAt'), 'approvesRevisedContent': False}
-        return Revision.objects.create(issue=issue, base=base, number=number, content=copy.deepcopy(base.content),
+        return Revision.objects.create(issue=issue, base=base, number=number, content=edit_content,
             data=data, provenance=provenance, created_by=actor, updated_by=actor)
 
 
@@ -224,6 +239,9 @@ def payload(revision):
                 # Only the new signature evidence comes from the signing row.
                 data.update({k: signed[k] for k in ('signatures', 'marks', 'fullySigned') if k in signed})
             else: data = signed
+    if key == 'training-plan' and revision.state == 'draft':
+        from learner_api.training_plan_activities import clean_document_presentation
+        data = clean_document_presentation(data)
     template = copy.deepcopy(revision.data.get('documentTemplateSnapshot', revision.issue.template_snapshot))
     template['content'] = copy.deepcopy(revision.content)
     if revision.data.get('documentPresentationTheme'):
@@ -376,7 +394,7 @@ def clone_for_signing(revision):
     model = type(source)
     values = {field.attname: copy.deepcopy(getattr(source, field.attname)) for field in model._meta.concrete_fields
         if not field.primary_key and not getattr(field, 'auto_now', False) and not getattr(field, 'auto_now_add', False)}
-    if blank_documents.is_blank(revision):
+    if blank_documents.is_blank(revision) or (key == 'training-plan' and revision.data.get('activitiesOverview')):
         # A fresh signing envelope, not a clone of old answers, dates or body.
         values = {'learner_id': source.learner_id, 'learner_kind': source.learner_kind}
         if key.startswith('review-'):
@@ -408,6 +426,10 @@ def clone_for_signing(revision):
 
 def finalize(revision, actor):
     if revision.state != 'draft': raise TemplateError('This revision is already finalized and cannot be changed.')
+    if revision.issue.document_key == 'training-plan':
+        from learner_api.training_plan_activities import require_ready, clean_document_presentation
+        require_ready(revision.data.get('activitiesOverview'))
+        revision.data = clean_document_presentation(revision.data)
     # Serialize issuance with first-issue signing, whose writer locks this row
     # before checking whether revised wording has already been issued.
     source_record(revision.issue.document_key, revision.issue.learner_id, revision.issue.source_id, lock=True)

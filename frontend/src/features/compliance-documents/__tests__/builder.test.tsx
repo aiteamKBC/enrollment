@@ -26,6 +26,8 @@ beforeEach(() => {
 });
 async function editIlr() {
   const user = userEvent.setup(); render(<Page />);
+  await screen.findAllByText('4 documents');
+  await user.click(screen.getByRole('button', { name: /Compliance Documents/ }));
   await user.click(await screen.findByRole('button', { name: 'Edit Individual Learner Record' }));
   await screen.findByRole('textbox', { name: 'Document page 1' });
   return user;
@@ -33,6 +35,83 @@ async function editIlr() {
 function editHeading(text: string) { const surface = screen.getByRole('textbox', { name: 'Document page 1' }); surface.querySelector('h1,h2,h3')!.textContent = text; fireEvent.input(surface); }
 
 describe('admin document builder', () => {
+  it('starts unselected and switches the shared content panel without changing records', async () => {
+    const source = indexFor();
+    const before = structuredClone(source);
+    api.listTemplates.mockResolvedValue(source);
+    render(<Page />); await screen.findAllByText('4 documents');
+    const compliance = screen.getByRole('button', { name: /Compliance Documents/ });
+    const reviews = screen.getByRole('button', { name: /Reviews Documents/ });
+    expect(compliance).toHaveAttribute('aria-pressed', 'false');
+    expect(compliance).not.toHaveAttribute('aria-expanded');
+    expect(screen.getByText('Select a document category')).toBeVisible();
+    expect(within(screen.getByRole('navigation', { name: 'Document categories' })).getAllByRole('button')).toHaveLength(2);
+    expect(reviews).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('table')).toBeNull();
+    await userEvent.click(compliance);
+    expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(4);
+    const group = within(screen.getByRole('region', { name: 'Compliance Documents' }));
+    for (const record of source.results.filter((t) => t.category === 'Compliance')) expect(group.getByRole('button', { name: `Edit ${record.title}` })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Edit ULN Privacy Notice & Learner Acknowledgement' })).toBeNull();
+    await userEvent.click(reviews);
+    expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(4);
+    await userEvent.click(compliance);
+    expect(reviews).toHaveAttribute('aria-pressed', 'false');
+    expect(compliance).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('table')).toHaveLength(1);
+    await userEvent.click(compliance);
+    expect(compliance).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(4);
+    expect(source).toEqual(before);
+    expect(api.saveTemplate).not.toHaveBeenCalled(); expect(api.publishTemplate).not.toHaveBeenCalled();
+  });
+
+  it('uses actual categories for changed and added records and searches title, category and programme', async () => {
+    const source = indexFor();
+    source.results[0].category = 'Review';
+    source.results[0].programmes = ['PCP_L6'];
+    source.results.push({ ...source.results[0], templateId: 'new-api-record', title: 'New API document', category: 'Compliance' });
+    api.listTemplates.mockResolvedValue(source);
+    render(<Page />); await screen.findByText('5 documents');
+    const input = screen.getByLabelText('Search document templates');
+    fireEvent.change(input, { target: { value: 'Project Controls Professional' } });
+    expect(screen.queryByRole('table')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Reviews Documents/ }));
+    expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(1);
+    expect(within(screen.getByRole('region', { name: 'Reviews Documents' })).getByRole('button', { name: `Edit ${source.results[0].title}` })).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Compliance Documents/ }));
+    expect(input).toHaveValue('Project Controls Professional');
+    expect(within(screen.getByRole('region', { name: 'Compliance Documents' })).getByRole('button', { name: 'Edit New API document' })).toBeVisible();
+    fireEvent.change(input, { target: { value: 'Review' } });
+    expect(screen.queryByRole('button', { name: /^Edit / })).toBeNull();
+    expect(screen.getByText('No matching templates in this category.')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Reviews Documents/ }));
+    expect(input).toHaveValue('Review');
+    expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(5);
+    fireEvent.change(input, { target: { value: 'New API document' } });
+    await userEvent.click(screen.getByRole('button', { name: /Compliance Documents/ }));
+    expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(1);
+    fireEvent.change(input, { target: { value: 'missing-search-result' } });
+    expect(screen.getByText('No matching templates in this category.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Edit / })).toBeNull();
+  });
+
+  it.each(['Compliance', 'Review'] as const)('preserves row preview, history and edit identities for %s', async category => {
+    const record = indexFor().results.find((t) => t.category === category)!;
+    render(<Page />); await screen.findAllByText('4 documents');
+    await userEvent.click(screen.getByRole('button', { name: category === 'Compliance' ? /Compliance Documents/ : /Reviews Documents/ }));
+    await userEvent.click(screen.getByRole('button', { name: `Preview ${record.title}` }));
+    await screen.findByRole('dialog', { name: 'Synthetic PDF viewer' });
+    expect(api.previewTemplate).toHaveBeenCalledWith(record.templateId, 0, undefined, record.publishedVersion!.id, true);
+    await userEvent.click(screen.getByRole('button', { name: 'Close preview' }));
+    await userEvent.click(screen.getByRole('button', { name: `Version history for ${record.title}` }));
+    await waitFor(() => expect(api.templateHistory).toHaveBeenCalledWith(record.templateId));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Close history' }));
+    await userEvent.click(screen.getByRole('button', { name: `Edit ${record.title}` }));
+    await waitFor(() => expect(api.readTemplate).toHaveBeenCalledWith(record.templateId));
+    expect(api.saveTemplate).not.toHaveBeenCalled(); expect(api.publishTemplate).not.toHaveBeenCalled();
+  });
+
   it('prepares the shared design only in the editable draft and keeps the original layout selectable', async () => {
     const user = await editIlr();
     expect(screen.getByRole('combobox', { name: 'Document design' })).toHaveValue('purple-reference-v2');
@@ -46,9 +125,12 @@ describe('admin document builder', () => {
     expect(api.publishTemplate).not.toHaveBeenCalled();
   });
   it('lists all eight documents in their original categories and supports search', async () => {
-    render(<Page />); await screen.findByRole('button', { name: 'Edit Individual Learner Record' });
-    expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(8);
-    expect(screen.getAllByText('Compliance', { exact: true })).toHaveLength(4);
+    render(<Page />); await screen.findAllByText('4 documents');
+    expect(screen.queryByRole('button', { name: /^Edit / })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Compliance Documents/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Reviews Documents/ }));
+    expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(4);
+    expect(screen.queryAllByText('Compliance', { exact: true })).toHaveLength(0);
     expect(screen.getAllByText('Review', { exact: true })).toHaveLength(4);
     fireEvent.change(screen.getByLabelText('Search document templates'), { target: { value: 'ULN' } });
     expect(screen.getAllByRole('button', { name: /^Edit / })).toHaveLength(1);
@@ -60,11 +142,27 @@ describe('admin document builder', () => {
       publishedVersion: null, draft: null, updatedAt: null, dynamic: true,
     }] });
     render(<Page />);
+    await screen.findByText('5 documents');
+    expect(screen.queryByText('Suitability & RPL Report')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Compliance Documents/ }));
+    expect(screen.queryByText('Suitability & RPL Report')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Reviews Documents/ }));
     expect(await screen.findByText('Suitability & RPL Report')).toBeInTheDocument();
     expect(screen.getByText('PDF: Suitability & Recognition of Prior Learning Report')).toBeInTheDocument();
     expect(screen.getByText('Open from the learner’s Suitability & RPL Report tab')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit Suitability & RPL Report' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Preview Suitability & RPL Report' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Version history for Suitability & RPL Report' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search document templates'), { target: { value: 'Recognition of Prior Learning' } });
+    expect(screen.getByText('Suitability & RPL Report')).toBeVisible();
+    expect(screen.getByRole('button', { name: /Reviews Documents/ })).toHaveTextContent('5 documents / 1 matching');
+    await userEvent.click(screen.getByRole('button', { name: /Compliance Documents/ }));
+    expect(screen.getByText('No matching templates in this category.')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Reviews Documents/ }));
+    expect(screen.getByText('Suitability & RPL Report')).toBeVisible();
     expect(api.readTemplate).not.toHaveBeenCalled();
+    expect(api.saveTemplate).not.toHaveBeenCalled();
+    expect(api.publishTemplate).not.toHaveBeenCalled();
   });
   it('saves a changed heading with optimistic revision and leaves publication explicit', async () => {
     const user = await editIlr();
@@ -133,12 +231,12 @@ describe('admin document builder', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('existing learner identifier'); expect(api.previewTemplate).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('Existing learner ID'), { target: { value: '123' } });
     await user.click(screen.getByRole('button', { name: 'Preview saved draft' }));
-    await waitFor(() => expect(api.previewTemplate).toHaveBeenCalledWith('ilr', 1, 123, undefined));
+    await waitFor(() => expect(api.previewTemplate).toHaveBeenCalledWith('ilr', 1, 123, undefined, false));
   });
   it('opens historical versions without saving, publishing or issuing', async () => {
     const user = await editIlr(); await user.click(screen.getByRole('button', { name: 'Version history for Individual Learner Record' }));
     await user.click(await screen.findByRole('button', { name: 'Preview historical PDF' }));
-    await waitFor(() => expect(api.previewTemplate).toHaveBeenCalledWith('ilr', 0, undefined, 'ilr-version-1'));
+    await waitFor(() => expect(api.previewTemplate).toHaveBeenCalledWith('ilr', 0, undefined, 'ilr-version-1', false));
     expect(api.saveTemplate).not.toHaveBeenCalled(); expect(api.publishTemplate).not.toHaveBeenCalled();
   });
 });

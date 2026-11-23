@@ -1,4 +1,5 @@
 import type { CustomAnswer } from './wizard/layout/types';
+import type { HomeCohort } from '@/features/programme-suitability/modules/configuration';
 // ============================================================================
 // Enrolment Console — shared types
 // Frontend only. Every shape is named so it can be mapped to the API later.
@@ -332,6 +333,7 @@ export interface EnrolmentBoard {
     actionPlans: string;
   };
   programme: {
+    homeCohort?: HomeCohort | null;
     type: string;
     name: string;
     cohort: string;
@@ -418,6 +420,12 @@ export interface IlrLearnerDetails {
   additionalSupportDetails?: string;
   highestQualification: string;
   employmentStatus: string;
+  /** Staff-managed official DateEmpStatApp; learner views it but cannot edit it. */
+  dateStatusApplies?: string;
+  /** Staff-managed official AgreemId (1-7 alphanumeric). */
+  agreementIdentifier?: string;
+  /** Organisation-level employer identifier resolved by the server. */
+  edrsErn?: string;
   /** In paid employment only. ISO date. */
   employmentStartDate?: string;
   /** In paid employment only. */

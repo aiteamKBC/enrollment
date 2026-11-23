@@ -29,8 +29,8 @@ export const readFields = (key: DocumentKey) => request<{ results: import('./typ
 export const saveTemplate = (content: DocumentTemplate, baseVersion: string, revision: number) =>
   request<DraftSaved>(`${BASE}/${encodeURIComponent(content.templateId)}/`, 'PUT', { content, baseVersion, revision });
 export const deleteDraft = (id: string, baseVersion: string, revision: number) => request(`${BASE}/${encodeURIComponent(id)}/`, 'DELETE', { baseVersion, revision });
-export const previewTemplate = (id: string, revision: number, learnerId?: number, version?: string) =>
-  request<PreviewResponse>(`${BASE}/${encodeURIComponent(id)}/preview/`, 'POST', { revision, ...(learnerId ? { learnerId } : {}), ...(version ? { version } : {}) });
+export const previewTemplate = (id: string, revision: number, learnerId?: number, version?: string, currentDesign = false) =>
+  request<PreviewResponse>(`${BASE}/${encodeURIComponent(id)}/preview/`, 'POST', { revision, ...(learnerId ? { learnerId } : {}), ...(version ? { version } : {}), ...(currentDesign ? { previewMode: 'current-design' } : {}) });
 export const publishTemplate = (id: string, revision: number, previewToken: string, reviewConfirmed: boolean, approvalNote: string) =>
   request<{ published: TemplateVersion }>(`${BASE}/${encodeURIComponent(id)}/publish/`, 'POST', { revision, previewToken, reviewConfirmed, approvalNote });
 export const templateHistory = (id: string) => request<{ results: TemplateVersion[] }>(`${BASE}/${encodeURIComponent(id)}/history/`);

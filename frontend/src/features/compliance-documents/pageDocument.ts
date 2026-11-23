@@ -7,6 +7,7 @@ import seedData from './seed.json';
 import { isLavender, isReferencePurple, documentPalette } from './documentTheme';
 import jsPDF from 'jspdf';
 import { learningPlanRows, learningPlanWidths } from './learningPlanLayout';
+import { trainingPlanActivitiesHtml } from './trainingPlanActivities';
 
 export const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 export interface DocumentPage { id: string; breakBlock?: DocumentBlock; blocks: DocumentBlock[] }
@@ -27,7 +28,8 @@ function inline(value: string, data?: Record<string, any>): string {
   return value.split(/(\{\{[A-Za-z0-9_.-]+\}\})/g).map((part) => {
     const key = part.match(/^\{\{(.+)\}\}$/)?.[1];
     if (!key) return escapeHtml(part).replaceAll('\n', '<br>');
-    return `<span contenteditable="false" data-field-key="${escapeHtml(key)}" class="rounded bg-violet-50 px-1 text-violet-800" title="${escapeHtml(part)}">${escapeHtml(data?.template ? substitute(part, data.template) || part : part)}</span>`;
+    const resolved = data?.template ? substitute(part, data.template) : part;
+    return `<span contenteditable="false" data-field-key="${escapeHtml(key)}" class="rounded bg-violet-50 px-1 text-violet-800" title="${escapeHtml(part)}">${escapeHtml(resolved)}</span>`;
   }).join('');
 }
 function rich(runs: TextRun[], data?: Record<string, any>, themed = false): string {
@@ -75,6 +77,7 @@ function sourceHtml(block: DocumentBlock, template: DocumentTemplate, data?: Rec
     return table(['Question', 'Answer'], rows.slice(starts[index + 1] + 1, starts[index + 2] ?? rows.length).filter((r) => r.kind === 'text' || r.kind === 'note').map((r) => r.kind === 'text' ? [r.label, r.value] : [r.kind === 'note' ? r.text : '', '']));
   }
   if (block.source === 'learning-plan') {
+    if (['activities-overview-v1', 'activities-overview-v2', 'activities-overview-v3', 'activities-overview-v4', 'activities-overview-v5', 'activities-overview-v6'].includes(data.activitiesOverview?.version)) return trainingPlanActivitiesHtml(data.activitiesOverview);
     if (isReferencePurple(template)) {
       const rows=learningPlanRows(data.learningPlan||[]);
       const measureDoc=new jsPDF();measureDoc.setFont('helvetica','normal').setFontSize(9.5);

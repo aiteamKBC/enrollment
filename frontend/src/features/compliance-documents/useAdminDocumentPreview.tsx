@@ -52,7 +52,7 @@ export function useAdminDocumentPreview(learnerId: string) {
     {(loading || failed) && <Modal title="Document preview" onClose={close}>
       {loading ? <p role="status">Loading the document…</p> : <p role="alert">{error}</p>}
     </Modal>}
-    {preview && <DocumentPreview value={preview.value} onClose={close}
+    {preview && <DocumentPreview showDiagnostics value={preview.value} onClose={close}
       onContinue={preview.proceed ? () => { setReviewed(preview); setPreview(null); preview.proceed?.(preview.value); } : undefined} />}
   </>;
   return { open, sign, button, dialog };

@@ -151,6 +151,11 @@ def field_values(key, learner, payload):
               'programme.name': getattr(learner, 'programme', ''), 'programme.cohort': getattr(learner, 'cohort', ''),
               'enrolment.startDate': start, 'enrolment.endDate': end,
               'employer.name': getattr(learner, 'employer', ''), 'employer.manager': getattr(learner, 'line_manager', '')}
+    if key == 'apprenticeship-agreement':
+        common['enrolment.endDate'] = payload.get('particulars', {}).get('endDate') or None
+    if key == 'training-plan' and payload.get('activitiesOverview'):
+        common['enrolment.startDate'] = payload.get('programme', {}).get('startDate') or None
+        common['enrolment.endDate'] = payload.get('programme', {}).get('endDate') or None
     result = {}
     for ref, definition in seeds()['fields'][key].items():
         if ref.startswith('signature.'): continue
@@ -170,9 +175,15 @@ def field_values(key, learner, payload):
 def bind_issue(key, document, learner, payload):
     if not ready(): return None
     selected = issuance_reference(key, learner)
+    if key == 'training-plan' and payload.get('activitiesOverview'):
+        from learner_api.training_plan_activities import new_content
+        selected['content'] = new_content(selected['content'])
+        selected['contentHash'] = digest(selected['content'])
+        selected['legacyEquivalent'] = False
     selected['originalPdfVersion'] = 2 if selected.get('presentationTheme') else 1
     from .learner_sources import date_warnings
-    selected['bindingWarnings'] = date_warnings(learner)
+    selected['bindingWarnings'] = ([*payload['activitiesOverview'].get('blockers', []),
+        *payload['activitiesOverview'].get('warnings', [])] if key == 'training-plan' and payload.get('activitiesOverview') else date_warnings(learner))
     version_id = None if selected['number'] == 0 else selected['id']
     binding = IssuedTemplate.objects.create(document_key=key, source_id=str(document.pk), learner_kind=document.learner_kind,
         learner_id=document.learner_id, version_id=version_id, template_snapshot=selected,
