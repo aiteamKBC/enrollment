@@ -86,10 +86,16 @@ class ProgrammeStructureTests(SimpleTestCase):
     def test_effective_learner_layout_keeps_public_four_field_contract(self):
         from enrolment_api import wizard_layout
         cursor = Mock()
-        cursor.fetchone.return_value = (7, {'steps': []}, 'created', 'admin', 'default', None, None)
+        cursor.fetchone.side_effect = [
+            (None, 7, None),
+            (True,),
+            (7, {'steps': []}, None, 'admin', 'default', None, None, 'apprenticeship', False),
+        ]
         result = wizard_layout.effective_layout(cursor, 'apprenticeship', 1601)
-        self.assertEqual(len(result), 4)
-        self.assertEqual(result[0], 7)
+        self.assertEqual(result[7:], ('apprenticeship', False))
+        payload = wizard_layout._payload(result)
+        self.assertEqual(set(payload), {'version', 'layout', 'updatedAt', 'updatedBy'})
+        self.assertEqual(payload['version'], 7)
 
     def test_required_optional_and_shared_mapping_parity_fixture(self):
         from .programme_structure import project_modules, project_catalogues
