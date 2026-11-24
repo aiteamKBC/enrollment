@@ -1,4 +1,4 @@
-import { DELIVERY_STATUS, PLAN_EDITABLE_STATUSES, isLearnerRow, combinedType, fillBlanks, mergeDirectoryRows, differs, rowTypes, matches, type DirectoryRow } from './page.helpers';
+import { DELIVERY_STATUS, PLAN_EDITABLE_STATUSES, isLearnerRow, uniqueDirectoryRows, differs, matches, type DirectoryRow } from './page.helpers';
 import { WorkspaceMetricContent } from '@/components/ui/WorkspaceMetricContent';
 import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -23,7 +23,6 @@ import { DownloadLearnerTemplateButton } from './components/DownloadLearnerTempl
 import { ImportLearnersModal } from './components/ImportLearnersModal';
 import { CreateStaffModal } from './components/CreateStaffModal';
 import { CreateEmployerModal } from './components/CreateEmployerModal';
-import { CreateOrganisationModal } from './components/CreateOrganisationModal';
 import { EditStaffModal } from './components/EditStaffModal';
 import { LearningPlanModal } from './components/LearningPlanModal';
 import { ShiftModuleModal } from './components/ShiftModuleModal';
@@ -200,7 +199,6 @@ export default function UsersListPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [createAdminOpen, setCreateAdminOpen] = useState(false);
   const [createEmployerOpen, setCreateEmployerOpen] = useState(false);
-  const [createOrgOpen, setCreateOrgOpen] = useState(false);
   const createRef = useRef<HTMLDivElement>(null);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -254,9 +252,8 @@ export default function UsersListPage() {
       listEmployers().then((r) => r.results).catch(() => [] as EmployerRow[]),
     ])
       .then(([learners, staff, employers]) => {
-        // Merged, not concatenated: somebody who is both staff and a learner
-        // has a record in two of these lists and would otherwise appear twice.
-        setRows(mergeDirectoryRows([
+        // Each source keeps its own row, including staff who are also learners.
+        setRows(uniqueDirectoryRows([
           ...learners,
           // Staff rows already arrive in UserListRow shape from to_staff_row.
           ...staff.map((r) => ({ ...r, source: 'staff' as const })),
@@ -380,10 +377,7 @@ export default function UsersListPage() {
   // their type, so the filter list is derived from the loaded rows rather than
   // the fixed TYPE_OPTIONS — otherwise staff would be unfilterable.
   const typeOptions = useMemo(
-    // Each role offered separately, not the combined "Admin · User" string —
-    // that string is not a role anyone would filter by, and only one of the
-    // people it could match would ever need it.
-    () => Array.from(new Set([...TYPE_OPTIONS, ...rows.flatMap(rowTypes)])).sort(),
+    () => Array.from(new Set([...TYPE_OPTIONS, ...rows.map((row) => row.type).filter(Boolean)])).sort(),
     [rows],
   );
 
@@ -478,7 +472,7 @@ export default function UsersListPage() {
 
   const applyLearnerImport = (imported: UserListRow[]) => {
     // Keep the saved rows in local state while refreshing server-derived fields.
-    setRows(previous => mergeDirectoryRows([...imported, ...previous]));
+    setRows(previous => uniqueDirectoryRows([...imported, ...previous]));
     setQueryValues({ page: 1 });
     load();
   };
@@ -529,7 +523,6 @@ export default function UsersListPage() {
                   <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateModalOpen(true); }}><AppIcon className="ri-user-add-line mr-2 text-foreground-400" />Create user</button>
                   {isAdmin && <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateAdminOpen(true); }}><AppIcon className="ri-shield-user-line mr-2 text-foreground-400" />Create admin</button>}
                   <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateEmployerOpen(true); }}><AppIcon className="ri-briefcase-line mr-2 text-foreground-400" />Create employer profile</button>
-                  <button className="w-full cursor-pointer px-3 py-2 text-left text-[13px] text-foreground-700 hover:bg-background-100" onClick={() => { setCreateOpen(false); setCreateOrgOpen(true); }}><AppIcon className="ri-building-line mr-2 text-foreground-400" />Create organisation profile</button>
                 </div>,
                 document.body,
               )}
@@ -884,11 +877,7 @@ export default function UsersListPage() {
           onSaved={load}
         />
       )}
-      {/* Organisations are companies rather than people, so they don't belong in
-          a directory of users — creating one just confirms and closes. Employers
-          are people and do get listed. */}
       {createEmployerOpen && <CreateEmployerModal onClose={() => setCreateEmployerOpen(false)} onCreated={load} />}
-      {createOrgOpen && <CreateOrganisationModal onClose={() => setCreateOrgOpen(false)} onCreated={() => {}} />}
       {editEmployer && (
         <CreateEmployerModal
           row={editEmployer}

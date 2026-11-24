@@ -16,6 +16,7 @@ from enrolment_api import eligibility_form as ef
 from enrolment_api import eligibility_invitation as ei
 from enrolment_api import eligibility_layout as el
 from enrolment_api.tests_eligibility_form import FakeCursor, URL, application, stub_lookup
+from learner_api import profile_email
 from learner_api.models import EnrolmentUser
 from login import services
 from login.models import SUBJECT_LEARNER
@@ -217,22 +218,17 @@ class InviteApplicantTests(SimpleTestCase):
 
 class HasAccountTests(SimpleTestCase):
     def setUp(self):
-        from login.models import LoginAccount
-
-        self.accounts = started(self, LoginAccount, "objects", new=MagicMock())
-        self.learners = started(self, EnrolmentUser, "all_learners", new=MagicMock())
-        self.accounts.filter.return_value.exists.return_value = False
-        self.learners.annotate.return_value.filter.return_value.exists.return_value = False
+        self.in_use = started(self, profile_email, "profile_email_in_use", new=MagicMock(return_value=False))
 
     def test_a_login_account_counts_whatever_the_case_of_the_address(self):
-        self.accounts.filter.return_value.exists.return_value = True
+        self.in_use.return_value = True
         self.assertTrue(ei.has_account("  Sam@Employer.Example "))
-        self.accounts.filter.assert_called_once_with(email="sam@employer.example")
+        self.in_use.assert_called_once_with("  Sam@Employer.Example ")
 
     def test_a_learner_record_without_an_account_counts(self):
-        self.learners.annotate.return_value.filter.return_value.exists.return_value = True
+        self.in_use.return_value = True
         self.assertTrue(ei.has_account("sam@employer.example"))
-        self.learners.annotate.return_value.filter.assert_called_once_with(_normalised_email="sam@employer.example")
+        self.in_use.assert_called_once_with("sam@employer.example")
 
     def test_a_new_address_has_no_account(self):
         self.assertFalse(ei.has_account("new@employer.example"))
