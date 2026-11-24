@@ -2,7 +2,7 @@
 // Organisations + employers API client
 // Talks to the Django backend at /learner_api (proxied to :8000 by Vite in dev).
 // Backs enrolment."Organisations" and enrolment."Employers" — the two profile
-// types created from the Users page's Create menu.
+// types managed from the Organisations directory and Users page.
 //
 // An organisation is a company; an employer is a person at one or more of them.
 // The employer form's "Employer Group" picker lists organisations, which is why
@@ -23,6 +23,7 @@ export interface WorkingHoursSession {
 
 export interface OrganisationRow {
   id: string;
+  mergedIntoOrganisationId?: string | null;
   status: string;
   name: string;
   owner: string;
@@ -125,12 +126,14 @@ export interface OrganisationPage {
 
 /**
  * List organisations. `page` drives the Employer Group picker's pager; omitting
- * it returns every row, which is what a plain list screen wants.
+ * it returns every row, which the existing form pickers use.
  */
-export function listOrganisations(opts: { search?: string; status?: string; page?: number } = {}): Promise<OrganisationPage> {
+export function listOrganisations(opts: { search?: string; postcode?: string; status?: string; includeMerged?: boolean; page?: number } = {}): Promise<OrganisationPage> {
   const qs = new URLSearchParams();
   if (opts.search) qs.set('search', opts.search);
+  if (opts.postcode) qs.set('postcode', opts.postcode);
   if (opts.status) qs.set('status', opts.status);
+  if (opts.includeMerged) qs.set('includeMerged', '1');
   if (opts.page) qs.set('page', String(opts.page));
   const suffix = qs.toString() ? `?${qs}` : '';
   return request<OrganisationPage>(`${ORGS}/${suffix}`);

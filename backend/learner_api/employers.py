@@ -65,12 +65,13 @@ def _resolve_groups(ids):
 def organisations(request):
     """Organisation profiles — enrolment."Organisations".
 
-    GET supports ?search= (name, case-insensitive), ?status=, and ?page= — the
+    GET supports ?search= (name, case-insensitive), ?postcode=, ?status=, and ?page= — the
     employer form's Employer Group picker is a searchable paged table, and the
     list screen reuses the same endpoint.
     """
     if request.method == "GET":
         search = (request.GET.get("search") or "").strip()
+        postcode = (request.GET.get("postcode") or "").strip()
         status = (request.GET.get("status") or "").strip()
         try:
             qs = Organisation.objects.all()
@@ -78,6 +79,8 @@ def organisations(request):
                 qs = qs.filter(merged_into_organisation_id__isnull=True)
             if search:
                 qs = qs.filter(name__icontains=search)
+            if postcode:
+                qs = qs.filter(post_code__icontains=postcode)
             if status:
                 qs = qs.filter(status=status)
             qs = qs.order_by("name", "id")

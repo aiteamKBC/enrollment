@@ -40,7 +40,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
     ...(!commercial ? [['/learner/onboarding', 'My enrolment'], ['/learner/onboarding/reviews', 'Reviews'], ['/learner/compliance-documents', 'Compliance documents']] : []),
     ['/learner/first-session', 'First learning session'], ['/lms?self=1', 'Continue to LMS'],
   ] : employer ? [[`/employers/${auth.account?.subjectId}/documents`, 'Documents to sign']] : [
-    ['/users', 'Users'], ['/users/eligibility-applications', 'Eligibility Applications'],
+    ['/users', 'Users'], ['/users/organisations', 'Organisations'], ['/users/eligibility-applications', 'Eligibility Applications'],
     ['/users/eligibility-builder', 'Eligibility Form Builder'], ['/users/wizard-builder', 'Enrolment Form Builder'],
     ...((isAdmin || auth.account?.role === 'admin') ? [['/users/programme-structure', 'Programme Structure']] : []),
     ['/users/compliance-documents', 'Documents'],
