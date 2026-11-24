@@ -27,7 +27,7 @@ export interface HeroStat {
  * banner; pass figures that come from the response, not constants.
  */
 export function AdminPage({
-  title, subtitle, icon, heroTitle, heroBlurb, stats, actions, children, workspaceRole = "admin",
+  title, subtitle, icon, heroTitle, heroBlurb, stats, actions, children, workspaceRole = "admin", compact = false,
 }: {
   workspaceRole?: "admin" | "compliance" | "curriculum";
   title: string;
@@ -38,6 +38,7 @@ export function AdminPage({
   stats?: HeroStat[];
   actions?: ReactNode;
   children: ReactNode;
+  compact?: boolean;
 }) {
   const { auth } = useAuth();
   const adminNav = roleNavMap[workspaceRole];
@@ -52,8 +53,8 @@ export function AdminPage({
       userName={auth.account?.displayName || auth.user?.fullName || 'Platform Admin'}
       userRole={workspaceRole === "admin" ? "Super Administrator" : adminNav.label}
     >
-      <div className="admin-console-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6 [&_table_th]:!bg-primary-50/60 [&_table_th]:!font-semibold [&_table_th]:!text-primary-700 [&_tbody_tr:hover]:!bg-primary-50/40">
-        <AdminPageHeader title={heroTitle} description={heroBlurb} icon={icon} stats={stats} actions={actions} />
+      <div className={`admin-console-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6 ${compact ? '' : '[&_table_th]:!bg-primary-50/60 [&_table_th]:!font-semibold [&_table_th]:!text-primary-700 [&_tbody_tr:hover]:!bg-primary-50/40'}`}>
+        {!compact && <AdminPageHeader title={heroTitle} description={heroBlurb} icon={icon} stats={stats} actions={actions} />}
         {children}
       </div>
     </WorkspaceShell>
