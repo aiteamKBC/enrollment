@@ -22,6 +22,8 @@ class EnrolmentApiRouteTests(SimpleTestCase):
             "/enrolment_api/programme-structure/preview/": "programme-structure-preview",
             "/enrolment_api/programme-structure/draft/": "programme-structure-draft",
             "/enrolment_api/programme-structure/publish/": "programme-structure-publish",
+            "/enrolment_api/programme-structure/catalog/readiness/": "programme-catalog-readiness",
+            "/enrolment_api/programme-structure/catalog/programmes/": "programme-catalog-programmes",
         }
 
         for path, expected in routes.items():
@@ -42,3 +44,11 @@ class EnrolmentApiRouteTests(SimpleTestCase):
             for path in paths:
                 response = self.client.get(path)
                 self.assertIn(response.status_code, (401, 403), path)
+
+    def test_catalogue_collection_is_mounted_behind_authentication(self):
+        with patch.dict(os.environ, {"ENROLMENT_API_REQUIRE_AUTH": "1"}):
+            # OPTIONS bypasses the outer API middleware, so this proves the
+            # Django URL resolver reached the catalogue view's own auth gate.
+            response = self.client.options("/enrolment_api/programme-structure/catalog/programmes/")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), {"error": "Authentication required."})

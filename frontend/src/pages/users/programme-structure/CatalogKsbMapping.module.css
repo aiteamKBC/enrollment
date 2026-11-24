@@ -1,0 +1,24 @@
+.scroller {
+  contain: inline-size paint;
+  overscroll-behavior-x: contain;
+}
+
+.scroller:focus-visible {
+  outline-offset: -3px;
+}
+
+:global(#root) .matrix thead th {
+  background: var(--kbc-purple-wash) !important;
+  color: var(--color-text) !important;
+  height: auto;
+  letter-spacing: normal;
+}
+
+:global(#root) .matrix tbody tr {
+  background: var(--kbc-surface) !important;
+}
+
+:global(#root) .matrix tbody tr > .assigned {
+  background: var(--kbc-purple-wash) !important;
+  color: var(--color-text) !important;
+}

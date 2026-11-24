@@ -13,8 +13,14 @@ from .models import ModuleConfigurationDraft
 def published_fixtures(base, current):
     connection = connections['default']
     connection.ensure_connection()
-    connection.connection.create_function('to_regclass', 1, lambda _: 'Wizard_Form_Layouts')
+    connection.connection.create_function('to_regclass', 1, lambda name: name)
     with connection.cursor() as cursor:
+        cursor.execute('ALTER TABLE enrolment."Wizard_Form_Layouts" ADD COLUMN "Learner_kind" TEXT')
+        cursor.execute(
+            """CREATE TEMP VIEW pg_attribute AS
+               SELECT 'enrolment."Wizard_Form_Layouts"' AS attrelid, name AS attname, 0 AS attisdropped
+               FROM pragma_table_info('Wizard_Form_Layouts', 'enrolment')"""
+        )
         cursor.execute('INSERT INTO enrolment."Wizard_Form_Layouts" (id,"Layout") VALUES (%s,%s)', [16, json.dumps(base)])
         cursor.execute('INSERT INTO enrolment."Wizard_Form_Layouts" (id,"Layout") VALUES (%s,%s)', [20, json.dumps(current)])
 
