@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
+import { SelectMenu } from '@/components/feature/SelectField';
 import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
@@ -116,6 +117,16 @@ export default function EligibilityBuilderPage() {
 
   const edit = useCallback((fn: (l: EligibilityLayout) => EligibilityLayout) => setLayout((l) => (l ? fn(l) : l)), []);
 
+  const discardChanges = () => {
+    if (!savedLayout) return;
+    setLayout(clone(savedLayout));
+    setCopiedFromVersion(savedLayout.copiedFromVersion ?? null);
+    setSourceVersion(null);
+    setEditing(null);
+    setSelected((cur) => (cur === PAGE || cur === EMAIL || savedLayout.sections.some((s) => s.slug === cur)
+      ? cur : savedLayout.sections[0]?.slug ?? PAGE));
+  };
+
   const publish = async () => {
     if (!layout) return;
     setPublishing(true);
@@ -178,13 +189,8 @@ export default function EligibilityBuilderPage() {
   };
 
   const copyVersion = async () => {
-    if (sourceVersion === null || !published) return;
-    const warning = draftId !== null
-      ? 'This will replace the saved draft with a copy of the selected published version. The current published form and submitted applications will stay unchanged. Continue?'
-      : unsaved
-        ? 'This will discard your unsaved edits and save a copy of the selected published version as the draft. Continue?'
-        : 'Save a copy of this earlier version as the draft? The current published form will stay unchanged.';
-    if (!window.confirm(warning)) return;
+    if (sourceVersion === null || !published || draftId !== null) return;
+    if (unsaved && !window.confirm('This will discard your unsaved edits and open a copy of the selected published version. Continue?')) return;
     setPublishing(true);
     try {
       const source = await fetchEligibilityVersion(sourceVersion);
@@ -195,17 +201,13 @@ export default function EligibilityBuilderPage() {
       if (!copy.activationEmailHtml && published.activationEmailHtml) {
         copy.activationEmailHtml = published.activationEmailHtml;
       }
-      const saved = await saveEligibilityDraft(copy, version, draftId);
-      if (!saved.draft) throw new Error('The server did not return the saved draft.');
-      const resolved = resolveLayout(saved.draft.layout, saved.workplaceEnabled === true);
-      setDraftId(saved.draft.id);
+      const resolved = resolveLayout(copy, source.workplaceEnabled === true);
       setLayout(clone(resolved));
-      setSavedLayout(clone(resolved));
       setSelected(PAGE);
       setEditing(null);
       setCopiedFromVersion(sourceVersion);
       setSourceVersion(null);
-      success('Version copied to draft', 'The published form is unchanged. Review the draft before publishing it as a new version.');
+      success('Version copied to editor', 'The copy is unsaved. Save a draft or publish to keep it.');
     } catch (e) {
       error('Could not copy version', e instanceof Error ? e.message : 'Unexpected error');
     } finally { setPublishing(false); }
@@ -226,7 +228,7 @@ export default function EligibilityBuilderPage() {
               <Link className={btnSecondary} to="/apprenticeship_application" target="_blank" rel="noopener noreferrer">
                 <AppIcon className="ri-external-link-line" />Open the form
               </Link>
-              <button type="button" className={btnSecondary} disabled={!unsaved || publishing} onClick={() => savedLayout && setLayout(clone(savedLayout))}>
+              <button type="button" className={btnSecondary} disabled={!unsaved || publishing} onClick={discardChanges}>
                 <AppIcon className="ri-arrow-go-back-line" />Discard changes
               </button>
               <button type="button" className={btnSecondary} disabled={!unsaved || publishing} onClick={saveDraft}>
@@ -236,7 +238,7 @@ export default function EligibilityBuilderPage() {
                 <AppIcon className="ri-archive-line" />Archive draft &amp; return to published
               </button>}
               <button type="button" className={btnPrimary} disabled={!dirty || publishing} onClick={() => setConfirming(true)}>
-                <AppIcon className="ri-upload-cloud-2-line" />Publish changes
+                <AppIcon className="ri-upload-cloud-2-line" />Publish layout
               </button>
             </div>
           }
@@ -253,28 +255,38 @@ export default function EligibilityBuilderPage() {
         {!loading && !loadError && layout && (
           <>
             <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-foreground-200 bg-background-50 p-4">
-              <label className="flex min-w-[16rem] flex-1 flex-col gap-1 text-[12px] font-medium text-foreground-700">
-                Copy from an earlier published version
-                <select className={inputClass} value={sourceVersion ?? ''} disabled={publishing}
-                  onChange={(e) => setSourceVersion(e.target.value ? Number(e.target.value) : null)}>
-                  <option value="">Select a version...</option>
-                  {versions.filter((entry) => entry.version !== version).map((entry) => (
-                    <option key={entry.version} value={entry.version}>
-                      v{entry.version}{entry.publishedAt ? ` · ${new Date(entry.publishedAt).toLocaleDateString('en-GB')}` : ''}{entry.publishedBy ? ` · ${entry.publishedBy}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="button" className={btnSecondary} disabled={sourceVersion === null || publishing} onClick={copyVersion}>
-                <AppIcon className="ri-file-copy-line" />Copy to draft
+              <div className="flex min-w-[16rem] flex-1 flex-col gap-1 text-[12px] font-medium text-foreground-700">
+                <span id="eligibility-copy-version-label">Copy from an earlier published version</span>
+                <SelectMenu
+                  value={sourceVersion?.toString() ?? ''}
+                  onChange={(value) => setSourceVersion(value ? Number(value) : null)}
+                  options={versions.filter((entry) => entry.version !== version).map((entry) => ({
+                    value: String(entry.version),
+                    label: `v${entry.version}${entry.publishedAt ? ` · ${new Date(entry.publishedAt).toLocaleDateString('en-GB')}` : ''}${entry.publishedBy ? ` · ${entry.publishedBy}` : ''}`,
+                  }))}
+                  placeholder="Select a version..."
+                  ariaLabelledBy="eligibility-copy-version-label"
+                  disabled={publishing}
+                  searchable={false}
+                  size="sm"
+                />
+              </div>
+              <button type="button" className={btnSecondary} disabled={sourceVersion === null || publishing || draftId !== null} onClick={copyVersion}>
+                <AppIcon className="ri-file-copy-line" />Copy to editor
               </button>
               <p className="w-full text-[12px] text-foreground-500">
-                {copiedFromVersion !== null ? `Editing a draft copied from v${copiedFromVersion}. Publish changes to make it the live form, or archive the draft to return to the current published form.` :
-                  'The selected version is copied into the saved draft. The live form stays unchanged until you publish.'}
+                {draftId !== null
+                  ? copiedFromVersion !== null
+                    ? `Editing a saved draft copied from v${copiedFromVersion}. Archive the draft to return to the current published form before copying another version.`
+                    : 'Archive the saved draft before copying an earlier version. Its archived record will be retained.'
+                  : copiedFromVersion !== null
+                    ? `Editing an unsaved copy of v${copiedFromVersion}. Save draft to keep it, publish to make it live, or discard to return to the current published form.`
+                    : 'Copying opens the selected version in the editor without saving it. The live form stays unchanged until you publish.'}
               </p>
             </div>
             <p className="text-[12px] text-foreground-500" aria-live="polite">
               {draftId !== null && <span className="mr-2 font-medium text-primary-700">Editing saved draft · </span>}
+              {draftId === null && copiedFromVersion !== null && <span className="mr-2 font-medium text-primary-700">Editing unsaved copy · </span>}
               {dirty ? (
                 <span className="font-medium text-amber-700"><AppIcon className="ri-edit-circle-line mr-1 inline" />You have unpublished changes.</span>
               ) : version ? (
@@ -636,7 +648,6 @@ function ItemRow({
             <span className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600">
               {note ? 'Information' : item.builtin ? 'Standard question' : `Custom · ${TYPE_LABEL[item.type ?? 'text']}`}
             </span>
-            {!item.builtin && !item.column && !contentOnly && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700">New — answer stored in JSONB</span>}
             {removalProtected && (
               <span
                 className="rounded-full bg-background-200 px-2 py-0.5 text-foreground-600"
