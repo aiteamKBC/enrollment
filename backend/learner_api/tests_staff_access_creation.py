@@ -1,5 +1,6 @@
 """Staff role grants on creation; all database writes are mocked."""
 import json
+from contextlib import nullcontext
 from inspect import unwrap
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -26,6 +27,8 @@ class StaffAccessCreationTests(SimpleTestCase):
         )
         request.login_account = SimpleNamespace(role=role)
         with patch("learner_api.views.StaffUser.objects.create") as save, \
+                patch("learner_api.views.transaction.atomic", return_value=nullcontext()), \
+                patch("learner_api.views.assert_available_for_new_profile"), \
                 patch("learner_api.views.to_staff_row", return_value={}), \
                 patch("learner_api.views._send_platform_invitation", return_value={}):
             response = unwrap(staff_users)(request)

@@ -3,7 +3,6 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth.helpers';
 import type { SidebarNavItem } from './Sidebar';
-import { hasOwnEnrolment } from '@/lib/enrollmentAccess';
 import styles from './EnrollmentShell.module.css';
 import { usePendingSignatures } from '@/features/pending-signatures/usePendingSignatures';
 import { PendingSignatureBadge, SignatureNotifications } from '@/features/pending-signatures/SignatureNotifications';
@@ -32,7 +31,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const lastPathname = useRef(pathname);
-  const learner = auth.account?.role === 'learner' || Boolean(auth.account && hasOwnEnrolment(auth.account) && pathname.startsWith('/learner'));
+  const learner = auth.account?.role === 'learner';
   const employer = auth.account?.role === 'employer';
   const commercial = (auth.account?.role === 'learner' ? auth.account.learnerType : auth.account?.learnerRecordKind) === 'commercial';
   const brandedLearner = auth.account?.role === 'learner' && !commercial;
@@ -45,7 +44,6 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
     ...((isAdmin || auth.account?.role === 'admin') ? [['/users/programme-structure', 'Programme Structure']] : []),
     ['/users/compliance-documents', 'Documents'],
     ['/users/coach-directory', 'Coach Directory'], ['/users/first-sessions', 'First-Session Bookings'], ['/lms', 'Open LMS'],
-    ...(auth.account && hasOwnEnrolment(auth.account) ? [['/learner/home?self=1', 'My enrolment']] : []),
   ];
   const displayName = auth.account?.displayName?.trim() || 'Account';
   const nameParts = displayName.split(/\s+/).filter(Boolean);

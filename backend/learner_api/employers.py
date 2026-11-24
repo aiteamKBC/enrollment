@@ -41,6 +41,9 @@ from .mappers import (
 from login.permissions import staff_only
 
 from .models import Employer, EnrolmentUser, Organisation, StaffUser
+from .profile_email import (
+    ProfileEmailInUse, assert_available_for_email_change, assert_available_for_new_profile,
+)
 from .views import _error, _parse_body, _send_platform_invitation
 from login.services import sync_account
 
@@ -273,7 +276,11 @@ def employers(request):
         except ValidationError as exc:
             return _error(str(exc), 400)
         try:
-            emp = Employer.objects.create(**fields)
+            with transaction.atomic(using="enrolment"):
+                assert_available_for_new_profile(fields.get("email"))
+                emp = Employer.objects.create(**fields)
+        except ProfileEmailInUse as exc:
+            return _error(str(exc), 409)
         except DatabaseError as exc:
             return _error(f"Database error: {exc}", 502)
 
@@ -312,16 +319,20 @@ def employer_detail(request, pk):
         except ValidationError as exc:
             return _error(str(exc), 400)
         if fields:
-            for attr, value in fields.items():
-                setattr(emp, attr, value)
             try:
-                emp.save(update_fields=[*fields.keys(), "updated_at"])
+                with transaction.atomic(using="enrolment"):
+                    if "email" in fields:
+                        assert_available_for_email_change(emp.email, fields["email"])
+                    for attr, value in fields.items():
+                        setattr(emp, attr, value)
+                    emp.save(update_fields=[*fields.keys(), "updated_at"])
+                    # Keep the invitation destination aligned with this profile.
+                    if any(field in fields for field in ("email", "full_name")):
+                        sync_account("employer", emp.pk, subject=emp)
+            except ProfileEmailInUse as exc:
+                return _error(str(exc), 409)
             except DatabaseError as exc:
                 return _error(f"Database error: {exc}", 502)
-            # The login account holds its own copy of the address an invitation
-            # is sent to; correcting it here has to reach that copy.
-            if any(field in fields for field in ("email", "full_name")):
-                sync_account("employer", emp.pk, subject=emp)
         return JsonResponse(to_employer_row(emp))
 
     return _error("Method not allowed.", 405)
