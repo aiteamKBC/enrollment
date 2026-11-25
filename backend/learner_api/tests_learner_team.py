@@ -331,6 +331,7 @@ class LearnerCreationAssignmentTests(SimpleTestCase):
         fake_model = SimpleNamespace(all_learners=manager)
         request = SimpleNamespace()
         with patch.object(views, "EnrolmentUser", fake_model), \
+             patch.object(views, "assert_available_for_new_profile"), \
              patch.object(views, "cohort_delivery_window", return_value=(None, None, None)), \
              patch.object(views, "case_owner_coach", return_value={
                  "coach_name": "Case Owner", "coach_email": "owner@example.test"
@@ -339,7 +340,7 @@ class LearnerCreationAssignmentTests(SimpleTestCase):
              patch.object(views, "to_list_row", return_value={"id": "11"}), \
              patch.object(views, "book_first_session", return_value={"booked": True}) as booking, \
              patch.object(views, "_send_platform_invitation", return_value={}):
-            views._create_enrolment_user(
+            views._create_enrolment_user.__wrapped__(
                 request,
                 {"username": "Learner", "email": "learner@example.test", "case_owner": "Case Owner"},
                 session_date=date(2026, 11, 18), session_time=time(10, 0),

@@ -29,7 +29,7 @@ export interface UserListRow {
    *  before the uuid backfill. */
   uuid: string | null;
   name: string;
-  /** Display labels include staff positions and combined roles in the directory. */
+  /** Display label for this record: learner type or staff position. */
   type: string;
   email: string;
   group: string;

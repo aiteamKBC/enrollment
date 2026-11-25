@@ -330,9 +330,11 @@ def _accept_eligibility_account(invitation):
                 or not (row.get("eligible") is True or link[1] is not None)
                 or row.get("work_email", "").casefold() != invitation.email.casefold()):
             raise TokenError("This link is invalid or has expired. Please request a new one.")
-    from enrolment_api.eligibility_invitation import has_account
-    if has_account(invitation.email):
-        raise TokenError("An account already exists for this email. Contact admissions.")
+    from learner_api.profile_email import ProfileEmailInUse, assert_available_for_new_profile
+    try:
+        assert_available_for_new_profile(invitation.email)
+    except ProfileEmailInUse as exc:
+        raise TokenError("An account already exists for this email. Contact admissions.") from exc
     org = resolve_application_organisation(row)
     fields = learner_fields(row)
     fields.update(organisation_id=org.pk, organization=org.name)

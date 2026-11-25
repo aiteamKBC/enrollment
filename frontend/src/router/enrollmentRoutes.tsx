@@ -7,6 +7,7 @@ const ForgotPassword = lazy(() => import('@/pages/forgot-password/page'));
 const SetPassword = lazy(() => import('@/pages/set-password/page'));
 const Application = lazy(() => import('@/pages/apprenticeship-application/page'));
 const Users = lazy(() => import('@/pages/users/page'));
+const Organisations = lazy(() => import('@/pages/users/organisations/page'));
 const Board = lazy(() => import('@/pages/users/BoardPage'));
 const Wizard = lazy(() => import('@/pages/users/wizard/WizardPage'));
 const WizardBuilder = lazy(() => import('@/pages/users/wizard-builder/page'));
@@ -42,6 +43,7 @@ export const enrollmentRoutes: RouteObject[] = [
   { element: <AccessGate />, children: [
     ...['/', '/enrollment', '/choose-workspace'].map(path => ({ path, element: <Home /> })),
     { path: '/users', element: <Users /> },
+    { path: '/users/organisations', element: <Organisations /> },
     { path: '/users/wizard-builder', element: <WizardBuilder /> },
     { path: '/users/programme-structure', element: <ProgrammeStructure /> },
     ...(import.meta.env.DEV ? [{ path: '/users/programme-structure/preview', element: <ProgrammeCataloguePreview /> }] : []),
