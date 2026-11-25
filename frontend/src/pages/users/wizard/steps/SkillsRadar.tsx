@@ -17,7 +17,7 @@ import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/p
 import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
 import styles from './SkillsRadar.module.css';
 import { useLearnerStepPresentation } from '@/features/learner-enrolment/stepPresentation';
-import { bindImpactModules, weightedReadiness, type ImpactModule } from '@/features/programme-suitability/skills-radar/moduleImpact';
+import { bindImpactModules, isPotentialPriorLearning, weightedReadiness, type ImpactModule } from '@/features/programme-suitability/skills-radar/moduleImpact';
 
 /**
  * Skills Radar: a sequential self-assessment questionnaire.
@@ -348,6 +348,8 @@ export default function SkillsRadar() {
           const score = module.readiness?.score;
           const unavailable = !impactError && impact?.status === 'ready' && module.record?.status === 'unavailable';
           const answered = module.readiness?.answered ?? module.answered;
+          const flagged = !impactError && module.record?.status === 'ready' && Boolean(module.record.revisionId) &&
+            isPotentialPriorLearning(module.readiness, impact?.screeningThresholdPercent ?? 50);
           return <article key={module.id} className={`${styles.moduleCard} ${unavailable ? styles.moduleCardUnavailable : ''}`}>
             <div className={styles.moduleHeading}>
               <h4 className={styles.moduleName}>{module.title}</h4>
@@ -358,6 +360,12 @@ export default function SkillsRadar() {
             </div>}
             {score != null && <div className={styles.scoreTrack} role="meter" aria-label={`${module.title} prior knowledge`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={score}>
               <span style={{ width: `${score}%` }} />
+            </div>}
+            {flagged && <div className={styles.moduleFlag} role="status">
+              <strong>Potential Prior Learning</strong>
+              <span>{readOnly
+                ? 'This assessment indicates possible prior learning in this module. Review evidence through the existing RPL process before making a decision.'
+                : 'Your assessment indicates possible prior learning in this module. Some training content may be reduced following an assessor review.'}</span>
             </div>}
             <p className={styles.moduleCount}>{answered} of {module.count} KSB{module.count === 1 ? '' : 's'} assessed</p>
           </article>;

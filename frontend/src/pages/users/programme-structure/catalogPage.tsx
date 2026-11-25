@@ -11,6 +11,7 @@ import { PricingWorkspace } from './CatalogPricing';
 import { KsbLibraryCsv } from './KsbLibraryCsv';
 import { CatalogLmsPanel } from './CatalogLmsPanel';
 import { CatalogModuleCountsEditor } from './CatalogModuleCountsEditor';
+import { SkillsRadarThreshold } from './SkillsRadarThreshold';
 import {
   CatalogRequestError, catalogRequest, programmePath, programmesPath,
   type CatalogRecord, type Cohort, type CurriculumModule, type Detail, type Programme, type ProgrammeCounts, type ProgrammeListRecord, type Resource, type StaffOptions,
@@ -470,6 +471,7 @@ export default function ProgrammeCatalogPage({ preview = false }: { preview?: bo
           </div>
         </section>
         : !programmeId ? <>
+          {!preview && <SkillsRadarThreshold />}
           <section aria-label="Programme filters" className={`${surface} space-y-4 p-4 sm:p-5`}>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <ListSearch label="Search programmes" query={query} onSearch={setQuery} />

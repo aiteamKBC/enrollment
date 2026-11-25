@@ -71,6 +71,7 @@ import { REVIEW_QUESTION_LABELS } from '@/pages/learner/onboarding/reviews/quest
 import { enrolmentReviewPath } from '@/pages/learner/onboarding/reviews/navigation';
 import type { LearnerKind } from '@/api/extendedIlr';
 import { SuitabilityRplReportTab } from './suitability-rpl/SuitabilityRplReportTab';
+import { SkillsRadarScreeningSummary } from './SkillsRadarScreeningSummary';
 import { fetchSuitabilityRplIssuedDocuments, type SuitabilityRplIssuedDocument } from '@/api/suitabilityRplReport';
 import { fetchEvidence, uploadEvidence, getEvidenceDownloadUrl, deleteEvidence, type EvidenceRecord } from '@/api/evidence';
 import { formatSystemTimestamp } from '@/lib/format';
@@ -1914,6 +1915,7 @@ function BoardView({
 
           {tab === 'overview' && (
             <>
+              <SkillsRadarScreeningSummary kind={kind} learnerId={userId} canReview={isAdmin} />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Card
                   title="Contact details"

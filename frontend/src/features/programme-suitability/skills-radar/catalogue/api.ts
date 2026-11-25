@@ -11,6 +11,10 @@ export const saveCatalogueDraft = (configuration: CatalogueDraft, baseVersion: n
   request<{ configuration: CatalogueDraft; baseVersion: number | null }>(`${BASE}/draft/`, { configuration, baseVersion });
 export const getLearnerCatalogue = (kind: LearnerKind, id: string) => request<LearnerCatalogue>(`${BASE}/${kind}/${id}/`);
 export const getModuleImpact = (kind: LearnerKind, id: string) => request<ModuleImpact>(`${BASE}/${kind}/${id}/module-impact/`);
+export interface ScreeningSetting { thresholdPercent: number; revision: number; schemaReady: boolean }
+export const getScreeningSetting = () => request<ScreeningSetting>(`${BASE}/screening-setting/`);
+export const saveScreeningSetting = (thresholdPercent: number, revision: number) =>
+  request<ScreeningSetting>(`${BASE}/screening-setting/`, { thresholdPercent, revision });
 export const csvUrl = (pid: ProgrammeId, template = false) => `${BASE}/catalogues/${pid}/${template ? '?template=1' : ''}`;
 export async function uploadCatalogue(pid: ProgrammeId, file: File): Promise<ImportPreview> {
   const body = new FormData(); body.append('file', file, file.name);

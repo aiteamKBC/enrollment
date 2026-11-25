@@ -18,6 +18,7 @@ from . import service
 from .catalogue import APPROVALS, KEY, PROGRAMMES, CatalogueError, check_approval, compare, current_catalogues, validate
 from .csv_io import MAX_BYTES, export_csv, parse_csv
 from .module_impact import learner_module_impact
+from .screening import read_setting, save_setting
 
 logger = logging.getLogger(__name__)
 CSV_TYPES = {'text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain', 'application/octet-stream'}
@@ -35,10 +36,45 @@ def module_impact(request, kind, learner_id):
     try:
         if not model.objects.filter(pk=learner_id).exists():
             return error('Not found.', 404)
-        return JsonResponse(learner_module_impact(kind, learner_id))
+        return JsonResponse({**learner_module_impact(kind, learner_id),
+                             'screeningThresholdPercent': read_setting()['thresholdPercent']})
     except DatabaseError:
         logger.exception('Could not load local Skills Radar module impact.')
         return error('Could not load Programme Structure mapping. Please retry.', 503)
+
+
+@never_cache
+@enrolment_login_required
+@csrf_protect
+def screening_setting(request):
+    account = getattr(request, 'login_account', None)
+    user = getattr(request, 'user', None)
+    if not ((account and account.role == 'admin') or
+            (account is None and user and user.is_authenticated and user.is_superuser)):
+        return error('Administrator access required.', 403)
+    if request.method not in {'GET', 'PUT'}:
+        return error('Method not allowed.', 405)
+    try:
+        if request.method == 'GET':
+            return JsonResponse(read_setting())
+        try:
+            data = json.loads(request.body)
+        except ValueError:
+            return error('Provide a valid JSON object.')
+        if not isinstance(data, dict):
+            return error('Provide a valid JSON object.')
+        try:
+            result = save_setting(data.get('thresholdPercent'), data.get('revision'), actor(request))
+        except ValueError as exc:
+            return error(exc)
+        if result is None:
+            return error('The setting was changed by another administrator. Reload and try again.', 409)
+        if result == 'setup_required':
+            return error('The Skills Radar setting requires migration 0020.', 503)
+        return JsonResponse(result)
+    except DatabaseError:
+        logger.exception('Could not read or save Skills Radar screening setting.')
+        return error('Could not load Skills Radar setting. Please retry.', 503)
 
 
 def error(exc, status=400):

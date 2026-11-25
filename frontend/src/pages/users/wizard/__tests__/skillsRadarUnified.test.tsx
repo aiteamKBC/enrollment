@@ -143,6 +143,26 @@ it('keeps an unmapped module and its answers visible without inventing a score',
   expect(within(screen.getByRole('table', { name: 'Skills assessments' })).getAllByRole('row')).toHaveLength(4);
   expect(screen.getByRole('button', { name: 'Edit K1' })).toBeVisible();
 });
+it('shows one non-decisional flag at the configured threshold in learner and staff cards', () => {
+  const entry = (id: string, code: string, weight: string) => ({ id, code, description: code,
+    kind: 'Knowledge', standard: 'ST0001', standardVersion: '1.0',
+    weight: { total_weight: weight, mapping_count: 1 } });
+  const base = { status: 'ready', programmeId: 'PCP_L6',
+    savedLevels: { [k.id]: 'champion', [s.id]: 'never', [b.id]: 'never' }, modules: [
+      { id: 'a', name: 'Synthetic module A', status: 'ready', revisionId: 'revision-a', ksbs: [entry('k', 'K1', '40'), entry('s', 'S1', '20')] },
+      { id: 'b', name: 'Synthetic module B', status: 'ready', revisionId: 'revision-b', ksbs: [entry('k', 'K1', '20'), entry('b', 'B1', '40')] },
+    ] };
+  for (const [threshold, count] of [[50, 1], [30, 2], [70, 0]]) {
+    const view = render(<Harness writes={vi.fn()} impact={{ ...base, screeningThresholdPercent: threshold }} />);
+    const cards = within(screen.getByRole('region', { name: 'Your prior knowledge by module' }));
+    expect(cards.queryAllByText('Potential Prior Learning')).toHaveLength(count);
+    if (count) expect(cards.getAllByText(/Some training content may be reduced following an assessor review/)).toHaveLength(count);
+    view.unmount();
+  }
+  render(<Harness learner={false} writes={vi.fn()} impact={{ ...base, screeningThresholdPercent: 50 }} />);
+  expect(screen.getByText('Potential Prior Learning')).toBeVisible();
+  expect(screen.getByText(/Review evidence through the existing RPL process/)).toBeVisible();
+});
 it('shows scored modules before unavailable modules without changing their scores', () => {
   const entry = (id: string, code: string, weight: string) => ({ id, code, description: code,
     kind: 'Knowledge', standard: 'ST0001', standardVersion: '1.0',

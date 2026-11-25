@@ -33,6 +33,8 @@
 .scoreTrack { height: 5px; flex: none; margin: auto 0 12px; overflow: hidden; border-radius: 999px; background: #eee5f5; }
 .scoreTrack span { display: block; height: 100%; border-radius: inherit; background: #7828bc; }
 .moduleCount { margin: auto 0 0; color: #513a63; font-size: 13px; font-weight: 650; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.moduleFlag { display: grid; gap: 3px; margin: 0 0 12px; padding: 9px 10px; border: 1px solid #dfd2ed; border-radius: 8px; background: #f9f5fc; color: #554663; font-size: 11px; line-height: 1.45; }
+.moduleFlag strong { color: #562086; font-size: 12px; }
 .scoreTrack + .moduleCount { margin-top: 0; }
 .table { border: 1px solid #e4d7f0; border-radius: 14px; overflow: hidden; background: #fff; }
 .tableHeader, .row { display: grid; grid-template-columns: minmax(0, 55fr) minmax(0, 28fr) minmax(135px, 17fr); align-items: center; column-gap: 16px; padding: 13px 16px; }

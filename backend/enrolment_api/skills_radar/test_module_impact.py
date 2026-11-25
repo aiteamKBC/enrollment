@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -90,6 +91,7 @@ class ModuleImpactTests(TestCase):
             response = match.func(request, **match.kwargs)
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'"social-media"', response.content)
+        self.assertEqual(json.loads(response.content)['screeningThresholdPercent'], 50)
 
     def test_historical_pinned_revision_keeps_missing_weight(self):
         module, first = self.delivery('Social Media')

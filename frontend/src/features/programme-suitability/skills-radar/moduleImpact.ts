@@ -14,6 +14,28 @@ export interface ImpactModule {
 export interface ModuleImpact {
   status: 'ready' | 'unavailable'; reason?: string; programmeId?: string;
   cohortId?: string; groupId?: string; modules: ImpactModule[]; savedLevels?: Record<string, string>;
+  screeningThresholdPercent?: number;
+}
+
+export function isPotentialPriorLearning(readiness: ReturnType<typeof weightedReadiness> | null | undefined,
+  threshold: number): boolean {
+  return Boolean(readiness && readiness.reason === null && readiness.count > 0 &&
+    readiness.answered === readiness.count && readiness.score != null && readiness.score >= threshold);
+}
+
+/** The profile summary uses only persisted answers and the verified, pinned revision. */
+export function screenedModules(impact: ModuleImpact): { id: string; name: string; score: number }[] {
+  if (impact.status !== 'ready') return [];
+  const answers = Object.fromEntries(Object.entries(impact.savedLevels ?? {}).map(([id, level]) =>
+    [id, { ksbId: id, level, evidenceFiles: [], actionPlan: null }]));
+  return impact.modules.flatMap((module) => {
+    if (module.status !== 'ready' || !module.revisionId) return [];
+    const ids = new Map(module.ksbs.map((ksb) => [ksb.code,
+      `${ksb.standard.toLowerCase()}-v${ksb.standardVersion.replace(/\./g, '-')}-${ksb.code}`]));
+    const readiness = weightedReadiness(module, answers as Record<string, KsbAssessment>, ids);
+    return isPotentialPriorLearning(readiness, impact.screeningThresholdPercent ?? 50)
+      ? [{ id: module.id, name: module.name, score: readiness.score! }] : [];
+  });
 }
 
 export function matchesQuestionStandard(questions: { id: string }[], declared: string, ksbs: ImpactKsb[]): boolean {

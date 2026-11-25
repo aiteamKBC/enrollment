@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessmentQuestionIds, bindImpactModules, matchesQuestionStandard, readinessBand, weightedReadiness, type ImpactModule } from '../skills-radar/moduleImpact';
+import { assessmentQuestionIds, bindImpactModules, isPotentialPriorLearning, matchesQuestionStandard, readinessBand, screenedModules, weightedReadiness, type ImpactModule } from '../skills-radar/moduleImpact';
 import type { KsbAssessment } from '@/pages/users/types';
 import type { Ksb } from '@/pages/users/types';
 
@@ -15,6 +15,26 @@ const answers = (levels: (KsbAssessment['level'] | null)[]) => Object.fromEntrie
 const ids = new Map([['K1', 'profile-0'], ['K2', 'profile-1']]);
 
 describe('weighted module readiness', () => {
+  it('flags only complete verified modules at the single provider threshold', () => {
+    const below = weightedReadiness(module(['40', '20']), answers(['never', 'mastery']), ids);
+    const above = weightedReadiness(module(['40', '20']), answers(['champion', 'never']), ids);
+    const at = weightedReadiness(module(['40', '40']), answers(['champion', 'never']), ids);
+    expect([below.score, at.score, above.score]).toEqual([29, 50, 67]);
+    expect([below, at, above].map(result => isPotentialPriorLearning(result, 50))).toEqual([false, true, true]);
+    expect(isPotentialPriorLearning(above, 70)).toBe(false);
+    expect(isPotentialPriorLearning(above, 60)).toBe(true);
+    expect(isPotentialPriorLearning(weightedReadiness(module(['40', '20']), answers(['champion', null]), ids), 50)).toBe(false);
+    expect(isPotentialPriorLearning(weightedReadiness(module(['40', undefined]), answers(['champion', 'never']), ids), 50)).toBe(false);
+    expect(isPotentialPriorLearning(weightedReadiness({ ...module(['40']), status: 'unavailable' }, answers(['champion']), ids), 50)).toBe(false);
+  });
+  it('summarises multiple flagged modules from saved answers without inventing unmapped scores', () => {
+    const first = module(['40']);
+    const second = { ...module(['20']), id: 'second', name: 'Second module' };
+    const result = screenedModules({ status: 'ready', modules: [first, second,
+      { ...first, id: 'unmapped', status: 'unavailable' }], screeningThresholdPercent: 50,
+      savedLevels: { 'st0596-v1-0-K1': 'champion' } });
+    expect(result.map(item => [item.name, item.score])).toEqual([['Social Media', 100], ['Second module', 100]]);
+  });
   it('uses module weights and the full 1–9 scale for a shared answer', () => {
     const ratings = answers(['champion', 'never']);
     expect(weightedReadiness(module(['40', '20']), ratings, ids).score).toBe(67);
