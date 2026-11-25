@@ -21,7 +21,6 @@ import json
 import logging
 
 from django.db import DatabaseError, transaction, connections
-from django.db.models.functions import Lower, Trim
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -79,6 +78,9 @@ from .mappers import (
     write_staff_fields,
 )
 from .models import CommercialUser, Employer, EnrolmentUser, LearnerProfile, LearnerTrainingPlanModule, Organisation, StaffUser
+from .profile_email import (
+    ProfileEmailInUse, assert_available_for_email_change, assert_available_for_new_profile,
+)
 from .constants import ACCESS_TUTOR
 from .progress_rules import progress_record_counts_as_achieved
 from .teams_attendance import fetch_verified_teams_attendance_rows
@@ -805,6 +807,7 @@ def enrolment_users(request):
     return _error("Method not allowed.", 405)
 
 
+@transaction.atomic(using="enrolment")
 def _create_enrolment_user(request, fields, *, require_account=False,
                            session_date=None, session_time=None):
     """Shared single/bulk creation, including placement and account setup.
@@ -819,25 +822,12 @@ def _create_enrolment_user(request, fields, *, require_account=False,
     """
     fields = dict(fields)
 
-    # The login account is pinned to one Created_users primary key. Creating a
-    # second source row for the same email can therefore leave the account on
-    # one row while the permanent LearnerProfile remains linked to the other.
-    # Compare a trimmed, case-insensitive value so legacy spacing/case cannot
-    # bypass the guard. The database's owner-run unique index remains the final
-    # protection against two truly concurrent requests.
-    email = str(fields.get('email') or '').strip()
-    if email:
-        existing = (
-            EnrolmentUser.all_learners
-            .annotate(_normalised_email=Lower(Trim('email')))
-            .filter(_normalised_email=email.casefold())
-            .only('id')
-            .first()
-        )
-        if existing is not None:
-            raise ValidationError(
-                'A learner with this email already exists. Update the existing learner instead.'
-            )
+    # Reserve the address before any learner or booking is written. This also
+    # checks staff and employer profiles, including ones without login accounts.
+    try:
+        assert_available_for_new_profile(fields.get("email"))
+    except ProfileEmailInUse as exc:
+        raise ValidationError(str(exc)) from exc
 
     # Stamp who/when enrolled, server-side.
     stamp = timezone.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -1018,6 +1008,8 @@ def enrolment_user_detail(request, pk):
             return _error(str(exc), 400)
         try:
             with transaction.atomic(using="enrolment"):
+                if "email" in fields:
+                    assert_available_for_email_change(user.email, fields["email"])
                 if getattr(request, "learner_self_write", False) and any(
                     key in fields for key in ("username", "phone_number", "date_of_birth")
                 ):
@@ -1059,6 +1051,8 @@ def enrolment_user_detail(request, pk):
                         # hook cannot notice Active -> Active, leaving the profile
                         # in Delivery and hiding coach/review/calendar records.
                         sync_active_user(user)
+        except ProfileEmailInUse as exc:
+            return _error(str(exc), 409)
         except DatabaseError:
             return _error("The learner could not be saved. Please try again.", 503)
         return JsonResponse({**to_board(user), **(handover or {})})
@@ -1297,7 +1291,11 @@ def staff_users(request):
         fields["invite_to_platform"] = True
 
         try:
-            user = StaffUser.objects.create(**fields)
+            with transaction.atomic(using="enrolment"):
+                assert_available_for_new_profile(fields.get("email"))
+                user = StaffUser.objects.create(**fields)
+        except ProfileEmailInUse as exc:
+            return _error(str(exc), 409)
         except DatabaseError as exc:
             return _error(f"Database error: {exc}", 502)
 
@@ -1360,18 +1358,21 @@ def staff_user_detail(request, pk):
                     )
 
         if fields:
-            for attr, value in fields.items():
-                setattr(user, attr, value)
             try:
-                # auto_now on Updated_at only fires when it's in update_fields.
-                user.save(update_fields=[*fields.keys(), "updated_at"])
+                with transaction.atomic(using="enrolment"):
+                    if "email" in fields:
+                        assert_available_for_email_change(user.email, fields["email"])
+                    for attr, value in fields.items():
+                        setattr(user, attr, value)
+                    # auto_now on Updated_at only fires when it's in update_fields.
+                    user.save(update_fields=[*fields.keys(), "updated_at"])
+                    # Keep the sign-in account in sync with staff identity/access.
+                    if any(field in fields for field in STAFF_IDENTITY_FIELDS):
+                        sync_account("staff", user.pk, subject=user)
+            except ProfileEmailInUse as exc:
+                return _error(str(exc), 409)
             except DatabaseError as exc:
                 return _error(f"Database error: {exc}", 502)
-            # Same as the learner path, plus role: a staff account's role is
-            # derived from position and access, so an edit to either has to
-            # reach the account that enforces it.
-            if any(field in fields for field in STAFF_IDENTITY_FIELDS):
-                sync_account("staff", user.pk, subject=user)
         return JsonResponse(to_staff_row(user))
 
     return _error("Method not allowed.", 405)

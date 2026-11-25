@@ -1,0 +1,10 @@
+:global(#root) .allocation thead th {
+  background: var(--color-background) !important;
+  color: var(--color-text) !important;
+  height: auto;
+  letter-spacing: normal;
+}
+
+:global(#root) .allocation tbody tr {
+  background: var(--color-surface) !important;
+}

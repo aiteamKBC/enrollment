@@ -2,7 +2,7 @@ from django.urls import include, path
 from .pending_signatures import pending_signatures
 from .plr_pdf_preview import plr_pdf_preview
 from .plr_pdf_import import plr_pdf_import
-from . import eligibility_applications, eligibility_exception, programme_structure_views
+from . import eligibility_applications, eligibility_exception, programme_catalog, programme_structure_views
 from . import bksb, cv_job_documents, documents, eligibility_form, eligibility_layout, extended_ilr, ilr_eligibility_evidence, ilr_employer_details, ilr_learner_record, plr_evidence, policy_documents, postcode_lookup, views, wizard_bootstrap, wizard_custom_uploads, wizard_inclusion, wizard_layout
 
 urlpatterns = [
@@ -21,6 +21,13 @@ urlpatterns = [
     path('programme-structure/draft/', programme_structure_views.programme_structure_draft, name='programme-structure-draft'),
     path('programme-structure/draft/reconcile/', programme_structure_views.programme_structure_reconcile, name='programme-structure-reconcile'),
     path('programme-structure/publish/', programme_structure_views.programme_structure_publish, name='programme-structure-publish'),
+    path('programme-structure/catalog/readiness/', programme_catalog.catalogue_readiness, name='programme-catalog-readiness'),
+    path('programme-structure/catalog/staff/', programme_catalog.staff_options, name='programme-catalog-staff'),
+    path('programme-structure/catalog/programmes/', programme_catalog.programmes, name='programme-catalog-programmes'),
+    path('programme-structure/catalog/programmes/<uuid:programme_id>/', programme_catalog.programme_detail, name='programme-catalog-programme'),
+    path('programme-structure/catalog/programmes/<uuid:programme_id>/pricing/', programme_catalog.programme_pricing, name='programme-catalog-pricing'),
+    path('programme-structure/catalog/programmes/<uuid:programme_id>/<slug:resource>/', programme_catalog.programme_records, name='programme-catalog-records'),
+    path('programme-structure/catalog/programmes/<uuid:programme_id>/<slug:resource>/<uuid:record_id>/', programme_catalog.programme_records, name='programme-catalog-record'),
     path('health/', views.health, name='enrolment-health'),
     path('commercial-users/<int:pk>/board/', views.commercial_board, name='commercial-board'),
     # Public apprenticeship eligibility form (/apprenticeship_application) — no sign-in

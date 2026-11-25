@@ -6,7 +6,6 @@ accepted. Existing addresses are not re-created by public submissions.
 import logging
 
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models.functions import Lower, Trim
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -19,20 +18,10 @@ RETRY_LATER = "retryLater"
 
 
 def has_account(email):
-    """Whether `email` already belongs to a learner record or a login account."""
-    from learner_api.models import EnrolmentUser
-    from login.models import LoginAccount
-    from login.security import normalize_email
+    """Whether this address already belongs to any enrolment person."""
+    from learner_api.profile_email import profile_email_in_use
 
-    address = normalize_email(email)
-    if LoginAccount.objects.filter(email=address).exists():
-        return True
-    return (
-        EnrolmentUser.all_learners
-        .annotate(_normalised_email=Lower(Trim("email")))
-        .filter(_normalised_email=address)
-        .exists()
-    )
+    return profile_email_in_use(email)
 
 
 def learner_fields(row):

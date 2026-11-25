@@ -3,6 +3,11 @@ import uuid
 from django.db import models
 from django.db.models import Q
 
+from .catalog_models import (
+    CatalogCohort, CatalogDelivery, CatalogGroup, CatalogKsb, CatalogModule, CatalogModuleRevision,
+    CatalogProgramme, CatalogWeeklyTopic,
+)
+
 
 class CohortGroupPool(models.Model):
     """Enrolment-owned, owner-verified capacity baseline; never created on GET."""
