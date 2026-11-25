@@ -39,6 +39,9 @@ export function ageFromDob(iso?: string): number | undefined {
 
 
 export interface WizardContextValue {
+  importPlrPdf?: (file: File, enteredUln: string, signal: AbortSignal) => Promise<import('@/api/plrPdfPreview').PlrPdfImportResult>;
+  canEditUln?: boolean;
+  plrCheck?: { checking: boolean; refresh: () => void };
   radarCatalogue?: import('@/features/programme-suitability/skills-radar/catalogue/types').ManagedRadar;
   radarImpact?: import('@/features/programme-suitability/skills-radar/moduleImpact').ModuleImpact | null;
   radarImpactError?: string;
@@ -73,7 +76,7 @@ export interface WizardContextValue {
    */
   readOnly: boolean;
   /** Persist the Extended ILR answers to enrolment."Extended_ILR". */
-  saveIlr: (options?: { finalizeIlr?: boolean; skillsRadarCheckpoint?: boolean; submitted?: boolean }) => Promise<void>;
+  saveIlr: (options?: { finalizeIlr?: boolean; skillsRadarCheckpoint?: boolean; submitted?: boolean; plrRecordChange?: import('@/api/extendedIlr').PlrRecordChange }) => Promise<void>;
   ilrFinalisedAt?: string;
   ilrLegacyReadOnly?: boolean;
   /** Persist only module choices through their revision-checked endpoint. */

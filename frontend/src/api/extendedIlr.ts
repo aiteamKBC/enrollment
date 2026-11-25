@@ -6,7 +6,7 @@ import { readLearnerJson } from './learnerRead';
 // The questionnaire is stored as one jsonb document, so this client posts the
 // wizard's IlrForm as-is and the server derives the signature/completion flags.
 // ============================================================================
-import type { EnrolmentBoard, IlrForm, WizardDraft } from '@/pages/users/types';
+import type { EnrolmentBoard, IlrForm, PlrRecord, WizardDraft } from '@/pages/users/types';
 import { primeKsbProfile, type KsbProfileResponse } from './curriculum';
 import { createCachedResource } from './cachedRequest';
 import type { LearnerKind } from './learnerDetail';
@@ -18,8 +18,10 @@ const BOOTSTRAP_BASE = '/enrolment_api/wizard-bootstrap';
 
 /** Every wizard step except the ILR, which travels in `answers`. */
 export type WizardDraftRest = Omit<WizardDraft, 'ilr'>;
+export type PlrRecordChange = { action: 'edit' | 'delete'; id: string; expected: PlrRecord; record?: PlrRecord };
 
 export interface ExtendedIlrMeta {
+  canEditUln?: boolean;
   learnerKind: LearnerKind;
   learnerId: number;
   learnerName: string;
@@ -169,7 +171,7 @@ export async function saveExtendedIlr(
   learnerId: string,
   answers: IlrForm,
   draft?: Partial<WizardDraftRest>,
-  versioning: { layoutVersion?: number | null; layoutToken?: string | null; skillsRadarCheckpoint?: boolean; submitted?: boolean; finalizeIlr?: boolean } = {},
+  versioning: { layoutVersion?: number | null; layoutToken?: string | null; skillsRadarCheckpoint?: boolean; submitted?: boolean; finalizeIlr?: boolean; ulnUpdate?: { value: string; expected: string }; plrRecordChange?: PlrRecordChange } = {},
 ): Promise<ExtendedIlrResponse> {
   const key = `${kind}/${learnerId}`;
   const body = {

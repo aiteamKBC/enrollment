@@ -1,0 +1,90 @@
+/* Shared Enrolment Corner admin chrome; page content keeps its own presentation. */
+.enrolment-admin-shell { --up-header-height: 60px; --up-sidebar-width: 215px; isolation: isolate; padding-top: var(--up-header-height); }
+.enrolment-admin-shell > header {
+  position: fixed; inset: 0 0 auto; z-index: 30; height: var(--up-header-height); min-height: 60px;
+  padding: 4px 32px 4px 10px; border: 0; color: #fff;
+  background: radial-gradient(ellipse at 40% -40%, #6f3585, transparent 65%), linear-gradient(100deg, #4c245c, #381748);
+  box-shadow: 0 2px 9px #3c164529;
+}
+.enrolment-admin-shell > header > a { display: flex; min-width: 0; align-items: center; gap: 13px; color: #fff; }
+.up-college-lockup { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.up-college-lockup > img { display: block; width: auto; height: 60px; object-fit: contain; mix-blend-mode: screen; }
+.up-brand-divider { height: 36px; width: 1px; margin-left: 42px; background: #ffffff58; }
+.enrolment-admin-shell > header button[aria-haspopup='menu'] { width: auto; height: 43px; gap: 13px; border-radius: 8px; color: #fff; background: transparent; box-shadow: none; --tw-ring-color: transparent; }
+.enrolment-admin-shell > header button[aria-haspopup='menu']:focus-visible { outline: 2px solid #ead184; outline-offset: 3px; }
+.up-profile-avatar { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 39px; height: 39px; border-radius: 50%; color: #512268; background: #f1e5fb; border: 1px solid #d4c1e4; }
+.up-profile-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.up-profile-copy > span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.up-profile-copy > small { color: #dfcfe8; font-size: 10px; font-weight: 400; text-transform: capitalize; }
+.enrolment-admin-shell > header > div > span { display: none; }
+.enrolment-admin-shell .up-navigation {
+  display: flex; flex-direction: column; padding: 0 10px; isolation: isolate;
+  background: radial-gradient(ellipse at 0 40%, #61247055, transparent 70%), linear-gradient(180deg, #3d154c, #461953 65%, #542663); border-color: #5e326c;
+  color: #fff; color-scheme: dark;
+  box-shadow: 3px 0 10px #4f24560a;
+}
+.up-sidebar-brand { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; flex-shrink: 0; gap: 6px; min-height: 104px; padding: 18px 12px; color: #fff; }
+.up-sidebar-brand strong { font-size: 16px; font-weight: 700; line-height: 22px; white-space: nowrap; }
+.up-sidebar-brand small { color: #e9cd8a; font-size: 9px; font-weight: 600; line-height: 13px; letter-spacing: .13em; text-transform: uppercase; }
+.up-sidebar-brand-accent { width: 28px; height: 2px; margin-top: 6px; background: #e4bd5f; }
+.up-navigation > ul { position: relative; z-index: 1; display: grid; gap: 3px; width: 100%; flex-shrink: 0; }
+.enrolment-admin-shell .up-navigation > ul > li { margin: 0 !important; }
+.enrolment-admin-shell .up-navigation > ul a {
+  position: relative; display: flex; justify-content: flex-start; align-items: center;
+  width: 100%; min-height: 36px; gap: 12px; padding: 7px 14px;
+  border: 1px solid transparent; border-radius: 22px; color: #fff; background: transparent; box-shadow: none;
+  font-size: 12px; line-height: 1.35; font-weight: 500;
+}
+.up-navigation > ul a > svg { flex-shrink: 0; color: #fff; }
+.enrolment-admin-shell .up-navigation > ul a:hover { color: #fff; background: #ffffff0e; }
+.enrolment-admin-shell .up-navigation > ul a[aria-current='page'] { color: #fff; font-weight: 600; border-color: #dfb85d; background: linear-gradient(105deg, #734487, #542362); box-shadow: inset 0 0 0 1px #ffffff08; }
+.enrolment-admin-shell .up-navigation > ul a[aria-current='page']:hover { background: linear-gradient(105deg, #7e4d92, #623070); }
+.enrolment-admin-shell .up-navigation > ul a:focus-visible { outline: 2px solid #efd288; outline-offset: 2px; }
+.up-sidebar-art { position: relative; isolation: isolate; flex: 1 0 320px; min-height: 320px; margin-inline: -10px; pointer-events: none; }
+.up-sidebar-art img { position: absolute; z-index: -1; left: 0; bottom: 0; width: 100%; height: 100%; object-fit: cover; object-position: center bottom; opacity: 1; filter: saturate(.94) contrast(.96); mask-image: linear-gradient(transparent, #00000040 18%, #000 36%); }
+.up-sidebar-art::before, .up-sidebar-art::after { content: ''; position: absolute; z-index: -1; left: 0; right: 0; pointer-events: none; }
+.up-sidebar-art::before { top: -28px; height: 92px; background: linear-gradient(100deg, #9460ac55, #a277bb77); clip-path: polygon(0 72%, 100% 0, 100% 24%, 0 100%); }
+.up-sidebar-art::after { top: -6px; height: 92px; background: linear-gradient(100deg, #7d45954d, #ab82bf55); clip-path: polygon(0 72%, 100% 0, 100% 24%, 0 100%); }
+.up-sidebar-slogan { position: relative; padding: 52px 8px 18px; color: #edc160; font: italic 20px/1.35 Georgia, 'Times New Roman', serif; text-align: center; text-shadow: 0 1px 3px #2a103d; }
+.up-sidebar-slogan::before { content: ''; display: block; width: 28px; height: 1px; margin: 0 auto 14px; background: #dcb35b; }
+.up-sidebar-slogan > span { display: block; }
+.enrolment-admin-shell .up-navigation > div:nth-child(2) > span { color: #fff; }
+.enrolment-admin-shell .up-navigation > div:nth-child(2) > button { color: #fff; background: #ffffff0e; border-color: #ffffff40; }
+
+.enrolment-admin-shell > header :is(button, a):focus-visible { outline-color: #efd288; }
+@media (min-width: 768px) {
+  .enrolment-admin-shell {
+    display: flex; flex-direction: column; min-height: 0;
+    height: 100vh; height: 100dvh; overflow: hidden;
+  }
+  .enrolment-admin-body { display: flex; flex: 1; min-height: 0; }
+  .enrolment-admin-content {
+    min-height: 0; margin-left: var(--up-sidebar-width);
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain;
+  }
+  .enrolment-admin-shell .up-navigation {
+    position: fixed; inset: var(--up-header-height) auto 0 0; z-index: 20;
+    width: var(--up-sidebar-width); height: calc(100vh - var(--up-header-height));
+    height: calc(100dvh - var(--up-header-height)); overflow-x: hidden; overflow-y: auto;
+  }
+  .enrolment-admin-shell .up-navigation > ul a { white-space: nowrap; font-size: 12px; min-height: 36px; padding-inline: 14px; gap: 12px; }
+  .up-college-lockup { margin-left: 16px; }
+}
+@media (max-width: 767px) {
+  .enrolment-admin-shell > header { padding: 6px 14px; height: auto; min-height: 60px; }
+  .enrolment-admin-shell > header > a { gap: 8px; }
+  .up-college-lockup > img { height: 48px; }
+  .up-brand-divider { display: none; }
+  .enrolment-admin-shell > header > div { flex-shrink: 0; gap: 8px; }
+  .up-profile-copy, .enrolment-admin-shell > header button[aria-haspopup='menu'] > svg { display: none; }
+  .enrolment-admin-shell > header button[aria-haspopup='menu'] { gap: 0; }
+  .up-sidebar-brand { display: none; }
+  .enrolment-admin-shell .up-navigation { padding-top: 16px; }
+  .up-sidebar-art { min-height: 320px; flex-basis: 320px; }
+}
+@media (max-width: 359px) {
+  .enrolment-admin-shell > header { padding-inline: 9px; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .enrolment-admin-shell *, .enrolment-admin-shell *::before, .enrolment-admin-shell *::after { transition: none !important; }
+}

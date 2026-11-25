@@ -42,8 +42,10 @@ vi.mock('@/api/curriculum', () => ({
 }));
 
 import { ToastProvider } from '@/hooks/useToast';
+import { AuthContext, type RbacContextValue } from '@/hooks/useAuth.helpers';
 import { fetchInclusionStatus } from '@/api/wizardInclusion';
 import { WizardProvider } from '../WizardContext';
+import { useWizard } from '../WizardContext.helpers';
 import { WizardShell } from '../WizardShell';
 import { defaultLayout } from '../layout/resolve';
 import type { EnrolmentBoard, IlrForm, IlrLearnerDetails, PersonalDetails } from '../../types';
@@ -109,11 +111,13 @@ function renderShell(mode: 'learner' | 'staff', onNavigateStep = vi.fn(), childr
   layout.steps.find((step) => step.slug === 'personal-details')!.hidden = true;
   render(
     <ToastProvider>
-      <WizardProvider userId="20" board={BOARD} layout={layout}>
-        {/* This fixture explicitly removes Personal Details, so ILR is step 3. */}
-        <WizardShell currentIndex={2} mode={mode} onNavigateStep={onNavigateStep} onFinish={vi.fn()} />
-        {children}
-      </WizardProvider>
+      <AuthContext.Provider value={{ auth: { account: { role: mode === 'staff' ? 'staff' : 'learner' } } } as unknown as RbacContextValue}>
+        <WizardProvider userId="20" board={BOARD} layout={layout}>
+          {/* This fixture explicitly removes Personal Details, so ILR is step 3. */}
+          <WizardShell currentIndex={2} mode={mode} onNavigateStep={onNavigateStep} onFinish={vi.fn()} />
+          {children}
+        </WizardProvider>
+      </AuthContext.Provider>
     </ToastProvider>
   );
   return onNavigateStep;
@@ -139,6 +143,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('learner step gating', () => {
+  it('keeps Skills Radar and PLR/ULN controls in the same staff provider', async () => {
+    let controls!: ReturnType<typeof useWizard>;
+    function Probe() { controls = useWizard(); return null; }
+    fetchExtendedIlr.mockResolvedValue({ answers: null, draft: { plr: { uln: '', records: [] } },
+      meta: { updatedAt: '', canEditUln: true } });
+    render(<AuthContext.Provider value={{ auth: { account: { role: 'admin' } } } as unknown as RbacContextValue}>
+      <WizardProvider userId="20" board={BOARD} readOnlyLearnerSteps><Probe /></WizardProvider>
+    </AuthContext.Provider>);
+    await waitFor(() => expect(controls.canEditUln).toBe(true));
+    expect(controls.importPlrPdf).toEqual(expect.any(Function));
+    expect(controls.plrCheck).toEqual(expect.objectContaining({ checking: false, refresh: expect.any(Function) }));
+    expect(controls.retryRadarImpact).toEqual(expect.any(Function));
+    expect(controls.radarImpact).toBeNull();
+  });
+
   it('keeps the final three tabs locked while earlier learner steps are incomplete', async () => {
     renderShell('learner');
     await waitForHydration();

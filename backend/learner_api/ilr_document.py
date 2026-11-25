@@ -85,10 +85,16 @@ def _rpl_detail(learner_id):
 
 def _wizard_plr(learner_id):
     try:
+        from enrolment_api.plr_uln_storage import canonical_enabled, read_uln
+        if canonical_enabled():
+            from types import SimpleNamespace
+            with transaction.atomic(using='enrolment'):
+                return SimpleNamespace(uln=read_uln(None, learner_id))
         from enrolment_api.models import WizardPlr
         return WizardPlr.objects.filter(learner_id=learner_id).first()
-    except DatabaseError:
-        logger.exception('_wizard_plr: lookup failed')
+    except DatabaseError as exc:
+        from enrolment_api.wizard_steps import log_plr_error
+        log_plr_error(exc, 'ILR ULN read')
         return None
 
 
@@ -125,6 +131,7 @@ def _extended_ilr(learner_id):
 def derive_learner_details(learner):
     """Page 1 of the form. Blank where we hold no source, never guessed."""
     from enrolment_api.document_templates.learner_sources import working_hours_per_week
+    from enrolment_api.plr_uln_storage import canonical_enabled
 
     personal = _wizard_personal(learner.pk)
     rpl = _rpl_detail(learner.pk)
@@ -154,7 +161,8 @@ def derive_learner_details(learner):
 
     return {
         "learnerReferenceNumber": _s(getattr(learner, "reference_number", "")),
-        "uln": _s(getattr(rpl, "uln", "")) or _s(getattr(plr, 'uln', '')),
+        "uln": (_s(getattr(plr, 'uln', '')) if canonical_enabled()
+                else _s(getattr(rpl, "uln", "")) or _s(getattr(plr, 'uln', ''))),
         "familyName": last,
         "givenNames": first,
         "dateOfBirth": _iso(getattr(personal, "date_of_birth", None)) or _s(learner.date_of_birth),

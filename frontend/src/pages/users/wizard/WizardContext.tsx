@@ -11,6 +11,7 @@ import { uploadEnrolmentDocument } from '@/api/enrolmentDocuments';
 import { fetchKsbProfile } from '@/api/curriculum';
 import { fetchWizardLayout, peekWizardLayout } from '@/api/wizardLayout';
 import { fetchInclusionStatus } from '@/api/wizardInclusion';
+import { importPlrPdf } from '@/api/plrPdfPreview';
 import { ilrDocumentBlob, ilrDocumentFilename } from './steps/ilrDocument';
 import { layoutForLearner, resolveLayout, visibleSteps } from './layout/resolve';
 import { WizardTextsContext } from './layout/textsContext';
@@ -190,6 +191,8 @@ export function WizardProvider({
   children: ReactNode;
 }) {
   const kindForSeed: LearnerKind = isCommercial ? 'commercial' : 'apprenticeship';
+  const importTarget = useRef(`${kindForSeed}/${userId}`);
+  importTarget.current = `${kindForSeed}/${userId}`;
   /**
    * The saved answers, if they are already in memory.
    *
@@ -200,6 +203,9 @@ export function WizardProvider({
    * "Loading your answers…" for a draft that was never actually missing.
    */
   const seed = peekExtendedIlr(kindForSeed, userId);
+  const [ulnAllowed, setUlnAllowed] = useState(seed?.meta.canEditUln === true);
+  const ulnBaseline = useRef(seed?.draft?.plr?.uln ?? '');
+  const canEditUln = readOnlyLearnerSteps && ulnAllowed;
 
   // `saved` is what the server holds; `filled` adds the record's values to its
   // blanks. Kept apart so the filled-in values count as unsaved (see
@@ -236,6 +242,25 @@ export function WizardProvider({
   // A cache hit means the answers are already in `draft`, so there is nothing to
   // wait for; the effect below still runs and is a no-op on the same payload.
   const [hydrated, setHydrated] = useState(Boolean(seed));
+  const [plrChecking, setPlrChecking] = useState(false);
+  const plrRetrying = useRef(false);
+  const plrCheck = useMemo(() => ({
+    checking: plrChecking,
+    refresh: () => {
+      if (plrRetrying.current) return;
+      plrRetrying.current = true;
+      setPlrChecking(true);
+      fetchExtendedIlr(kindForSeed, userId, { force: true }).then((res) => {
+        const plr = res.draft?.plr;
+        if (!plr || plr.loadError || !Array.isArray(plr.records)) throw new Error('PLR unavailable');
+        ulnBaseline.current = plr.uln;
+        setUlnAllowed(res.meta.canEditUln === true);
+        setDraft((prev) => ({ ...prev, plr: { ...plr, loadError: undefined } }));
+      }).catch(() => {
+        setDraft((prev) => ({ ...prev, plr: { ...prev.plr, loadError: 'Personal Learning Record could not be loaded. Please retry.' } }));
+      }).finally(() => { plrRetrying.current = false; setPlrChecking(false); });
+    },
+  }), [kindForSeed, userId, plrChecking]);
   /** Whether the programme's competencies have been seeded (or settled as none). */
   const [ksbsSettled, setKsbsSettled] = useState(false);
   const [radarProfile, setRadarProfile] = useState<{ programme: string; ksbs: Ksb[] | null; error: string }>({ programme: '', ksbs: null, error: '' });
@@ -349,6 +374,8 @@ export function WizardProvider({
       .then((res) => {
         loadFailed.current = false;
         if (cancelled || (!res.answers && !res.draft && !res.prefill)) return;
+        setUlnAllowed(res.meta.canEditUln === true);
+        if (res.draft?.plr && !res.draft.plr.loadError) ulnBaseline.current = res.draft.plr.uln ?? '';
         setDraft((prev) => {
           const server = mergeSaved(initial.filled, res);
           const merged = preserveEdits(initial.filled, prev, server);
@@ -570,11 +597,33 @@ export function WizardProvider({
       radarImpact,
       radarImpactError,
       retryRadarImpact: () => setImpactRetry((value) => value + 1),
+      importPlrPdf: (file, enteredUln, signal) => {
+        if (!canEditUln || draft.plr.loadError) return Promise.reject(new Error('PLR import is not available right now.'));
+        const target = `${kind}/${userId}`;
+        const operation = saveQueue.current.catch(() => {}).then(async () => {
+          const result = await importPlrPdf(kind, userId, file, enteredUln, signal);
+          if (importTarget.current === target && !signal.aborted) {
+            const persistedIds = new Set(lastSavedDraft.current?.plr.records.map((record) => record.id) ?? []);
+            const returnedIds = new Set(result.plr.records.map((record) => record.id));
+            ulnBaseline.current = result.plr.uln;
+            if (lastSavedDraft.current) lastSavedDraft.current = { ...lastSavedDraft.current, plr: result.plr };
+            setDraft((current) => {
+              const pending = current.plr.records.filter((record) => record.recordType === 'Manual' && !persistedIds.has(record.id) && !returnedIds.has(record.id));
+              return { ...current, plr: pending.length ? { ...result.plr, records: [...result.plr.records, ...pending] } : result.plr };
+            });
+          }
+          return result;
+        });
+        saveQueue.current = operation.then(() => undefined, () => undefined);
+        return operation;
+      },
+      canEditUln,
       suitability,
       modules: apmStaffReview ? { ...modules, data: radarModulesData, error: radarModulesError } : modules,
       moduleSaveQueue,
       readOnly: readOnlyLearnerSteps,
       setSection: (key, val) => {
+        if (key === 'plr' && draft.plr.loadError) return;
         if ((ilrFinalisedAt || ilrLegacyReadOnly) && !isCommercial && !readOnlyLearnerSteps && (key === 'personalDetails' || key === 'ilrDetails')) return;
         if (key === 'programmeModules') { moduleEditRef.current += 1; setModuleEditVersion(moduleEditRef.current); }
         setDraft((prev) => ({ ...prev, [key]: val }));
@@ -603,12 +652,20 @@ export function WizardProvider({
       },
       saveIlr: async (options = {}) => {
         if (!hydrated || loadFailed.current) throw new Error('Your saved answers could not be loaded. Refresh and try again before saving.');
+        if (options.submitted && draft.plr.loadError) throw new Error(draft.plr.loadError);
+        if (options.plrRecordChange && (!canEditUln || draft.plr.loadError)) throw new Error('PLR records cannot be changed right now.');
         const saving = draft;
+        const requestedUlnBaseline = ulnBaseline.current;
         const operation = saveQueue.current.catch(() => {}).then(async () => {
+          const ulnUpdate = canEditUln && !saving.plr.loadError && saving.plr.uln !== requestedUlnBaseline && saving.plr.uln !== ulnBaseline.current
+            ? { value: saving.plr.uln, expected: requestedUlnBaseline } : undefined;
+          if (ulnUpdate && ulnUpdate.value !== '' && !/^[0-9]{10}$/.test(ulnUpdate.value)) {
+            throw new Error('ULN must be empty or contain exactly 10 digits.');
+          }
           // Nothing has changed since the last write — moving off a step the
           // learner didn't touch costs no request and shows no spinner.
           const mustRecordVersion = Boolean(options.skillsRadarCheckpoint || options.submitted);
-          if (!options.finalizeIlr && !mustRecordVersion && lastSavedDraft.current && Object.keys(saving).every((key) =>
+          if (!options.finalizeIlr && !options.plrRecordChange && !mustRecordVersion && lastSavedDraft.current && Object.keys(saving).every((key) =>
             key === 'programmeModules' || key === 'programmeModulesCompletion' || saving[key as keyof WizardDraft] === lastSavedDraft.current?.[key as keyof WizardDraft])) return;
           // Captured before the await: the learner can keep typing while the
           // request is in flight, and marking *that* newer draft saved would
@@ -619,6 +676,8 @@ export function WizardProvider({
             // existing wizard persistence and projection workflow.
             const { ilr, ...savedRest } = saving;
             const rest: Partial<typeof savedRest> = { ...savedRest };
+            if (saving.plr.loadError) delete rest.plr;
+            else if (rest.plr) rest.plr = { ...rest.plr, records: rest.plr.records.filter((record) => record.recordType !== 'Imported') };
             // Read from the Safeguarding database on every open; never stored.
             delete rest.inclusion;
             delete rest.programmeSuitability;
@@ -642,8 +701,23 @@ export function WizardProvider({
               skillsRadarCheckpoint: Boolean(options.skillsRadarCheckpoint),
               submitted: Boolean(options.submitted),
               finalizeIlr: Boolean(options.finalizeIlr),
+              ...(ulnUpdate ? { ulnUpdate } : {}),
+              ...(options.plrRecordChange ? { plrRecordChange: options.plrRecordChange } : {}),
             });
             lastSavedDraft.current = saving;
+            if (res.draft?.plr && !res.draft.plr.loadError) {
+              const savedPlr = res.draft.plr;
+              const sentIds = new Set(saving.plr.records.map((record) => record.id));
+              lastSavedDraft.current = { ...saving, plr: savedPlr };
+              setDraft((current) => ({ ...current, plr: current.plr === saving.plr ? savedPlr : {
+                ...current.plr, records: [...savedPlr.records, ...current.plr.records.filter((record) => !sentIds.has(record.id) && !savedPlr.records.some((saved) => saved.id === record.id))],
+              } }));
+            }
+            if (ulnUpdate && res.draft?.plr && !res.draft.plr.loadError) ulnBaseline.current = res.draft.plr.uln;
+            if (res.draft?.plr?.loadError) {
+              const loadError = res.draft.plr.loadError;
+              setDraft((current) => ({ ...current, plr: { ...current.plr, loadError } }));
+            }
             setIlrSavedAt(res.meta.updatedAt);
             setIlrFinalisedAt(res.meta.ilrFinalisedAt ?? '');
             setIlrLegacyReadOnly(res.meta.ilrLegacyReadOnly ?? false);
@@ -682,8 +756,9 @@ export function WizardProvider({
       },
       ilrFiling,
       inclusionCheck,
+      plrCheck,
     }),
-    [userId, isCommercial, board, readOnlyLearnerSteps, draft, layout, publishedVersion, publishedLayoutToken, steps, completed, kind, ilrSaving, ilrSavedAt, ilrFinalisedAt, ilrLegacyReadOnly, hydrated, ksbsSettled, impactSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, radarImpact, radarImpactError, effectiveRadarIds, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
+    [userId, isCommercial, board, readOnlyLearnerSteps, draft, canEditUln, layout, publishedVersion, publishedLayoutToken, steps, completed, kind, ilrSaving, ilrSavedAt, ilrFinalisedAt, ilrLegacyReadOnly, hydrated, ksbsSettled, impactSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, plrCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, radarImpact, radarImpactError, effectiveRadarIds, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
   );
   moduleWriter.current = value.saveModules;
 
