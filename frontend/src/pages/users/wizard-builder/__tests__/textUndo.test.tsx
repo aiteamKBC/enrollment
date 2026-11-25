@@ -43,10 +43,11 @@ describe('the history rules', () => {
 });
 
 /** The editor wired to state, as the builder wires it. */
-function Harness({ slotKey }: { slotKey: string }) {
+function Harness({ slotKey, collapsiblePreview = false }: { slotKey: string; collapsiblePreview?: boolean }) {
   const [texts, setTexts] = useState<Record<string, string> | undefined>(undefined);
   return (
     <TextEditor
+      collapsiblePreview={collapsiblePreview}
       slot={TEXT_SLOTS[slotKey]}
       texts={texts}
       onChange={(v) => setTexts((t) => {
@@ -60,6 +61,22 @@ function Harness({ slotKey }: { slotKey: string }) {
 }
 
 describe('undo in the wording editor', () => {
+  it('keeps live wording in the builder-only collapsible preview and preserves undo', async () => {
+    const { container } = render(<Harness slotKey="block.introduction.body" collapsiblePreview />);
+    const body = screen.getByLabelText('Page text');
+    const preview = container.querySelector('details')!;
+    expect(preview).not.toHaveAttribute('open');
+    await userEvent.clear(body);
+    await userEvent.type(body, 'Updated preview');
+    await userEvent.click(screen.getByText('PREVIEW'));
+    expect(preview).toHaveAttribute('open');
+    expect(preview).toHaveTextContent('Updated preview');
+    await userEvent.click(screen.getByRole('button', { name: 'Undo change to Page text' }));
+    expect(preview).not.toHaveTextContent('Updated preview');
+    await userEvent.click(screen.getByText('PREVIEW'));
+    expect(preview).not.toHaveAttribute('open');
+  });
+
   it('Ctrl+Z takes back typing and Ctrl+Y puts it back', async () => {
     render(<Harness slotKey="block.introduction.title" />);
     const box = screen.getByLabelText('Heading');

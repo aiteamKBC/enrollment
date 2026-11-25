@@ -25,6 +25,8 @@ from django.views.decorators.csrf import csrf_exempt
 from learner_api.models import CommercialUser, EnrolmentUser
 
 from .auth import enrolment_login_required
+from .plr_uln import can_edit_uln, valid_uln, reserve_uln, UlnAssignmentError
+from .plr_record_changes import DELETED_KEY, SERVER_PLR_KEYS, RecordChangeError, apply_change
 from .models import ExtendedIlr, WizardIlrLearnerDetails
 from .ilr_finalisation import legacy_review_required, published_ilr_custom_keys, signed_snapshot, validate_finalisation
 from .ilr_health import validate_ilr_additions
@@ -35,6 +37,9 @@ from .wizard_steps import (
     project_draft,
     read_ilr_details,
     read_projection,
+    read_plr,
+    log_plr_error,
+    PLR_LOAD_ERROR,
     without_ilr_details,
 )
 from .learner_profile_fields import clean_profile, transport_profile, without_profile_fields
@@ -96,7 +101,7 @@ def _next_of_kin_state(answers):
 def _payload(row):
     return {
         "answers": row.answers or {},
-        "draft": row.wizard_draft or {},
+        "draft": {key: value for key, value in (row.wizard_draft or {}).items() if key not in SERVER_PLR_KEYS},
         "meta": {
             "learnerKind": row.learner_kind,
             "learnerId": row.learner_id,
@@ -143,6 +148,8 @@ def read_extended_ilr(kind, learner_id, learner_name, show_signed_snapshot=False
     which the caller is expected to turn into its own error response.
     """
     payload = _read_extended_ilr_row(kind, learner_id, learner_name)
+    plr = read_plr(kind, int(learner_id))
+    payload['draft'] = {**(payload.get('draft') or {}), 'plr': plr}
     # The ILR Learner Details step lives in its own table, never in this row's
     # draft snapshot, so it is read from there and handed back alongside.
     details = read_ilr_details(kind, int(learner_id))
@@ -220,7 +227,9 @@ def extended_ilr(request, kind, learner_id):
     if request.method == "GET":
         try:
             own = getattr(getattr(request, 'login_account', None), 'role', None) == 'learner'
-            return JsonResponse(read_extended_ilr(kind, learner_id, learner_name, own, learner))
+            payload = read_extended_ilr(kind, learner_id, learner_name, own, learner)
+            payload['meta']['canEditUln'] = can_edit_uln(request)
+            return JsonResponse(payload)
         except DatabaseError:
             return _error('Your answers could not be loaded. Please try again.', 503)
 
@@ -235,6 +244,25 @@ def extended_ilr(request, kind, learner_id):
             return _error("Request body must be valid JSON.", 400)
         if not isinstance(body, dict):
             return _error("Request body must be a JSON object.", 400)
+        uln_update = body.get('ulnUpdate')
+        record_change = body.get('plrRecordChange')
+        if 'plrRecordChange' in body:
+            if not can_edit_uln(request):
+                return _error('Only an authorized enrolment Admin can edit or delete PLR records.', 403)
+            if (not isinstance(record_change, dict) or record_change.get('action') not in ('edit', 'delete')
+                    or not isinstance(record_change.get('id'), str) or not record_change['id']
+                    or not isinstance(record_change.get('expected'), dict)
+                    or not isinstance(body.get('draft'), dict) or not isinstance(body['draft'].get('plr'), dict)):
+                return _error('Provide a valid PLR record operation.', 400)
+        if 'ulnUpdate' in body:
+            if not can_edit_uln(request):
+                return _error('Only an authorized enrolment Admin can update the ULN.', 403)
+            if (not isinstance(uln_update, dict) or not valid_uln(uln_update.get('value'))
+                    or not isinstance(uln_update.get('expected'), str)):
+                return _error('ULN must be empty or contain exactly 10 digits.', 400)
+            if (not isinstance(body.get('draft'), dict) or not isinstance(body['draft'].get('plr'), dict)
+                    or not isinstance(body['draft']['plr'].get('records'), list)):
+                return _error('Load the Personal Learning Record before updating its ULN.', 400)
 
         # `answers` is the ILR step and is optional, mirroring `draft` below: a
         # client that only wants to save the other steps omits it, and the
@@ -255,6 +283,8 @@ def extended_ilr(request, kind, learner_id):
         draft = body.get("draft")
         if draft is not None and not isinstance(draft, dict):
             return _error("'draft' must be a JSON object.", 400)
+        if draft is not None:
+            draft = {key: value for key, value in draft.items() if key not in SERVER_PLR_KEYS}
 
         layout_version = body.get("layoutVersion")
         if layout_version is not None and (not isinstance(layout_version, int) or isinstance(layout_version, bool) or layout_version < 1):
@@ -308,6 +338,27 @@ def extended_ilr(request, kind, learner_id):
 
         try:
             with transaction.atomic(using="enrolment"):
+                plr_error = None
+                if uln_update is not None:
+                    reserve_uln(uln_update['value'], int(learner_id))
+                if uln_update is not None or record_change is not None:
+                    # Serialize compare-and-update against the selected learner.
+                    learner = model.objects.select_for_update().get(pk=learner_id)
+                plr_state = read_plr(kind, int(learner_id))
+                if plr_state.get('loadError'):
+                    plr_error = plr_state['loadError']
+                if record_change is not None and (plr_error or (draft or {}).get('plr', {}).get('loadError')):
+                    return _error(PLR_LOAD_ERROR, 503)
+                if uln_update is not None:
+                    if plr_error or (draft or {}).get('plr', {}).get('loadError'):
+                        return _error(PLR_LOAD_ERROR, 503)
+                    if plr_state['uln'] != uln_update['expected']:
+                        return _error('The ULN has changed. Reload the enrolment page before updating it.', 409)
+                if isinstance((draft or {}).get('plr'), dict) and not plr_error:
+                    # Ignore stale/forged ULNs in ordinary drafts from either interface.
+                    draft = {**draft, 'plr': {**draft['plr'], 'uln': uln_update['value'] if uln_update else plr_state['uln']}}
+                if submitted and plr_error:
+                    return _error(PLR_LOAD_ERROR, 503)
                 layout_snapshot = None
                 if layout_version is not None:
                     with connections["enrolment"].cursor() as cursor:
@@ -370,6 +421,11 @@ def extended_ilr(request, kind, learner_id):
                 if draft is not None:
                     stored_row = ExtendedIlr.objects.filter(learner_kind=kind, learner_id=learner_id).first()
                     previous = (stored_row.wizard_draft or {}) if stored_row else {}
+                    deleted_records = previous.get(DELETED_KEY) or {}
+                    # PLR has its own savepoint. A failed read/write must never
+                    # turn an unavailable collection into a replacement list.
+                    if isinstance(draft.get('plr'), dict) and draft['plr'].get('loadError'):
+                        plr_error = PLR_LOAD_ERROR
                     history = previous.get(HISTORY_KEY) or []
                     if not learner_write and isinstance(draft.get(ILR_DETAILS_KEY), dict):
                         try:
@@ -391,6 +447,32 @@ def extended_ilr(request, kind, learner_id):
                             stored = {**stored, 'skillsRadar': radar}
                     from .skills_radar.service import prepare_answers
                     prepare_answers(kind, learner, draft, stored)
+                    if 'plr' in draft and not plr_error:
+                        try:
+                            with transaction.atomic(using='enrolment'):
+                                # Re-read under the learner lock: another Admin may have
+                                # changed a record after this browser loaded its draft.
+                                canonical = read_plr(kind, int(learner_id))
+                                if canonical.get('loadError'):
+                                    raise DatabaseError('PLR unavailable')
+                                plr_projection = {key: value for key, value in draft['plr'].items() if key != 'uln'}
+                                if uln_update is not None:
+                                    plr_projection['uln'] = uln_update['value']
+                                trusted_types = {r['id']: r.get('recordType') or 'Manual' for r in (previous.get('plr') or {}).get('records', []) if isinstance(r, dict) and isinstance(r.get('id'), str)}
+                                project_draft(kind, int(learner_id), {'plr': plr_projection}, plr_deleted_refs=deleted_records, plr_record_types=trusted_types)
+                                canonical = read_plr(kind, int(learner_id))
+                                if canonical.get('loadError'):
+                                    raise DatabaseError('PLR unavailable')
+                                if record_change is not None:
+                                    canonical, deleted_records = apply_change(kind, int(learner_id), record_change, canonical, deleted_records)
+                                draft = {**draft, 'plr': canonical}
+                        except DatabaseError as exc:
+                            log_plr_error(exc, 'save')
+                            plr_error = PLR_LOAD_ERROR
+                    if (submitted or record_change is not None) and plr_error:
+                        raise DatabaseError('PLR unavailable during submission')
+                    if plr_error:
+                        draft = {key: value for key, value in draft.items() if key != 'plr'}
                     if signed or legacy:
                         merged = {**previous, **without_ilr_details(draft)}
                         if 'custom' in draft:
@@ -398,6 +480,13 @@ def extended_ilr(request, kind, learner_id):
                         defaults["wizard_draft"] = merged
                     else:
                         defaults["wizard_draft"] = without_ilr_details(draft)
+                    if 'plr' not in draft and 'plr' in previous:
+                        defaults['wizard_draft'] = {**defaults['wizard_draft'], 'plr': previous['plr']}
+                    for key in SERVER_PLR_KEYS:
+                        if key in previous:
+                            defaults['wizard_draft'] = {**defaults['wizard_draft'], key: previous[key]}
+                    if deleted_records:
+                        defaults['wizard_draft'] = {**defaults['wizard_draft'], DELETED_KEY: deleted_records}
                 row, _ = ExtendedIlr.objects.update_or_create(
                     learner_kind=kind,
                     learner_id=learner_id,
@@ -411,7 +500,7 @@ def extended_ilr(request, kind, learner_id):
                 # Same transaction as the document, so the queryable per-step
                 # tables can never disagree with the draft they came from.
                 if draft is not None:
-                    project_draft(kind, int(learner_id), draft)
+                    project_draft(kind, int(learner_id), {key: value for key, value in draft.items() if key != 'plr'})
                     # The wizard builder's custom fields, into their own columns.
                     # Conditions on Extended ILR questions read the stored answers.
                     project_custom_fields(kind, int(learner_id), draft, answers=row.answers, layout=layout_snapshot)
@@ -449,12 +538,17 @@ def extended_ilr(request, kind, learner_id):
                         )
         except DatabaseError:
             return _error('Your answers could not be saved. Please try again.', 503)
+        except RecordChangeError as exc:
+            return _error(str(exc), exc.status)
+        except UlnAssignmentError as exc:
+            return _error(str(exc), 409)
         except LayoutError as exc:
             return _error(str(exc), 409)
         except CatalogueError as exc:
             return _error(str(exc), 409)
 
         response = _payload(row)
+        response['meta']['canEditUln'] = can_edit_uln(request)
         if 'meta' in response and learner_write:
             response['meta']['ilrFinalisedAt'] = (snapshot['finalisedAt'] if finalise
                                                    else signed.get('finalisedAt', '') if signed else '')
@@ -472,6 +566,8 @@ def extended_ilr(request, kind, learner_id):
                 stored = {**stored, 'personalDetails': {**(stored.get('personalDetails') or {}),
                                                        **transport_profile(profile)}}
             response['draft'] = stored
+        if plr_error:
+            response['draft'] = {**(response.get('draft') or {}), 'plr': {'loadError': plr_error}}
         return JsonResponse(response)
 
     return _error("Method not allowed.", 405)

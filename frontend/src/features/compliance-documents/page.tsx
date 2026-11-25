@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FileText } from 'lucide-react';
+import { ChevronRight, Eye, FileText, History, Info, Layers, List, Pencil, Search } from 'lucide-react';
+import './documentsBuilder.css';
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { Modal } from '@/pages/users/components/Modal';
 import { btnPrimary, btnSecondary, inputClass } from '@/pages/users/components/ui';
@@ -118,37 +119,45 @@ export default function ComplianceDocumentsBuilder() {
   const selectedNative = nativeBlocks.find((b) => b.source === nativeSource) || nativeBlocks[0];
   const nativeAlreadyPresent = Boolean(selectedNative && content?.blocks.some((b) => b.type === 'native' && b.source === selectedNative.source && questionFields(b, content.documentKey).length));
   return <WorkspaceShell role="compliance" roleLabel="Enrolment" navItems={[]} pageTitle="Documents Builder" pageSubtitle="Manage versioned Compliance and Review document templates">
-    <div className="min-w-0 space-y-4 p-3 md:p-6">
-      <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">These documents may contain contractual or compliance wording. Obtain the appropriate organisational review before publishing. Publishing a template does not certify legal compliance. Previously issued and signed documents retain their original content.</p>
+    <div className="documents-builder-page min-w-0">
+      <section className="db-hero" aria-labelledby="db-hero-title">
+        <svg className="db-hero-wave" viewBox="0 0 1600 140" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="db-hero-fill"><stop stopColor="#f5eafa"/><stop offset="1" stopColor="#e6c9fa"/></linearGradient></defs><path fill="url(#db-hero-fill)" d="M0 0H760C910 0 930 140 1110 140C1340 140 1400 -20 1600 50V140H0Z"/><path fill="none" stroke="#efc04b" strokeWidth="3" d="M730 0H760C910 0 930 140 1110 140"/></svg>
+        <div className="db-hero-copy"><span className="db-hero-icon" aria-hidden="true"><FileText /></span><div><h2 id="db-hero-title">Create, version &amp; manage your document templates</h2><p>Maintain compliance and review documents, keep versions under control,<br className="db-desktop-break" /> and ensure consistency across programmes.</p></div></div>
+        <img className="db-hero-illustration" src="/images/documents/documents-builder-hero.png" alt="" />
+      </section>
+      <p className="db-warning rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><Info aria-hidden="true" />These documents may contain contractual or compliance wording. Obtain the appropriate organisational review before publishing. Publishing a template does not certify legal compliance. Previously issued and signed documents retain their original content.</p>
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       {message && <p role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm">{message}</p>}
       {!index && !error && <p role="status">Loading document templates…</p>}
       {index?.setupRequired && <p role="alert" className="rounded-lg border border-amber-200 p-3 text-sm">Document template storage has not been deployed. Current templates can be previewed. Ask the deployment owner to run <code>python manage.py apply_document_templates</code> before saving or publishing.</p>}
-      <section aria-label="Document templates" className="rounded-xl border bg-background-50 p-4">
-        <label className="block max-w-xl text-sm font-medium">Search document templates<input className={`${inputClass} mt-1`} value={query} onChange={(e) => search(e.target.value)} placeholder="Title, category or programme" /></label>
-        <div className="mt-4 grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
-          <nav aria-label="Document categories" className="min-w-0 space-y-3">
+      <section aria-label="Document templates" className="db-templates">
+        <div className="db-search-row"><label className="db-search"><span className="sr-only">Search document templates</span><Search aria-hidden="true" /><input className={inputClass} value={query} onChange={(e) => search(e.target.value)} placeholder="Search document templates..." /></label></div>
+        <div className="db-workspace grid min-w-0 gap-4">
+          <nav aria-label="Document categories" className="db-categories min-w-0 space-y-3">
+            <div className="db-categories-heading"><h2><Layers aria-hidden="true" />Document Categories</h2><span>{categories.length}</span></div>
             {categories.map((category) => {
               const total = index?.results.filter((template) => template.category === category.value).length ?? 0;
               const matching = filtered.filter((template) => template.category === category.value).length;
               const selected = selectedCategory === category.value;
               return <button key={category.value} type="button" aria-pressed={selected} aria-controls="document-category-content"
-                className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left ${selected ? 'border-primary-300 bg-primary-50 text-primary-800' : 'border-foreground-200 bg-background-50'}`}
+                className={`db-category flex w-full items-start gap-3 rounded-xl border p-4 text-left ${selected ? 'border-primary-300 bg-primary-50 text-primary-800' : 'border-foreground-200 bg-background-50'}`}
                 onClick={() => setSelectedCategory(category.value)}>
                 <FileText size={24} className="shrink-0 text-foreground-500" aria-hidden="true" />
                 <span className="min-w-0 flex-1"><span className="block font-semibold">{category.label}</span>
                   <span className="block text-sm text-foreground-500">{index ? `${total} ${total === 1 ? 'document' : 'documents'}${query ? ` / ${matching} matching` : ''}` : 'Loading documents...'}</span></span>
+                <ChevronRight className="db-category-chevron" aria-hidden="true" />
               </button>;
             })}
           </nav>
-          <section id="document-category-content" aria-label={selectedCategoryLabel ?? 'Document category content'} className="min-w-0 rounded-xl border border-foreground-200 bg-background-50 p-4">
+          <section id="document-category-content" aria-label={selectedCategoryLabel ?? 'Document category content'} className="db-document-panel min-w-0 rounded-xl border border-foreground-200 bg-background-50 p-4">
             {!selectedCategory ? <p className="py-8 text-center text-sm text-foreground-500">Select a document category</p> : <>
-              <h2 className="mb-4 font-semibold">{selectedCategoryLabel}</h2>
-              <div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm"><thead><tr><th className="p-2">Document title</th><th>Category</th><th>Programmes</th><th>Published version</th><th>Draft</th><th>Last updated</th><th>Actions</th></tr></thead><tbody>
-          {documents.map((t) => <tr key={t.templateId} className="border-t align-top"><th className="p-2"><div>{t.title}</div>{t.fullTitle && <div className="mt-1 text-xs font-normal text-foreground-600">PDF: {t.fullTitle}</div>}</th><td className="p-2">{t.category}</td><td className="p-2">{t.programmes.length ? t.programmes.map((p) => index!.programmes[p]).join(', ') : 'Shared — all programmes'}</td><td className="p-2">{t.dynamic ? 'Learner-specific' : t.publishedVersion ? t.publishedVersion.number ? `v${t.publishedVersion.number}` : 'Original' : 'Not published'}</td><td className="p-2">{t.dynamic ? 'Managed by report workflow' : t.draft ? 'Saved draft' : '—'}</td><td className="p-2">{t.dynamic ? 'Finalised report snapshot' : t.updatedAt ? new Date(t.updatedAt).toLocaleString('en-GB') : 'Original template'}</td><td className="p-2"><div className="flex flex-wrap gap-2">
-            {t.dynamic ? <span className="text-xs text-foreground-600">Open from the learner’s Suitability &amp; RPL Report tab</span> : <><button className={btnSecondary} disabled={busy} aria-label={`Edit ${t.title}`} onClick={() => void open(t.templateId)}>Edit</button>
-            <button className={btnSecondary} disabled={busy || !t.publishedVersion} aria-label={`Preview ${t.title}`} onClick={() => void previewSaved(t.templateId, t.publishedVersion?.id, true)}>Preview</button>
-            <button className={btnSecondary} disabled={busy} aria-label={`Version history for ${t.title}`} onClick={() => { setBusy(true); void api.templateHistory(t.templateId).then((data) => setHistory({ id: t.templateId, versions: data.results })).catch((e: Error) => setError(e.message)).finally(() => setBusy(false)); }}>Version history</button></>}
+              <header className="db-category-banner"><span className="db-category-icon" aria-hidden="true"><FileText /></span><div><h2>{selectedCategoryLabel}</h2><p>{documents.length} {documents.length === 1 ? 'document' : 'documents'}</p></div><svg viewBox="0 0 600 100" preserveAspectRatio="none" aria-hidden="true"><path fill="currentColor" d="M0 100Q120 15 260 80T480 60T600 35V100Z" /></svg></header>
+              <div className="db-list-heading"><List aria-hidden="true" />Document List</div>
+              <div className="db-table-scroll overflow-x-auto"><table className="db-table w-full min-w-[780px] text-left text-sm"><thead><tr><th className="p-2">Document title</th><th>Category</th><th>Programmes</th><th>Published version</th><th>Draft</th><th>Last updated</th><th>Actions</th></tr></thead><tbody>
+          {documents.map((t) => <tr key={t.templateId} className="border-t align-top"><th className="p-2"><div className="db-document-title"><FileText aria-hidden="true" />{t.title}</div>{t.fullTitle && <div className="mt-1 text-xs font-normal text-foreground-600">PDF: {t.fullTitle}</div>}</th><td className="p-2"><span className="db-category-badge">{t.category}</span></td><td className="p-2">{t.programmes.length ? t.programmes.map((p) => index!.programmes[p]).join(', ') : 'Shared — all programmes'}</td><td className="p-2"><span className="db-version-badge">{t.dynamic ? 'Learner-specific' : t.publishedVersion ? t.publishedVersion.number ? `v${t.publishedVersion.number}` : 'Original' : 'Not published'}</span></td><td className="p-2">{t.dynamic ? 'Managed by report workflow' : t.draft ? 'Saved draft' : '—'}</td><td className="p-2">{t.dynamic ? 'Finalised report snapshot' : t.updatedAt ? new Date(t.updatedAt).toLocaleString('en-GB') : 'Original template'}</td><td className="p-2"><div className="db-row-actions flex flex-wrap gap-2">
+            {t.dynamic ? <span className="text-xs text-foreground-600">Open from the learner’s Suitability &amp; RPL Report tab</span> : <><button className={btnSecondary} disabled={busy} title={`Edit ${t.title}`} aria-label={`Edit ${t.title}`} onClick={() => void open(t.templateId)}><Pencil aria-hidden="true" /></button>
+            <button className={btnSecondary} disabled={busy || !t.publishedVersion} title={`Preview ${t.title}`} aria-label={`Preview ${t.title}`} onClick={() => void previewSaved(t.templateId, t.publishedVersion?.id, true)}><Eye aria-hidden="true" /></button>
+            <button className={btnSecondary} disabled={busy} title={`Version history for ${t.title}`} aria-label={`Version history for ${t.title}`} onClick={() => { setBusy(true); void api.templateHistory(t.templateId).then((data) => setHistory({ id: t.templateId, versions: data.results })).catch((e: Error) => setError(e.message)).finally(() => setBusy(false)); }}><History aria-hidden="true" /></button></>}
           </div></td></tr>)}
         </tbody></table>{index && !documents.length && <p className="p-3 text-sm">{query ? 'No matching templates in this category.' : 'No templates in this category.'}</p>}</div>
             </>}

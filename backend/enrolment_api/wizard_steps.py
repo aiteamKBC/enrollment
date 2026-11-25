@@ -5,13 +5,12 @@ The draft document (ExtendedIlr.wizard_draft) stays the source of truth for
 so reporting doesn't have to dig through jsonb — see apply_enrolment_wizard_tables
 for the rationale.
 
-Writes are last-write-wins per learner and run inside the caller's transaction:
-the projection is rebuilt from the incoming draft, so it can never disagree with
-the document it came from. Child collections (KSBs, PLR records, policy acks) are
-upserted by their natural key and rows absent from the payload are deleted, so
-removing a PLR record in the UI removes it here too.
+Writes run inside the caller's transaction. KSBs and policy acknowledgements
+retain their existing replacement behavior. PLR drafts add entries only;
+authorized record operations own changes and deletions so stale drafts are safe.
 """
 import logging
+from django.db import DatabaseError, transaction
 
 from .ilr_health import working_hours_value
 from .models import (
@@ -23,9 +22,59 @@ from .models import (
     WizardPlrRecord,
     WizardPolicyAck,
     WizardSkillsRadar,
+    ExtendedIlr,
 )
+from .plr_record_changes import DELETED_KEY, IMPORT_KEY, merge_records
+from .plr_uln_storage import read_uln, write_uln
 
 logger = logging.getLogger(__name__)
+
+PLR_LOAD_ERROR = 'Personal Learning Record could not be loaded. Please retry.'
+
+
+def log_plr_error(exc, operation):
+    # Database messages/SQL parameters can contain learner data. Log diagnostics
+    # without the exception text; the request logger supplies the request ID.
+    cause = exc.__cause__
+    logger.error('PLR %s failed: error_type=%s sqlstate=%s', operation,
+                 type(exc).__name__, getattr(cause, 'sqlstate', None) or 'unknown')
+
+
+def read_plr(kind, learner_id):
+    """A failed section is explicit, never represented as an empty collection.
+
+    The savepoint also keeps a PostgreSQL error from poisoning a surrounding
+    enrolment transaction, so subsequent sections can still be read.
+    """
+    scope = {'learner_kind': kind, 'learner_id': learner_id}
+    try:
+        with transaction.atomic(using='enrolment'):
+            uln = read_uln(kind, learner_id)
+            records = list(WizardPlrRecord.objects.filter(**scope).order_by('id'))
+            stored = ExtendedIlr.objects.filter(**scope).first()
+            snapshot = (stored.wizard_draft or {}) if stored else {}
+            result = {
+                'uln': uln,
+                'records': [{
+                    'id': r.record_ref, 'placeOfStudy': r.place_of_study or '',
+                    'qualificationType': r.qualification_type or '', 'subject': r.subject or '',
+                    'level': r.level or '', 'awardDate': str(r.award_date) if r.award_date else '',
+                    'credits': r.credits if r.record_type == 'Imported' else r.credits or 0, 'grade': r.grade or '', 'recordType': r.record_type or '',
+                    'startDate': str(r.start_date) if r.start_date else '',
+                    'endDate': str(r.end_date) if r.end_date else '',
+                } for r in records],
+            }
+            result['records'] = merge_records((snapshot.get('plr') or {}).get('records') or [],
+                                               result['records'], snapshot.get(DELETED_KEY) or {})
+            sources = snapshot.get(IMPORT_KEY) or {}
+            for record in result['records']:
+                source = sources.get(record['id']) or {}
+                if source:
+                    record.update({key: source.get(key, '') for key in ('sourceSection', 'completionStatus', 'outcomeStatus')})
+            return result
+    except DatabaseError as exc:
+        log_plr_error(exc, 'read')
+        return {'loadError': PLR_LOAD_ERROR}
 
 # The 9-point self-assessment scale (see COMPETENCE_LEVELS in the frontend), plus
 # the three legacy 5-point values so assessments saved before the scale was
@@ -97,7 +146,7 @@ def _list(value):
     return value if isinstance(value, list) else []
 
 
-def project_draft(kind, learner_id, draft):
+def project_draft(kind, learner_id, draft, *, plr_deleted_refs=(), plr_record_types=None):
     """Write `draft` into the per-step tables for one learner.
 
     Absent sections are skipped, not cleared: a client that only sends
@@ -194,15 +243,21 @@ def project_draft(kind, learner_id, draft):
 
     if "plr" in draft:
         plr = _dict(draft["plr"])
-        WizardPlr.objects.update_or_create(**scope, defaults={"uln": _s(plr.get("uln"))})
+        # An omitted ULN means preserve it, rather than clear it on an unrelated save.
+        if 'uln' in plr:
+            write_uln(kind, learner_id, plr['uln'])
+        else:
+            WizardPlr.objects.update_or_create(**scope, defaults={})
 
-        seen = []
         for i, raw in enumerate(_list(plr.get("records"))):
             r = _dict(raw)
             # Fall back to the index so a record with no client id still gets a
             # stable key instead of colliding on ''.
             ref = _s(r.get("id")) or f"idx-{i}"
-            WizardPlrRecord.objects.update_or_create(
+            if ref in plr_deleted_refs:
+                continue
+            record_type = (plr_record_types.get(ref, 'Manual') if plr_record_types is not None else _s(r.get('recordType')) or 'Manual')
+            record, created = WizardPlrRecord.objects.get_or_create(
                 **scope,
                 record_ref=ref,
                 defaults={
@@ -213,23 +268,24 @@ def project_draft(kind, learner_id, draft):
                     "award_date": _date(r.get("awardDate")),
                     "credits": _int(r.get("credits")),
                     "grade": _s(r.get("grade")),
-                    "record_type": _s(r.get("recordType")),
+                    "record_type": record_type,
                     "start_date": _date(r.get("startDate")),
                     "end_date": _date(r.get("endDate")),
                 },
             )
-            seen.append(ref)
-        removed = WizardPlrRecord.objects.filter(**scope).exclude(record_ref__in=seen)
-        # A removed record takes its certificate files with it — once the delete
-        # has committed, so a rolled-back save never loses a file it kept.
-        orphaned = [item for row in removed for item in (row.evidence or []) if isinstance(item, dict)]
-        removed.delete()
-        if orphaned:
-            from django.db import transaction
-
-            from .learner_uploads import remove_blob
-
-            transaction.on_commit(lambda: [remove_blob(item) for item in orphaned], using="enrolment")
+            if not created and not record.record_type and not any(getattr(record, key) for key in (
+                    'subject', 'qualification_type', 'place_of_study', 'level', 'award_date', 'grade', 'credits', 'start_date', 'end_date')):
+                # Fill an evidence-only placeholder once, preserving its files.
+                defaults = {
+                    'place_of_study': _s(r.get('placeOfStudy')), 'qualification_type': _s(r.get('qualificationType')),
+                    'subject': _s(r.get('subject')), 'level': _s(r.get('level')), 'award_date': _date(r.get('awardDate')),
+                    'credits': _int(r.get('credits')), 'grade': _s(r.get('grade')), 'record_type': record_type,
+                    'start_date': _date(r.get('startDate')), 'end_date': _date(r.get('endDate')),
+                }
+                for key, value in defaults.items():
+                    setattr(record, key, value)
+                record.save(update_fields=[*defaults, 'updated_at'])
+        # Existing entries are changed only by explicit, authorized record operations.
 
     if "cvJob" in draft:
         cv = _dict(draft["cvJob"])
@@ -375,28 +431,7 @@ def read_projection(kind, learner_id):
             },
         }
 
-    plr = WizardPlr.objects.filter(**scope).first()
-    records = list(WizardPlrRecord.objects.filter(**scope).order_by("id"))
-    if plr or records:
-        out["plr"] = {
-            "uln": (plr.uln if plr else "") or "",
-            "records": [
-                {
-                    "id": r.record_ref,
-                    "placeOfStudy": r.place_of_study or "",
-                    "qualificationType": r.qualification_type or "",
-                    "subject": r.subject or "",
-                    "level": r.level or "",
-                    "awardDate": str(r.award_date) if r.award_date else "",
-                    "credits": r.credits or 0,
-                    "grade": r.grade or "",
-                    "recordType": r.record_type or "",
-                    "startDate": str(r.start_date) if r.start_date else "",
-                    "endDate": str(r.end_date) if r.end_date else "",
-                }
-                for r in records
-            ],
-        }
+    out['plr'] = read_plr(kind, learner_id)
 
     cv = WizardCvJob.objects.filter(**scope).first()
     if cv:

@@ -1,5 +1,4 @@
-"""PLR entries: certificate/evidence stored in Azure with its path on the
-Wizard_Plr_Records row, the new dates saved, and removed entries' files cleaned up.
+"""PLR evidence storage and dates; ordinary drafts never remove records or files.
 
 SimpleTestCase with the ORM and the Azure SDK mocked: no query ever reaches a
 database and no blob is written.
@@ -108,7 +107,7 @@ class PlrProjectionTests(SimpleTestCase):
         removed = MagicMock()
         removed.__iter__.return_value = iter(removed_rows)
         with patch.object(wizard_steps.WizardPlr.objects, "update_or_create"), \
-                patch.object(wizard_steps.WizardPlrRecord.objects, "update_or_create") as upsert, \
+                patch.object(wizard_steps.WizardPlrRecord.objects, "get_or_create", return_value=(SimpleNamespace(), True)) as upsert, \
                 patch.object(wizard_steps.WizardPlrRecord.objects, "filter") as rows, \
                 patch("django.db.transaction.on_commit") as on_commit, \
                 patch("enrolment_api.learner_uploads.remove_blob") as remove_blob:
@@ -130,16 +129,16 @@ class PlrProjectionTests(SimpleTestCase):
         # Files are written only by the evidence endpoint, never by a draft save.
         self.assertNotIn("evidence", defaults)
 
-    def test_removing_an_entry_deletes_its_files_after_commit(self):
+    def test_a_draft_omission_never_deletes_records_or_evidence(self):
         item = {"id": "f1", "container": "evidence-approved", "blobName": "b/gone"}
         _, removed, on_commit, remove_blob = self._project([SimpleNamespace(evidence=[item])])
 
-        removed.delete.assert_called_once()
-        on_commit.assert_called_once()
-        remove_blob.assert_called_once_with(item)
+        removed.delete.assert_not_called()
+        on_commit.assert_not_called()
+        remove_blob.assert_not_called()
 
     def test_removing_an_entry_without_files_schedules_nothing(self):
         _, removed, on_commit, _ = self._project([SimpleNamespace(evidence=[])])
 
-        removed.delete.assert_called_once()
+        removed.delete.assert_not_called()
         on_commit.assert_not_called()

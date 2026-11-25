@@ -29,6 +29,7 @@ from learner_api.models import CommercialUser, EnrolmentUser
 
 from .auth import enrolment_login_required
 from .extended_ilr import read_extended_ilr
+from .plr_uln import can_edit_uln
 
 KINDS = {"apprenticeship": EnrolmentUser, "commercial": CommercialUser}
 
@@ -71,6 +72,7 @@ def wizard_bootstrap(request, kind, learner_id):
                        and str(getattr(account, 'subject_id', '')) == str(learner.pk))
         board = to_board(learner)
         ilr = read_extended_ilr(kind, int(learner_id), str(learner.username or "").strip(), own_learner, learner)
+        ilr.setdefault('meta', {})['canEditUln'] = can_edit_uln(request)
         if kind == 'apprenticeship':
             saved = ilr.get('draft') or {}
             previously_signed = bool((saved.get('personalDetails') or {}).get('signature')

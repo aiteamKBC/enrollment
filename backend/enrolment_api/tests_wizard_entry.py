@@ -24,7 +24,8 @@ class TitleTests(SimpleTestCase):
              patch.object(ilr.ExtendedIlr.objects, 'filter', return_value=SimpleNamespace(first=lambda: None)), \
              patch.object(ilr.ExtendedIlr.objects, 'update_or_create', return_value=(MagicMock(), True)) as upsert, \
              patch.object(ilr, 'project_draft'), patch.object(ilr, 'project_custom_fields'), \
-             patch.object(ilr, '_payload', return_value={'draft': {}}):
+             patch.object(ilr, 'read_plr', return_value={'uln': '', 'records': []}), \
+             patch.object(ilr, '_payload', return_value={'draft': {}, 'meta': {}}):
             response = ilr.extended_ilr(request, kind=kind, learner_id=41)
         return response, learner, upsert
 

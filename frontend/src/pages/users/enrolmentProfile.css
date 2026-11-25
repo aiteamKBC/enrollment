@@ -1,0 +1,135 @@
+.enrolment-admin-content:has(> .enrolment-details-page) { background: radial-gradient(ellipse at 75% 20%, #f0e4fc88, transparent 65%), #f9f4ff; }
+.enrolment-admin-content:has(> .enrolment-details-page) > div:first-child { display: none; }
+.enrolment-details-page { width: 100%; max-width: none; padding: 14px 28px 28px; color: #291046; }
+.enrolment-details-page .ep-summary { display: grid; gap: 10px; min-width: 0; }
+.enrolment-details-page .ep-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 0 0 7px; }
+.enrolment-details-page .ep-page-heading h1 { margin: 0; color: #391257; font: 750 29px/1.2 Georgia, 'Times New Roman', serif; }
+.enrolment-details-page .ep-page-heading p { color: #736087; font-size: 14px; margin: 4px 0 0; }
+.enrolment-details-page .ep-page-heading > div:first-child::after { content: ''; display: block; width: 50px; height: 2px; margin-top: 10px; background: #dfb03b; }
+.enrolment-details-page .ep-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-right: 20px; }
+.enrolment-details-page .ep-page-actions > button { border: 1px solid #dfc7fa; border-radius: 14px; background: linear-gradient(#f9f2ff, #f0e4fc); padding: 10px 18px; color: #4e1b77; font-weight: 650; box-shadow: 0 2px 4px #5c328817; }
+.enrolment-details-page .ep-page-actions > span { border-radius: 14px; padding: 10px 18px; font-weight: 650; }
+.enrolment-details-page .ep-hero { display: flex; align-items: center; gap: 22px; position: relative; min-height: 145px; padding: 18px 28% 20px 38px; border-radius: 20px; background: linear-gradient(105deg, #472055, #804193 58%, #ad79bd 76%, #f1d9df); box-shadow: 0 5px 9px #60327c26; color: #fff; }
+.enrolment-details-page .ep-hero-wave { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; pointer-events: none; }
+.enrolment-details-page .ep-hero-artwork { position: absolute; right: 2.5%; bottom: 0; width: 26%; height: 145px; object-fit: contain; pointer-events: none; }
+.enrolment-details-page .ep-identity { display: flex; align-items: center; gap: 24px; position: relative; flex: 1.2; min-width: 0; }
+.enrolment-details-page .ep-avatar { display: grid; place-items: center; width: 92px; height: 92px; flex-shrink: 0; border: 1px solid #f6eaff; border-radius: 20px; background: linear-gradient(125deg, #faf2ff, #e9d7fa); color: #5a148a; font-size: 32px; font-weight: 750; }
+.enrolment-details-page .ep-identity h2 { font: 750 30px/1.2 Georgia, 'Times New Roman', serif; color: #fff; margin: 0; overflow-wrap: anywhere; }
+.enrolment-details-page .ep-identity p { color: #f9f0ff; font-size: 14px; line-height: 1.35; margin: 5px 0 9px; overflow-wrap: anywhere; }
+.enrolment-details-page .ep-active-learner { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 22px; color: #17723d; background: #dffbe7; font-size: 13px; font-weight: 650; }
+.enrolment-details-page .ep-active-learner > span { width: 8px; height: 8px; border-radius: 50%; background: #22c36b; }
+.enrolment-details-page .ep-hero-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: center; flex: 1.7; position: relative; }
+.enrolment-details-page .ep-hero-facts > div { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.enrolment-details-page .ep-hero-facts > div:first-child, .enrolment-details-page .ep-hero-facts > div:last-child { border-left: 1px solid #ead3ee66; padding-left: 24px; }
+.enrolment-details-page .ep-hero-facts svg { width: 29px; height: 29px; flex-shrink: 0; }
+.enrolment-details-page .ep-hero-facts span { display: block; font-size: 12px; color: #f5eafa; margin-bottom: 4px; }
+.enrolment-details-page .ep-hero-facts strong { font-size: 15px; font-weight: 650; line-height: 1.35; overflow-wrap: anywhere; }
+.enrolment-details-page .ep-summary-strip, .enrolment-details-page .ep-status-strip { display: grid; align-items: center; gap: 18px; border: 1px solid #e2cef7; border-radius: 16px; background: linear-gradient(115deg, #fffdfef5, #f4ebffdc); box-shadow: 0 3px 6px #6c3e941a; }
+.enrolment-details-page .ep-summary-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 10px 36px; }
+.enrolment-details-page .ep-summary-strip > div { padding-left: 24px; border-left: 1px solid #c9addc; }
+.enrolment-details-page .ep-summary-strip > div:first-child { padding-left: 16px; border-left: none; }
+.enrolment-details-page .ep-summary-strip > div > p:first-child { color: #69577d; font-size: 11px; margin-bottom: 4px; }
+.enrolment-details-page .ep-summary-strip > div > p:last-child { font-weight: 650; color: #29124b; font-size: 14px; }
+.enrolment-details-page .ep-status-strip { grid-template-columns: minmax(150px, .7fr) minmax(0, 3fr) auto; padding: 12px 36px; gap: 24px; }
+.enrolment-details-page .ep-programme-control { min-width: 0; }
+.enrolment-details-page .ep-programme-control select { max-width: 100%; width: 100%; min-width: 130px; background: #fff; border-color: #d5c6e5; color: #2f164c; }
+.enrolment-details-page .ep-dates-session { min-width: 0; }
+.enrolment-details-page .ep-dates-session > div { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.2fr); align-items: start; gap: 24px; }
+.enrolment-details-page .ep-dates-session form > div:first-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: end; }
+.enrolment-details-page .ep-dates-session form > div:first-child > button { grid-column: 1 / -1; justify-self: start; }
+.enrolment-details-page .ep-dates-session button[aria-haspopup] { min-width: 0; background: #fffaff; border-color: #e5d9f0; }
+.enrolment-details-page .ep-onboarding { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 9px 15px; border-radius: 22px; background: #f4eaff; border: 1px solid #cda6ee; color: #60269a; font-size: 12px; font-weight: 650; box-shadow: 0 2px 4px #673c8812; }
+.enrolment-details-page .ep-tabs { display: flex; gap: 12px; padding: 0; border: 1px solid #e4d1fa; border-radius: 22px; background: #fcf8ff; box-shadow: 0 2px 4px #6b388b0a; }
+.enrolment-details-page .ep-tabs > button { display: flex; align-items: center; justify-content: center; flex: 1 0 auto; min-height: 41px; padding: 9px 24px; border-radius: 22px; font-size: 14px; color: #4c1b73; }
+.enrolment-details-page .ep-tabs > button[aria-selected='true'] { background: linear-gradient(#a14cc2, #61118e); color: #fff; box-shadow: 0 3px 5px #652b8526; }
+.enrolment-details-page .ep-tabs > button > svg { width: 21px; height: 21px; }
+.enrolment-details-page .ep-tabs > button > span { font-size: 12px; padding: 1px 10px; color: #4b1d74; background: #eee2fb; border: 1px solid #e1d0f1; box-shadow: 0 1px 3px #63328612; }
+.enrolment-details-page .ep-overview-row { gap: 18px; align-items: stretch; }
+.enrolment-details-page .ep-card { border: 1px solid #ddc9f4; border-radius: 18px; background: linear-gradient(110deg, #fffdfef5, #f7f0ffed); box-shadow: 0 4px 8px #5c327e21; }
+.enrolment-details-page .ep-card > header { padding: 8px 18px; gap: 12px; border-color: #e6d8f5; }
+.enrolment-details-page .ep-card > header h3 { color: #43116f; font-size: 20px; font-weight: 750; letter-spacing: -.4px; text-transform: capitalize; }
+.enrolment-details-page .ep-card > header h3 > span:first-child { background: transparent; color: #6820a1; width: 33px; height: 33px; }
+.enrolment-details-page .ep-card > header h3 > span:first-child svg { width: 28px; height: 28px; stroke-width: 1.8; }
+.enrolment-details-page .ep-card > header h3 > span:nth-child(2) { white-space: normal; }
+.enrolment-details-page .ep-card > header > div > button { padding: 7px 12px; color: #32134e; border-color: #d9c9e9; border-radius: 10px; background: #fdfaff; box-shadow: 0 2px 4px #603b7f12; }
+.enrolment-details-page .ep-card > div { padding: 14px 20px; }
+.enrolment-details-page .ep-facts { gap: 12px 24px; }
+.enrolment-details-page .ep-facts dt { color: #685478; font-size: 11px; line-height: 1.3; }
+.enrolment-details-page .ep-facts dd { color: #261241; font-size: 13px; margin-top: 2px; line-height: 1.4; overflow-wrap: anywhere; }
+.enrolment-details-page .ep-facts dd > a { color: #6b16c5; }
+.enrolment-details-page .ep-contact-facts > div { display: grid; grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 0 9px; grid-column: auto; }
+.enrolment-details-page .ep-fact-icon { grid-column: 1; grid-row: 1 / 3; color: #6920a5; }
+.enrolment-details-page .ep-contact-facts dt { grid-column: 2; font-size: 13px; font-weight: 650; text-transform: none; letter-spacing: 0; color: #261241; }
+.enrolment-details-page .ep-contact-facts dd { grid-column: 2; font-size: 13px; }
+.enrolment-details-page .ep-contact-facts img { max-width: 100%; width: 165px; height: 42px; object-fit: contain; background: #fff; border-color: #dfd2ec; border-radius: 8px; padding: 3px; }
+.enrolment-details-page .ep-programme-facts { gap: 7px 22px; }
+.enrolment-details-page .ep-programme-facts > div { display: grid; grid-template-columns: minmax(90px, .85fr) minmax(0, 1.3fr); gap: 10px; grid-column: auto; }
+.enrolment-details-page .ep-programme-facts dt { text-transform: none; letter-spacing: 0; color: #25113c; font-weight: 650; font-size: 13px; }
+.enrolment-details-page .ep-programme-facts dd { font-size: 13px; margin: 0; }
+.enrolment-details-page .ep-programme-facts > [data-fact='Programme'] { order: 1; }
+.enrolment-details-page .ep-programme-facts > [data-fact='Cohort'] { order: 2; }
+.enrolment-details-page .ep-programme-facts > [data-fact='Type'] { order: 3; }
+.enrolment-details-page .ep-programme-facts > [data-fact='Cohort end'] { order: 4; }
+.enrolment-details-page .ep-programme-facts > [data-fact='Cohort start'] { order: 5; }
+.enrolment-details-page .ep-programme-facts > [data-fact='Onboarding'] { order: 6; }
+.enrolment-details-page .ep-programme-facts > [data-fact='Enrolled'] { order: 7; }
+.enrolment-details-page .ep-programme-facts > [data-fact='Onboarding completed'] { order: 9; }
+.enrolment-details-page .ep-overview-row:nth-of-type(2) .ep-card > div > div > div, .enrolment-details-page .ep-card[aria-label='Learner Team'] > div > div > div { border-color: #e3d4f4; border-radius: 14px; background: linear-gradient(#fcf8ff, #f6effe); box-shadow: 0 2px 4px #6331830a; }
+.enrolment-details-page .ep-card[aria-label='Learner Team'] select { width: 100%; max-width: none; color: #35164f; background: #fffaff; border-color: #d7c6e9; }
+.enrolment-details-page .ep-card[aria-label='Learner Team'] p { color: #3f2858; font-size: 13px; line-height: 1.4; }
+.enrolment-details-page .ep-card[aria-label='Learner Team'] > div > div > div { padding: 14px 16px; }
+.enrolment-details-page .ep-card[aria-label='Employer & Manager'] > div > div { gap: 22px; }
+.enrolment-details-page .ep-card[aria-label='Employer & Manager'] section { border-color: #e0cff2; border-radius: 14px; background: #fbf7ff; }
+.enrolment-details-page .ep-card[aria-label='Employer & Manager'] h4 { padding: 8px 18px; color: #43156b; font-size: 13px; background: #eee0fb; }
+.enrolment-details-page .ep-card[aria-label='Employer & Manager'] section > div { padding: 8px 18px; }
+.enrolment-details-page .ep-card[aria-label='Employer & Manager'] .ep-facts { gap: 7px; }
+.enrolment-details-page .ep-card[aria-label='Employer & Manager'] dt { font-size: 10px; }
+
+@media (min-width: 1024px) { .enrolment-details-page .ep-overview-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1450px) {
+  .enrolment-details-page .ep-hero { padding-left: 22px; gap: 18px; padding-right: 24%; }
+  .enrolment-details-page .ep-avatar { width: 74px; height: 80px; font-size: 28px; }
+  .enrolment-details-page .ep-identity { gap: 16px; }
+  .enrolment-details-page .ep-identity h2 { font-size: 26px; }
+  .enrolment-details-page .ep-hero-artwork { width: 23%; right: 1%; }
+  .enrolment-details-page .ep-hero-facts { gap: 12px; }
+  .enrolment-details-page .ep-hero-facts > div { gap: 8px; }
+  .enrolment-details-page .ep-hero-facts > div:first-child, .enrolment-details-page .ep-hero-facts > div:last-child { padding-left: 12px; }
+  .enrolment-details-page .ep-status-strip { padding-inline: 20px; gap: 18px; grid-template-columns: minmax(140px, .8fr) minmax(0, 3fr); }
+  .enrolment-details-page .ep-onboarding { grid-column: 1 / -1; justify-self: end; }
+  .enrolment-details-page .ep-dates-session > div { gap: 14px; }
+  .enrolment-details-page .ep-dates-session form > div:first-child { gap: 12px; }
+  .enrolment-details-page .ep-tabs { gap: 4px; }
+  .enrolment-details-page .ep-tabs > button { padding-inline: 15px; }
+}
+@media (max-width: 1023px) {
+  .enrolment-details-page .ep-hero { flex-wrap: wrap; padding: 22px 28% 22px 22px; }
+  .enrolment-details-page .ep-identity { flex: 1 1 100%; }
+  .enrolment-details-page .ep-hero-facts { flex: 1 1 100%; }
+  .enrolment-details-page .ep-hero-artwork { width: 27%; height: auto; }
+  .enrolment-details-page .ep-summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; }
+  .enrolment-details-page .ep-summary-strip > div { padding-left: 12px; }
+  .enrolment-details-page .ep-status-strip { grid-template-columns: minmax(0, 1fr); }
+  .enrolment-details-page .ep-onboarding { justify-self: start; }
+}
+@media (max-width: 640px) {
+  .enrolment-details-page { padding: 12px; }
+  .enrolment-details-page .ep-page-actions { padding: 0; gap: 8px; }
+  .enrolment-details-page .ep-page-actions > button, .enrolment-details-page .ep-page-actions > span { padding: 8px 12px; }
+  .enrolment-details-page .ep-page-heading h1 { font-size: 26px; }
+  .enrolment-details-page .ep-hero { padding: 20px; gap: 18px; }
+  .enrolment-details-page .ep-identity h2 { font-size: 26px; }
+  .enrolment-details-page .ep-hero-facts { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .enrolment-details-page .ep-hero-facts > div:first-child, .enrolment-details-page .ep-hero-facts > div:last-child { border-left: 0; padding-left: 0; }
+  .enrolment-details-page .ep-hero-artwork { position: relative; order: 3; width: 100%; height: 145px; right: auto; bottom: auto; }
+  .enrolment-details-page .ep-summary-strip { gap: 14px; }
+  .enrolment-details-page .ep-summary-strip > div { border: 0; padding: 0; }
+  .enrolment-details-page .ep-summary-strip > div:first-child { padding: 0; }
+  .enrolment-details-page .ep-status-strip { padding: 15px; }
+  .enrolment-details-page .ep-dates-session > div { grid-template-columns: minmax(0, 1fr); }
+  .enrolment-details-page .ep-dates-session form > div:first-child { grid-template-columns: minmax(0, 1fr); }
+  .enrolment-details-page .ep-card > header { padding: 10px 14px; }
+  .enrolment-details-page .ep-card > div { padding: 14px; }
+  .enrolment-details-page .ep-contact-facts, .enrolment-details-page .ep-programme-facts { grid-template-columns: minmax(0, 1fr); }
+  .enrolment-details-page .ep-card > div > div { grid-template-columns: minmax(0, 1fr); }
+}

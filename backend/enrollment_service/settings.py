@@ -46,6 +46,12 @@ if DEBUG:
 ENROLLMENT_SESSION_COOKIE_NAME = 'enrollment_session'
 LMS_URL = os.environ.get('LMS_URL', '').rstrip('/')
 ENROLLMENT_ONLY = True
+# The approved ULN expansion/reconciliation has been applied centrally.
+# New backends use canonical storage; explicit legacy mode is retained only for
+# a coordinated rollback (see sql/uln_created_users/README.md).
+ENROLMENT_ULN_STORAGE = os.environ.get('ENROLMENT_ULN_STORAGE', 'created_users')
+if ENROLMENT_ULN_STORAGE not in ('legacy', 'created_users'):
+    raise ImproperlyConfigured('ENROLMENT_ULN_STORAGE must be legacy or created_users.')
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Background LMS projections are not processes owned by this service.

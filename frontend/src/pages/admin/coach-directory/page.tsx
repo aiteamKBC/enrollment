@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Check, Copy, Link2, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
+import { ArrowUpRight, Check, Copy, Filter, Link2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import styles from './directory.module.css';
+import { BookingOptionIcon, DirectoryHero } from './directoryPresentation';
+import { matchesCoachFilter, type CoachFilter } from './directoryData';
 import { AdminPage } from '../_shared/AdminPage';
 import { bookingTypes, coachPagePath, deleteCoach, emptyLinks, listCoaches, saveCoach, type BookingLinks, type DirectoryCoach } from '@/api/coachBookingDirectory';
 
@@ -14,6 +16,7 @@ export default function CoachDirectoryPage({ workspaceRole = "admin" }: { worksp
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
+  const [coachFilter, setCoachFilter] = useState<CoachFilter>('all');
   const [editing, setEditing] = useState<{ id?: number; version?: number; name: string; links: BookingLinks } | null>(null);
   const [busy, setBusy] = useState(false);
   const nameInput = useRef<HTMLInputElement>(null);
@@ -51,8 +54,14 @@ export default function CoachDirectoryPage({ workspaceRole = "admin" }: { worksp
   return <AdminPage workspaceRole={workspaceRole} title="Coach directory" subtitle="Manage coach booking pages" icon="ri-team-line" heroTitle="Coach directory"
     heroBlurb="Manage public booking links for each coach. Super admins, enrolment and curriculum staff can add, edit or remove coaches."
     stats={[{ label: 'Coaches', value: coaches.length }]}
-    actions={<button className={primary} disabled={Boolean(editing) || busy} onClick={() => setEditing({ name: '', links: emptyLinks() })}><Plus size={18} aria-hidden="true" />Add coach</button>}>
+>
     <div className={styles.directory}>
+    <DirectoryHero coaches={loading || error ? null : coaches} />
+    <div className={styles.toolbar}>
+      <label className={styles.search}><Search size={19} aria-hidden="true" /><input aria-label="Search coaches" placeholder="Search coaches by name..." value={search} onChange={event => setSearch(event.target.value)} /></label>
+      <label className={styles.filter}><Filter size={18} aria-hidden="true" /><select aria-label="Filter coaches" value={coachFilter} onChange={event => setCoachFilter(event.target.value as CoachFilter)}><option value="all">All coaches ({coaches.length})</option><option value="with-links">With booking links</option><option value="without-links">Without booking links</option></select></label>
+      <div className={styles.addCoach}><button className={primary} disabled={Boolean(editing) || busy} onClick={() => setEditing({ name: '', links: emptyLinks() })}><Plus size={18} aria-hidden="true" />Add coach</button></div>
+    </div>
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{error}<button className={`${button} ml-4`} disabled={busy} onClick={() => setVersion(value => value + 1)}>Reload directory</button></div>}
     {notice && <p role="status" className="rounded-xl bg-green-50 p-4 text-green-900">{notice}</p>}
     {editing && <form aria-label="Coach editor" onSubmit={submit} className={styles.editor}>
@@ -63,15 +72,14 @@ export default function CoachDirectoryPage({ workspaceRole = "admin" }: { worksp
       <div className="flex justify-end gap-3"><button type="button" className={button} disabled={busy} onClick={() => { if (window.confirm('Discard changes to this coach?')) setEditing(null); }}>Cancel</button><button className={primary} disabled={busy}>{busy ? 'Saving...' : 'Save coach'}</button></div>
     </form>}
     <section className={styles.panel}>
-      <div className={styles.toolbar}><div className={styles.sectionTitle}><span className={styles.headingIcon}><Users size={23} aria-hidden="true" /></span><div><h2>Coach booking pages</h2><p>Share a page, manage links and keep booking options up to date.</p></div></div><label className={styles.search}><Search size={18} aria-hidden="true" /><input aria-label="Search coaches" placeholder="Search coaches" value={search} onChange={event => setSearch(event.target.value)} /></label></div>
-      {loading ? <p role="status" className={styles.empty}>Loading coaches...</p> : <div className={styles.grid}>{coaches.filter(coach => coach.name.toLowerCase().includes(search.toLowerCase())).map(coach => <article key={coach.id} className={styles.card}>
-        <div className={styles.cardHeading}><span className={styles.avatar} aria-hidden="true">{coach.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('')}</span><div><h3>{coach.name}</h3><p>{bookingTypes.filter(type => coach.links[type.key]).length} booking options</p></div><span className={styles.publicBadge}>Public page</span></div>
-        <div className={styles.pageAddress}><Link2 size={15} aria-hidden="true" /><span>{coachPagePath(coach.slug)}</span></div>
-        <ul className={styles.sessions} aria-label={`Booking options for ${coach.name}`}>{bookingTypes.map(type => <li key={type.key} data-available={Boolean(coach.links[type.key])}><span>{coach.links[type.key] ? <Check size={13} aria-hidden="true" /> : <span aria-hidden="true">–</span>}</span>{type.label}<span className={styles.srOnly}>{coach.links[type.key] ? ': Available' : ': Not available'}</span></li>)}</ul>
-        <Link className={`${primary} ${styles.openPage}`} to={coachPagePath(coach.slug)} target="_blank" rel="noopener noreferrer">Open booking page<ArrowUpRight size={18} aria-hidden="true" /></Link>
-        <div className={styles.cardActions}><button className={button} onClick={() => void copy(coach.slug)}><Copy size={15} aria-hidden="true" />Copy page link</button><button className={button} disabled={busy || Boolean(editing)} onClick={() => { setEditing({ ...coach, links: { ...emptyLinks(), ...coach.links } }); setNotice(''); }}><Pencil size={15} aria-hidden="true" />Edit</button><button className={`${button} ${styles.remove}`} disabled={busy || Boolean(editing)} onClick={() => void remove(coach)}><Trash2 size={15} aria-hidden="true" />Remove</button></div>
+      {loading ? <p role="status" className={styles.empty}>Loading coaches...</p> : <div className={styles.grid}>{coaches.filter(coach => coach.name.toLowerCase().includes(search.toLowerCase()) && matchesCoachFilter(coach, coachFilter)).map(coach => <article key={coach.id} className={styles.card}>
+        <div className={styles.cardHeading}><span className={styles.avatar} aria-hidden="true">{coach.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('')}</span><div><h3>{coach.name}</h3><p>{bookingTypes.filter(type => coach.links[type.key]).length} booking options</p></div><span className={styles.publicBadge}><Check size={12} aria-hidden="true" />Public page</span></div>
+        <div className={styles.pageAddress}><Link2 size={15} aria-hidden="true" /><span>{coachPagePath(coach.slug)}</span><button type="button" className={styles.addressCopy} aria-label={`Copy booking page link for ${coach.name}`} title="Copy booking page link" onClick={() => void copy(coach.slug)}><Copy size={16} aria-hidden="true" /></button></div>
+        <ul className={styles.sessions} aria-label={`Booking options for ${coach.name}`}>{bookingTypes.map(type => <li key={type.key} data-available={Boolean(coach.links[type.key])}><BookingOptionIcon type={type.key} /><span className={styles.availability}>{coach.links[type.key] ? <Check size={13} aria-hidden="true" /> : <span aria-hidden="true">–</span>}</span>{type.label}<span className={styles.srOnly}>{coach.links[type.key] ? ': Available' : ': Not available'}</span></li>)}</ul>
+
+        <div className={styles.cardActions}><Link className={`${primary} ${styles.openPage}`} to={coachPagePath(coach.slug)} target="_blank" rel="noopener noreferrer">Open booking page<ArrowUpRight size={18} aria-hidden="true" /></Link><button className={button} onClick={() => void copy(coach.slug)}><Copy size={15} aria-hidden="true" />Copy link</button><button className={button} disabled={busy || Boolean(editing)} onClick={() => { setEditing({ ...coach, links: { ...emptyLinks(), ...coach.links } }); setNotice(''); }}><Pencil size={15} aria-hidden="true" />Edit</button><button className={`${button} ${styles.remove}`} disabled={busy || Boolean(editing)} onClick={() => void remove(coach)}><Trash2 size={15} aria-hidden="true" />Remove</button></div>
       </article>)}</div>}
-      {!loading && !coaches.some(coach => coach.name.toLowerCase().includes(search.toLowerCase())) && <p className={styles.empty}>No coaches found.</p>}
+      {!loading && !coaches.some(coach => coach.name.toLowerCase().includes(search.toLowerCase()) && matchesCoachFilter(coach, coachFilter)) && <p className={styles.empty}>No coaches found.</p>}
     </section>
     </div>
   </AdminPage>;

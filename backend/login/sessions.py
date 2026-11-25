@@ -24,6 +24,7 @@ end can be told apart in aggregate: see ``expiry_reason``.
 from __future__ import annotations
 
 import logging
+import re
 
 from django.conf import settings
 from django.utils import timezone
@@ -419,17 +420,29 @@ def authenticate_request(request):
     setattr(request, RENEWED_UNTIL_ATTR, None)
 
     if session is not None:
+        preview_only = bool(re.fullmatch(
+            r'/enrolment_api/wizard/(?:apprenticeship|commercial)/[0-9]+/plr-pdf-preview/',
+            getattr(request, 'path_info', ''),
+        ))
         # The renewal, if any, has to reach the response: the cookie lifetime is
         # the other half of an expiry, and a row that says "another fortnight" is
         # worthless if the browser drops the cookie tonight.
-        setattr(request, RENEWED_UNTIL_ATTR, touch_session(session))
-        _refresh_staff_role(request.login_account)
+        if not preview_only:
+            setattr(request, RENEWED_UNTIL_ATTR, touch_session(session))
+            _refresh_staff_role(request.login_account)
+        else:
+            # Preview requests still apply current role/grant changes in memory,
+            # while their entire authentication path remains read-only.
+            _refresh_staff_role(request.login_account, persist=False)
 
     return request.login_account
 
 
-def _refresh_staff_role(account):
+def _refresh_staff_role(account, *, persist=True):
     """Re-derive a staff account's role from its current access grant.
+
+    Read-only PDF previews use persist=False to apply current permissions
+    without updating the account record.
 
     ``require_role`` has always documented that a demotion "takes effect on their
     next request, not only when they next sign in" — but nothing actually
@@ -470,7 +483,8 @@ def _refresh_staff_role(account):
         derived = role_for_staff(row.position, row.access)
         if derived != account.role:
             account.role = derived
-            account.save(update_fields=["role", "updated_at"])
+            if persist:
+                account.save(update_fields=["role", "updated_at"])
     except DatabaseError:
         account._staff_access_unavailable = True
     except Exception:  # noqa: BLE001 - never break authentication over this
