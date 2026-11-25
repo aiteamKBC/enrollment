@@ -3,7 +3,6 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth.helpers';
 import type { SidebarNavItem } from './Sidebar';
-import { hasOwnEnrolment } from '@/lib/enrollmentAccess';
 import styles from './EnrollmentShell.module.css';
 import './EnrollmentAdminChrome.css';
 import { usePendingSignatures } from '@/features/pending-signatures/usePendingSignatures';
@@ -35,7 +34,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const lastPathname = useRef(pathname);
-  const learner = auth.account?.role === 'learner' || Boolean(auth.account && hasOwnEnrolment(auth.account) && pathname.startsWith('/learner'));
+  const learner = auth.account?.role === 'learner';
   const employer = auth.account?.role === 'employer';
   const adminChrome = !learner && !employer;
   const commercial = (auth.account?.role === 'learner' ? auth.account.learnerType : auth.account?.learnerRecordKind) === 'commercial';
@@ -44,12 +43,11 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
     ...(!commercial ? [['/learner/onboarding', 'My enrolment'], ['/learner/onboarding/reviews', 'Reviews'], ['/learner/compliance-documents', 'Compliance documents']] : []),
     ['/learner/first-session', 'First learning session'], ['/lms?self=1', 'Continue to LMS'],
   ] : employer ? [[`/employers/${auth.account?.subjectId}/documents`, 'Documents to sign']] : [
-    ['/users', 'Users'], ['/users/eligibility-applications', 'Eligibility Applications'],
+    ['/users', 'Users'], ['/users/organisations', 'Organisations'], ['/users/eligibility-applications', 'Eligibility Applications'],
     ['/users/eligibility-builder', 'Eligibility Form Builder'], ['/users/wizard-builder', 'Enrolment Form Builder'],
     ...((isAdmin || auth.account?.role === 'admin') ? [['/users/programme-structure', 'Programme Structure']] : []),
     ['/users/compliance-documents', 'Documents'],
     ['/users/coach-directory', 'Coach Directory'], ['/users/first-sessions', 'First-Session Bookings'], ['/lms', 'Open LMS'],
-    ...(auth.account && hasOwnEnrolment(auth.account) ? [['/learner/home?self=1', 'My enrolment']] : []),
   ];
   const displayName = auth.account?.displayName?.trim() || 'Account';
   const nameParts = displayName.split(/\s+/).filter(Boolean);

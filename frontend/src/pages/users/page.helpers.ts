@@ -53,105 +53,23 @@ export function isLearnerRow(row: Pick<UserListRow, 'source'>): boolean {
  * the closest real equivalent — a learner's group is their cohort, an employer's
  * is the company they belong to.
  */
-/**
- * One row per person, not one row per record.
- *
- * A staff member or administrator who also studies a programme has BOTH a
- * `Staff_users` row and a `Created_users` row on the same address (see
- * login/learner_enrolment.py). Concatenating the three sources listed them
- * twice — the same human appearing as two users, each with half the truth.
- *
- * The learner record wins the row, because it is the one that carries the
- * programme, the learning plan and the enrolment actions the directory exists
- * to offer. The staff fields are merged in underneath, so nothing is lost and
- * the row still opens the person's staff record where that is what was clicked.
- *
- * Matched on the normalised email. That is what makes the two records the same
- * person in every other part of the platform — `existing_learner_record` looks
- * a learner up by address for exactly this reason — and a row with no address
- * cannot be matched to anything, so it is always kept as its own row.
- */
-/** The Type column for a person holding two records, e.g. "Admin · User".
- *
- * Distinct labels only, in the order the records were loaded, so somebody who
- * is both staff and a learner reads as both rather than as whichever record
- * happened to win the merge. */
-export function combinedType(a: DirectoryRow, b: DirectoryRow): string {
-  const labels: string[] = [];
-  for (const value of [a.type, b.type]) {
-    const label = (value || '').trim();
-    if (label && !labels.includes(label)) labels.push(label);
-  }
-  return labels.join(' · ');
-}
-
-
-/** `over` wins, except where it has nothing to say.
- *
- * Merging two records of the same person must not let one record's empty
- * fields erase the other's real ones: a learner record has no position or
- * access, and a staff row has no programme or learning plan. Each fills the
- * other's gaps. */
-export function fillBlanks(over: DirectoryRow, under: DirectoryRow): DirectoryRow {
-  const out: DirectoryRow = { ...under };
-  for (const [key, value] of Object.entries(over)) {
-    const empty = value === undefined || value === null || value === '';
-    const existing = Reflect.get(out, key);
-    if (!empty || !(key in out) || existing === undefined || existing === null || existing === '') {
-      Reflect.set(out, key, value);
-    }
-  }
-  return out;
-}
-
-
-export function mergeDirectoryRows(rows: DirectoryRow[]): DirectoryRow[] {
-  const byEmail = new Map<string, number>();
-  const merged: DirectoryRow[] = [];
-
-  for (const row of rows) {
-    const key = (row.email || '').trim().toLowerCase();
-    if (!key) {
-      merged.push(row);
-      continue;
-    }
-    const seen = byEmail.get(key);
-    if (seen === undefined) {
-      byEmail.set(key, merged.length);
-      merged.push(row);
-      continue;
-    }
-    const existing = merged[seen];
-    // Whichever of the two is the learner keeps the row's identity; the other
-    // contributes only the fields the learner record does not have.
-    const learner = isLearnerRow(row) ? row : isLearnerRow(existing) ? existing : null;
-    const other = learner === row ? existing : row;
-    // The learner record wins, but only where it actually says something. A
-    // plain spread let its empty strings overwrite real values from the staff
-    // row -- a learner record carries no position, so merging one in blanked
-    // the Type column for somebody who is an Admin.
-    const combined = learner ? fillBlanks(learner, other) : fillBlanks(row, existing);
-    // Both roles in the Type column. This person really is an Admin AND a
-    // learner, and showing one of them made the merged row look like the other
-    // record had simply been lost.
-    merged[seen] = { ...combined, type: combinedType(existing, row) };
-  }
-
-  return merged;
+/** Keep staff, learner and employer records separate even when emails match.
+ * Import updates may contain an already loaded record, so deduplicate only by
+ * the record's own source and id. The first copy is the newest. */
+export function uniqueDirectoryRows(rows: DirectoryRow[]): DirectoryRow[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = `${row.source ?? 'apprenticeship'}:${row.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 
 /** True when a row value doesn't match a chosen filter value, ignoring case/padding. */
 export function differs(rowValue: string | undefined, filterValue: string): boolean {
   return (rowValue ?? '').trim().toLowerCase() !== filterValue.trim().toLowerCase();
-}
-
-
-/** The role(s) a row's Type column names, split back out of a merged row's
- *  "Admin · User" for filtering and options -- an ordinary row has exactly
- *  one. */
-export function rowTypes(row: Pick<DirectoryRow, 'type'>): string[] {
-  return (row.type || '').split(' · ').map((s) => s.trim()).filter(Boolean);
 }
 
 
@@ -162,11 +80,7 @@ export function matches(row: DirectoryRow, f: UsersFilter): boolean {
   // curriculum lookup rather than only from the rows themselves.
   if (f.groups && f.groups.length > 0 && !f.groups.some((g) => !differs(row.group, g))) return false;
   if (f.statuses && f.statuses.length > 0 && !f.statuses.includes(row.subscriptionStatus)) return false;
-  // A merged row's type is the two roles joined ("Admin · User"), so an exact
-  // match would make it invisible under either filter option. Split and check
-  // membership instead, which also matches an ordinary single-role row exactly
-  // as before.
-  if (f.type && f.type !== 'all' && !rowTypes(row).includes(f.type)) return false;
+  if (f.type && f.type !== 'all' && row.type !== f.type) return false;
   // Programme and cohort are picked from the curriculum lists, but the values on
   // the row were written as free text at create time, so both sides are folded
   // before comparing — casing drift on an older row shouldn't empty the results.

@@ -65,6 +65,7 @@ export interface SelectMenuProps {
   id?: string;
   ariaLabel?: string;
   ariaLabelledBy?: string;
+  ariaRequired?: boolean;
   className?: string;
   triggerClassName?: string;
   menuClassName?: string;
@@ -94,6 +95,7 @@ export function SelectMenu({
   id,
   ariaLabel,
   ariaLabelledBy,
+  ariaRequired,
   className = '',
   triggerClassName = '',
   menuClassName = '',
@@ -323,6 +325,7 @@ export function SelectMenu({
         aria-controls={open ? listboxId : undefined}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
+        aria-required={ariaRequired}
         className={`flex w-full items-center gap-2 rounded-lg border pl-3 pr-2 text-left outline-none transition-smooth ${TRIGGER_HEIGHT[size]} ${triggerTone} ${triggerClassName}`}
       >
         {selected?.icon && <AppIcon className={`${selected.icon} shrink-0 text-foreground-400`}></AppIcon>}

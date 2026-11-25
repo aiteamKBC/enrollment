@@ -39,6 +39,9 @@ http://127.0.0.1:8000. `/health/` is a liveness endpoint; it does not claim data
 Microsoft availability. Existing account passwords are copied; browser sessions and
 password-reset sessions are independent. Production must use HTTPS and secure cookies.
 
+For the manual Programme Structure catalogue, see the
+[catalogue API and migration guide](backend/programme_suitability/PROGRAMME_CATALOG.md).
+
 ## Environment
 
 | File / variables | Purpose |
