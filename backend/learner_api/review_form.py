@@ -228,19 +228,22 @@ def _plr_context(review, learner):
     if "plr" not in sections_for(review.review_type):
         return {}
 
-    from enrolment_api.models import WizardPlr, WizardPlrRecord
+    from enrolment_api.models import WizardPlrRecord
+    from enrolment_api.plr_uln_storage import read_uln
 
     try:
-        plr = WizardPlr.objects.filter(learner_id=review.learner_id).first()
-        records = list(
-            WizardPlrRecord.objects.filter(learner_id=review.learner_id).order_by("id")
-        )
-    except DatabaseError:
-        logger.exception("_plr_context: PLR lookup failed")
+        with transaction.atomic(using='enrolment'):
+            uln = read_uln(None, review.learner_id)
+            records = list(
+                WizardPlrRecord.objects.filter(learner_id=review.learner_id).order_by("id")
+            )
+    except DatabaseError as exc:
+        from enrolment_api.wizard_steps import log_plr_error
+        log_plr_error(exc, 'review ULN read')
         return {"uln": "", "plrRecords": []}
 
     return {
-        "uln": _s(getattr(plr, "uln", "")),
+        "uln": uln,
         "plrRecords": [
             {
                 "placeOfStudy": _s(row.place_of_study),

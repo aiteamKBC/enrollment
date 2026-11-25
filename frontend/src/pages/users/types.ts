@@ -600,11 +600,16 @@ export interface PlrRecord {
   startDate?: string;
   endDate?: string;
   awardDate?: string;
-  credits: number;
+  credits: number | null;
   grade: string;
   recordType: 'Imported' | 'Manual' | string;
+  sourceSection?: string;
+  completionStatus?: string;
+  outcomeStatus?: string;
 }
 export interface PlrState {
+  /** Transport-only failure state; never persisted as PLR answers. */
+  loadError?: string;
   /** No longer asked on the step; kept so a saved ULN is carried through unchanged. */
   uln: string;
   records: PlrRecord[];

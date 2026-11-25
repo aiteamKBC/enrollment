@@ -27,6 +27,10 @@ def snapshot(learner_id, existing_staff=None):
         if len(users) != 1:
             raise ValueError('Learner not found.')
         user = users[0]
+        # Contract v1 receivers do not have Created_users.ULN. The retained
+        # Wizard_Plr mirror already carries it in the supported payload shape.
+        # Deploy this exporter BEFORE the optional column is added.
+        user.pop('ULN', None)
         select('enrolment.Employers', 'id', [user.get('Employer_id')])
         profiles = select('Learner.learners', 'enrolment_id', [learner_id])
         profile_ids = [row['id'] for row in profiles]

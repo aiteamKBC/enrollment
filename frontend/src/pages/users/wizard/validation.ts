@@ -48,6 +48,7 @@ export function ilrDetailsMissing(d: WizardDraft, layout: WizardLayout = DEFAULT
 export function missingForStep(stepIndex: number, draft: WizardDraft, layout: WizardLayout = DEFAULT_LAYOUT): string[] {
   const step = visibleSteps(layout)[stepIndex];
   if (!step) return [];
+  if (draft.plr?.loadError && step.items.some((item) => item.key === 'block.plr')) return [draft.plr.loadError];
   const missing = missingForLayoutStep(step, draft, layout);
   if (step.slug === SUITABILITY_STEP.slug && draft.programmeModulesCompletion?.required && !draft.programmeModulesCompletion.complete) missing.push('PCP pathway and modules (complete and save your selection)');
   // A version-pinned wizard layout can predate suitability while the separate

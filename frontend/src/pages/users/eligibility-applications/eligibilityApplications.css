@@ -1,0 +1,88 @@
+/* Eligibility list only. Shared chrome and application-detail presentation are untouched. */
+.enrolment-admin-content:has(> .eligibility-applications-page) {
+  background: radial-gradient(ellipse at 72% 15%, #ecdefb99, transparent 62%), linear-gradient(135deg, #fbf8ff, #f0e9fa);
+  color: #29104d;
+}
+.enrolment-admin-content:has(> .eligibility-applications-page) > div:first-child { padding: 18px 16px 0; }
+.enrolment-admin-content:has(> .eligibility-applications-page) > div:first-child h1 { color: #2e0d59; font: 700 40px/1.1 Georgia, 'Times New Roman', serif; }
+.enrolment-admin-content:has(> .eligibility-applications-page) > div:first-child p { margin-top: 5px; color: #68508b; font-size: 18px; font-weight: 600; line-height: 24px; }
+.eligibility-applications-page { display: flex; min-width: 0; flex-direction: column; gap: 20px; padding: 40px 22px 24px; }
+.eligibility-applications-page > :not([hidden]) ~ :not([hidden]) { margin-block: 0; }
+.eligibility-applications-page .ea-disclaimer { order: 1; padding: 9px 12px; border: 1px solid #ded0ec; border-radius: 10px; background: #f9f5fe; color: #67507e; font-size: 11px; line-height: 17px; }
+.ea-hero { position: relative; isolation: isolate; min-height: 120px; border-radius: 22px; background: linear-gradient(100deg, #f7edfd, #f2e7fb 65%, #ead5fb); }
+.ea-hero-wave { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.ea-hero-copy { display: flex; align-items: center; gap: 24px; min-height: 120px; width: calc(100% - 340px); padding: 20px 32px; }
+.ea-hero-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 80px; height: 80px; flex-shrink: 0; border-radius: 21px; color: #fff; background: linear-gradient(135deg, #d3afe9, #7c31ab 65%, #551a7f); box-shadow: 0 4px 8px #50207133, inset 0 1px 1px #ffffff60; }
+.ea-hero-icon > span { position: absolute; right: -6px; bottom: 6px; display: grid; place-items: center; width: 33px; height: 33px; border: 1px solid #ffe8a3; border-radius: 50%; color: #fff; background: linear-gradient(#ffda55, #f5a820); box-shadow: 0 2px 5px #a4612640; }
+.ea-hero-copy > div { padding-left: 18px; border-left: 1px solid #9a62bd; }
+.ea-hero h2 { margin: 0; color: #2b0d55; font: 700 26px/1.2 Georgia, 'Times New Roman', serif; }
+.ea-hero p { margin-top: 10px; color: #39235c; font-size: 13px; line-height: 19px; }
+.ea-hero-illustration { position: absolute; right: 75px; bottom: 0; width: 340px; height: 188px; object-fit: contain; object-position: center bottom; pointer-events: none; }
+.ea-statistics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.ea-stat { position: relative; display: flex; align-items: center; gap: 20px; min-width: 0; min-height: 98px; overflow: hidden; padding: 15px 26px; border: 1px solid #dcc4f4; border-radius: 17px; background: linear-gradient(125deg, #fdfbff, #f5edfd); box-shadow: 0 5px 10px #6e3b8a15; }
+.ea-stat:first-child { border-color: #edc45e; background: linear-gradient(110deg, #fffcf7, #f8effb); }
+.ea-stat-icon { display: flex; align-items: center; justify-content: center; width: 62px; height: 62px; flex-shrink: 0; border-radius: 17px; color: #6e16b7; background: linear-gradient(145deg, #f4e9ff, #e6d1f8); box-shadow: 0 3px 7px #50207116; }
+.ea-stat-value { color: #2e0b59; font: 700 36px/1 Georgia, 'Times New Roman', serif; }
+.ea-stat h2 { position: relative; margin-top: 4px; color: #29104d; font-size: 16px; font-weight: 650; line-height: 21px; }
+.ea-stat-laurel { position: absolute; right: 20px; bottom: 10px; width: 64px; height: 78px; color: #f0c57e; opacity: .48; pointer-events: none; }
+.ea-search { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, .36fr) 138px; align-items: end; gap: 24px; padding: 16px 28px; border: 1px solid #ffffffd9; border-radius: 17px; background: linear-gradient(110deg, #ffffffdf, #faf6ff); box-shadow: 0 5px 12px #69359012; }
+.ea-search label { display: block; margin-bottom: 7px; color: #28114b; font-size: 14px; font-weight: 700; line-height: 18px; }
+.ea-search-field, .ea-status-field { min-width: 0; }
+.ea-search-input { position: relative; }
+.ea-search-input > svg { position: absolute; left: 17px; top: 50%; margin-top: -10.5px; color: #4d178a; pointer-events: none; }
+.ea-search #application-search, .ea-search #assessment-filter { height: 42px; min-height: 42px; border: 1px solid #cfb6ee; border-radius: 24px; background: #fcf9ff; color: #301454; font-size: 14px; line-height: 20px; box-shadow: inset 0 1px 2px #63348c05; }
+.ea-search #application-search { padding: 9px 18px 9px 47px; }
+.ea-search #application-search::placeholder { color: #796494; opacity: 1; }
+.ea-search #assessment-filter { padding: 9px 17px; font-weight: 600; }
+.ea-status-field { position: relative; margin-left: 8px; padding-left: 24px; border-left: 1px solid #e7c867; }
+.eligibility-applications-page .ea-search .ea-search-submit.primary-action { display: flex; align-items: center; justify-content: center; gap: 10px; height: 42px; min-height: 42px; padding: 8px 16px; border: 1px solid #8a40d6 !important; border-radius: 24px; color: #fff !important; background: linear-gradient(#8424d0, #510cad) !important; font-size: 15px; font-weight: 650; box-shadow: 0 4px 8px #5f22ab26 !important; }
+.eligibility-applications-page .ea-search .ea-search-submit.primary-action:not(:disabled):hover { background: linear-gradient(#9035da, #6117ba) !important; }
+.ea-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 350px; padding: 18px 20px 20px; border: 1px solid #ffffffc9; border-radius: 18px; background: linear-gradient(120deg, #ffffffed, #faf7ff); box-shadow: 0 8px 18px #80539b0c; text-align: center; }
+.ea-empty > img { width: 350px; max-width: 100%; height: 160px; object-fit: contain; }
+.ea-empty h2 { margin-top: 17px; color: #2a0c54; font: 700 26px/1.25 Georgia, 'Times New Roman', serif; }
+.ea-empty p { margin-top: 8px; color: #6b538c; font-size: 16px; line-height: 23px; }
+.ea-clear { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 44px; margin-top: 20px; padding: 9px 28px; border: 1px solid #b58aea; border-radius: 25px; color: #6318bd; background: #fcf9ff; font-size: 15px; font-weight: 650; cursor: pointer; }
+.ea-clear:hover { background: #f0e4fc; }
+.eligibility-applications-page :is(input, select, button):focus-visible { outline: 2px solid #8d52c0; outline-offset: 3px; }
+@media (max-width: 1279px) {
+  .ea-hero-copy { width: calc(100% - 260px); padding-inline: 24px; gap: 18px; }
+  .ea-hero-illustration { right: 18px; width: 260px; height: 170px; }
+  .ea-hero h2 { font-size: 23px; }
+  .ea-stat { padding-inline: 18px; gap: 14px; }
+  .ea-stat-icon { width: 50px; height: 50px; }
+  .ea-stat h2 { font-size: 14px; }
+  .ea-stat-laurel { opacity: .22; right: 8px; }
+  .ea-search { grid-template-columns: minmax(0, 1fr) minmax(210px, .6fr) 118px; gap: 16px; padding-inline: 20px; }
+  .ea-status-field { margin-left: 0; padding-left: 16px; }
+}
+@media (max-width: 1023px) {
+  .ea-hero-copy { width: 100%; padding-right: 24px; padding-bottom: 155px; }
+  .ea-hero-illustration { width: 240px; height: 150px; }
+  .ea-statistics { grid-template-columns: 1fr; }
+  .ea-stat { min-height: 90px; }
+  .ea-stat-laurel { opacity: .4; }
+  .ea-search { grid-template-columns: minmax(0, 1fr) 138px; }
+  .ea-search-field { grid-column: 1 / -1; }
+  .ea-status-field { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 767px) {
+  .enrolment-admin-content:has(> .eligibility-applications-page) > div:first-child { padding-inline: 14px; }
+  .enrolment-admin-content:has(> .eligibility-applications-page) > div:first-child h1 { font-size: 31px; }
+  .enrolment-admin-content:has(> .eligibility-applications-page) > div:first-child p { font-size: 16px; }
+  .eligibility-applications-page { gap: 16px; padding: 28px 12px 20px; }
+  .ea-hero-copy { align-items: flex-start; gap: 14px; padding: 22px 18px 165px; }
+  .ea-hero-icon { width: 54px; height: 54px; border-radius: 15px; }
+  .ea-hero-icon > svg { width: 31px; height: 31px; }
+  .ea-hero-icon > span { width: 26px; height: 26px; right: -5px; bottom: 0; }
+  .ea-hero-copy > div { padding-left: 12px; }
+  .ea-hero h2 { font-size: 22px; }
+  .ea-hero p { font-size: 12px; line-height: 18px; }
+  .ea-hero-illustration { right: 14px; }
+  .ea-search { padding: 18px 16px; gap: 16px 12px; grid-template-columns: minmax(0, 1fr) 104px; }
+  .ea-search label { font-size: 12px; }
+  .ea-search #assessment-filter, .ea-search #application-search { font-size: 12px; }
+  .eligibility-applications-page .ea-search .ea-search-submit.primary-action { padding-inline: 12px; font-size: 13px; }
+  .ea-empty { min-height: 340px; padding-inline: 18px; }
+  .ea-empty h2 { font-size: 23px; }
+  .ea-empty p { font-size: 14px; }
+}

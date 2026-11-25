@@ -16,6 +16,7 @@ import { Modal } from '../../components/Modal';
 import { Table, Pagination, inputClass, btnPrimary, btnSecondary, iconBtn } from '../../components/ui';
 import { StepHeading } from './fields';
 import { useText } from '../layout/textsContext';
+import { PlrPdfPreview } from './PlrPdfPreview';
 import { FieldError, invalidClass } from '../stepErrors';
 import { OTHER, QUALIFICATION_TYPE_OPTIONS, SUBJECT_OPTIONS, joinChoice, splitChoice } from './plrText';
 
@@ -86,19 +87,6 @@ function usePlrEvidence(kind: LearnerKind, learnerId: string) {
 
 type Evidence = ReturnType<typeof usePlrEvidence>;
 
-function FileLinks({ files, evidence }: { files: PlrEvidenceFile[]; evidence: Evidence }) {
-  if (files.length === 0) return <span className="text-foreground-300">—</span>;
-  return (
-    <div className="flex flex-col gap-0.5">
-      {files.map((f) => (
-        <button key={f.id} type="button" onClick={() => void evidence.open(f)} className="text-left text-[12px] text-primary-600 hover:underline cursor-pointer truncate max-w-[180px]">
-          {f.filename}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: ReactNode }) {
   return (
     <label className="block mb-3">
@@ -133,22 +121,22 @@ function toForm(r: PlrRecord): FormState {
     qualificationType: q.choice, qualificationTypeOther: q.other,
     placeOfStudy: r.placeOfStudy, subject: s.choice, subjectOther: s.other,
     level: r.level ?? '', startDate: r.startDate ?? '', endDate: r.endDate ?? '', awardDate: r.awardDate ?? '',
-    credits: r.credits ? String(r.credits) : '', grade: r.grade,
+    credits: r.credits != null ? String(r.credits) : '', grade: r.grade,
   };
 }
 
 /** What still has to be filled in, keyed by form field. */
-function formErrors(f: FormState): Partial<Record<keyof FormState, string>> {
+function formErrors(f: FormState, allowMissing = false): Partial<Record<keyof FormState, string>> {
   const out: Partial<Record<keyof FormState, string>> = {};
   const blank = (v: string) => v.trim() === '';
-  if (blank(f.qualificationType)) out.qualificationType = 'Please choose a qualification type.';
+  if (!allowMissing && blank(f.qualificationType)) out.qualificationType = 'Please choose a qualification type.';
   else if (f.qualificationType === OTHER && blank(f.qualificationTypeOther)) out.qualificationTypeOther = 'Please specify the qualification type.';
-  if (blank(f.placeOfStudy)) out.placeOfStudy = 'Please enter the place of study.';
-  if (blank(f.subject)) out.subject = 'Please choose a subject.';
+  if (!allowMissing && blank(f.placeOfStudy)) out.placeOfStudy = 'Please enter the place of study.';
+  if (!allowMissing && blank(f.subject)) out.subject = 'Please choose a subject.';
   else if (f.subject === OTHER && blank(f.subjectOther)) out.subjectOther = 'Please specify the subject.';
-  if (blank(f.level)) out.level = 'Please enter the level.';
-  if (blank(f.awardDate)) out.awardDate = 'Please enter the award date.';
-  if (blank(f.grade)) out.grade = 'Please enter the grade.';
+  if (!allowMissing && blank(f.level)) out.level = 'Please enter the level.';
+  if (!allowMissing && blank(f.awardDate)) out.awardDate = 'Please enter the award date.';
+  if (!allowMissing && blank(f.grade)) out.grade = 'Please enter the grade.';
   if (f.credits.trim() !== '' && !/^\d+$/.test(f.credits.trim())) out.credits = 'Credits must be a whole number.';
   return out;
 }
@@ -163,17 +151,20 @@ function PlrForm({
   record: PlrRecord;
   isNew: boolean;
   evidence: Evidence;
-  onSave: (r: PlrRecord) => void;
+  onSave: (r: PlrRecord) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<FormState>(() => toForm(record));
   const [tried, setTried] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   // Files go to storage as soon as they are picked. Cancelling a new entry
   // takes back the ones picked for it, so nothing is left behind for an entry
   // that was never added.
   const [pickedHere, setPickedHere] = useState<PlrEvidenceFile[]>([]);
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
-  const errors = tried ? formErrors(form) : {};
+  const allowMissing = !isNew && record.recordType === 'Imported';
+  const errors = tried ? formErrors(form, allowMissing) : {};
   const files = evidence.files.filter((f) => f.recordRef === record.id);
   const control = (key: keyof FormState) => `${inputClass}${errors[key] ? invalidClass : ''}`;
 
@@ -182,10 +173,11 @@ function PlrForm({
     onClose();
   };
 
-  const save = () => {
+  const save = async () => {
     setTried(true);
-    if (Object.keys(formErrors(form)).length > 0) return;
-    onSave({
+    if (Object.keys(formErrors(form, allowMissing)).length > 0 || saving) return;
+    setSaving(true); setSaveError('');
+    try { await onSave({
       ...record,
       qualificationType: joinChoice(form.qualificationType, form.qualificationTypeOther),
       placeOfStudy: form.placeOfStudy.trim(),
@@ -194,24 +186,26 @@ function PlrForm({
       startDate: form.startDate,
       endDate: form.endDate,
       awardDate: form.awardDate,
-      credits: form.credits.trim() ? Number(form.credits.trim()) : 0,
+      credits: form.credits.trim() ? Number(form.credits.trim()) : record.recordType === 'Imported' ? null : 0,
       grade: form.grade.trim(),
-    });
+    }); } catch (e) { setSaveError(e instanceof Error ? e.message : 'Could not save this record.'); }
+    finally { setSaving(false); }
   };
 
   return (
     <Modal
       title={isNew ? 'Add PLR' : 'Edit PLR'}
-      onClose={cancel}
+      onClose={() => { if (!saving) cancel(); }}
       size="max-w-lg"
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={btnSecondary} onClick={cancel}>Cancel</button>
-          <button type="button" className={btnPrimary} onClick={save} disabled={evidence.uploading}>Save</button>
+          <button type="button" className={btnSecondary} onClick={cancel} disabled={saving}>Cancel</button>
+          <button type="button" className={btnPrimary} onClick={() => void save()} disabled={evidence.uploading || saving}>Save</button>
         </div>
       }
     >
-      <Field label="Qualification type" required error={errors.qualificationType}>
+      {saveError && <p role="alert" className="mb-3 text-sm text-red-600">{saveError}</p>}
+      <Field label="Qualification type" required={!allowMissing} error={errors.qualificationType}>
         <select value={form.qualificationType} onChange={(e) => set({ qualificationType: e.target.value })} aria-invalid={Boolean(errors.qualificationType) || undefined} className={`${control('qualificationType')} cursor-pointer`}>
           <option value="">Select…</option>
           {QUALIFICATION_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -222,10 +216,10 @@ function PlrForm({
           <input value={form.qualificationTypeOther} onChange={(e) => set({ qualificationTypeOther: e.target.value })} className={control('qualificationTypeOther')} />
         </Field>
       )}
-      <Field label="Place of Study" required error={errors.placeOfStudy}>
+      <Field label="Place of Study" required={!allowMissing} error={errors.placeOfStudy}>
         <input value={form.placeOfStudy} onChange={(e) => set({ placeOfStudy: e.target.value })} className={control('placeOfStudy')} />
       </Field>
-      <Field label="Subject" required error={errors.subject}>
+      <Field label="Subject" required={!allowMissing} error={errors.subject}>
         <select value={form.subject} onChange={(e) => set({ subject: e.target.value })} aria-invalid={Boolean(errors.subject) || undefined} className={`${control('subject')} cursor-pointer`}>
           <option value="">Select…</option>
           {SUBJECT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -236,18 +230,18 @@ function PlrForm({
           <input value={form.subjectOther} onChange={(e) => set({ subjectOther: e.target.value })} className={control('subjectOther')} />
         </Field>
       )}
-      <Field label="Level" required error={errors.level}>
+      <Field label="Level" required={!allowMissing} error={errors.level}>
         <input value={form.level} onChange={(e) => set({ level: e.target.value })} className={control('level')} />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-3">
         <div className="mb-3"><DatePickerField label="Start date" value={form.startDate} onChange={value => set({ startDate: value })} /></div>
         <div className="mb-3"><DatePickerField label="End date" value={form.endDate} onChange={value => set({ endDate: value })} /></div>
-        <div className="mb-3"><DatePickerField label="Award date" required error={errors.awardDate} value={form.awardDate} onChange={value => set({ awardDate: value })} /></div>
+        <div className="mb-3"><DatePickerField label="Award date" required={!allowMissing} error={errors.awardDate} value={form.awardDate} onChange={value => set({ awardDate: value })} /></div>
       </div>
       <Field label="Credits" error={errors.credits}>
         <input inputMode="numeric" value={form.credits} onChange={(e) => set({ credits: e.target.value })} className={control('credits')} />
       </Field>
-      <Field label="Grade" required error={errors.grade}>
+      <Field label="Grade" required={!allowMissing} error={errors.grade}>
         <input value={form.grade} onChange={(e) => set({ grade: e.target.value })} className={control('grade')} />
       </Field>
 
@@ -290,7 +284,7 @@ function PlrForm({
 }
 
 export default function Plr() {
-  const { draft, setSection, userId, isCommercial } = useWizard();
+  const { draft, setSection, userId, isCommercial, plrCheck, canEditUln, saveIlr, importPlrPdf } = useWizard();
   const t = useText();
   const plr = draft.plr;
   const kind: LearnerKind = isCommercial ? 'commercial' : 'apprenticeship';
@@ -298,19 +292,39 @@ export default function Plr() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(PAGE_SIZES[0]);
   const [editing, setEditing] = useState<{ record: PlrRecord; isNew: boolean } | null>(null);
+  const [removing, setRemoving] = useState<PlrRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
-  const setRecords = (records: PlrRecord[]) => setSection('plr', { ...plr, records });
+  const setRecords = (records: PlrRecord[]) => { if (!plr.loadError) setSection('plr', { ...plr, records }); };
   const add = () =>
     setEditing({
       isNew: true,
       record: { id: newId(), placeOfStudy: '', qualificationType: '', subject: '', level: '', startDate: '', endDate: '', awardDate: '', credits: 0, grade: '', recordType: 'Manual' },
     });
-  const save = (r: PlrRecord) => {
-    setRecords(editing?.isNew ? [...plr.records, r] : plr.records.map((x) => (x.id === r.id ? r : x)));
+  const save = async (r: PlrRecord) => {
+    if (editing?.isNew) setRecords([...plr.records, r]);
+    else if (canEditUln && editing) await saveIlr({ plrRecordChange: { action: 'edit', id: r.id, expected: editing.record, record: r } });
+    else return;
     setEditing(null);
   };
-  // The entry's certificate files are deleted with it when the step is saved.
-  const remove = (id: string) => setRecords(plr.records.filter((r) => r.id !== id));
+  const remove = async () => {
+    if (!removing || deleting || !canEditUln) return;
+    setDeleting(true); setDeleteError('');
+    try { await saveIlr({ plrRecordChange: { action: 'delete', id: removing.id, expected: removing } }); setRemoving(null); }
+    catch (e) { setDeleteError(e instanceof Error ? e.message : 'Could not delete this record.'); }
+    finally { setDeleting(false); }
+  };
+
+  if (plr.loadError) return (
+    <div>
+      <StepHeading title={t('block.plr.title')} />
+      <p role="alert" className="mb-3 text-sm text-red-600">{plr.loadError}</p>
+      <button type="button" className={btnSecondary} disabled={plrCheck?.checking} onClick={() => plrCheck?.refresh()}>
+        {plrCheck?.checking ? 'Retrying…' : 'Retry'}
+      </button>
+    </div>
+  );
 
   const total = plr.records.length;
   const totalPages = Math.max(1, Math.ceil(total / perPage));
@@ -322,12 +336,26 @@ export default function Plr() {
   return (
     <div>
       <StepHeading title={t('block.plr.title')} />
-      <button type="button" className={`${btnSecondary} mb-3`} onClick={add}>
+      {canEditUln && <div className="mb-3">
+        <div className="flex items-center gap-3">
+          <label htmlFor="plr-uln" className="text-sm font-medium">ULN</label>
+          <input id="plr-uln" className={`${inputClass} !w-52`} placeholder="Enter ULN" type="text"
+            inputMode="numeric" maxLength={10} value={plr.uln} autoComplete="off"
+            aria-invalid={Boolean(plr.uln && !/^[0-9]{10}$/.test(plr.uln)) || undefined}
+            aria-describedby={plr.uln && !/^[0-9]{10}$/.test(plr.uln) ? 'plr-uln-error' : undefined}
+            onChange={(e) => setSection('plr', { ...plr, uln: e.target.value.replace(/[^0-9]/g, '').slice(0, 10) })} />
+        </div>
+        {plr.uln && !/^[0-9]{10}$/.test(plr.uln) && <p id="plr-uln-error" className="mt-1 text-xs text-red-600">ULN must contain exactly 10 digits, or be left empty.</p>}
+      </div>}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <button type="button" className={btnSecondary} onClick={add}>
         <AppIcon className="ri-add-line" />Add
       </button>
+      {canEditUln && <PlrPdfPreview kind={kind} learnerId={userId} enteredUln={plr.uln} onImport={importPlrPdf} />}
+      </div>
 
       <div className="border border-foreground-100 rounded-xl overflow-hidden">
-        <Table headers={['Place of Study', 'Qualification Type', 'Subject', 'Level', 'Award Date', 'Credits', 'Grade', 'Record Type', 'Certificate / Evidence', 'Actions']}>
+        <Table headers={['Place of Study', 'Qualification Type', 'Subject', 'Level', 'Award Date', 'Credits', 'Grade', 'Record Type', 'Edit', 'Delete']}>
           {rows.length === 0 ? (
             <tr>
               <td colSpan={10} className="py-4 px-3 text-center text-[12px] text-foreground-400"><span>{t('block.plr.empty')}</span></td>
@@ -335,22 +363,25 @@ export default function Plr() {
           ) : (
             rows.map((r) => (
               <tr key={r.id} className="border-b border-foreground-100 last:border-0 align-top">
-                <td className="py-2 px-3 text-foreground-700">{r.placeOfStudy || '—'}</td>
-                <td className="py-2 px-3 text-foreground-600">{r.qualificationType || '—'}</td>
-                <td className="py-2 px-3 text-foreground-700">{r.subject || '—'}</td>
-                <td className="py-2 px-3 text-foreground-600">{r.level || '—'}</td>
-                <td className="py-2 px-3 text-foreground-600 whitespace-nowrap">{fmtDate(r.awardDate)}</td>
+                <td className="py-2 px-3 text-foreground-700">{r.placeOfStudy || (r.recordType === 'Imported' ? '' : '—')}</td>
+                <td className="py-2 px-3 text-foreground-600">{r.qualificationType || (r.recordType === 'Imported' ? '' : '—')}</td>
+                <td className="py-2 px-3 text-foreground-700">{r.subject || (r.recordType === 'Imported' ? '' : '—')}
+                  {r.sourceSection && <span className="mt-1 block text-[11px] text-foreground-500">{[r.sourceSection, r.completionStatus, r.outcomeStatus].filter(Boolean).join(' · ')}</span>}
+                </td>
+                <td className="py-2 px-3 text-foreground-600">{r.level || (r.recordType === 'Imported' ? '' : '—')}</td>
+                <td className="py-2 px-3 text-foreground-600 whitespace-nowrap">{r.recordType === 'Imported' && !r.awardDate ? '' : fmtDate(r.awardDate)}</td>
                 <td className="py-2 px-3 text-foreground-600">{r.credits}</td>
-                <td className="py-2 px-3 text-foreground-600">{r.grade || '—'}</td>
+                <td className="py-2 px-3 text-foreground-600">{r.grade || (r.recordType === 'Imported' ? '' : '—')}</td>
                 <td className="py-2 px-3 text-foreground-600">{r.recordType}</td>
-                <td className="py-2 px-3"><FileLinks files={evidence.files.filter((f) => f.recordRef === r.id)} evidence={evidence} /></td>
                 <td className="py-2 px-3 whitespace-nowrap">
-                  <button type="button" className={iconBtn} aria-label={`Edit ${r.subject || 'record'}`} onClick={() => setEditing({ record: r, isNew: false })}>
+                  {canEditUln && <button type="button" className={iconBtn} aria-label={`Edit ${r.subject || 'record'}`} onClick={() => setEditing({ record: r, isNew: false })}>
                     <AppIcon className="ri-pencil-line text-sm" />
-                  </button>
-                  <button type="button" className={`${iconBtn} ml-1`} aria-label={`Delete ${r.subject || 'record'}`} onClick={() => remove(r.id)}>
-                    <AppIcon className="ri-delete-bin-line text-sm" />
-                  </button>
+                  </button>}
+                </td>
+                <td className="py-2 px-3 whitespace-nowrap">
+                  {canEditUln && <button type="button" className={`${iconBtn} !text-red-600`} aria-label={`Delete ${r.subject || 'record'}`} onClick={() => { setRemoving(r); setDeleteError(''); }}>
+                    <AppIcon className="ri-close-line text-sm" />
+                  </button>}
                 </td>
               </tr>
             ))
@@ -373,6 +404,13 @@ export default function Plr() {
         </div>
       </div>
 
+      {removing && <Modal title="Delete personal learning record" onClose={() => { if (!deleting) setRemoving(null); }} footer={<div className="flex justify-end gap-2">
+        <button type="button" className={btnSecondary} disabled={deleting} onClick={() => setRemoving(null)}>Cancel</button>
+        <button type="button" className={`${btnPrimary} !bg-red-600`} disabled={deleting} onClick={() => void remove()}>Delete</button>
+      </div>}>
+        <p>Are you sure you want to delete this personal learning record?</p>
+        {deleteError && <p role="alert" className="mt-3 text-sm text-red-600">{deleteError}</p>}
+      </Modal>}
       {editing && (
         <PlrForm
           key={editing.record.id}
