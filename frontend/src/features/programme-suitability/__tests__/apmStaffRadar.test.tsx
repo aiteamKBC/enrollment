@@ -9,7 +9,7 @@ import type { AssessmentState } from '../types';
 import { fresh } from './fixtures';
 import { confirmedApm, apmModules, apmProfile } from './apmRadarFixtures';
 
-const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), profile: vi.fn(), modules: vi.fn(), layout: vi.fn(), assessment: vi.fn() }));
+const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), profile: vi.fn(), modules: vi.fn(), layout: vi.fn(), assessment: vi.fn(), impact: vi.fn() }));
 vi.mock('@/api/extendedIlr', () => ({ fetchExtendedIlr: api.read, peekExtendedIlr: () => undefined, saveExtendedIlr: api.write }));
 vi.mock('@/api/curriculum', () => ({ fetchKsbProfile: api.profile, peekKsbProfile: () => undefined }));
 vi.mock('@/api/enrolmentDocuments', () => ({ uploadEnrolmentDocument: vi.fn() }));
@@ -18,6 +18,7 @@ vi.mock('@/api/wizardLayout', () => ({ peekWizardLayout: () => undefined, fetchW
 vi.mock('../api', () => ({ getAssessment: api.assessment, peekAssessment: () => undefined,
   prefetchAssessmentSecurity: async () => ({ csrfToken: 'synthetic' }), primeAssessment: vi.fn() }));
 vi.mock('../modules/api', () => ({ getModules: api.modules, saveModuleSelection: vi.fn() }));
+vi.mock('../skills-radar/catalogue/api', () => ({ getModuleImpact: api.impact }));
 
 const board = { user: { id: '41', name: 'Assigned APM learner' }, contact: { email: '', phone: '', dob: '' },
   programme: { name: 'Associate Project Manager Level 4', onboardingStatus: 'In progress' } } as EnrolmentBoard;
@@ -28,6 +29,7 @@ const page = (readOnly = true) => <WizardProvider userId="41" board={board} read
 
 beforeEach(() => {
   vi.clearAllMocks();
+  api.impact.mockResolvedValue({ status: 'unavailable', modules: [], reason: 'cohort_assignment_unavailable' });
   api.profile.mockResolvedValue({ results: apmProfile });
   api.modules.mockResolvedValue(apmModules());
   api.assessment.mockResolvedValue(fresh());
@@ -41,11 +43,11 @@ afterAll(() => vi.unstubAllGlobals());
 
 it('shows published 42/20 modules for staff before Step 6, preserving read-only answers without confirmation or writes', async () => {
   render(page());
-  const nav = await screen.findByRole('navigation', { name: 'Selected modules' });
-  expect(within(nav).queryByRole('button')).toBeNull();
-  expect(within(nav).getByText('1 of 42 answered')).toBeVisible();
-  expect(within(nav).getByText('0 of 20 answered')).toBeVisible();
-  expect(screen.getByText('1 of 62 answered')).toBeVisible();
+  const nav = await screen.findByRole('region', { name: 'Your prior knowledge by module' });
+  expect(within(nav).getByRole('button', { name: 'About your scores' })).toBeVisible();
+  expect(within(nav).getByText('1 of 42 KSBs assessed')).toBeVisible();
+  expect(within(nav).getByText('0 of 20 KSBs assessed')).toBeVisible();
+  expect(screen.getByText('1 of 62')).toBeVisible();
   expect(screen.getAllByRole('button', { name: /^View [KSB]\d+$/ })).toHaveLength(62);
   const calls = api.profile.mock.calls.length;
   await userEvent.click(screen.getByRole('button', { name: 'View K1' }));
@@ -66,7 +68,7 @@ it('shows published 42/20 modules for staff before Step 6, preserving read-only 
 it('does not enable the unconfirmed staff fallback for a learner', async () => {
   render(page(false));
   await waitFor(() => expect(latest.ready).toBe(true));
-  expect(screen.queryByRole('navigation', { name: 'Selected modules' })).toBeNull();
+  expect(screen.queryByRole('region', { name: 'Your prior knowledge by module' })).toBeNull();
   expect(screen.getByText('SKILL DESCRIPTION')).toBeVisible();
   expect(latest.suitability?.selectionConfirmed).toBe(false); expect(api.modules).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });
@@ -78,19 +80,19 @@ it('uses the pinned confirmed APM snapshot for staff instead of the newer publis
   api.modules.mockResolvedValue(pinned);
   render(page());
   await waitFor(() => expect(api.assessment).toHaveBeenCalled());
-  expect(screen.queryByRole('navigation', { name: 'Selected modules' })).toBeNull();
+  expect(screen.queryByRole('region', { name: 'Your prior knowledge by module' })).toBeNull();
   expect(screen.queryByText('SKILL DESCRIPTION')).toBeNull();
   await act(async () => resolve(confirmedApm));
-  expect(within(await screen.findByRole('navigation', { name: 'Selected modules' })).getByText('Pinned PMP title')).toBeVisible();
+  expect(within(await screen.findByRole('region', { name: 'Your prior knowledge by module' })).getByText('Pinned PMP title')).toBeVisible();
   expect(api.modules).toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });
 
 it('reviews an assigned APM programme when the published wizard has no assessment configuration', async () => {
   api.layout.mockResolvedValue({ version: 11, layout: { steps: [], programmeModules: apmModules().configuration } });
   render(page());
-  const nav = await screen.findByRole('navigation', { name: 'Selected modules' });
-  expect(within(nav).queryByRole('button')).toBeNull();
-  expect(within(nav).getAllByText(/\d+ of \d+ answered/)).toHaveLength(2);
+  const nav = await screen.findByRole('region', { name: 'Your prior knowledge by module' });
+  expect(within(nav).getByRole('button', { name: 'About your scores' })).toBeVisible();
+  expect(within(nav).getAllByText(/\d+ of \d+ KSBs assessed/)).toHaveLength(2);
   expect(api.assessment).not.toHaveBeenCalled();
   expect(api.modules).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });

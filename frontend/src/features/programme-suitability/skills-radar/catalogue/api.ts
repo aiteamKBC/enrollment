@@ -2,6 +2,7 @@ import type { LearnerKind } from '@/api/extendedIlr';
 import { prefetchAssessmentSecurity, request } from '../../api';
 import type { ProgrammeId } from '../../types';
 import type { CatalogueDraft, CatalogueIndex, ImportPreview, LearnerCatalogue } from './types';
+import type { ModuleImpact } from '../moduleImpact';
 
 const BASE = '/enrolment_api/skills-radar';
 export const getCatalogues = () => request<CatalogueIndex>(`${BASE}/catalogues/`);
@@ -9,6 +10,7 @@ export const getCatalogueDraft = () => request<{ configuration: CatalogueDraft |
 export const saveCatalogueDraft = (configuration: CatalogueDraft, baseVersion: number | null) =>
   request<{ configuration: CatalogueDraft; baseVersion: number | null }>(`${BASE}/draft/`, { configuration, baseVersion });
 export const getLearnerCatalogue = (kind: LearnerKind, id: string) => request<LearnerCatalogue>(`${BASE}/${kind}/${id}/`);
+export const getModuleImpact = (kind: LearnerKind, id: string) => request<ModuleImpact>(`${BASE}/${kind}/${id}/module-impact/`);
 export const csvUrl = (pid: ProgrammeId, template = false) => `${BASE}/catalogues/${pid}/${template ? '?template=1' : ''}`;
 export async function uploadCatalogue(pid: ProgrammeId, file: File): Promise<ImportPreview> {
   const body = new FormData(); body.append('file', file, file.name);

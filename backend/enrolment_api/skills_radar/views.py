@@ -6,6 +6,7 @@ from django.db import DatabaseError, transaction
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.cache import never_cache
 
 from enrolment_api.auth import enrolment_login_required
 from enrolment_api.models import ExtendedIlr
@@ -16,9 +17,28 @@ from programme_suitability.permissions import is_staff
 from . import service
 from .catalogue import APPROVALS, KEY, PROGRAMMES, CatalogueError, check_approval, compare, current_catalogues, validate
 from .csv_io import MAX_BYTES, export_csv, parse_csv
+from .module_impact import learner_module_impact
 
 logger = logging.getLogger(__name__)
 CSV_TYPES = {'text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain', 'application/octet-stream'}
+
+
+@never_cache
+@enrolment_login_required
+def module_impact(request, kind, learner_id):
+    if request.method != 'GET':
+        return error('Method not allowed.', 405)
+    from enrolment_api.extended_ilr import KINDS
+    model = KINDS.get(kind)
+    if model is None:
+        return error('Unknown learner kind.', 400)
+    try:
+        if not model.objects.filter(pk=learner_id).exists():
+            return error('Not found.', 404)
+        return JsonResponse(learner_module_impact(kind, learner_id))
+    except DatabaseError:
+        logger.exception('Could not load local Skills Radar module impact.')
+        return error('Could not load Programme Structure mapping. Please retry.', 503)
 
 
 def error(exc, status=400):

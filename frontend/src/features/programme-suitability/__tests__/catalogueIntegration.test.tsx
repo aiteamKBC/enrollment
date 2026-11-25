@@ -13,7 +13,7 @@ import { confirmedMm } from './mmRadarFixtures';
 import { confirmedApm } from './apmRadarFixtures';
 import { confirmedPcp, pcpModules } from './pcpRadarFixtures';
 
-const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), profile: vi.fn(), layout: vi.fn(), assessment: vi.fn(), radar: vi.fn(), modules: vi.fn() }));
+const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), profile: vi.fn(), layout: vi.fn(), assessment: vi.fn(), radar: vi.fn(), impact: vi.fn(), modules: vi.fn() }));
 vi.mock('@/api/extendedIlr', () => ({ fetchExtendedIlr: api.read, peekExtendedIlr: () => undefined, saveExtendedIlr: api.write }));
 vi.mock('@/api/curriculum', () => ({ fetchKsbProfile: api.profile, peekKsbProfile: () => undefined }));
 vi.mock('@/api/enrolmentDocuments', () => ({ uploadEnrolmentDocument: vi.fn() }));
@@ -21,7 +21,7 @@ vi.mock('@/api/wizardInclusion', () => ({ fetchInclusionStatus: vi.fn(async () =
 vi.mock('@/api/wizardLayout', () => ({ peekWizardLayout: () => undefined, fetchWizardLayout: api.layout }));
 vi.mock('../api', () => ({ getAssessment: api.assessment, peekAssessment: () => undefined, primeAssessment: vi.fn(), prefetchAssessmentSecurity: async () => ({ csrfToken: 'synthetic' }) }));
 vi.mock('../modules/api', () => ({ getModules: api.modules, saveModuleSelection: vi.fn() }));
-vi.mock('../skills-radar/catalogue/api', () => ({ getLearnerCatalogue: api.radar }));
+vi.mock('../skills-radar/catalogue/api', () => ({ getLearnerCatalogue: api.radar, getModuleImpact: api.impact }));
 const board = { user: { id: '41', name: 'Synthetic learner' }, contact: { email: '', phone: '', dob: '' },
   programme: { name: 'Marketing Executive Level 4', onboardingStatus: 'In progress' } } as EnrolmentBoard;
 const confirmed = { ME_L4: confirmedMe, MM_L6: confirmedMm, APM_L4: confirmedApm, PCP_L6: confirmedPcp };
@@ -42,6 +42,7 @@ beforeEach(() => {
   api.layout.mockResolvedValue({ version: 11, layout: { steps: [], programmeModules: index.modules, skillsRadarCatalogues: index.catalogues, programmeSuitability: confirmedMe.configuration } });
   api.read.mockResolvedValue({ answers: null, draft: null, meta: { updatedAt: '' } });
   api.write.mockResolvedValue({ meta: { updatedAt: 'saved' } });
+  api.impact.mockResolvedValue({ status: 'unavailable', modules: [], reason: 'cohort_assignment_unavailable' });
   setup('ME_L4');
 });
 afterAll(() => vi.unstubAllGlobals());
@@ -58,6 +59,23 @@ it.each(['ME_L4', 'MM_L6', 'APM_L4', 'PCP_L6'] as ProgrammeId[])('renders a new 
   expect(total).toBe(catalogue.records.length);
   expect(screen.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(catalogue.records.length);
   expect(api.profile).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
+});
+
+it('uses the selected local module KSB union for wizard completion without removing historical catalogue records', async () => {
+  const catalogue = setup('ME_L4');
+  const modules = ['marketing-impact', 'social-media', 'martech'].map((id) => ({
+    id, name: id, status: 'ready', ksbs: catalogue.records.filter((record) => record.code !== 'K99' &&
+      (record.moduleKeys ?? (record.moduleKey ? [record.moduleKey] : [])).includes(id)).map((record) => ({
+      id: record.id, code: record.code, description: record.description, kind: record.kind,
+      standard: 'ST0596', standardVersion: '1.0', weight: { total_weight: '40', mapping_count: 1 },
+    })),
+  }));
+  api.impact.mockResolvedValue({ status: 'ready', programmeId: 'ME_L4', modules, savedLevels: {} });
+  render(page());
+  await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(33));
+  expect(latest.draft.skillsRadar.programmeKsbIds).not.toContain('radar:ME_L4:K99');
+  expect(screen.queryByRole('button', { name: 'Answer K99' })).toBeNull();
+  expect(catalogue.records).toHaveLength(34);
 });
 
 it('keeps pinned 33-question history after a 34-question publication, refresh and staff read-only View', async () => {

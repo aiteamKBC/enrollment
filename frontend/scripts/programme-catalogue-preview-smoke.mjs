@@ -7,8 +7,8 @@ import { chromium } from 'playwright';
 const origin = 'http://localhost:3001';
 const routeRoot = origin + '/users/programme-structure';
 const screenshots = await mkdtemp(resolve(tmpdir(), 'enrolment-interactive-preview-'));
-const executablePath = process.env.CATALOGUE_PREVIEW_CHROMIUM;
-const mobile = process.env.CATALOGUE_PREVIEW_MOBILE === '1';
+const executablePath = process.env.CATALOGUE_PREVIEW_CHROMIUM || process.argv[2];
+const mobile = process.env.CATALOGUE_PREVIEW_MOBILE === '1' || process.argv.includes('--mobile');
 const phoneViewport = { width: 390, height: 844 };
 const viewport = mobile ? phoneViewport : { width: 1440, height: 960 };
 const layout = mobile ? 'mobile' : 'desktop';
@@ -613,7 +613,28 @@ try {
   const deliveries = [];
   const scheduled = [];
   const deliveryUpdates = [];
+  const lmsRequests = [];
   liveCatalogue = (route, path) => {
+    if (path === base + 'lms/preview/' && route.request().method() === 'POST') {
+      lmsRequests.push(route.request().postDataJSON());
+      return route.fulfill({ json: {
+        snapshot: {
+          programme: { id: 'PROG-ME-L4', name: 'Marketing Executive Level 4', code: 'PROG-ME-L4', level: 4, import_status: 'new' },
+          cohorts: [{ id: 'c1', name: 'Feb 2027', start_date: '2027-01-01', training_end_date: '2028-01-31', import_status: 'new' }],
+          groups: [{ id: 'g1', name: 'Group 1', import_status: 'new' }],
+          modules: [
+            { id: 'm1', name: 'Social Media', sessions: 14, weekly_topics: Array(14).fill({}), ksb_ids: Array(22).fill('k'), import_status: 'new' },
+            { id: 'm2', name: 'Marketing Technology', sessions: 15, weekly_topics: Array(15).fill({}), ksb_ids: Array(11).fill('k'), import_status: 'new' },
+          ],
+          ksbs: [{ id: 'k1', code: 'K1', description: 'Knowledge', import_status: 'new' }],
+          counts: { programmes: 1, cohorts: 1, groups: 1, modules: 2, weekly_topics: 29, ksbs: 33 },
+        },
+        preview_fingerprint: 'a'.repeat(64), can_import: false, link_schema_ready: false,
+        conflicts: [], missing_fields: ['Apply migration 0019 before approving persistent LMS imports.'],
+        metrics: { query_count: 6, data_query_count: 4, rows_returned: 124, payload_bytes: 20088, payload_kb: 19.62, execution_ms: 32 },
+        performance_warnings: [],
+      } });
+    }
     if (path === base + 'staff/') return route.fulfill({ json: { coaches: [], tutors: [fixtureTutor] } });
     if (path === base + 'programmes/') return route.fulfill({ json: { programmes: [
       { ...programme, counts: { cohorts: 1, groups: groups.length, scheduled_modules: deliveries.length } },
@@ -673,6 +694,17 @@ try {
   };
   await page.setViewportSize(viewport);
   await openProgrammeStructure();
+  assert.equal(lmsRequests.length, 0, 'Normal catalogue load must not query LMS');
+  await click('Import from LMS');
+  assert.equal(lmsRequests.length, 0, 'Opening the LMS panel must not query LMS');
+  await click('Preview Import');
+  await page.getByText('6 (4 data)', { exact: true }).waitFor();
+  await page.getByText(/Apply migration 0019/).waitFor();
+  assert.ok(await page.getByRole('button', { name: 'Approve & Import', exact: true }).isDisabled());
+  assert.equal(lmsRequests.length, 1, 'Preview must issue one explicit LMS operation');
+  if (mobile) await verifyMobile();
+  await capture(`lms-import-preview-${layout}.png`);
+  await click('Close LMS panel');
   const search = page.getByRole('searchbox', { name: 'Search programmes' });
   await search.fill('absent programme');
   await page.getByText('No programmes match your search.', { exact: true }).waitFor();

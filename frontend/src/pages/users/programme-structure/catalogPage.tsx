@@ -9,6 +9,8 @@ import { CatalogKsbMapping } from './CatalogKsbMapping';
 import { hasValidParents, isEditableParent, type ParentSelection } from './CatalogParents';
 import { PricingWorkspace } from './CatalogPricing';
 import { KsbLibraryCsv } from './KsbLibraryCsv';
+import { CatalogLmsPanel } from './CatalogLmsPanel';
+import { CatalogModuleCountsEditor } from './CatalogModuleCountsEditor';
 import {
   CatalogRequestError, catalogRequest, programmePath, programmesPath,
   type CatalogRecord, type Cohort, type CurriculumModule, type Detail, type Programme, type ProgrammeCounts, type ProgrammeListRecord, type Resource, type StaffOptions,
@@ -316,7 +318,9 @@ export default function ProgrammeCatalogPage({ preview = false }: { preview?: bo
       if (parentResource && (selectedRequest.loading || selectedRequest.error || !hasValidParents(parentResource, editorDetail, creationParents))) {
         throw new Error('Select valid parent records before continuing.');
       }
-      validateDraft(selectedEditor, data, editorDetail, preview);
+      if (!(selectedEditor.resource === 'modules' && selectedEditor.record?.source_system === 'lms')) {
+        validateDraft(selectedEditor, data, editorDetail, preview);
+      }
       const result = persistRecord(selectedEditor, scopeId, data, panel?.revision);
       const record = result instanceof Promise ? await result : result;
       let target = view;
@@ -438,7 +442,11 @@ export default function ProgrammeCatalogPage({ preview = false }: { preview?: bo
           <button type="button" className={action} onClick={() => navigation.go(programme ? programmeView : {})}>
             {programme ? 'Open programme' : 'Open programme catalogue'}
           </button>
-        </div> : effectiveEditor ? <CatalogEditor key={location.key}
+        </div> : effectiveEditor?.resource === 'modules' && effectiveEditor.record?.source_system === 'lms'
+          ? <CatalogModuleCountsEditor key={location.key} module={effectiveEditor.record as CurriculumModule}
+            busy={busy} error={error} onSave={data => void save(data)} onCancel={cancelPanel}
+            onReload={conflict ? reloadAfterConflict : undefined} onDirtyChange={navigation.setDirty} />
+        : effectiveEditor ? <CatalogEditor key={location.key}
           editor={effectiveEditor} detail={editorDetail} staff={staff} busy={busy} error={error} preview={preview}
           staffLoading={staffRequest.loading} staffError={staffRequest.error} retryStaff={() => setStaffRevision(value => value + 1)}
           addPreviewStaff={preview ? (role, member) => setPreviewStaff(current => ({ ...current, [role]: [...current[role], member] })) : undefined}
@@ -474,6 +482,7 @@ export default function ProgrammeCatalogPage({ preview = false }: { preview?: bo
                 onClick={() => setStatusFilter(status)}>{status}</button>)}
             </div>
           </section>
+          {!preview && <CatalogLmsPanel onImported={id => { refresh(); navigateProgramme(id); }} onUpdated={refresh} />}
           {catalogueReady && selectableProgrammes.length > 0 && <div className="flex flex-wrap gap-2" role="group" aria-label="Create catalogue records">
             <button type="button" className={action} onClick={() => editRecord({ resource: 'cohorts' })}>Add cohort</button>
             <button type="button" className={action} onClick={() => editRecord({ resource: 'groups' })}>Add group</button>
@@ -517,6 +526,8 @@ export default function ProgrammeCatalogPage({ preview = false }: { preview?: bo
                 Show archived delivery and curriculum records
               </label>
             </div>}
+            {!preview && !cohort && !template && programme.source_system === 'lms' && <CatalogLmsPanel
+              programme={programme} onImported={id => { refresh(); navigateProgramme(id); }} onUpdated={refresh} />}
             {!cohort && !template && section === 'overview' && <ProgrammeOverview detail={detail} preview={preview} />}
             {!cohort && !template && section === 'pricing' && <PricingWorkspace key={`${programme.id}:${programme.revision}`} detail={detail} preview={preview} revision={revision} />}
             {section === 'cohorts' && !template && !cohort && <>
@@ -650,13 +661,16 @@ export default function ProgrammeCatalogPage({ preview = false }: { preview?: bo
             </>}
             {template && <>
               <Heading title={template.name} description={`Reusable template${template.current_revision ? ` · Latest revision v${template.current_revision.number}` : ''}`}
-                actions={recordActions('modules', template, template.name, programmeLocked)} />
+                actions={programme.source_system === 'lms' && template.source_system === 'lms' && !template.archived_at
+                  ? <button className={action} onClick={() => editRecord({ resource: 'modules', record: template })}>Edit Progress Reviews and Books</button>
+                  : recordActions('modules', template, template.name, programmeLocked)} />
               <Stats items={[
                 ...(preview ? [] : [['Duration', `${template.weeks} weeks`] as [string, ReactNode]]),
                 [preview ? 'Sessions' : 'Lectures', template.lectures ?? 'Not set'],
                 [preview ? 'Progress reviews' : 'Reviews', template.reviews ?? 'Not set'], ['Books', template.books ?? 'Not set'],
               ]} />
-              <CurriculumContent topics={template.weekly_topics} ksbs={detail.ksbs.filter(row => template.ksb_ids.includes(row.id))} />
+              <CurriculumContent topics={template.weekly_topics} ksbs={detail.ksbs.filter(row => template.ksb_ids.includes(row.id))
+                .map(row => ({ ...row, ...(template.ksb_weights?.[row.id] ? { mapping_weight: template.ksb_weights[row.id] } : {}) }))} />
             </>}
           </div>}
         </DataPanel>}

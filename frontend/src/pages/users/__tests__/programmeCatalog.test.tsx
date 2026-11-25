@@ -823,6 +823,48 @@ it('saves structured weekly topics and multiple KSB references on a curriculum m
   });
 });
 
+it('edits LMS module counts from the module library and reloads the saved values', async () => {
+  const linkedProgramme = { ...programme, source_system: 'lms', external_id: 'PROG-ME-L4' };
+  const module = { ...metadata, source_system: 'lms', external_id: 'source-module', id: 'module',
+    name: 'Planning LMS', weeks: 2, lectures: 2, reviews: null, books: null,
+    current_revision: { id: 'pin-one', number: 1 }, weekly_topics: [], ksb_ids: [] };
+  const scope = base + `programmes/${programme.id}/`;
+  const patches = vi.fn();
+  vi.stubGlobal('fetch', vi.fn(async (url: string, request?: RequestInit) => {
+    if (url === base + 'staff/') return json({ coaches: [], tutors: [] });
+    if (url === base + 'programmes/') return json({ programmes: [linkedProgramme] });
+    if (url === scope) return json({ ...detail, programme: linkedProgramme, modules: [module] });
+    if (url === scope + 'modules/module/' && request?.method === 'PATCH') {
+      const data = JSON.parse(String(request.body));
+      patches(new Headers(request.headers).get('If-Match'), data);
+      Object.assign(module, data, { revision: 2, current_revision: { id: 'pin-two', number: 2 } });
+      return json(module);
+    }
+    if (url.endsWith('/pricing/')) return json({ pricing });
+    throw new Error(`Unexpected request: ${url}`);
+  }));
+  const user = userEvent.setup();
+  const first = mount();
+  await user.click(await screen.findByRole('button', { name: 'Fixture programme' }));
+  await user.click(await screen.findByRole('button', { name: 'Curriculum' }));
+  await user.click(await screen.findByRole('button', { name: 'Planning LMS' }));
+  await user.click(screen.getByRole('button', { name: 'Edit Progress Reviews and Books' }));
+  const form = within(screen.getByRole('form', { name: 'Edit module counts' }));
+  expect(form.getByRole('button', { name: 'Save counts' })).toBeDisabled();
+  await user.type(form.getByRole('spinbutton', { name: 'Progress Reviews' }), '4');
+  await user.type(form.getByRole('spinbutton', { name: 'Books' }), '2');
+  await user.click(form.getByRole('button', { name: 'Save counts' }));
+  expect(patches).toHaveBeenCalledWith('"1"', { reviews: 4, books: 2 });
+  expect(await screen.findByText('Module template saved.')).toBeVisible();
+  first.unmount();
+  render(<MemoryRouter initialEntries={[`/?programme=${programme.id}&tab=curriculum&curriculum=templates&template=module`]}>
+    <ProgrammeCatalogPage />
+  </MemoryRouter>);
+  expect(await screen.findByRole('button', { name: 'Edit Progress Reviews and Books' })).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Edit Progress Reviews and Books' }));
+  expect(within(screen.getByRole('form', { name: 'Edit module counts' })).getByRole('spinbutton', { name: 'Progress Reviews' })).toHaveValue(4);
+});
+
 it('saves only KSB links with the displayed revision and handles a stale assignment', async () => {
   const ksbs = [
     { ...metadata, id: 'knowledge', code: 'K1', description: 'Understand the process' },

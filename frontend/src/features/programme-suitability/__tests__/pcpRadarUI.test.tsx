@@ -29,17 +29,17 @@ afterAll(() => vi.unstubAllGlobals());
 
 it('shows all 71 PCP KSBs once with coverage from the selected modules', () => {
   render(<Harness />);
-  const nav = screen.getByRole('navigation', { name: 'Selected modules' });
+  const nav = screen.getByRole('region', { name: 'Your prior knowledge by module' });
   const groups = allocatePcpQuestions(pcpProfile, pcpModules());
-  expect(within(nav).queryByRole('button')).toBeNull();
-  expect(within(nav).getAllByText(/0 of \d+ answered/)).toHaveLength(5);
+  expect(within(nav).getByRole('button', { name: 'About your scores' })).toBeVisible();
+  expect(within(nav).getAllByText(/0 of \d+ KSBs assessed/)).toHaveLength(5);
   expect(document.querySelectorAll('details, summary')).toHaveLength(0);
   expect(screen.queryByText('Earned Value Management (EVM)')).toBeNull();
   expect(screen.getByText('COVERED BY MODULES')).toBeVisible();
   const displayedCodes = new Set<string>();
   for (const group of groups) {
     expect(within(nav).getByText(group.title)).toBeVisible();
-    expect(within(nav).getByText(`0 of ${group.questions.length} answered`)).toBeVisible();
+    expect(within(nav).getByText(`0 of ${group.questions.length} KSBs assessed`)).toBeVisible();
     for (const question of group.questions) {
       const original = source.ksbs.find((ksb) => ksb.code === question.codes[0])!;
       expect(screen.getByText(`${original.code} ${original.full_description}`)).toBeVisible();
@@ -50,12 +50,12 @@ it('shows all 71 PCP KSBs once with coverage from the selected modules', () => {
   }
   expect(screen.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(71);
   expect(displayedCodes.size).toBe(71);
-  expect(screen.getByText('0 of 71 answered')).toBeVisible();
+  expect(screen.getByText('0 of 71')).toBeVisible();
   expect(mock.write).not.toHaveBeenCalled();
   expect(mock.fetch).not.toHaveBeenCalled();
 });
 
-it('reuses the existing 9-option popup with full text, note/evidence and a stable sequential next question', async () => {
+it('reuses the 9-option popup without new note/evidence and advances to the next question', async () => {
   render(<Harness />);
   await userEvent.click(screen.getByRole('button', { name: 'Answer K1' }));
   const dialog = within(screen.getByRole('dialog'));
@@ -63,11 +63,11 @@ it('reuses the existing 9-option popup with full text, note/evidence and a stabl
   expect(dialog.getByText(new RegExp(source.ksbs[0].full_description))).toBeVisible();
   expect(dialog.getAllByRole('radio')).toHaveLength(9);
   await userEvent.click(dialog.getByRole('radio', { name: /Champion/ }));
-  expect(dialog.getByRole('button', { name: /Confirm & next/i })).toBeDisabled();
-  await userEvent.type(dialog.getByLabelText(/Add a note/), 'Existing rating workflow');
-  await userEvent.upload(screen.getByRole('dialog').querySelector('input[type="file"]')!, new File(['evidence'], 'evidence.txt', { type: 'text/plain' }));
+  expect(dialog.getByRole('button', { name: /Confirm & next/i })).toBeEnabled();
+  expect(dialog.queryByLabelText(/Add a note/)).toBeNull();
+  expect(screen.getByRole('dialog').querySelector('input[type="file"]')).toBeNull();
   await userEvent.click(dialog.getByRole('button', { name: /Confirm & next/i }));
-  expect(mock.write.mock.lastCall![0].assessments['st0845-v1-1-K1']).toMatchObject({ level: 'champion', note: 'Existing rating workflow', evidenceFiles: ['evidence.txt'] });
+  expect(mock.write.mock.lastCall![0].assessments['st0845-v1-1-K1']).toMatchObject({ level: 'champion', note: '', evidenceFiles: [] });
   expect(screen.getByText('Question 2 of 71')).toBeVisible();
 });
 
@@ -79,25 +79,25 @@ it('keeps an answered redistributed KSB attached to its profile ID across module
   const firstState = pcpModules();
   const view = render(<Harness saved={saved} modules={firstState} />);
   const owner = allocatePcpQuestions(pcpProfile, firstState).find((group) => group.questions.some((ksb) => ksb.id === id))!;
-  const nav = within(screen.getByRole('navigation', { name: 'Selected modules' }));
+  const nav = within(screen.getByRole('region', { name: 'Your prior knowledge by module' }));
   expect(nav.getByText(owner.title)).toBeVisible();
-  expect(nav.getByText(`1 of ${owner.questions.length} answered`)).toBeVisible();
+  expect(nav.getByText(`1 of ${owner.questions.length} KSBs assessed`)).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: `Edit ${finance.code}` }));
-  expect(screen.getByLabelText(/Add a note/)).toHaveValue(answer.note);
-  expect(within(screen.getByRole('dialog')).getByText('historical.pdf')).toBeVisible();
+  expect(screen.queryByLabelText(/Add a note/)).toBeNull();
+  expect(within(screen.getByRole('dialog')).queryByText('historical.pdf')).toBeNull();
   view.rerender(<Harness saved={saved} modules={pcpModules('operational', ['earned-value', 'pmi-sp'])} />);
-  expect(within(screen.getByRole('dialog')).getByLabelText(/Add a note/)).toHaveValue(answer.note);
+  expect(within(screen.getByRole('dialog')).queryByLabelText(/Add a note/)).toBeNull();
   expect(within(screen.getByRole('dialog')).getByText((text) => text.includes(finance.full_description))).toBeVisible();
-  expect(screen.getByText('1 of 71 answered')).toBeVisible();
+  expect(screen.getByText('1 of 71')).toBeVisible();
   await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
   expect(mock.write).not.toHaveBeenCalled();
 });
 
 it.each(['portfolio', 'earned-value'])('renders the four Chartered child modules and only selected %s optional', (optional) => {
   render(<Harness modules={pcpModules('chartered', [optional])} />);
-  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getAllByText(/0 of \d+ answered/)).toHaveLength(6);
+  expect(within(screen.getByRole('region', { name: 'Your prior knowledge by module' })).getAllByText(/0 of \d+ KSBs assessed/)).toHaveLength(6);
   expect(screen.queryByText('Certified PMO Professional Level 6')).toBeNull();
-  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByText(optional === 'portfolio' ? 'Portfolio Management (APMG)' : 'Earned Value Management (APMG)')).toBeVisible();
+  expect(within(screen.getByRole('region', { name: 'Your prior knowledge by module' })).getByText(optional === 'portfolio' ? 'Portfolio Management (APMG)' : 'Earned Value Management (APMG)')).toBeVisible();
   expect(screen.queryByText(optional === 'portfolio' ? 'Earned Value Management (APMG)' : 'Portfolio Management (APMG)')).toBeNull();
 });
 
@@ -124,7 +124,7 @@ it('advances across a PCP module boundary and updates its coverage count', async
   const last = groups[0].questions.at(-1)!;
   const next = groups[1].questions[0];
   render(<Harness />);
-  const nav = screen.getByRole('navigation', { name: 'Selected modules' });
+  const nav = screen.getByRole('region', { name: 'Your prior knowledge by module' });
   expect(within(nav).getByText(groups[0].title)).toBeVisible();
   expect(within(nav).getByText(groups[1].title)).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: `Answer ${last.codes[0]}` }));
@@ -134,8 +134,8 @@ it('advances across a PCP module boundary and updates its coverage count', async
   await userEvent.click(dialog.getByRole('button', { name: /Confirm & next/i }));
   expect(screen.getByText('Question 17 of 71')).toBeVisible();
   expect(within(screen.getByRole('dialog')).getByText((text) => text.includes(next.title))).toBeVisible();
-  expect(within(nav).getByText('1 of 16 answered')).toBeVisible();
-  expect(screen.getByText('1 of 71 answered')).toBeVisible();
+  expect(within(nav).getByText('1 of 16 KSBs assessed')).toBeVisible();
+  expect(screen.getByText('1 of 71')).toBeVisible();
   expect(mock.write).toHaveBeenCalledTimes(1);
   expect(mock.write.mock.lastCall![0].assessments[last.id]).toMatchObject({ ksbId: last.id, level: 'never' });
   await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
@@ -146,10 +146,10 @@ it('continues at the first unanswered KSB without an answer write', async () => 
   const groups = allocatePcpQuestions(pcpProfile, pcpModules());
   const saved = Object.fromEntries(groups[0].questions.map((ksb) => [ksb.id, { ksbId: ksb.id, level: 'never' as const, note: '', evidenceFiles: [], actionPlan: null }]));
   render(<Harness saved={saved} />);
-  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByText(groups[1].title)).toBeVisible();
+  expect(within(screen.getByRole('region', { name: 'Your prior knowledge by module' })).getByText(groups[1].title)).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Continue assessment' }));
   expect(screen.getByText('Question 17 of 71')).toBeVisible();
-  expect(within(screen.getByRole('navigation', { name: 'Selected modules' })).getByText('16 of 16 answered')).toBeVisible();
-  expect(screen.getByText('16 of 71 answered')).toBeVisible();
+  expect(within(screen.getByRole('region', { name: 'Your prior knowledge by module' })).getByText('16 of 16 KSBs assessed')).toBeVisible();
+  expect(screen.getByText('16 of 71')).toBeVisible();
   expect(mock.write).not.toHaveBeenCalled();
 });
