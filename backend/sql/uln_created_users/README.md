@@ -1,8 +1,28 @@
-# ULN canonical storage: proposed deployment, awaiting production approval
+# ULN canonical storage: central migration and rollback runbook
 
-Prepared and rehearsed 25 November 2026. **No production migration or write test
-has been run.** Production continues using `Wizard_Plr.ULN` because
-`ENROLMENT_ULN_STORAGE` defaults to `legacy`. No new Django model field is mapped.
+The two exact approved SQL scripts were applied centrally on 25 November 2026,
+after backup/recovery verification, the shared-writer pause and preflight.
+Existing enrolment data, PLR/evidence, orphan rows, layouts and assignments were
+verified unchanged. No synthetic write tests were run against production.
+
+This final release defaults `ENROLMENT_ULN_STORAGE` to `created_users`. The
+pre-cutover compatibility commit defaulted to `legacy`; explicit legacy mode is
+retained for coordinated rollback. No new Django learner model field is mapped.
+
+**Developers do not run database migrations.** The coordinator completes the
+code and testing, the project owner pushes it through the normal Git workflow,
+and colleagues pull that completed compatible version before restarting their
+backends. Keep all other backends stopped until release. Do not distribute or
+apply individual Git bundles/patches as part of this workflow.
+
+Before restarting, remove any old `ENROLMENT_ULN_STORAGE=legacy` override or
+change it to `created_users` in backend/.env and terminal/IDE settings. An
+explicit environment override takes precedence over the new canonical default.
+Keep DATABASE_URL and credentials unchanged; never point the app at recovery.
+Do not rerun either SQL script or independently restart a legacy-mode writer.
+
+The preparation and cutover checklists below document the guarded sequence used
+for this centrally completed schema change and the retained rollback procedure.
 
 ## Production preflight
 
@@ -363,10 +383,10 @@ scope and existing application duplicate/concurrency protections are unchanged.
    manual acceptance checks. Do not run synthetic write/load tests on Neon.
    Keep legacy storage for the compatibility/rollback period.
 
-No production setting has been changed, no application service restarted, and
-no migration applied as part of this preparation. Expansion alone never enables
-canonical mode. Do not run backfill again after cutover, even if every ULN is
-currently NULL; it is not an ongoing reconciliation job.
+The preparation release kept canonical mode disabled until both SQL stages and
+the required checks passed. This final release uses canonical storage. Expansion
+alone was not permission to enable it. Do not run backfill again after cutover,
+even if every ULN is currently NULL; it is not an ongoing reconciliation job.
 
 ## Backup, rollback and recovery
 

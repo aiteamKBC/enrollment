@@ -17,13 +17,15 @@ const api = vi.hoisted(() => ({
   getPlrEvidenceUrl: vi.fn(),
 }));
 vi.mock('@/api/plrEvidence', () => api);
-const wizard = vi.hoisted(() => ({ records: [] as PlrRecord[], setSection: vi.fn() }));
+const wizard = vi.hoisted(() => ({ records: [] as PlrRecord[], setSection: vi.fn(), admin: false, saveIlr: vi.fn() }));
 vi.mock("../WizardContext.helpers", () => ({
   useWizard: () => ({
     userId: '41',
     isCommercial: false,
     draft: { plr: { uln: '', records: wizard.records } },
     setSection: wizard.setSection,
+    canEditUln: wizard.admin,
+    saveIlr: wizard.saveIlr,
   }),
 }));
 vi.mock("@/hooks/useToast.helpers", () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
@@ -42,6 +44,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('AppIcon', AppIcon);
   wizard.records = [];
+  wizard.admin = false;
+  wizard.saveIlr.mockResolvedValue(undefined);
   api.fetchPlrEvidence.mockResolvedValue([]);
 });
 
@@ -54,7 +58,9 @@ describe('Personal Learning Record step', () => {
     expect(screen.queryByRole('button', { name: /Get PLR/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Export to CSV')).not.toBeInTheDocument();
     expect(screen.getByText('There are no personal learning records.')).toBeInTheDocument();
-    expect(screen.getByText('Certificate / Evidence')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Edit' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.queryByText('Certificate / Evidence')).not.toBeInTheDocument();
   });
 
   it('is complete without a ULN or any records', () => {
@@ -105,6 +111,7 @@ describe('Personal Learning Record step', () => {
   });
 
   it('edits an entry in place, reading a free-text subject back as Other', async () => {
+    wizard.admin = true;
     wizard.records = [GCSE, { ...GCSE, id: 'rec-2', subject: 'Business Management (Z0002074)', qualificationType: 'Other', recordType: 'Imported' }];
     render(<Plr />);
 
@@ -122,9 +129,11 @@ describe('Personal Learning Record step', () => {
     await userEvent.type(box('Please specify the qualification type'), 'Non regulated provision');
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
-    const records = wizard.setSection.mock.lastCall![1].records as PlrRecord[];
-    expect(records.map((r) => r.id)).toEqual(['rec-1', 'rec-2']);
-    expect(records[1]).toEqual(expect.objectContaining({ grade: 'Pass', subject: 'Business Management (Z0002074)', recordType: 'Imported' }));
+    expect(wizard.saveIlr).toHaveBeenCalledWith({ plrRecordChange: expect.objectContaining({
+      action: 'edit', id: 'rec-2', expected: wizard.records[1],
+      record: expect.objectContaining({ grade: 'Pass', subject: 'Business Management (Z0002074)', recordType: 'Imported' }),
+    }) });
+    expect(wizard.setSection).not.toHaveBeenCalled();
   });
 
   it('uploads a certificate for the entry, and takes it back if a new entry is cancelled', async () => {
@@ -144,23 +153,82 @@ describe('Personal Learning Record step', () => {
     expect(wizard.setSection).not.toHaveBeenCalled();
   });
 
-  it('lists an entry’s stored certificates in the table', async () => {
+  it('preserves stored certificates in the existing Admin edit modal', async () => {
+    wizard.admin = true;
     wizard.records = [GCSE];
     api.fetchPlrEvidence.mockResolvedValue([
       { id: 'f9', recordRef: 'rec-1', filename: 'gcse-maths.pdf', contentType: 'application/pdf', sizeBytes: 4, uploadedAt: null },
     ]);
     render(<Plr />);
-
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Maths' }));
     expect(await screen.findByRole('button', { name: 'gcse-maths.pdf' })).toBeInTheDocument();
     expect(screen.getByText('20/08/2020')).toBeInTheDocument();
     expect(screen.getByText('1 - 1 of 1 items')).toBeInTheDocument();
   });
 
-  it('deletes an entry from the table', async () => {
+  it('requires confirmation before requesting a selected Admin deletion', async () => {
+    wizard.admin = true;
     wizard.records = [GCSE];
     render(<Plr />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete Maths' }));
-    expect(wizard.setSection).toHaveBeenCalledWith('plr', expect.objectContaining({ records: [] }));
+    expect(wizard.saveIlr).not.toHaveBeenCalled();
+    const confirm = screen.getByRole('dialog', { name: 'Delete personal learning record' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+    expect(wizard.saveIlr).toHaveBeenCalledWith({ plrRecordChange: { action: 'delete', id: GCSE.id, expected: GCSE } });
+    expect(api.deletePlrEvidence).not.toHaveBeenCalled();
+    expect(wizard.setSection).not.toHaveBeenCalled();
   });
+
+  it('leaves the Student Edit and Delete cells empty and keeps Add available', () => {
+    wizard.records = [GCSE];
+    render(<Plr />);
+    const row = screen.getByText('Maths').closest('tr')!;
+    const cells = within(row).getAllByRole('cell');
+    expect(cells.at(-2)).toBeEmptyDOMElement();
+    expect(cells.at(-1)).toBeEmptyDOMElement();
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+  });
+
+  it('keeps the edit modal and record intact when an Admin save fails', async () => {
+    wizard.admin = true;
+    wizard.records = [GCSE];
+    wizard.saveIlr.mockRejectedValueOnce(new Error('This PLR record has changed. Reload before editing.'));
+    render(<Plr />);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Maths' }));
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('This PLR record has changed');
+    expect(dialog()).toBeInTheDocument();
+    expect(wizard.setSection).not.toHaveBeenCalled();
+  });
+
+  it('keeps the confirmation and record intact when an Admin deletion fails', async () => {
+    wizard.admin = true;
+    wizard.records = [GCSE];
+    wizard.saveIlr.mockRejectedValueOnce(new Error('PLR could not be saved.'));
+    render(<Plr />);
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Maths' }));
+    const confirm = screen.getByRole('dialog', { name: 'Delete personal learning record' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('PLR could not be saved.');
+    expect(confirm).toBeInTheDocument();
+    expect(screen.getByText('Maths')).toBeInTheDocument();
+    expect(api.deletePlrEvidence).not.toHaveBeenCalled();
+  });
+
+  for (const credits of [null, 0]) {
+    it(`preserves ${credits === null ? 'missing' : 'explicit zero'} credits and other blank imported fields while editing`, async () => {
+      wizard.admin = true;
+      wizard.records = [{ ...GCSE, recordType: 'Imported', placeOfStudy: '', level: '', awardDate: '', grade: '', credits }];
+      render(<Plr />);
+      await userEvent.click(screen.getByRole('button', { name: 'Edit Maths' }));
+      expect(box('Credits')).toHaveValue(credits === null ? '' : '0');
+      await userEvent.type(box('Grade'), 'Reviewed');
+      await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
+      expect(wizard.saveIlr).toHaveBeenCalledWith({ plrRecordChange: expect.objectContaining({ record: expect.objectContaining({
+        credits, placeOfStudy: '', level: '', awardDate: '', grade: 'Reviewed',
+      }) }) });
+    });
+  }
 });
