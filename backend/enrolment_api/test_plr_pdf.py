@@ -104,3 +104,73 @@ class SyntheticPdfTests(unittest.TestCase):
         self.assertEqual(len(result['records']), 2)
         self.assertEqual(result['records'][1]['referenceNumber'], 'SYN-B')
         self.assertNotIn('subject', result['records'][1])
+
+    def test_tightly_spaced_rows_remain_separate_in_both_sections(self):
+        for section, row in (
+            ('Learning Events', ['Synthetic College', '', 'Award', 'SYN-A', 'Synthetic Award', '', '', '', '', '', '']),
+            ('Achievements', ['Synthetic College', '', 'Award', '3', 'Synthetic Award', 'SYN-A', '', '', '']),
+        ):
+            for identical in (True, False):
+                with self.subTest(section=section, identical=identical):
+                    second = row.copy()
+                    reference_index = 3 if section == 'Learning Events' else 5
+                    if not identical:
+                        second[reference_index] = 'SYN-B'
+                    records = parse_pdf(synthetic_pdf([(section, [row, second])], row_padding=1.5))['records']
+                    self.assertEqual(len(records), 2)
+                    self.assertEqual([r['referenceNumber'] for r in records], [row[reference_index], second[reference_index]])
+                    self.assertTrue(all(r['subject'] == 'Synthetic Award' for r in records))
+
+    def test_wrapped_reference_cell_is_one_record_in_both_sections(self):
+        for section, row in (
+            ('Learning Events', ['Synthetic College', '', 'Award', 'SYN-\n001\nA', 'Synthetic Award', '', '', '', '', '', '']),
+            ('Achievements', ['Synthetic College', '', 'Award', '3', 'Synthetic Award', 'SYN-\n001\nA', '', '', '']),
+        ):
+            with self.subTest(section=section):
+                records = parse_pdf(synthetic_pdf([(section, [row])]))['records']
+                self.assertEqual(len(records), 1)
+                self.assertEqual(records[0]['referenceNumber'], 'SYN- 001 A')
+                self.assertEqual(records[0]['subject'], 'Synthetic Award')
+
+    def test_larger_line_spacing_preserves_wrapped_cells_and_next_record(self):
+        first = ['Synthetic College\nNorth Campus', '', 'Extended\nCertificate', 'SYN-A',
+                 'Synthetic award\ncontinued title', '', '', '', '', '', '']
+        second = ['', '', 'Award', 'SYN-B', 'Separate award', '', '', '', '', '', '']
+        for counts in (True, False):
+            with self.subTest(printed_counts=counts):
+                records = parse_pdf(synthetic_pdf([('Learning Events', [first, second])],
+                    line_spacing=14, printed_counts=counts))['records']
+                self.assertEqual(len(records), 2)
+                self.assertEqual(records[0]['provider'], 'Synthetic College North Campus')
+                self.assertEqual(records[0]['qualificationType'], 'Extended Certificate')
+                self.assertEqual(records[0]['subject'], 'Synthetic award continued title')
+                self.assertEqual(records[1]['referenceNumber'], 'SYN-B')
+
+    def test_wrapped_reference_can_continue_on_the_next_page(self):
+        first = ['Synthetic College', '', 'Award', 'SYN-', 'Synthetic award', '', '', '', '', '', '']
+        continuation = ['', '', '', '001', 'continued title', '', '', '', '', '', '']
+        for banner in (True, False):
+            with self.subTest(repeat_banners=banner):
+                records = parse_pdf(synthetic_pdf([('Learning Events', [first]), ('Learning Events', [continuation])],
+                    totals_override={'Learning Events': 1}, repeat_banners=banner))['records']
+                self.assertEqual(len(records), 1)
+                self.assertEqual(records[0]['referenceNumber'], 'SYN- 001')
+                self.assertEqual(records[0]['subject'], 'Synthetic award continued title')
+
+    def test_ambiguous_boundaries_are_not_guessed_from_a_record_count(self):
+        first = ['Synthetic College', '', 'Award', 'SYN-A', 'Synthetic award', '', '', '', '', '', '']
+        second = ['', '', '', 'SYN-B', '', '', '', '', '', '', '']
+        third = ['', '', '', 'SYN-C', '', '', '', '', '', '', '']
+        for printed_counts, total in ((True, 2), (False, 3)):
+            with self.subTest(printed_counts=printed_counts):
+                with self.assertRaises(PlrError) as error:
+                    parse_pdf(synthetic_pdf([('Learning Events', [first, second, third])],
+                        row_padding=1.5, printed_counts=printed_counts, totals_override={'Learning Events': total}))
+                self.assertEqual(error.exception.code, 'ambiguous_rows')
+
+    def test_unanchored_distant_text_is_not_silently_appended_to_a_record(self):
+        first = ['Synthetic College', '', 'Award', 'SYN-A', 'Synthetic award', '', '', '', '', '', '']
+        unknown = ['', '', '', '', 'Unidentified separate text', '', '', '', '', '', '']
+        with self.assertRaises(PlrError):
+            parse_pdf(synthetic_pdf([('Learning Events', [first, unknown])],
+                printed_counts=False, row_padding=25))

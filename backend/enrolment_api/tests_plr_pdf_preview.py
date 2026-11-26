@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, SimpleTestCase
 from .models import ExtendedIlr, WizardPlr, WizardPlrRecord
 from learner_api.models import EnrolmentUser
 from .plr_pdf_preview import plr_pdf_preview
-from .plr_fixtures import synthetic_pdf
+from .plr_fixtures import synthetic_pdf, synthetic_boundary_cases
 from .plr_pdf import MAX_BYTES
 
 
@@ -71,6 +71,19 @@ class PdfPreviewTests(TestCase):
         self.assertEqual(ExtendedIlr.objects.get(**self.scope).wizard_draft, saved)
         self.assertEqual(WizardPlr.objects.get(**self.scope).uln, '1234509876')
         self.assertIn('no-store', response['Cache-Control'])
+
+    def test_previously_rejected_row_layouts_preview_without_writes(self):
+        before = list(WizardPlrRecord.objects.values())
+        saved = ExtendedIlr.objects.get(**self.scope).wizard_draft
+        for name, pdf, expected in synthetic_boundary_cases():
+            with self.subTest(layout=name):
+                response = self.call(pdf)
+                self.assertEqual(response.status_code, 200, response.content)
+                preview = json.loads(response.content)
+                self.assertEqual([(r['referenceNumber'], r['subject']) for r in preview['records']], expected)
+                self.assertTrue(preview['identityVerified'])
+                self.assertEqual(list(WizardPlrRecord.objects.values()), before)
+                self.assertEqual(ExtendedIlr.objects.get(**self.scope).wizard_draft, saved)
 
     def test_permissions_are_enforced_even_with_development_auth_bypass(self):
         for gate in ('0', '1'):

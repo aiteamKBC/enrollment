@@ -52,7 +52,8 @@ describe('Admin navigation', () => {
     expect(container.querySelector('.enrolment-admin-shell')).toBeInTheDocument();
     expect(container.querySelector('.enrolment-admin-content')).toHaveTextContent('Content');
     expect(container.querySelector(`nav a[href="${path}"]`)).toHaveAttribute('aria-current', 'page');
-    expect(container.querySelector('.up-college-lockup img')).toHaveAttribute('src', '/images/Kent%20logo.png');
+    expect(container.querySelector('nav .up-sidebar-logo .up-college-lockup img')).toHaveAttribute('src', '/images/Kent%20logo.png');
+    expect(container.querySelector('header .up-college-lockup')).not.toBeInTheDocument();
     expect(container.querySelector('.up-sidebar-art img')).toHaveAttribute('src', '/images/dashboard-sidebar-building.png');
   });
 
@@ -78,9 +79,10 @@ describe('Admin navigation', () => {
   it('keeps the staff navigation order without the retired Report Templates link', () => {
     auth.account.role = 'admin';
     renderShell();
-    const links = within(screen.getByRole('navigation', { name: 'Enrolment navigation' })).getAllByRole('link');
+    const links = within(screen.getByRole('navigation', { name: 'Enrolment navigation' })).getAllByRole('link').filter(link => link.getAttribute('href') !== '/enrollment');
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['Users', '/users'],
+      ['Organisations', '/users/organisations'],
       ['Eligibility Applications', '/users/eligibility-applications'],
       ['Eligibility Form Builder', '/users/eligibility-builder'],
       ['Enrolment Form Builder', '/users/wizard-builder'],

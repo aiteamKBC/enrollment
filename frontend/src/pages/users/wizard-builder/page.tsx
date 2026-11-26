@@ -7,7 +7,7 @@ import { configurationErrors } from '@/features/programme-suitability/modules/co
 import { WorkspaceShell } from '@/components/feature/WorkspaceShell';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { SelectMenu, type SelectOption } from '@/components/feature/SelectField';
-import { AdminPageHeader } from '@/pages/admin/_shared/AdminPage';
+import './wizardBuilder.css';
 import { useToast } from "@/hooks/useToast.helpers";
 import { roleNavMap } from '@/mocks/navigation';
 import * as WizardLayoutApi from '@/api/wizardLayout';
@@ -256,14 +256,20 @@ export default function WizardBuilderPage() {
 
   return (
     <WorkspaceShell role="compliance" roleLabel={enrolmentNav.label} navItems={enrolmentNav.items} workspaceLabel={enrolmentNav.workspaceLabel} pageTitle="Enrolment wizard" pageSubtitle="Edit the enrolment wizard learners complete at onboarding">
-      <div className="admin-console-page min-w-0 space-y-4 p-3 md:space-y-5 md:p-6">
-        <AdminPageHeader
-          title={`${kind === 'apprenticeship' ? 'Apprenticeship' : 'Commercial'} enrolment wizard`}
-          description="Edit the onboarding wizard. Learners use the latest version until they reach Skills Radar; submitted learners keep their submitted version."
-          icon="ri-magic-line"
-          eyebrow="Enrolment"
-          actions={
-            <div className="flex flex-wrap items-start gap-2">
+      <div className="wizard-builder-page admin-console-page min-w-0">
+        <section className="wb-hero" aria-labelledby="wb-hero-title">
+          <svg className="wb-hero-waves" viewBox="0 0 1500 128" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="wb-gold"><stop stopColor="#edcb7b"/><stop offset="1" stopColor="#edcb7b" stopOpacity="0"/></linearGradient></defs>
+            <path fill="#e9dcfb" fillOpacity=".7" d="M540 128C730 128 720 -30 970 0H1500V128Z" />
+            <path fill="#e0cdf7" fillOpacity=".55" d="M850 128C1030 12 1050 128 1160 128C1290 128 1420 10 1500 30V128Z" />
+            <path fill="none" stroke="url(#wb-gold)" strokeWidth="5" d="M830 128Q960 45 1080 128M1240 0Q1360 -70 1500 -20" />
+          </svg>
+          <div className="wb-hero-copy">
+            <img className="wb-hero-steps" src="/images/enrolment-builder/enrolment-wizard-steps-icon.png" alt="" />
+            <div><p className="wb-eyebrow">ENROLMENT</p><h2 id="wb-hero-title">{ kind === 'apprenticeship' ? 'Apprenticeship' : 'Commercial'} enrolment wizard</h2><p>Edit the onboarding wizard. Learners use the latest version until they reach Skills Radar; submitted learners keep their submitted version.</p></div>
+          </div>
+          <img className="wb-hero-laptop" src="/images/enrolment-builder/enrolment-wizard-laptop.png" alt="" />
+            <div className="wb-hero-actions flex flex-wrap items-start gap-2">
               <button type="button" className={btnSecondary} disabled={!layout || !version} onClick={() => setVersionAction('create')}>
                 <AppIcon className="ri-git-branch-line" />Create targeted version
               </button>
@@ -277,11 +283,10 @@ export default function WizardBuilderPage() {
                 <AppIcon className="ri-upload-cloud-2-line" />Publish changes
               </button>
             </div>
-          }
-        />
+        </section>
 
-        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-foreground-200 bg-background-50 p-3">
-          <label className="w-64 max-w-full text-[12px] font-medium text-foreground-700">Form type
+        <div className="wb-version-controls flex flex-wrap items-end gap-3 rounded-xl border border-foreground-200 bg-background-50 p-3">
+          <label className="wb-form-type w-64 max-w-full text-[12px] font-medium text-foreground-700"><AppIcon className="ri-stack-line wb-control-icon" />Form type
             <SelectMenu className="mt-1" triggerClassName="!h-10" value={kind} ariaLabel="Form type"
               options={[{ value: 'apprenticeship', label: 'Apprenticeship' }, { value: 'commercial', label: 'Commercial' }]}
               onChange={(value) => {
@@ -298,11 +303,11 @@ export default function WizardBuilderPage() {
                 setKind(next);
               }} />
           </label>
-          <label className="min-w-64 flex-1 text-[12px] font-medium text-foreground-700">Version to edit
+          <label className="wb-version-picker min-w-64 flex-1 text-[12px] font-medium text-foreground-700"><AppIcon className="ri-price-tag-3-line wb-control-icon" />Version to edit
             <SelectMenu className="mt-1" triggerClassName="!h-10" value={version === defaultVersion ? 'current' : String(version ?? 'current')} options={versionOptions}
               ariaLabel="Version to edit" onChange={(value) => void loadVersion(value)} disabled={loading} />
           </label>
-          <label className="flex min-h-10 items-center gap-2 text-[12px] font-medium text-foreground-700">
+          <label className="wb-archived-toggle flex min-h-10 items-center gap-2 text-[12px] font-medium text-foreground-700">
             <input type="checkbox" checked={showArchivedVersions} onChange={(e) => {
               const show = e.target.checked;
               if (!show && versions.find((item) => item.version === version)?.archived) {
@@ -313,9 +318,9 @@ export default function WizardBuilderPage() {
             }} />
             Show archived versions
           </label>
-          <button type="button" className={btnSecondary} disabled={!versions.some((item) => item.version === version)} onClick={() => void manageVersion('rename')}>Rename version</button>
+          <button type="button" className={btnSecondary} disabled={!versions.some((item) => item.version === version)} onClick={() => void manageVersion('rename')}><AppIcon className="ri-pencil-line" />Rename version</button>
           <button type="button" className={btnSecondary} disabled={!versions.some((item) => item.version === version)} onClick={() => void manageVersion('archive')}>
-            {versions.find((item) => item.version === version)?.archived ? 'Restore version' : 'Archive version'}
+            <AppIcon className="ri-archive-line" />{versions.find((item) => item.version === version)?.archived ? 'Restore version' : 'Archive version'}
           </button>
         </div>
         {version !== defaultVersion && <p className="text-[12px] text-foreground-600">You are editing a copy of an earlier or targeted version. Use Create targeted version to save it as a new named version.</p>}
@@ -330,17 +335,17 @@ export default function WizardBuilderPage() {
 
         {!loading && !loadError && layout && (
           <>
-            <p className="text-[12px] text-foreground-500" aria-live="polite">
+            <p className="wb-publication text-[12px] text-foreground-500" aria-live="polite">
               {dirty ? (
                 <span className="font-medium text-amber-700"><AppIcon className="ri-edit-circle-line mr-1" />You have unpublished changes.</span>
               ) : version ? (
-                <>Published version {version}{updatedAt ? ` · ${new Date(updatedAt).toLocaleString('en-GB')}` : ''}{updatedBy ? ` · ${updatedBy}` : ''}</>
+                <><span className="wb-version-badge">Published version {version}</span>{updatedAt ? ` · ${new Date(updatedAt).toLocaleString('en-GB')}` : ''}{updatedBy ? ` · ${updatedBy}` : ''}</>
               ) : (
                 'Showing the standard wizard — nothing has been published from the builder yet.'
               )}
             </p>
-            <p className="-mt-2 text-[12px] text-foreground-500">Unsubmitted learners use the latest global version until the successful step change that takes them to Skills Radar, which pins their version. Admins can assign a different published version to unsubmitted learners.</p>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+            <p className="wb-pinning-note text-[12px] text-foreground-500">Unsubmitted learners use the latest global version until the successful step change that takes them to Skills Radar, which pins their version. Admins can assign a different published version to unsubmitted learners.</p>
+            <div className="wb-workspace flex flex-col gap-4 lg:flex-row lg:items-start">
               <StepList
                 layout={layout}
                 selected={selected}
@@ -408,9 +413,9 @@ function StepList({
   const removed = layout.steps.filter((step) => step.hidden);
   const [showRemoved, setShowRemoved] = useState(false);
   return (
-    <nav aria-label="Wizard steps" className="shrink-0 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm lg:w-72">
+    <nav aria-label="Wizard steps" className="wb-steps shrink-0 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm lg:w-72">
       <div className="border-b border-foreground-100 px-4 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground-400">Steps</p>
+        <h2 className="wb-steps-title"><AppIcon className="ri-list-check" />Steps</h2><span className="wb-step-count">{shown.length} steps</span>
       </div>
       <ol className="space-y-0.5 p-2">
         {shown.map((s, i) => {
@@ -505,15 +510,17 @@ function StepEditor({
   };
 
   return (
-    <section aria-label={`${step.label} step`} className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
-      <div className="flex flex-wrap items-end gap-3 border-b border-foreground-100 px-5 py-4">
+    <section aria-label={`${step.label} step`} className="wb-step-editor min-w-0 flex-1 overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
+      <div className="wb-selected-step"><div><span className="wb-selected-number">{layout.steps.filter((entry) => !entry.hidden).findIndex((entry) => entry.slug === step.slug) + 1}</span><h2>{step.label}</h2></div>
+        <button type="button" className={`${btnSecondary} mb-1`} disabled={!canRemoveStep(layout, step.slug) || layout.steps.filter((entry) => !entry.hidden).length <= 1} onClick={() => setConfirmRemoveStep(true)} aria-label={`Remove ${step.label} step`}>
+          <AppIcon className="ri-delete-bin-line" />Remove step
+        </button>
+      </div>
+      <div className="wb-step-name">
         <label className="min-w-[220px] flex-1 text-[12px] font-medium text-foreground-600" htmlFor="builder-step-name">
           Step name
           <input id="builder-step-name" className={`${inputClass} mt-1`} value={step.label} onChange={(e) => edit((l) => updateStep(l, step.slug, { label: e.target.value }))} />
         </label>
-        <button type="button" className={`${btnSecondary} mb-1`} disabled={!canRemoveStep(layout, step.slug) || layout.steps.filter((entry) => !entry.hidden).length <= 1} onClick={() => setConfirmRemoveStep(true)} aria-label={`Remove ${step.label} step`}>
-          <AppIcon className="ri-delete-bin-line" />Remove step
-        </button>
       </div>
       {confirmRemoveStep && (
         <div role="alert" className="mx-5 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-[13px] text-amber-950">
@@ -533,7 +540,7 @@ function StepEditor({
       {(TEXT_SLOTS_BY_ITEM[`step:${step.slug}`] ?? []).length > 0 && (
         <div className="space-y-3 border-b border-foreground-100 px-5 py-4">
           {TEXT_SLOTS_BY_ITEM[`step:${step.slug}`].map((slot) => (
-            <TextEditor key={slot.key} slot={slot} texts={layout.texts} onChange={(v) => edit((l) => setText(l, slot.key, v))} />
+            <TextEditor collapsiblePreview key={slot.key} slot={slot} texts={layout.texts} onChange={(v) => edit((l) => setText(l, slot.key, v))} />
           ))}
         </div>
       )}
@@ -697,14 +704,14 @@ function ItemRow({
   };
 
   return (
-    <div className="flex overflow-hidden rounded-xl border border-foreground-100 bg-background-50">
-      <button type="button" draggable onDragStart={onDragStart} onDragEnd={onDragEnd} className="flex w-14 shrink-0 cursor-grab select-none items-center justify-center border-r border-foreground-100 bg-background-100/40 text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
+    <div className="wb-block flex overflow-hidden rounded-xl border border-foreground-100 bg-background-50">
+      <button type="button" draggable onDragStart={onDragStart} onDragEnd={onDragEnd} className="wb-drag-handle flex w-14 shrink-0 cursor-grab select-none items-center justify-center border-r border-foreground-100 bg-background-100/40 text-foreground-400 active:cursor-grabbing" aria-label={`Drag ${label} to reorder`} title="Drag to reorder">
         <AppIcon className="ri-drag-move-2-line text-[20px]" />
       </button>
-      <div className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="wb-block-body min-w-0 flex-1 px-3 py-2.5">
+        <div className="wb-block-header flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-foreground-900">{label}</p>
+          <p className="wb-block-title text-[13px] font-medium text-foreground-900"><AppIcon className="ri-file-text-line" />{label}</p>
           {slots.length > 0 && !wordy && (
             <p className="mt-0.5 truncate text-[12px] text-foreground-500">“{textFor(layout.texts, slots[0].key)}”</p>
           )}
