@@ -13,6 +13,8 @@ MAX_PAGES = 25
 MAX_WORDS = 100000
 MAX_RECORDS = 2000
 ULN_ERROR = 'Unable to extract a valid ULN from this PDF. Please upload the original Personal Learning Record report.'
+ROW_ERROR = ('The PLR table rows could not be separated unambiguously. '
+             'Please use a complete text-based PLR report. No records were saved.')
 
 
 class PlrError(ValueError):
@@ -70,6 +72,39 @@ def _columns(lines, section):
     return sorted(columns, key=lambda c: c[1])
 
 
+def _resolve_rows(records, optional_boundaries, expected):
+    """Use printed counts only when they identify one possible partition.
+
+    A close reference cell may start a tight row or wrap the previous reference.
+    Each such boundary is retained provisionally. If some, but not all, of those
+    boundaries must be removed, the count cannot tell us which ones: fail closed.
+    Missing counts cannot resolve an uncertain boundary either.
+    """
+    merge_sections = set()
+    for section, count in expected.items():
+        actual = sum(row['sourceSection'] == section for row in records)
+        uncertain = sum(records[index]['sourceSection'] == section for index in optional_boundaries)
+        if not uncertain:
+            continue
+        if count is not None and count not in (actual - uncertain, actual):
+            if not actual - uncertain <= count <= actual:
+                raise PlrError(f'The {section} record count does not match the report. No records were saved.')
+            raise PlrError(ROW_ERROR, 'ambiguous_rows')
+        if count is None:
+            raise PlrError(ROW_ERROR, 'ambiguous_rows')
+        if count == actual - uncertain:
+            merge_sections.add(section)
+    resolved = []
+    for index, row in enumerate(records):
+        if index in optional_boundaries and row['sourceSection'] in merge_sections:
+            for key, value in row.items():
+                if key != 'sourceSection':
+                    resolved[-1][key] = (resolved[-1].get(key, '') + ' ' + value).strip()
+        else:
+            resolved.append(row.copy())
+    return resolved
+
+
 def parse_pdf(data):
     import pymupdf
     if not data or len(data) > MAX_BYTES or not data.startswith(b'%PDF-'):
@@ -84,7 +119,8 @@ def parse_pdf(data):
         identities, records, expected = [], [], {}
         headed_sections, empty_sections = set(), set()
         section, columns, current = None, None, None
-        last_data_bottom = None
+        last_data_bottom, last_data_height, last_data_page = None, None, None
+        optional_boundaries = set()
         word_count = 0
         for page in document:
             horizontal = [line['bbox'] for block in page.get_text('dict', flags=pymupdf.TEXTFLAGS_TEXT)['blocks'] if 'lines' in block
@@ -139,6 +175,7 @@ def parse_pdf(data):
                     if section != previous_section:
                         current = None
                         last_data_bottom = None
+                        last_data_height = last_data_page = None
                     i += 1
                     continue
                 if section and text.startswith('Provider') and 'Awarding' in text:
@@ -161,27 +198,29 @@ def parse_pdf(data):
                     if key:
                         cells[key].append(w[4])
                 cells = {key: ' '.join(value) for key, value in cells.items()}
-                # A wrapped type/reference cell on its own is a continuation,
-                # not a second qualification. Counts still validate boundaries.
-                gap = line[0][1] - last_data_bottom if last_data_bottom is not None else float('inf')
+                # Compare spacing with the text height, not a fixed number of
+                # points. Page coordinates restart and cannot define row gaps.
+                height = max(w[3] - w[1] for w in line)
+                same_page = last_data_page == page.number
+                gap = min(w[1] for w in line) - last_data_bottom if same_page else None
+                close = gap is not None and gap <= max(height, last_data_height) * .75
                 anchor = cells.get('referenceNumber') or cells.get('qualificationType') or (cells.get('provider') and cells.get('subject'))
-                marker = anchor and (current is None or gap > 4
-                                     or (gap < 0 and cells.get('referenceNumber')))
-                if current and cells.get('referenceNumber') and 0 <= gap <= 4:
-                    raise PlrError('A table row boundary could not be verified reliably.')
+                uncertain = current is not None and cells.get('referenceNumber') and (close or not same_page)
+                marker = anchor and (current is None or uncertain or (same_page and not close))
                 if marker:
+                    if uncertain:
+                        optional_boundaries.add(len(records))
                     current = {'sourceSection': section, **cells}
                     records.append(current)
                 elif current is not None:
-                    if gap > 4:
-                        raise PlrError('A table row boundary could not be verified reliably.')
+                    if same_page and not close:
+                        raise PlrError(ROW_ERROR, 'ambiguous_rows')
                     for key, value in cells.items():
                         current[key] = (current.get(key, '') + ' ' + value).strip()
                 elif cells:
                     raise PlrError('A table row could not be reconstructed reliably. No records were saved.')
                 last_data_bottom = max(w[3] for w in line)
-                if len(records) > MAX_RECORDS:
-                    raise PlrError('This report exceeds the 2,000 record limit.')
+                last_data_height, last_data_page = height, page.number
                 i += 1
         if not identities or len({x['uln'] for x in identities}) != 1:
             raise PlrError(ULN_ERROR, 'invalid_uln')
@@ -189,6 +228,9 @@ def parse_pdf(data):
             raise PlrError('The learner identification headers disagree. No records were saved.')
         if not expected:
             raise PlrError('No supported Learning Events or Achievements section was found.')
+        records = _resolve_rows(records, optional_boundaries, expected)
+        if len(records) > MAX_RECORDS:
+            raise PlrError('This report exceeds the 2,000 record limit.')
         for section, count in expected.items():
             actual = sum(r['sourceSection'] == section for r in records)
             if count is not None and actual != count:

@@ -8,7 +8,7 @@ ACH_COLUMNS = [('Provider', 25), ('Awarding Body', 115), ('Type', 210), ('Qualif
 
 def synthetic_pdf(pages=None, uln='1234509876', name='Morgan Synthetic Learner', dob='12 Mar 1994', displayed=None,
                   totals_override=None, repeat_banners=True, printed_counts=True, event_columns=None, horizontal_watermark=False,
-                  repeat_identity=True):
+                  repeat_identity=True, line_spacing=9, row_padding=10):
     pages = pages if pages is not None else [('Learning Events', [
         ['Fictional Academy\nNorth Campus', 'Example Awards', 'Award', '9912345678', 'Award in Fictional\nPayroll Practice (RQF)', '03 Jan 2020', '12 Feb 2020', 'L1', 'Completed', 'Achieved', ''],
         ['Imaginary College', 'Example Awards', 'Certificate', 'SYN-002', 'Digital Practice', '04 Mar 2021', '30 Jun 2021', 'Not Applicable', 'Withdrawn', 'No Achievement', ''],
@@ -39,12 +39,12 @@ def synthetic_pdf(pages=None, uln='1234509876', name='Morgan Synthetic Learner',
             if len(parts) > 1: canvas.drawString(x, 424, ' '.join(parts[1:]))
         y = 403
         for index, row in enumerate(rows):
-            height = max(len(cell.split('\n')) for cell in row) * 9 + 10
+            height = max(len(cell.split('\n')) for cell in row) * line_spacing + row_padding
             if index % 2:
                 canvas.setFillColorRGB(.85, .85, .85); canvas.rect(25, y - height + 9, 790, height, fill=1, stroke=0)
                 canvas.setFillColorRGB(0, 0, 0)
             for cell, (_, x) in zip(row, columns):
-                for offset, text in enumerate(cell.split('\n')): canvas.drawString(x, y - offset * 9, text)
+                for offset, text in enumerate(cell.split('\n')): canvas.drawString(x, y - offset * line_spacing, text)
             y -= height
         if not rows: canvas.drawString(25, y, 'No records')
         if horizontal_watermark: canvas.drawString(25, y - 20, 'Learning Records Service')
@@ -55,6 +55,19 @@ def synthetic_pdf(pages=None, uln='1234509876', name='Morgan Synthetic Learner',
         canvas.showPage()
     canvas.save()
     return stream.getvalue()
+
+
+def synthetic_boundary_cases():
+    """Previously rejected layouts, generated in memory for API regressions."""
+    first = ['Synthetic College', '', 'Award', 'SYN-A', 'Synthetic award', '', '', '', '', '', '']
+    second = ['', '', 'Award', 'SYN-B', 'Separate award', '', '', '', '', '', '']
+    yield 'tight_rows', synthetic_pdf([('Learning Events', [first, second])], row_padding=1.5), [
+        ('SYN-A', 'Synthetic award'), ('SYN-B', 'Separate award')]
+    wrapped = first.copy(); wrapped[3] = 'SYN-\n001'
+    yield 'wrapped_reference', synthetic_pdf([('Learning Events', [wrapped])]), [('SYN- 001', 'Synthetic award')]
+    spaced = first.copy(); spaced[4] = 'Synthetic award\ncontinued title'
+    yield 'spaced_continuation', synthetic_pdf([('Learning Events', [spaced])], line_spacing=14), [
+        ('SYN-A', 'Synthetic award continued title')]
 
 
 if __name__ == '__main__':

@@ -4,11 +4,11 @@ import os
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import DatabaseError
-from django.test import RequestFactory, TestCase
+from django.db import DatabaseError, connections
+from django.test import RequestFactory, TestCase, override_settings
 from learner_api.models import EnrolmentUser
 from .models import WizardPlr, WizardPlrRecord, ExtendedIlr
-from .plr_fixtures import synthetic_pdf, EVENT_COLUMNS
+from .plr_fixtures import synthetic_pdf, synthetic_boundary_cases, EVENT_COLUMNS
 from .plr_pdf_import import plr_pdf_import
 from .plr_record_changes import IMPORT_KEY, DELETED_KEY
 from .plr_uln import reserve_uln
@@ -166,3 +166,74 @@ class PdfImportTests(TestCase):
         self.assertEqual(json.loads(first.content)['added'], 2)
         again = json.loads(self.upload(pdf).content)
         self.assertEqual((again['added'], again['skipped']), (0, 2))
+
+
+@override_settings(ENROLMENT_ULN_STORAGE='created_users')
+class CanonicalPdfBoundaryTests(TestCase):
+    """Canonical read/write paths on an in-memory database, never Neon."""
+    databases = {'default', 'enrolment'}
+    setUp = preview_tests.PdfPreviewTests.setUp
+    upload = PdfImportTests.upload
+    preview = preview_tests.PdfPreviewTests.call
+    enrolment = uln_tests.AdminUlnTests.request
+
+    @classmethod
+    def setUpTestData(cls):
+        connection = connections['enrolment']
+        if connection.vendor != 'sqlite' or connection.settings_dict['NAME'] != ':memory:':
+            raise RuntimeError('Synthetic canonical PDF tests require in-memory SQLite.')
+        # The test runner creates the legacy model schema. Add the canonical
+        # column only inside this isolated test class's rollback transaction.
+        with connection.cursor() as cursor:
+            cursor.execute('ALTER TABLE enrolment."Created_users" ADD COLUMN "ULN" VARCHAR(10)')
+
+    def canonical_uln(self):
+        with connections['enrolment'].cursor() as cursor:
+            cursor.execute('SELECT "ULN" FROM enrolment."Created_users" WHERE id = %s', [self.learner.pk])
+            return cursor.fetchone()[0]
+
+    def test_boundary_layouts_preview_import_and_reimport_with_student_visibility(self):
+        saved = ExtendedIlr.objects.get(**self.scope).wizard_draft['personalDetails']
+        total = 1  # Existing manual qualification must survive every import.
+        for name, pdf, expected in synthetic_boundary_cases():
+            with self.subTest(layout=name):
+                previous_uln = self.canonical_uln()
+                preview = self.preview(pdf)
+                self.assertEqual(preview.status_code, 200, preview.content)
+                self.assertEqual(self.canonical_uln(), previous_uln)
+                self.assertEqual(WizardPlrRecord.objects.filter(**self.scope).count(), total)
+                self.assertEqual([(r['referenceNumber'], r['subject']) for r in json.loads(preview.content)['records']], expected)
+                response = self.upload(pdf)
+                self.assertEqual(response.status_code, 200, response.content)
+                imported = json.loads(response.content)
+                self.assertEqual((imported['added'], imported['skipped']), (len(expected), 0))
+                total += len(expected)
+                self.assertEqual(self.canonical_uln(), '1234509876')
+                self.assertEqual(WizardPlr.objects.get(**self.scope).uln, '1234509876')
+                self.assertEqual(WizardPlrRecord.objects.filter(**self.scope).count(), total)
+                stored = ExtendedIlr.objects.get(**self.scope).wizard_draft
+                self.assertEqual(stored['personalDetails'], saved)
+                self.assertEqual(WizardPlrRecord.objects.get(record_ref='existing').subject, 'Keep this qualification')
+                for role in ('admin', 'learner'):
+                    loaded = self.enrolment(role=role)
+                    self.assertEqual(loaded.status_code, 200, loaded.content)
+                    self.assertEqual(json.loads(loaded.content)['draft']['plr'], imported['plr'])
+                again = self.upload(pdf)
+                self.assertEqual(again.status_code, 200, again.content)
+                repeated = json.loads(again.content)
+                self.assertEqual((repeated['added'], repeated['skipped']), (0, len(expected)))
+                self.assertEqual(WizardPlrRecord.objects.filter(**self.scope).count(), total)
+
+    def test_ambiguous_layout_does_not_save_uln_records_or_progress(self):
+        first = ['Synthetic College', '', 'Award', 'SYN-A', 'Synthetic award', '', '', '', '', '', '']
+        other = ['', '', '', 'SYN-B', '', '', '', '', '', '', '']
+        pdf = synthetic_pdf([('Learning Events', [first, other, other])], row_padding=1.5,
+                            totals_override={'Learning Events': 2})
+        before = ExtendedIlr.objects.get(**self.scope).wizard_draft
+        for response in (self.preview(pdf), self.upload(pdf)):
+            self.assertEqual(response.status_code, 400, response.content)
+            self.assertEqual(json.loads(response.content)['code'], 'ambiguous_rows')
+        self.assertIsNone(self.canonical_uln())
+        self.assertEqual(WizardPlr.objects.get(**self.scope).uln, '1234509876')
+        self.assertEqual(WizardPlrRecord.objects.filter(**self.scope).count(), 1)
+        self.assertEqual(ExtendedIlr.objects.get(**self.scope).wizard_draft, before)
