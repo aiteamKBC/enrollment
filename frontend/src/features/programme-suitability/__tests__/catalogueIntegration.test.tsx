@@ -2,6 +2,7 @@ import { afterAll, beforeEach, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WizardProvider } from '@/pages/users/wizard/WizardContext';
+import { SCREENING_RULE_CHANGED } from '../skills-radar/catalogue/screeningRefresh';
 import { useWizard } from '@/pages/users/wizard/WizardContext.helpers';
 import SkillsRadar from '@/pages/users/wizard/steps/SkillsRadar';
 import { BUILTIN_ITEMS } from '@/pages/users/wizard/layout/registry';
@@ -47,6 +48,17 @@ beforeEach(() => {
 });
 afterAll(() => vi.unstubAllGlobals());
 
+it('refreshes only the module impact after a screening rule save in the same tab', async () => {
+  render(page());
+  await screen.findByRole('region', { name: 'Your prior knowledge by module' });
+  await waitFor(() => expect(api.impact).toHaveBeenCalled());
+  const impactRequests = api.impact.mock.calls.length;
+  const catalogueRequests = api.radar.mock.calls.length;
+  act(() => window.dispatchEvent(new Event(SCREENING_RULE_CHANGED)));
+  await waitFor(() => expect(api.impact).toHaveBeenCalledTimes(impactRequests + 1));
+  expect(api.radar).toHaveBeenCalledTimes(catalogueRequests);
+});
+
 it.each(['ME_L4', 'MM_L6', 'APM_L4', 'PCP_L6'] as ProgrammeId[])('renders a new imported %s catalogue with dynamic module/global progress and no curriculum fallback', async (pid) => {
   const catalogue = setup(pid);
   render(page());
@@ -54,10 +66,13 @@ it.each(['ME_L4', 'MM_L6', 'APM_L4', 'PCP_L6'] as ProgrammeId[])('renders a new 
   await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(catalogue.records.length));
   expect(screen.getByText(`0 of ${catalogue.records.length}`)).toBeVisible();
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual([`${catalogue.records.length} competencies not yet rated`]);
-  const cards = within(screen.getByRole('region', { name: 'Your prior knowledge by module' })).getAllByText(/0 of \d+ KSBs assessed/);
-  const total = cards.reduce((count, card) => count + Number(card.textContent!.match(/0 of (\d+) KSBs assessed/)![1]), 0);
-  expect(total).toBe(catalogue.records.length);
-  expect(screen.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(catalogue.records.length);
+  expect(within(screen.getByRole('region', { name: 'Your prior knowledge by module' })).getAllByRole('article').length).toBeGreaterThan(0);
+  let visibleTotal = 0;
+  for (const label of ['Knowledge', 'Skills', 'Behaviours']) {
+    await userEvent.click(screen.getByRole('tab', { name: label }));
+    visibleTotal += screen.queryAllByRole('button', { name: /^Answer [KSB]\d+$/ }).length;
+  }
+  expect(visibleTotal).toBe(catalogue.records.length);
   expect(api.profile).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
 });
 
@@ -74,6 +89,7 @@ it('keeps published KSB questions even when the current local module coverage ex
   render(page());
   await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(34));
   expect(latest.draft.skillsRadar.programmeKsbIds).toContain('radar:ME_L4:K99');
+  await userEvent.click(screen.getByRole('tab', { name: 'Knowledge' }));
   expect(screen.getByRole('button', { name: 'Answer K99' })).toBeVisible();
   expect(catalogue.records).toHaveLength(34);
 });

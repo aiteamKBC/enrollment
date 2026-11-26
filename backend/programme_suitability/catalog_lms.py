@@ -83,21 +83,44 @@ def _mapping_weight(value):
         if value['missing_weight_count'] != 0:
             raise ValueError('A source mapping has no weight.')
         counts = {key: value[key] for key in _WEIGHT_COUNTS}
+        has_possible_classification = ('possible_classification_count' in value or
+                                       'possible_classification_weight' in value)
+        if has_possible_classification:
+            counts['possible_classification_count'] = value['possible_classification_count']
+        elif counts['possible_count'] == 0:
+            counts['possible_classification_count'] = 0
+        else:
+            raise ValueError('Possible mappings have no classification breakdown.')
         if any(type(item) is not int or item < 0 for item in counts.values()):
             raise ValueError('Invalid source mapping counts.')
         weights = {key: value[key] for key in _WEIGHT_TOTALS}
+        weights['possible_classification_weight'] = (value['possible_classification_weight']
+                                                     if has_possible_classification else '0')
         if any(not isinstance(item, str) for item in weights.values()):
             raise ValueError('Source weights must retain their decimal representation.')
         numbers = {key: Decimal(item) for key, item in weights.items()}
-        if any(not number.is_finite() for number in numbers.values()):
+        if any(not number.is_finite() or number < 0 for number in numbers.values()):
             raise ValueError('Invalid source mapping weight.')
+        if any(counts[count_key] == 0 and numbers[weight_key] != 0 for count_key, weight_key in (
+                ('hard_count', 'hard_weight'), ('soft_count', 'soft_weight'),
+                ('possible_count', 'possible_weight'), ('main_count', 'main_weight'),
+                ('secondary_count', 'secondary_weight'),
+                ('possible_classification_count', 'possible_classification_weight'))):
+            raise ValueError('A source weight has no corresponding mappings.')
         if (counts['mapping_count'] == 0 or
                 sum(counts[key] for key in ('hard_count', 'soft_count', 'possible_count')) != counts['mapping_count'] or
-                counts['main_count'] + counts['secondary_count'] != counts['mapping_count'] or
+                counts['main_count'] + counts['secondary_count'] +
+                counts['possible_classification_count'] != counts['mapping_count'] or
                 sum(numbers[key] for key in ('hard_weight', 'soft_weight', 'possible_weight')) != numbers['total_weight'] or
-                numbers['main_weight'] + numbers['secondary_weight'] != numbers['total_weight']):
+                sum(numbers[key] for key in ('main_weight', 'secondary_weight',
+                                            'possible_classification_weight')) != numbers['total_weight']):
             raise ValueError('Incomplete source mapping breakdown.')
-        return {**counts, **weights}
+        result = {**{key: counts[key] for key in _WEIGHT_COUNTS},
+                  **{key: weights[key] for key in _WEIGHT_TOTALS}}
+        if counts['possible_classification_count']:
+            result['possible_classification_count'] = counts['possible_classification_count']
+            result['possible_classification_weight'] = weights['possible_classification_weight']
+        return result
     except (KeyError, TypeError, ValueError, InvalidOperation) as exc:
         raise CatalogLmsError('The LMS KSB weight aggregation is incomplete or invalid.',
                               'lms_ksb_weight_incomplete', 409) from exc
@@ -459,11 +482,29 @@ def _field_changes(previous, current):
             before, after = previous.get(key) or {}, current.get(key) or {}
             for ksb_id in sorted(set(before) | set(after)):
                 if before.get(ksb_id) != after.get(ksb_id):
-                    changes.append({'field': f'KSB {ksb_id} mapping weight',
+                    effective_changed = _hard_weight(before.get(ksb_id)) != _hard_weight(after.get(ksb_id))
+                    changes.append({'field': f'KSB {ksb_id} ' +
+                                    ('mapping weight' if effective_changed else 'source mapping details'),
+                                    'impact': 'hard_readiness' if effective_changed else 'source_audit_only',
                                     'before': before.get(ksb_id), 'after': after.get(ksb_id)})
         elif previous.get(key) != current.get(key):
             changes.append({'field': key, 'before': previous.get(key), 'after': current.get(key)})
     return changes
+
+
+def _hard_weight(value):
+    if not isinstance(value, dict) or 'hard_count' not in value or 'hard_weight' not in value:
+        return None
+    return value['hard_count'], value['hard_weight']
+
+
+def _module_curriculum_changed(previous, current):
+    if any(previous.get(key) != current.get(key)
+           for key in ('name', 'sessions', 'ksb_ids', 'weekly_topics')):
+        return True
+    old_weights, new_weights = previous.get('ksb_weights') or {}, current.get('ksb_weights') or {}
+    return any(_hard_weight(old_weights.get(ksb_id)) != _hard_weight(new_weights.get(ksb_id))
+               for ksb_id in set(old_weights) | set(new_weights))
 
 
 def repin_future_deliveries(module, revision):
@@ -660,6 +701,19 @@ def apply_updates(programme, preview_fingerprint, selected_keys, actor, expected
             for field in ('code', 'description', 'kind', 'standard', 'standard_version'):
                 setattr(local, field, source[field])
         elif local_type == 'module_template':
+            current_state = _state(entity_type, source)
+            if not _module_curriculum_changed(link.accepted_state, current_state):
+                # Preserve source-only Soft/Possible changes for auditing without
+                # creating a new curriculum revision or repinning delivery.
+                local.source_revision, local.last_synced_at = source['source_revision'], timezone.now()
+                local.save(update_fields=['source_revision', 'last_synced_at'])
+                link.accepted_state = current_state
+                link.accepted_fingerprint = canonical_fingerprint(current_state)
+                link.source_revision = source['source_revision']
+                link.last_synced_at, link.last_synced_by = timezone.now(), actor
+                link.save()
+                applied += 1
+                continue
             ksb_links = _source_links().filter(local_entity_type='ksb', source_entity_id__in=source['ksb_ids'])
             topics = [{'week': item['week'], 'content': item['content']} for item in source['weekly_topics']]
             local.name = source['name']

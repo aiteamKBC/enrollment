@@ -36,8 +36,11 @@ def module_impact(request, kind, learner_id):
     try:
         if not model.objects.filter(pk=learner_id).exists():
             return error('Not found.', 404)
+        rule = read_setting()
         return JsonResponse({**learner_module_impact(kind, learner_id),
-                             'screeningThresholdPercent': read_setting()['thresholdPercent']})
+                             'minimumQualifyingRating': rule['minimumQualifyingRating'],
+                             'maximumQualifyingRating': rule['maximumQualifyingRating'],
+                             'minimumHighRatedHardKsbs': rule['minimumHighRatedHardKsbs']})
     except DatabaseError:
         logger.exception('Could not load local Skills Radar module impact.')
         return error('Could not load Programme Structure mapping. Please retry.', 503)
@@ -64,13 +67,13 @@ def screening_setting(request):
         if not isinstance(data, dict):
             return error('Provide a valid JSON object.')
         try:
-            result = save_setting(data.get('thresholdPercent'), data.get('revision'), actor(request))
+            result = save_setting(data, actor(request))
         except ValueError as exc:
             return error(exc)
         if result is None:
             return error('The setting was changed by another administrator. Reload and try again.', 409)
         if result == 'setup_required':
-            return error('The Skills Radar setting requires migration 0020.', 503)
+            return error('Skills Radar screening settings require migrations 0021 and 0022.', 503)
         return JsonResponse(result)
     except DatabaseError:
         logger.exception('Could not read or save Skills Radar screening setting.')

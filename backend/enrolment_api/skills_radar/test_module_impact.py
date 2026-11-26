@@ -61,7 +61,8 @@ class ModuleImpactTests(TestCase):
             accepted_fingerprint='test', last_synced_at=timezone.now())
         entry = {'id': str(self.ksb.id), 'code': 'K5', 'description': 'Knowledge five'}
         if weight is not None:
-            entry['mapping_weight'] = {'total_weight': weight, 'mapping_count': 1}
+            entry['mapping_weight'] = {'total_weight': weight, 'hard_weight': weight,
+                                       'hard_count': 1, 'mapping_count': 1}
         revision = CatalogModuleRevision.objects.create(
             module=module, number=1, name=name, weeks=1, ksbs=[entry])
         CatalogDelivery.objects.create(group=self.group, module=module, module_revision=revision,
@@ -74,6 +75,8 @@ class ModuleImpactTests(TestCase):
         result = learner_module_impact('apprenticeship', 917)
         self.assertEqual([m['status'] for m in result['modules']], ['ready', 'ready', 'unavailable'])
         self.assertEqual([result['modules'][i]['ksbs'][0]['weight']['total_weight'] for i in (0, 1)],
+                         ['1060.00', '40.00'])
+        self.assertEqual([result['modules'][i]['ksbs'][0]['weight']['hard_weight'] for i in (0, 1)],
                          ['1060.00', '40.00'])
         self.assertEqual(result['modules'][2]['reason'], 'module_mapping_unavailable')
 
@@ -91,7 +94,10 @@ class ModuleImpactTests(TestCase):
             response = match.func(request, **match.kwargs)
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'"social-media"', response.content)
-        self.assertEqual(json.loads(response.content)['screeningThresholdPercent'], 50)
+        self.assertEqual({key: json.loads(response.content)[key] for key in
+                          ('minimumQualifyingRating', 'maximumQualifyingRating', 'minimumHighRatedHardKsbs')},
+                         {'minimumQualifyingRating': 5, 'maximumQualifyingRating': 9,
+                          'minimumHighRatedHardKsbs': 2})
 
     def test_historical_pinned_revision_keeps_missing_weight(self):
         module, first = self.delivery('Social Media')
@@ -115,6 +121,12 @@ class ModuleImpactTests(TestCase):
     def test_same_title_without_verified_source_link_is_unavailable(self):
         module, _ = self.delivery('Social Media', '40.00')
         CatalogSourceLink.objects.filter(local_record_id=module.id).delete()
+        result = learner_module_impact('apprenticeship', 917)
+        self.assertEqual(result['modules'][0]['reason'], 'module_mapping_unavailable')
+
+    def test_link_from_an_unapproved_source_branch_is_unavailable(self):
+        module, _ = self.delivery('Social Media', '40.00')
+        CatalogSourceLink.objects.filter(local_record_id=module.id).update(source_branch_id='other-branch')
         result = learner_module_impact('apprenticeship', 917)
         self.assertEqual(result['modules'][0]['reason'], 'module_mapping_unavailable')
 
@@ -147,3 +159,39 @@ class ModuleImpactTests(TestCase):
                                              'modulesByPathway': {'operational': ['chosen'],
                                                                   'strategic': ['wrong-path']}}
         self.assertEqual([item['id'] for item in selected_modules(self.assessment)], ['required', 'chosen'])
+
+    def test_module_cards_follow_the_selected_programme_snapshot_at_any_size(self):
+        for count in (0, 1, 3, 5, 7):
+            with self.subTest(count=count):
+                modules = [{'id': f'approved-{index}', 'title': f'Published module {index + 1}',
+                            'active': True} for index in range(count)]
+                self.assessment.modules_configuration = {'programmes': [
+                    {'id': 'MM_L6', 'modules': [{'id': 'other-programme', 'title': 'Other programme',
+                                               'active': True}]},
+                    {'id': 'ME_L4', 'modules': modules},
+                ]}
+                self.assessment.save(update_fields=['modules_configuration'])
+                result = learner_module_impact('apprenticeship', 917)
+                self.assertEqual([item['name'] for item in result['modules']],
+                                 [item['title'] for item in modules])
+                self.assertTrue(all(item['status'] == 'unavailable' for item in result['modules']))
+
+    def test_delivery_from_another_group_or_cohort_cannot_be_screened(self):
+        module, _ = self.delivery('Social Media', '40.00')
+        delivery = CatalogDelivery.objects.get(module=module)
+        self.assertEqual(learner_module_impact('apprenticeship', 917)['modules'][0]['status'], 'ready')
+        other_group = CatalogGroup.objects.create(
+            cohort=self.cohort, name='Group B', weekday=2, start_time='09:00', end_time='17:00',
+            source_system='lms', external_id='group-b')
+        delivery.group = other_group
+        delivery.save(update_fields=['group'])
+        self.assertEqual(learner_module_impact('apprenticeship', 917)['modules'][0]['reason'],
+                         'module_mapping_unavailable')
+        other_cohort = CatalogCohort.objects.create(
+            programme=self.programme, name='2028', start_date=date(2028, 1, 1),
+            training_end_date=date(2029, 1, 1), training_duration_months=12,
+            epa_period=3, epa_unit='months', source_system='lms', external_id='cohort-2028')
+        other_group.cohort = other_cohort
+        other_group.save(update_fields=['cohort'])
+        self.assertEqual(learner_module_impact('apprenticeship', 917)['modules'][0]['reason'],
+                         'module_mapping_unavailable')

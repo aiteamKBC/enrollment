@@ -171,3 +171,70 @@ it('shows per-KSB weight changes for review before any sync', async () => {
   expect(screen.getByText(/Not recorded/)).toBeVisible();
   expect(request).toHaveBeenCalledTimes(1);
 });
+
+it('requires explicit selection and keeps a separate group change out of a new-module approval', async () => {
+  const programme: Programme = {
+    id: '11111111-1111-1111-1111-111111111111', revision: 2, archived_at: null,
+    source_system: 'lms', external_id: 'PROG-ME-L4', name: 'Marketing Executive Level 4',
+    code: 'PROG-ME-L4', level: 4, description: '', status: 'draft', total_cost: '6000',
+    epa_cost: '1000', epao: '', funding_band_maximum: null, lecture_hours: '2.5',
+  };
+  const newWeight = { ...weight, total_weight: '19170.00', hard_count: 274, hard_weight: '10960.00',
+    soft_count: 274, soft_weight: '5480.00', possible_count: 273, possible_weight: '2730.00',
+    mapping_count: 821, main_count: 274, main_weight: '10960.00', secondary_count: 274,
+    secondary_weight: '5480.00', possible_classification_count: 273, possible_classification_weight: '2730.00' };
+  request.mockResolvedValueOnce({ preview_fingerprint: 'b'.repeat(64), has_changes: true, metrics,
+    performance_warnings: [], snapshot: { ...preview.snapshot,
+      modules: [{ ...preview.snapshot.modules[0], id: 'm2', name: 'New module', ksb_weights: { '130': newWeight } }],
+    }, changes: [
+      { key: 'group:g1:group', state: 'modified', entity_type: 'group', source_id: 'g1',
+        fields: [{ field: 'weekday', before: 5, after: 1 }] },
+      { key: 'module_template:m2:module_template', state: 'new', entity_type: 'module_template', source_id: 'm2', fields: [] },
+      { key: 'module_delivery:m2:module_delivery', state: 'new', entity_type: 'module_delivery', source_id: 'm2', fields: [] },
+    ] }).mockResolvedValueOnce({ applied: 2 });
+  const user = userEvent.setup();
+  const updated = vi.fn();
+  render(<CatalogLmsPanel programme={programme} onImported={vi.fn()} onUpdated={updated} />);
+  await user.click(screen.getByRole('button', { name: 'LMS link & updates' }));
+  await user.click(screen.getByRole('button', { name: 'Check for Updates' }));
+  expect(await screen.findByText(/New module Hard weights/)).toBeVisible();
+  expect(screen.getByText(/Hard 10960\.00 \(274 mappings\)/)).toBeVisible();
+  const boxes = screen.getAllByRole('checkbox');
+  expect(boxes).toHaveLength(3);
+  boxes.forEach(box => expect(box).not.toBeChecked());
+  const apply = screen.getByRole('button', { name: 'Approve & Apply Changes' });
+  expect(apply).toBeDisabled();
+  await user.click(boxes[1]);
+  await user.click(boxes[2]);
+  expect(boxes[0]).not.toBeChecked();
+  await user.click(apply);
+  expect(request).toHaveBeenLastCalledWith(`programmes/${programme.id}/lms/apply/`, expect.objectContaining({
+    method: 'POST', data: expect.objectContaining({
+      selected_keys: ['module_template:m2:module_template', 'module_delivery:m2:module_delivery'],
+      archive_keys: [],
+    }),
+  }));
+  expect(updated).toHaveBeenCalledOnce();
+});
+
+it('identifies Soft-only changes as source audit without claiming a Hard readiness change', async () => {
+  const programme: Programme = {
+    id: '11111111-1111-1111-1111-111111111111', revision: 2, archived_at: null,
+    source_system: 'lms', external_id: 'PROG-ME-L4', name: 'Marketing Executive Level 4',
+    code: 'PROG-ME-L4', level: 4, description: '', status: 'draft', total_cost: '6000',
+    epa_cost: '1000', epao: '', funding_band_maximum: null, lecture_hours: '2.5',
+  };
+  request.mockResolvedValueOnce({ preview_fingerprint: 'b'.repeat(64), has_changes: true, metrics,
+    performance_warnings: [], changes: [{ key: 'module_template:m1:module_template', state: 'modified',
+      entity_type: 'module_template', source_id: 'm1', fields: [{ field: 'KSB 130 source mapping details',
+        impact: 'source_audit_only', before: weight, after: { ...weight, soft_weight: '30.00', total_weight: '1070.00' } }],
+    }],
+  });
+  const user = userEvent.setup();
+  render(<CatalogLmsPanel programme={programme} onImported={vi.fn()} onUpdated={vi.fn()} />);
+  await user.click(screen.getByRole('button', { name: 'LMS link & updates' }));
+  await user.click(screen.getByRole('button', { name: 'Check for Updates' }));
+  expect(await screen.findByText(/KSB 130 source mapping details/)).toBeVisible();
+  expect(screen.getByText(/Source audit only: Soft\/Possible changes/)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Approve & Apply Changes' })).toBeDisabled();
+});

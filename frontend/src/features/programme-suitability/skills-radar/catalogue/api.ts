@@ -2,7 +2,8 @@ import type { LearnerKind } from '@/api/extendedIlr';
 import { prefetchAssessmentSecurity, request } from '../../api';
 import type { ProgrammeId } from '../../types';
 import type { CatalogueDraft, CatalogueIndex, ImportPreview, LearnerCatalogue } from './types';
-import type { ModuleImpact } from '../moduleImpact';
+import type { ModuleImpact, ScreeningRule } from '../moduleImpact';
+import { SCREENING_RULE_CHANGED } from './screeningRefresh';
 
 const BASE = '/enrolment_api/skills-radar';
 export const getCatalogues = () => request<CatalogueIndex>(`${BASE}/catalogues/`);
@@ -11,10 +12,13 @@ export const saveCatalogueDraft = (configuration: CatalogueDraft, baseVersion: n
   request<{ configuration: CatalogueDraft; baseVersion: number | null }>(`${BASE}/draft/`, { configuration, baseVersion });
 export const getLearnerCatalogue = (kind: LearnerKind, id: string) => request<LearnerCatalogue>(`${BASE}/${kind}/${id}/`);
 export const getModuleImpact = (kind: LearnerKind, id: string) => request<ModuleImpact>(`${BASE}/${kind}/${id}/module-impact/`);
-export interface ScreeningSetting { thresholdPercent: number; revision: number; schemaReady: boolean }
+export interface ScreeningSetting extends ScreeningRule { revision: number; schemaReady: boolean }
 export const getScreeningSetting = () => request<ScreeningSetting>(`${BASE}/screening-setting/`);
-export const saveScreeningSetting = (thresholdPercent: number, revision: number) =>
-  request<ScreeningSetting>(`${BASE}/screening-setting/`, { thresholdPercent, revision });
+export const saveScreeningSetting = (rule: ScreeningRule, revision: number) =>
+  request<ScreeningSetting>(`${BASE}/screening-setting/`, { ...rule, revision }).then((setting) => {
+    window.dispatchEvent(new Event(SCREENING_RULE_CHANGED));
+    return setting;
+  });
 export const csvUrl = (pid: ProgrammeId, template = false) => `${BASE}/catalogues/${pid}/${template ? '?template=1' : ''}`;
 export async function uploadCatalogue(pid: ProgrammeId, file: File): Promise<ImportPreview> {
   const body = new FormData(); body.append('file', file, file.name);

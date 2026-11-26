@@ -89,6 +89,9 @@ class SkillsRadarScreeningSetting(models.Model):
 
     key = models.CharField(max_length=32, primary_key=True)
     threshold_percent = models.PositiveSmallIntegerField(default=50)
+    minimum_high_rated_hard_ksbs = models.PositiveSmallIntegerField(default=2)
+    minimum_qualifying_rating = models.PositiveSmallIntegerField(default=5)
+    maximum_qualifying_rating = models.PositiveSmallIntegerField(default=9)
     revision = models.PositiveBigIntegerField(default=1)
     history = models.JSONField(default=list)
     updated_by = models.CharField(max_length=200, blank=True)

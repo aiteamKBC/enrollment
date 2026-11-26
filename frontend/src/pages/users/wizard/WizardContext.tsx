@@ -30,6 +30,7 @@ import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar
 import { useCatalogue } from '@/features/programme-suitability/skills-radar/catalogue/useCatalogue';
 import { catalogueQuestions } from '@/features/programme-suitability/skills-radar/catalogue/runtime';
 import { getModuleImpact } from '@/features/programme-suitability/skills-radar/catalogue/api';
+import { SCREENING_RULE_CHANGED } from '@/features/programme-suitability/skills-radar/catalogue/screeningRefresh';
 import { assessmentQuestionIds, bindImpactModules, type ModuleImpact } from '@/features/programme-suitability/skills-radar/moduleImpact';
 
 function emptyIlr(firstNames: string, surname: string): IlrForm {
@@ -441,6 +442,16 @@ export function WizardProvider({
     [managedRadar, radarCatalogue.grouping, pcpRadar, mmRadar, meRadar, apmRadar, radarProfile, programmeName, modules.data, modules.error, radarModulesData, radarModulesError]);
   const impactEnabled = hydrated && (managedRadar || moduleRadar) && /^\d+$/.test(userId);
   const [impactRetry, setImpactRetry] = useState(0);
+  useEffect(() => {
+    if (!impactEnabled) return;
+    const reload = () => setImpactRetry(value => value + 1);
+    window.addEventListener('focus', reload);
+    window.addEventListener(SCREENING_RULE_CHANGED, reload);
+    return () => {
+      window.removeEventListener('focus', reload);
+      window.removeEventListener(SCREENING_RULE_CHANGED, reload);
+    };
+  }, [impactEnabled]);
   const impactKey = `${kind}:${userId}:${ilrSavedAt}:${impactRetry}`;
   const [impactResult, setImpactResult] = useState<{ key: string; data: ModuleImpact | null; error: string }>({ key: '', data: null, error: '' });
   useEffect(() => {

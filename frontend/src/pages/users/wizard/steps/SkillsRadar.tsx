@@ -17,7 +17,7 @@ import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/p
 import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
 import styles from './SkillsRadar.module.css';
 import { useLearnerStepPresentation } from '@/features/learner-enrolment/stepPresentation';
-import { bindImpactModules, isPotentialPriorLearning, weightedReadiness, type ImpactModule } from '@/features/programme-suitability/skills-radar/moduleImpact';
+import { bindImpactModules, screenModule, screeningRuleFromImpact, type ImpactModule } from '@/features/programme-suitability/skills-radar/moduleImpact';
 
 /**
  * Skills Radar: a sequential self-assessment questionnaire.
@@ -60,6 +60,34 @@ function workingFrom(existing?: KsbAssessment): WorkingAnswer {
     note: existing?.note ?? '',
     evidenceFiles: existing?.evidenceFiles ?? [],
   };
+}
+
+type KsbCategory = 'Knowledge' | 'Skill' | 'Behaviour';
+const CATEGORIES: { kind: KsbCategory; label: string }[] = [
+  { kind: 'Knowledge', label: 'Knowledge' }, { kind: 'Skill', label: 'Skills' },
+  { kind: 'Behaviour', label: 'Behaviours' },
+];
+function categoryOf(ksb: Ksb): KsbCategory {
+  if (ksb.kind === 'Knowledge' || ksb.kind === 'Skill' || ksb.kind === 'Behaviour') return ksb.kind;
+  const prefixes = new Set(ksb.codes.map(code => code.match(/^([KSB])\d+$/i)?.[1]?.toUpperCase()));
+  if (prefixes.size === 1) {
+    const prefix = [...prefixes][0];
+    if (prefix === 'S') return 'Skill';
+    if (prefix === 'B') return 'Behaviour';
+  }
+  return 'Knowledge';
+}
+
+function codeNumber(ksb: Ksb, category: KsbCategory): number | null {
+  const prefix = category === 'Knowledge' ? 'K' : category === 'Skill' ? 'S' : 'B';
+  for (const code of ksb.codes) {
+    const match = code.trim().match(new RegExp(`^${prefix}(\\d+)$`, 'i'));
+    if (match) {
+      const value = Number(match[1]);
+      if (Number.isSafeInteger(value)) return value;
+    }
+  }
+  return null;
 }
 
 export default function SkillsRadar() {
@@ -148,11 +176,12 @@ export default function SkillsRadar() {
   [grouping, impact, modules?.data?.selectedProgramme, sr.standardId]);
   const savedAssessments = useMemo(() => Object.fromEntries(Object.entries(impact?.savedLevels ?? {}).map(([id, level]) =>
     [id, { ksbId: id, level: level as KsbAssessment['level'], evidenceFiles: [], actionPlan: null }])), [impact?.savedLevels]);
-  const readinessByModule = useMemo(() => new Map(mappedModules.flatMap((module) => {
+  const screeningRule = useMemo(() => screeningRuleFromImpact(impact), [impact]);
+  const screeningByModule = useMemo(() => new Map(mappedModules.flatMap((module) => {
     const record = module.impact as ImpactModule | undefined;
     return record?.status === 'ready'
-      ? [[module.id, weightedReadiness(record, savedAssessments, answerIdByCode)] as const] : [];
-  })), [mappedModules, savedAssessments, answerIdByCode]);
+      ? [[module.id, screenModule(record, savedAssessments, answerIdByCode, screeningRule)] as const] : [];
+  })), [mappedModules, savedAssessments, answerIdByCode, screeningRule]);
   // The assessment's published questions remain authoritative. A new local
   // revision can cover fewer unique KSBs than the original questionnaire.
   const ksbs = useMemo(() => {
@@ -179,30 +208,33 @@ export default function SkillsRadar() {
   const coverageByCode = useMemo(() => new Map(mappedModules.filter((module) => !impact || module.impact?.status === 'ready')
     .flatMap((module) => module.questions.flatMap((question) => question.codes.map((code) => [code, module.title] as const)))), [mappedModules, impact]);
   const moduleCoverage = useMemo(() => mappedModules.map((module) => {
-    const ids = new Set(module.questions.map((ksb) => ksb.id));
-    const record = module.impact as ImpactModule | undefined;
-    const readiness = readinessByModule.get(module.id) ?? null;
-    return {
-      id: module.id, title: module.title, record, readiness,
-      count: ids.size,
-      answered: [...ids].filter((id) => sr.assessments[id]?.level).length,
-    };
-  }), [mappedModules, sr.assessments, readinessByModule]);
+    const screening = screeningByModule.get(module.id) ?? null;
+    return { id: module.id, title: module.title, screening };
+  }), [mappedModules, screeningByModule]);
   const orderedModuleCoverage = useMemo(() => [
-    ...moduleCoverage.filter((module) => module.readiness?.score != null),
-    ...moduleCoverage.filter((module) => module.readiness?.score == null),
+    ...moduleCoverage.filter((module) => module.screening?.status === 'potential'),
+    ...moduleCoverage.filter((module) => module.screening?.status === 'none'),
+    ...moduleCoverage.filter((module) => !module.screening || module.screening.status === 'unavailable'),
   ], [moduleCoverage]);
-  const questionIndex = useMemo(() => new Map(ksbs.map((ksb, index) => [ksb.id, index])), [ksbs]);
-
   // An unrated row per competency is seeded by WizardProvider rather than here:
   // completeness is judged for every step at once, so a learner who never opens
   // this one must still show it as outstanding.
 
   // Keep the open question tied to its profile ID if module grouping changes.
   const [openKsbId, setOpenKsbId] = useState<string | null>(null);
-  const [showScoreHelp, setShowScoreHelp] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<KsbCategory>('Knowledge');
+  const visibleQuestions = useMemo(() => ksbs.map((ksb, index) => ({ ksb, index }))
+    .filter(({ ksb }) => categoryOf(ksb) === activeCategory)
+    .sort((a, b) => {
+      const first = codeNumber(a.ksb, activeCategory);
+      const second = codeNumber(b.ksb, activeCategory);
+      if (first === null || second === null) return first === null && second === null
+        ? a.index - b.index : first === null ? 1 : -1;
+      return first - second || a.index - b.index;
+    }), [ksbs, activeCategory]);
   const position = openKsbId == null ? -1 : ksbs.findIndex((ksb) => ksb.id === openKsbId);
   const openIndex = position < 0 ? null : position;
+  const visiblePosition = openIndex == null ? -1 : visibleQuestions.findIndex(({ index }) => index === openIndex);
   const [work, setWork] = useState<WorkingAnswer>(workingFrom());
 
   const answeredCount = useMemo(
@@ -213,6 +245,7 @@ export default function SkillsRadar() {
   const open = (index: number) => {
     const ksb = ksbs[index];
     if (!ksb) return;
+    setActiveCategory(categoryOf(ksb));
     setWork(workingFrom(sr.assessments[ksb.id]));
     setOpenKsbId(ksb.id);
   };
@@ -236,9 +269,9 @@ export default function SkillsRadar() {
   const confirm = () => {
     if (openIndex == null) return;
     commit(openIndex);
-    // through all of them without reopening the list each time.
-    const nextIndex = openIndex + 1;
-    if (nextIndex < ksbs.length) {
+    // Continue within the selected category; the learner chooses the next tab.
+    const nextIndex = visiblePosition < 0 ? undefined : visibleQuestions[visiblePosition + 1]?.index;
+    if (nextIndex != null) {
       open(nextIndex);
     } else {
       setOpenKsbId(null);
@@ -332,64 +365,56 @@ export default function SkillsRadar() {
       </div>}
 
       {moduleCoverage.length > 0 && <section aria-labelledby="module-results-heading" className={styles.moduleCoverage}>
-        <div className={styles.moduleTitleRow}>
-          <h3 id="module-results-heading">Your prior knowledge by module</h3>
-          <button type="button" className={styles.scoreHelpButton} aria-expanded={showScoreHelp} aria-controls="skills-radar-score-help" onClick={() => setShowScoreHelp((open) => !open)}>
-            <Info aria-hidden="true" />About your scores
-          </button>
-        </div>
-        <p className={styles.moduleIntro}>Module scores reflect self-assessed prior knowledge, weighted by the KSBs covered in each module.</p>
-        <p id="skills-radar-score-help" className={styles.scoreHelpContent} hidden={!showScoreHelp}>Module scores are indicative and based on self-assessment. They do not represent the percentage of training that can automatically be removed. Any potential reduction in training must be supported by appropriate evidence and reviewed through the provider's existing Recognition of Prior Learning (RPL) process.</p>
+        <h3 id="module-results-heading" className={styles.moduleTitle}>Your prior knowledge by module</h3>
+        <p className={styles.moduleIntro}>Your answers may indicate prior learning for an assessor to review. This is not an RPL decision.</p>
         {impactError && <div role="alert" className={styles.impactError}>
           <span>We couldn’t load module results right now. Your answers are still saved.</span>
           <button type="button" onClick={retryRadarImpact}>Retry</button>
         </div>}
         <div className={styles.moduleGrid}>{orderedModuleCoverage.map((module) => {
-          const score = module.readiness?.score;
-          const unavailable = !impactError && impact?.status === 'ready' && module.record?.status === 'unavailable';
-          const answered = module.readiness?.answered ?? module.answered;
-          const flagged = !impactError && module.record?.status === 'ready' && Boolean(module.record.revisionId) &&
-            isPotentialPriorLearning(module.readiness, impact?.screeningThresholdPercent ?? 50);
-          return <article key={module.id} className={`${styles.moduleCard} ${unavailable ? styles.moduleCardUnavailable : ''}`}>
+          const status = impactError ? 'unavailable' : module.screening?.status ?? 'unavailable';
+          return <article key={module.id} className={`${styles.moduleCard} ${status === 'unavailable' ? styles.moduleCardUnavailable : ''}`}>
             <div className={styles.moduleHeading}>
               <h4 className={styles.moduleName}>{module.title}</h4>
             </div>
-            {score == null ? <div className={styles.unavailableScore}>Score unavailable</div> : <div className={styles.scoreRow}>
-              <div className={styles.moduleScore} aria-label={`Prior knowledge ${score} percent`}>{score}<span>%</span></div>
-              <span className={styles.scoreLabel}>Prior knowledge</span>
-            </div>}
-            {score != null && <div className={styles.scoreTrack} role="meter" aria-label={`${module.title} prior knowledge`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={score}>
-              <span style={{ width: `${score}%` }} />
-            </div>}
-            {flagged && <div className={styles.moduleFlag} role="status">
-              <strong>Potential Prior Learning</strong>
-              <span>{readOnly
-                ? 'This assessment indicates possible prior learning in this module. Review evidence through the existing RPL process before making a decision.'
-                : 'Your assessment indicates possible prior learning in this module. Some training content may be reduced following an assessor review.'}</span>
-            </div>}
-            <p className={styles.moduleCount}>{answered} of {module.count} KSB{module.count === 1 ? '' : 's'} assessed</p>
+            <p className={`${styles.moduleStatus} ${status === 'potential' ? styles.moduleStatusPotential : ''}`}>
+              {status === 'potential' ? 'Potential Prior Learning' : status === 'none' ? 'No indication yet' : 'Not available yet'}
+            </p>
           </article>;
         })}</div>
       </section>}
 
-      {!readOnly && answeredCount < ksbs.length && (
-        <button
-          className={`${btnPrimary} mb-4`}
-          onClick={() => open(ksbs.findIndex((k) => !sr.assessments[k.id]?.level))}
-        >
-          <AppIcon className="ri-play-line" />{answeredCount === 0 ? 'Start assessment' : 'Continue assessment'}
-        </button>
-      )}
+      {ksbs.length > 0 && (grouping?.status === 'ready' || !moduleBased) &&
+        <div role="tablist" aria-label="KSB categories" className={styles.categoryTabs}>
+          {CATEGORIES.map(({ kind, label }, index) => <button key={kind} id={`ksb-tab-${kind.toLowerCase()}`}
+            type="button" role="tab" aria-selected={activeCategory === kind} aria-controls="skills-radar-ksb-table"
+            className={`${styles.categoryTab} ${activeCategory === kind ? styles.categoryTabActive : ''}`}
+            onClick={() => setActiveCategory(kind)}
+            onKeyDown={event => {
+              const current = CATEGORIES.findIndex(item => item.kind === activeCategory);
+              const next = event.key === 'ArrowRight' ? (current + 1) % CATEGORIES.length
+                : event.key === 'ArrowLeft' ? (current + CATEGORIES.length - 1) % CATEGORIES.length
+                : event.key === 'Home' ? 0 : event.key === 'End' ? CATEGORIES.length - 1 : index;
+              if (next !== index) { event.preventDefault(); setActiveCategory(CATEGORIES[next].kind);
+                document.getElementById(`ksb-tab-${CATEGORIES[next].kind.toLowerCase()}`)?.focus(); }
+            }}>{label}</button>)}
+        </div>}
 
       {/* One assessment row per stable KSB ID, for both learner and staff views. */}
-      {(grouping?.status === 'ready' || !moduleBased) && <div role="table" aria-label="Skills assessments" className={styles.table}>
+      {(grouping?.status === 'ready' || !moduleBased) && <div id="skills-radar-ksb-table" role="table" aria-label="Skills assessments" className={styles.table}>
         <div role="row" className={styles.tableHeader}>
           <span role="columnheader">SKILL DESCRIPTION</span>
           <span role="columnheader">COVERED BY MODULES</span>
           <span role="columnheader">ANSWER</span>
         </div>
-        {ksbs.map((ksb) => renderQuestion(ksb, questionIndex.get(ksb.id)!))}
+        {visibleQuestions.map(({ ksb, index }) => renderQuestion(ksb, index))}
       </div>}
+
+      {!readOnly && answeredCount < ksbs.length && (
+        <button className={`${btnPrimary} mt-4`} onClick={() => open(ksbs.findIndex((k) => !sr.assessments[k.id]?.level))}>
+          <AppIcon className="ri-play-line" />{answeredCount === 0 ? 'Start assessment' : 'Continue assessment'}
+        </button>
+      )}
 
       {/* Question modal */}
       {openIndex != null && openKsb && (
@@ -406,7 +431,7 @@ export default function SkillsRadar() {
               <>
                 <button className={btnSecondary} onClick={() => setOpenKsbId(null)}>Cancel</button>
                 <button className={btnPrimary} onClick={confirm} disabled={!work.level}>
-                  <AppIcon className="ri-check-line" />{openIndex + 1 < ksbs.length ? 'Confirm & next' : 'Confirm'}
+                  <AppIcon className="ri-check-line" />{visiblePosition >= 0 && visiblePosition < visibleQuestions.length - 1 ? 'Confirm & next' : 'Confirm'}
                 </button>
               </>
             )

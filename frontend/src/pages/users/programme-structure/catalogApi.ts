@@ -32,6 +32,7 @@ export type KsbMappingWeight = {
   hard_weight: string; soft_weight: string; possible_weight: string;
   main_count: number; secondary_count: number;
   main_weight: string; secondary_weight: string;
+  possible_classification_count?: number; possible_classification_weight?: string;
 };
 export type WeightedKsb = Pick<Ksb, 'id' | 'code' | 'description'> & { mapping_weight?: KsbMappingWeight };
 export type PinnedCurriculum = ModuleRevisionRef & {

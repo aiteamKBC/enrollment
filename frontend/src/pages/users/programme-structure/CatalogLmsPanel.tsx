@@ -24,10 +24,12 @@ type ImportPreview = {
 type Change = {
   key: string; state: 'new' | 'modified' | 'missing_source' | 'conflict';
   entity_type: string; source_id: string;
-  fields: { field: string; before: unknown; after: unknown }[];
+  fields: { field: string; before: unknown; after: unknown; impact?: 'hard_readiness' | 'source_audit_only' }[];
 };
 type UpdatePreview = {
   preview_fingerprint: string; has_changes: boolean; changes: Change[];
+  snapshot?: { modules: Pick<ImportSnapshot['modules'][number], 'id' | 'ksb_weights'>[];
+    ksbs: Pick<ImportSnapshot['ksbs'][number], 'id' | 'code'>[] };
   metrics: Metrics; performance_warnings: string[];
 };
 
@@ -63,10 +65,12 @@ function changeValue(value: unknown) {
   if (value == null) return 'Not recorded';
   if (typeof value === 'object' && 'total_weight' in value) {
     const weight = value as KsbMappingWeight;
-    return `Total Mapping Weight ${weight.total_weight}; ${weight.mapping_count} mappings; ` +
-      `hard ${weight.hard_count} (${weight.hard_weight}), soft ${weight.soft_count} (${weight.soft_weight}), ` +
+    return `Effective Hard weight ${weight.hard_weight ?? 'Not recorded'}; Total Mapping Weight ${weight.total_weight}; ${weight.mapping_count} mappings; ` +
+      `hard ${weight.hard_count ?? 'Not recorded'} (${weight.hard_weight ?? 'Not recorded'}), soft ${weight.soft_count} (${weight.soft_weight}), ` +
       `possible ${weight.possible_count} (${weight.possible_weight}); ` +
-      `main ${weight.main_count} (${weight.main_weight}), secondary ${weight.secondary_count} (${weight.secondary_weight})`;
+      `main ${weight.main_count} (${weight.main_weight}), secondary ${weight.secondary_count} (${weight.secondary_weight})` +
+      (weight.possible_classification_count == null ? '' :
+        `, possible classification ${weight.possible_classification_count} (${weight.possible_classification_weight})`);
   }
   return JSON.stringify(value);
 }
@@ -135,7 +139,7 @@ export function CatalogLmsPanel({ programme, onImported, onUpdated }: {
     if (!programme) return;
     void run(() => catalogRequest<UpdatePreview>(`programmes/${programme.id}/lms/check/`, { method: 'POST', data: {} }), value => {
       setUpdates(value);
-      setSelected(value.changes.filter(change => change.state === 'new' || change.state === 'modified').map(change => change.key));
+      setSelected([]);
       setArchiveSelected([]);
     });
   }
@@ -200,7 +204,7 @@ export function CatalogLmsPanel({ programme, onImported, onUpdated }: {
         </div>
         <details className="rounded-lg border border-background-200 bg-background-50 p-3 text-sm">
           <summary className={`cursor-pointer font-semibold ${focus}`}>Review module KSB mapping weights</summary>
-          <p className="mt-2 text-foreground-600">Source totals are mapping weights, not percentages. They belong to each module revision.</p>
+          <p className="mt-2 text-foreground-600">Source totals are mapping weights, not percentages. Hard weights alone contribute to readiness; Soft and Possible remain for source auditing.</p>
           {preview.snapshot.modules.map(module => <section key={module.id} className="mt-3 border-t border-background-200 pt-3">
             <h4 className="font-semibold">{module.name}</h4>
             <ul className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -208,7 +212,7 @@ export function CatalogLmsPanel({ programme, onImported, onUpdated }: {
                 <strong>{preview.snapshot.ksbs.find(row => row.id === ksbId)?.code ?? ksbId}</strong> ·
                 Total Mapping Weight {weight.total_weight} · {weight.mapping_count} mappings
                 <span className="block text-xs text-foreground-600">Hard {weight.hard_count} ({weight.hard_weight}) · Soft {weight.soft_count} ({weight.soft_weight}) · Possible {weight.possible_count} ({weight.possible_weight})</span>
-                <span className="block text-xs text-foreground-600">Main {weight.main_count} ({weight.main_weight}) · Secondary {weight.secondary_count} ({weight.secondary_weight})</span>
+                <span className="block text-xs text-foreground-600">Main {weight.main_count} ({weight.main_weight}) · Secondary {weight.secondary_count} ({weight.secondary_weight}){weight.possible_classification_count == null ? '' : ` · Possible classification ${weight.possible_classification_count} (${weight.possible_classification_weight})`}</span>
               </li>)}
             </ul>
           </section>)}
@@ -256,6 +260,8 @@ export function CatalogLmsPanel({ programme, onImported, onUpdated }: {
             const selectable = change.state === 'new' || change.state === 'modified';
             const canArchive = change.state === 'missing_source' && change.entity_type !== 'programme';
             const checked = selectable ? selected.includes(change.key) : archiveSelected.includes(change.key);
+            const newModule = change.state === 'new' && change.entity_type === 'module_template'
+              ? updates.snapshot?.modules.find(module => module.id === change.source_id) : undefined;
             return <label key={change.key} className="flex min-w-0 items-start gap-3 rounded-lg border border-background-200 p-3 text-sm">
               <input type="checkbox" className="mt-1 accent-primary-600" disabled={!selectable && !canArchive} checked={checked} aria-label={canArchive ? `Archive missing ${change.entity_type} ${change.source_id}` : undefined}
                 onChange={event => selectable
@@ -263,6 +269,13 @@ export function CatalogLmsPanel({ programme, onImported, onUpdated }: {
                   : setArchiveSelected(current => event.target.checked ? [...current, change.key] : current.filter(key => key !== change.key))} />
               <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><strong className="break-all">{change.entity_type}: {change.source_id}</strong><State value={change.state} /></span>
                 {change.fields.length > 0 && <ul className="mt-2 space-y-1 text-foreground-700">{change.fields.map(field => <li className="break-words" key={field.field}><strong>{field.field.replaceAll('_', ' ')}:</strong> {changeValue(field.before)} → {changeValue(field.after)}</li>)}</ul>}
+                {change.fields.some(field => field.impact === 'source_audit_only') &&
+                  <span className="mt-1 block text-foreground-600">Source audit only: Soft/Possible changes do not change Hard readiness or repin deliveries.</span>}
+                {newModule && <div className="mt-2 rounded-lg bg-background-100 p-2">
+                  <strong>New module Hard weights ({Object.keys(newModule.ksb_weights).length} KSBs)</strong>
+                  <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-foreground-700">{Object.entries(newModule.ksb_weights).map(([ksbId, weight]) =>
+                    <li key={ksbId}>{updates.snapshot?.ksbs.find(ksb => ksb.id === ksbId)?.code ?? ksbId}: Hard {weight.hard_weight} ({weight.hard_count} mappings); Soft {weight.soft_weight}; Possible {weight.possible_weight}</li>)}</ul>
+                </div>}
                 {canArchive && <span className="mt-1 block text-amber-900">Optional explicit archive. The record is never deleted automatically.</span>}
                 {!selectable && !canArchive && <span className="mt-1 block text-amber-900">Manual review required. This record will not be deleted or overwritten.</span>}
               </span>

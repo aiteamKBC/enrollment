@@ -86,6 +86,7 @@ class LmsCatalogueQueryTests(SimpleTestCase):
         self.assertNotIn('c.title', queries[3])
         self.assertIn('GROUP BY c.module_catalogue_id, km.standard_ksb_id', queries[3])
         self.assertIn('SUM(km.weight)::text AS total_weight', queries[3])
+        self.assertIn("km.classification = 'possible'", queries[3])
         self.assertIn("w.status = 'active'", queries[3])
         self.assertIn('w.id = c.week_id', queries[3])
         self.assertIn("g.status = 'active'", queries[3])
@@ -101,6 +102,47 @@ class LmsCatalogueQueryTests(SimpleTestCase):
         self.assertEqual(result['modules'][0]['ksb_weights']['130']['total_weight'], '1060.00')
         self.assertEqual((result['modules'][0]['ksb_weights']['130']['hard_count'],
                           result['modules'][0]['ksb_weights']['130']['soft_count']), (26, 1))
+        self.assertNotIn('possible_classification_count', result['modules'][0]['ksb_weights']['130'])
+
+    def test_possible_classification_is_validated_without_losing_any_weight_class(self):
+        source = raw_snapshot()
+        value = source['ksbs'][0]['module_weights'][0]
+        value.update({
+            'mapping_count': 821, 'hard_count': 274, 'soft_count': 274, 'possible_count': 273,
+            'total_weight': '19170.00', 'hard_weight': '10960.00',
+            'soft_weight': '5480.00', 'possible_weight': '2730.00',
+            'main_count': 274, 'secondary_count': 274,
+            'possible_classification_count': 273,
+            'main_weight': '10960.00', 'secondary_weight': '5480.00',
+            'possible_classification_weight': '2730.00',
+        })
+        result = normalize_snapshot(source, programme_id='PROG-ME-L4',
+                                    cohort_start_date=date(2027, 1, 1),
+                                    standard_ref='ST0596', standard_version='1.0')
+        self.assertEqual(result['modules'][0]['ksb_weights']['130']['hard_weight'], '10960.00')
+        self.assertEqual(result['modules'][0]['ksb_weights']['130']['possible_classification_count'], 273)
+        for invalid in ({'possible_classification_count': 272},
+                        {'possible_classification_weight': '2729.00'},
+                        {'missing_weight_count': 1}):
+            broken = deepcopy(source)
+            broken['ksbs'][0]['module_weights'][0].update(invalid)
+            with self.assertRaises(CatalogLmsError):
+                normalize_snapshot(broken, programme_id='PROG-ME-L4',
+                                   cohort_start_date=date(2027, 1, 1),
+                                   standard_ref='ST0596', standard_version='1.0')
+        broken = deepcopy(source)
+        broken['ksbs'][0]['module_weights'][0].update({'hard_count': 0, 'soft_count': 548,
+                                                         'hard_weight': '10960.00'})
+        with self.assertRaises(CatalogLmsError):
+            normalize_snapshot(broken, programme_id='PROG-ME-L4',
+                               cohort_start_date=date(2027, 1, 1),
+                               standard_ref='ST0596', standard_version='1.0')
+        broken = deepcopy(source)
+        del broken['ksbs'][0]['module_weights'][0]['possible_classification_count']
+        with self.assertRaises(CatalogLmsError):
+            normalize_snapshot(broken, programme_id='PROG-ME-L4',
+                               cohort_start_date=date(2027, 1, 1),
+                               standard_ref='ST0596', standard_version='1.0')
 
     def test_filter_uses_actual_start_date(self):
         value = raw_snapshot()
@@ -128,6 +170,51 @@ class LmsCatalogueQueryTests(SimpleTestCase):
 
 class LmsCataloguePersistenceTests(TestCase):
     @patch('programme_suitability.catalog_lms.preview_import')
+    def test_other_programme_import_preserves_shared_ksb_with_independent_hard_only_and_soft_possible_weights(self, mocked_preview):
+        raw = raw_snapshot()
+        raw['programme'].update({'programme_id': 'PROG-OTHER-L4', 'name': 'Another Programme',
+                                 'standard_ref': 'ST0123'})
+        raw['ksbs'][0]['standard_ref'] = 'ST0123'
+        second_row = deepcopy(raw['hierarchy'][0])
+        second_row.update({'module_catalogue_id': 'm2', 'module_title': 'Second module'})
+        raw['hierarchy'].append(second_row)
+        raw['weeks'].extend([{**item, 'id': f"{item['id']}-second", 'module_catalogue_id': 'm2'}
+                             for item in deepcopy(raw['weeks'])])
+        hard_only = raw['ksbs'][0]['module_weights'][0]
+        hard_only.update({'mapping_count': 1, 'hard_count': 1, 'soft_count': 0, 'possible_count': 0,
+                          'total_weight': '40.00', 'hard_weight': '40.00', 'soft_weight': '0',
+                          'possible_weight': '0', 'main_count': 1, 'secondary_count': 0,
+                          'main_weight': '40.00', 'secondary_weight': '0'})
+        soft_possible = {**hard_only, 'module_id': 'm2', 'mapping_count': 2,
+                         'hard_count': 0, 'soft_count': 1, 'possible_count': 1,
+                         'total_weight': '30.00', 'hard_weight': '0', 'soft_weight': '20.00',
+                         'possible_weight': '10.00', 'main_count': 0, 'secondary_count': 1,
+                         'possible_classification_count': 1, 'main_weight': '0',
+                         'secondary_weight': '20.00', 'possible_classification_weight': '10.00'}
+        raw['ksbs'][0]['module_ids'] = ['m1', 'm2']
+        raw['ksbs'][0]['module_weights'].append(soft_possible)
+        normalized = normalize_snapshot(raw, programme_id='PROG-OTHER-L4',
+                                        cohort_start_date=date(2027, 1, 1),
+                                        standard_ref='ST0123', standard_version='1.0')
+        self.assertEqual(normalized['counts']['modules'], 2)
+        self.assertEqual(normalized['counts']['ksbs'], 1)
+        mocked_preview.return_value = preview(normalized)
+        scope = ('a' * 64, 'PROG-OTHER-L4', date(2027, 1, 1), 'ST0123', '1.0', PRICING, '41')
+        counts = {'m1': {'reviews': 0, 'books': 0}, 'm2': {'reviews': 1, 'books': 0}}
+        approve_import(*scope, module_counts=counts)
+        approve_import(*scope, module_counts=counts)
+        self.assertEqual((CatalogProgramme.objects.count(), CatalogModule.objects.count(),
+                          CatalogDelivery.objects.count()), (1, 2, 2))
+        first = CatalogModule.objects.get(external_id='m1').revisions.first()
+        second = CatalogModule.objects.get(external_id='m2').revisions.first()
+        self.assertEqual(first.ksbs[0]['id'], second.ksbs[0]['id'])
+        self.assertEqual(first.ksbs[0]['mapping_weight']['hard_weight'], '40.00')
+        self.assertEqual(second.ksbs[0]['mapping_weight']['hard_weight'], '0')
+        self.assertEqual(second.ksbs[0]['mapping_weight']['possible_weight'], '10.00')
+        self.assertEqual((CatalogModule.objects.get(external_id='m2').reviews,
+                          CatalogModule.objects.get(external_id='m2').books), (1, 0))
+
+    @patch('programme_suitability.catalog_lms.preview_import')
     def test_stale_import_preview_is_rejected_before_writes(self, mocked_preview):
         mocked_preview.return_value = preview() | {'preview_fingerprint': 'b' * 64}
         with self.assertRaises(CatalogLmsError) as failure:
@@ -146,6 +233,30 @@ class LmsCataloguePersistenceTests(TestCase):
         self.assertEqual(CatalogModule.objects.count(), 1)
         self.assertEqual(CatalogDelivery.objects.count(), 1)
         self.assertEqual(CatalogSourceLink.objects.filter(source_entity_type='weekly_topic').count(), 2)
+
+    @patch('programme_suitability.catalog_lms.preview_import')
+    def test_three_class_weight_breakdown_is_pinned_without_duplicating_records(self, mocked_preview):
+        expanded = snapshot()
+        weight = expanded['modules'][0]['ksb_weights']['130']
+        weight.update({
+            'mapping_count': 3, 'hard_count': 1, 'soft_count': 1, 'possible_count': 1,
+            'total_weight': '70.00', 'hard_weight': '40.00',
+            'soft_weight': '20.00', 'possible_weight': '10.00',
+            'main_count': 1, 'secondary_count': 1,
+            'possible_classification_count': 1,
+            'main_weight': '40.00', 'secondary_weight': '20.00',
+            'possible_classification_weight': '10.00',
+        })
+        mocked_preview.return_value = preview(expanded)
+        scope = ('a' * 64, 'PROG-ME-L4', date(2027, 1, 1), 'ST0596', '1.0', PRICING, '41')
+        approve_import(*scope, module_counts=MODULE_COUNTS)
+        approve_import(*scope, module_counts=MODULE_COUNTS)
+        pinned = CatalogDelivery.objects.get().module_revision.ksbs[0]['mapping_weight']
+        self.assertEqual((pinned['hard_weight'], pinned['soft_weight'], pinned['possible_weight']),
+                         ('40.00', '20.00', '10.00'))
+        self.assertEqual(pinned['possible_classification_count'], 1)
+        self.assertEqual((CatalogProgramme.objects.count(), CatalogModule.objects.count(),
+                          CatalogDelivery.objects.count()), (1, 1, 1))
 
     @patch('programme_suitability.catalog_lms.preview_import')
     def test_admin_owned_module_counts_are_saved_in_first_pinned_revision(self, mocked_preview):
@@ -291,6 +402,98 @@ class LmsCataloguePersistenceTests(TestCase):
         self.assertEqual((delivery.module_revision.books, delivery.module_revision.reviews), (2, 4))
         self.assertEqual(check_updates(programme)['changes'], [])
         self.assertEqual(CatalogModule.objects.get().revisions.count(), 2)
+
+    @patch('programme_suitability.catalog_lms.normalize_snapshot')
+    @patch('programme_suitability.catalog_lms.read_catalogue_snapshot')
+    @patch('programme_suitability.catalog_lms.preview_import')
+    def test_soft_only_source_change_is_audited_without_curriculum_revision(self, mocked_preview, mocked_read, mocked_normalize):
+        mocked_preview.return_value = preview()
+        imported = approve_import('a' * 64, 'PROG-ME-L4', date(2027, 1, 1), 'ST0596', '1.0', PRICING, '41',
+                                  module_counts=MODULE_COUNTS)
+        programme = CatalogProgramme.objects.get(pk=imported['programme_id'])
+        module = CatalogModule.objects.get()
+        delivery = CatalogDelivery.objects.get()
+        pinned = delivery.module_revision_id
+        original_revision = module.revision
+        mocked_read.return_value = {'metrics': {'query_count': 6}, 'performance_warnings': []}
+        changed = deepcopy(snapshot())
+        weight = changed['modules'][0]['ksb_weights']['130']
+        weight['soft_weight'] = weight['secondary_weight'] = '30.00'
+        weight['total_weight'] = '1070.00'
+        changed['fingerprint'] = 'b' * 64
+        mocked_normalize.return_value = changed
+        diff = check_updates(programme)['changes']
+        self.assertEqual(len(diff), 1)
+        self.assertEqual(diff[0]['fields'][0]['impact'], 'source_audit_only')
+        self.assertEqual(diff[0]['fields'][0]['field'], 'KSB 130 source mapping details')
+        apply_updates(programme, changed['fingerprint'], [diff[0]['key']], '41', programme.revision)
+        module.refresh_from_db()
+        delivery.refresh_from_db()
+        self.assertEqual(module.revision, original_revision)
+        self.assertEqual(module.revisions.count(), 1)
+        self.assertEqual(delivery.module_revision_id, pinned)
+        self.assertEqual(check_updates(programme)['changes'], [])
+        link = CatalogSourceLink.objects.get(local_entity_type='module_template')
+        self.assertEqual(link.accepted_state['ksb_weights']['130']['soft_weight'], '30.00')
+        self.assertEqual(delivery.module_revision.ksbs[0]['mapping_weight']['soft_weight'], '20.00')
+
+        hard_changed = deepcopy(changed)
+        hard_weight = hard_changed['modules'][0]['ksb_weights']['130']
+        hard_weight['hard_weight'] = hard_weight['main_weight'] = '1080.00'
+        hard_weight['total_weight'] = '1110.00'
+        hard_changed['fingerprint'] = 'c' * 64
+        mocked_normalize.return_value = hard_changed
+        programme.refresh_from_db()
+        hard_diff = check_updates(programme)['changes']
+        self.assertEqual(hard_diff[0]['fields'][0]['impact'], 'hard_readiness')
+        with patch('programme_suitability.catalog_lms.timezone.localdate', return_value=date(2028, 1, 1)):
+            apply_updates(programme, hard_changed['fingerprint'], [hard_diff[0]['key']], '41', programme.revision)
+        module.refresh_from_db()
+        delivery.refresh_from_db()
+        self.assertEqual(module.revisions.count(), 2)
+        self.assertEqual(delivery.module_revision_id, pinned)
+        self.assertEqual(module.revisions.first().ksbs[0]['mapping_weight']['hard_weight'], '1080.00')
+        self.assertEqual((module.books, module.reviews), (2, 4))
+
+    @patch('programme_suitability.catalog_lms.normalize_snapshot')
+    @patch('programme_suitability.catalog_lms.read_catalogue_snapshot')
+    @patch('programme_suitability.catalog_lms.preview_import')
+    def test_selective_new_three_class_module_does_not_apply_unselected_group_change(self, mocked_preview, mocked_read, mocked_normalize):
+        mocked_preview.return_value = preview()
+        imported = approve_import('a' * 64, 'PROG-ME-L4', date(2027, 1, 1), 'ST0596', '1.0', PRICING, '41',
+                                  module_counts=MODULE_COUNTS)
+        programme = CatalogProgramme.objects.get(pk=imported['programme_id'])
+        first_delivery = CatalogDelivery.objects.get()
+        first_revision = first_delivery.module_revision_id
+        changed = deepcopy(snapshot())
+        changed['groups'][0]['weekday'] = 1
+        second = deepcopy(changed['modules'][0])
+        second['id'], second['name'] = 'm2', 'New three-class module'
+        second['weekly_topics'] = [{**topic, 'id': f"{topic['id']}-second"} for topic in second['weekly_topics']]
+        weight = second['ksb_weights']['130']
+        weight.update({'mapping_count': 3, 'hard_count': 1, 'soft_count': 1, 'possible_count': 1,
+                       'hard_weight': '40.00', 'soft_weight': '20.00', 'possible_weight': '10.00',
+                       'total_weight': '70.00', 'main_count': 1, 'secondary_count': 1,
+                       'possible_classification_count': 1, 'main_weight': '40.00',
+                       'secondary_weight': '20.00', 'possible_classification_weight': '10.00'})
+        changed['modules'].append(second)
+        changed['fingerprint'] = 'b' * 64
+        mocked_read.return_value = {'metrics': {'query_count': 6}, 'performance_warnings': []}
+        mocked_normalize.return_value = changed
+        diff = check_updates(programme)['changes']
+        self.assertEqual({(item['entity_type'], item['state']) for item in diff},
+                         {('group', 'modified'), ('module_template', 'new'), ('module_delivery', 'new')})
+        selected = [item['key'] for item in diff if item['entity_type'].startswith('module_')]
+        apply_updates(programme, changed['fingerprint'], selected, '41', programme.revision)
+        first_delivery.refresh_from_db()
+        self.assertEqual(first_delivery.module_revision_id, first_revision)
+        self.assertEqual((CatalogModule.objects.count(), CatalogDelivery.objects.count()), (2, 2))
+        new_module = CatalogModule.objects.get(external_id='m2')
+        self.assertEqual(new_module.revisions.first().ksbs[0]['mapping_weight']['hard_weight'], '40.00')
+        self.assertEqual(new_module.revisions.first().ksbs[0]['mapping_weight']['possible_weight'], '10.00')
+        programme.refresh_from_db()
+        remaining = check_updates(programme)['changes']
+        self.assertEqual([(item['entity_type'], item['state']) for item in remaining], [('group', 'modified')])
 
     @patch('programme_suitability.catalog_lms.preview_import')
     def test_sync_rejects_stale_local_programme_revision(self, mocked_preview):

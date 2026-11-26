@@ -5,7 +5,7 @@ import type { RadarModule } from './allocation';
 
 export interface ImpactKsb {
   id: string; code: string; description: string; kind: string; standard: string; standardVersion: string;
-  weight?: { total_weight: string; mapping_count: number };
+  weight?: { total_weight: string; mapping_count: number; hard_weight?: string; hard_count?: number };
 }
 export interface ImpactModule {
   id: string; name: string; status: 'ready' | 'unavailable'; reason?: string;
@@ -14,27 +14,69 @@ export interface ImpactModule {
 export interface ModuleImpact {
   status: 'ready' | 'unavailable'; reason?: string; programmeId?: string;
   cohortId?: string; groupId?: string; modules: ImpactModule[]; savedLevels?: Record<string, string>;
-  screeningThresholdPercent?: number;
+  minimumQualifyingRating?: number; maximumQualifyingRating?: number; minimumHighRatedHardKsbs?: number;
 }
 
-export function isPotentialPriorLearning(readiness: ReturnType<typeof weightedReadiness> | null | undefined,
-  threshold: number): boolean {
-  return Boolean(readiness && readiness.reason === null && readiness.count > 0 &&
-    readiness.answered === readiness.count && readiness.score != null && readiness.score >= threshold);
+export interface ScreeningRule {
+  minimumQualifyingRating: number;
+  maximumQualifyingRating: number;
+  minimumHighRatedHardKsbs: number;
+}
+
+export function screeningRuleFromImpact(impact: ModuleImpact | null): ScreeningRule | null {
+  if (!impact) return null;
+  const { minimumQualifyingRating: low, maximumQualifyingRating: high,
+    minimumHighRatedHardKsbs: count } = impact;
+  if (!Number.isInteger(low) || !Number.isInteger(high) || !Number.isInteger(count) ||
+      low! < 1 || high! > MAX_COMPETENCE_SCORE || low! > high! || count! < 1 || count! > 500) return null;
+  return { minimumQualifyingRating: low!, maximumQualifyingRating: high!, minimumHighRatedHardKsbs: count! };
+}
+
+export function screenModule(module: ImpactModule | undefined, answers: Record<string, KsbAssessment>,
+  answerIdByCode: Map<string, string>, rule: ScreeningRule | null) {
+  if (!rule || !module || module.status !== 'ready' || !module.revisionId || !module.ksbs.length)
+    return { status: 'unavailable' as const, qualifyingCodes: [] as string[] };
+  const qualified = new Map<string, string>();
+  let incompleteMapping = false;
+  for (const ksb of module.ksbs) {
+    const weight = ksb.weight;
+    const hard = Number(weight?.hard_weight);
+    const total = Number(weight?.total_weight);
+    if (!weight || weight.hard_weight == null || !Number.isInteger(weight.hard_count) ||
+        !Number.isInteger(weight.mapping_count) || weight.mapping_count < 0 ||
+        weight.hard_count! < 0 || weight.hard_count! > weight.mapping_count ||
+        !Number.isFinite(hard) || hard < 0 || !Number.isFinite(total) || total < hard ||
+        (weight.hard_count === 0 && hard !== 0)) {
+      incompleteMapping = true;
+      continue;
+    }
+    const rating = competenceScore(answers[answerIdByCode.get(ksb.code) ?? '']?.level);
+    if (weight.hard_count! > 0 && rating != null && rating >= rule.minimumQualifyingRating &&
+        rating <= rule.maximumQualifyingRating)
+      qualified.set(ksb.id, ksb.code);
+  }
+  const qualifyingCodes = [...qualified.values()];
+  return { status: qualifyingCodes.length >= rule.minimumHighRatedHardKsbs ? 'potential' as const
+    : incompleteMapping ? 'unavailable' as const : 'none' as const, qualifyingCodes };
+}
+
+export function isPotentialPriorLearning(screening: ReturnType<typeof screenModule>): boolean {
+  return screening.status === 'potential';
 }
 
 /** The profile summary uses only persisted answers and the verified, pinned revision. */
-export function screenedModules(impact: ModuleImpact): { id: string; name: string; score: number }[] {
+export function screenedModules(impact: ModuleImpact): { id: string; name: string; qualifyingCodes: string[] }[] {
   if (impact.status !== 'ready') return [];
+  const rule = screeningRuleFromImpact(impact);
   const answers = Object.fromEntries(Object.entries(impact.savedLevels ?? {}).map(([id, level]) =>
     [id, { ksbId: id, level, evidenceFiles: [], actionPlan: null }]));
   return impact.modules.flatMap((module) => {
     if (module.status !== 'ready' || !module.revisionId) return [];
     const ids = new Map(module.ksbs.map((ksb) => [ksb.code,
       `${ksb.standard.toLowerCase()}-v${ksb.standardVersion.replace(/\./g, '-')}-${ksb.code}`]));
-    const readiness = weightedReadiness(module, answers as Record<string, KsbAssessment>, ids);
-    return isPotentialPriorLearning(readiness, impact.screeningThresholdPercent ?? 50)
-      ? [{ id: module.id, name: module.name, score: readiness.score! }] : [];
+    const screening = screenModule(module, answers as Record<string, KsbAssessment>, ids, rule);
+    return isPotentialPriorLearning(screening)
+      ? [{ id: module.id, name: module.name, qualifyingCodes: screening.qualifyingCodes }] : [];
   });
 }
 
@@ -93,16 +135,28 @@ export function weightedReadiness(module: ImpactModule, answers: Record<string, 
   const count = module.ksbs.length;
   const answered = module.ksbs.filter((item) => competenceScore(answers[answerIdByCode.get(item.code) ?? '']?.level) != null).length;
   if (module.status !== 'ready' || !count) return { count, answered, score: null, reason: 'mapping_unavailable' };
-  if (module.ksbs.some((item) => item.weight?.total_weight == null)) return { count, answered, score: null, reason: 'weight_missing' };
-  const weighted = module.ksbs.map((item) => ({ item, weight: Number(item.weight!.total_weight) }));
-  if (weighted.some(({ weight }) => !Number.isFinite(weight) || weight < 0)) return { count, answered, score: null, reason: 'weight_invalid' };
-  const availableWeight = weighted.reduce((total, { weight }) => total + weight, 0);
-  if (availableWeight <= 0) return { count, answered, score: null, reason: 'weight_zero' };
-  const rated = weighted.map(({ item, weight }) => ({ weight, score: competenceScore(answers[answerIdByCode.get(item.code) ?? '']?.level) }));
+  if (module.ksbs.some((item) => item.weight?.hard_weight == null || item.weight?.hard_count == null))
+    return { count, answered, score: null, reason: 'hard_weight_missing' };
+  const weighted = module.ksbs.map((item) => ({ item, weight: Number(item.weight!.hard_weight),
+    totalWeight: Number(item.weight!.total_weight), hardCount: item.weight!.hard_count!,
+    mappingCount: item.weight!.mapping_count }));
+  if (weighted.some(({ weight, totalWeight, hardCount, mappingCount }) =>
+    !Number.isFinite(weight) || weight < 0 || !Number.isFinite(totalWeight) || totalWeight < 0 ||
+    weight > totalWeight || !Number.isInteger(hardCount) || hardCount < 0 ||
+    !Number.isInteger(mappingCount) || mappingCount < 0 || hardCount > mappingCount ||
+    (hardCount === 0 && weight !== 0)))
+    return { count, answered, score: null, reason: 'hard_weight_invalid' };
+  const contributing = weighted.filter(({ weight, hardCount }) => hardCount > 0 && weight > 0);
+  const availableWeight = contributing.reduce((total, { weight }) => total + weight, 0);
+  if (availableWeight <= 0) return { count, answered, score: null, reason: 'hard_weight_unavailable',
+    hardKsbCount: 0, coveredOnlyCount: count };
+  const rated = contributing.map(({ item, weight }) => ({ weight, score: competenceScore(answers[answerIdByCode.get(item.code) ?? '']?.level) }));
   const answeredWeight = rated.reduce((total, entry) => total + (entry.score == null ? 0 : entry.weight), 0);
-  if (answeredWeight <= 0) return { count, answered, score: null, reason: 'not_answered' };
+  if (answeredWeight <= 0) return { count, answered, score: null, reason: 'not_answered',
+    hardKsbCount: contributing.length, coveredOnlyCount: count - contributing.length };
   const score = Math.round(100 * rated.reduce((total, entry) =>
     total + (entry.score == null ? 0 : entry.weight * (entry.score - 1) / (MAX_COMPETENCE_SCORE - 1)), 0) / answeredWeight);
   return { count, answered, score, reason: answered < count ? 'incomplete' : null,
-    answeredWeight, availableWeight };
+    answeredWeight, availableWeight, hardKsbCount: contributing.length,
+    coveredOnlyCount: count - contributing.length };
 }

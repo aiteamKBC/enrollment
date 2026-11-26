@@ -3,14 +3,15 @@
 .completion { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 5px; margin: 0 0 20px; padding: 9px 14px; border: 1px solid #e6d6f2; border-radius: 10px; background: #f8f3fc; color: #54316d; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .completionValue { color: #552080; font-size: 17px; font-weight: 750; }
 .progressFill { height: 100%; border-radius: inherit; background: #7722b8; }
-.moduleCoverage { margin-bottom: 16px; }
+.moduleCoverage { margin-bottom: 14px; }
+.moduleTitle { margin: 0 0 5px; font-size: 19px; line-height: 1.3; font-weight: 700; color: #342044; }
 .moduleTitleRow { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 5px; }
 .moduleTitleRow h3 { margin: 0; font-size: 19px; line-height: 1.3; font-weight: 700; color: #342044; }
 .scoreHelpButton { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 2px 4px; border: 0; border-radius: 5px; background: transparent; color: #64229a; font-size: 12px; font-weight: 650; cursor: pointer; }
 .scoreHelpButton:hover { background: #f3eafb; }
 .scoreHelpButton:focus-visible { outline: 2px solid #8a22d0; outline-offset: 2px; }
 .scoreHelpButton svg { width: 15px; height: 15px; flex: none; }
-.moduleIntro { margin: 0 0 16px; color: #655572; font-size: 13px; line-height: 1.55; }
+.moduleIntro { margin: 0 0 14px; color: #655572; font-size: 13px; line-height: 1.55; }
 .scoreHelpContent { max-width: 68ch; margin: -6px 0 14px; padding: 8px 12px; border-left: 2px solid #a66acb; border-radius: 0 6px 6px 0; background: #faf7fd; color: #513f60; font-size: 12px; line-height: 1.5; }
 .priorLearningNotice { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; gap: 9px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid #e4d9ee; border-radius: 8px; background: #faf8fc; color: #493d57; font-size: 12px; line-height: 1.45; }
 .priorLearningNotice > svg { width: 16px; height: 16px; flex: none; margin-top: 1px; color: #6d3694; }
@@ -21,10 +22,17 @@
 .impactError button { min-height: 32px; padding: 5px 12px; border: 1px solid #d99ca3; border-radius: 8px; background: #fff; color: #72252e; font-weight: 700; }
 .impactError button:focus-visible { outline: 2px solid #8a22d0; outline-offset: 2px; }
 .moduleGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 14px; }
-.moduleCard { display: flex; flex-direction: column; min-width: 0; min-height: 205px; padding: 18px; border: 1px solid #e4d6ee; border-radius: 14px; background: #fff; }
+.moduleCard { display: flex; flex-direction: column; min-width: 0; min-height: 108px; padding: 18px; border: 1px solid #e4d6ee; border-radius: 14px; background: #fff; }
 .moduleCardUnavailable { background: #faf9fc; }
-.moduleHeading { display: flex; align-items: center; min-height: 46px; }
+.moduleHeading { display: flex; align-items: flex-start; }
 .moduleName { margin: 0; font-size: 15px; line-height: 1.3; color: #382247; font-weight: 700; overflow-wrap: anywhere; }
+.moduleStatus { margin: auto 0 0; padding-top: 14px; color: #655773; font-size: 13px; font-weight: 700; }
+.moduleStatusPotential { color: #562086; }
+.categoryTabs { display: flex; align-items: stretch; gap: 6px; width: 100%; margin: 0 0 10px; border-bottom: 1px solid #e4d7f0; }
+.categoryTab { flex: 1; min-width: 0; padding: 10px 8px; border: 0; border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0; background: transparent; color: #685776; font-size: 13px; font-weight: 650; cursor: pointer; }
+.categoryTab:hover { background: #f8f3fc; }
+.categoryTab:focus-visible { outline: 2px solid #8a22d0; outline-offset: -2px; }
+.categoryTabActive { border-bottom-color: #7225b1; background: #f7effd; color: #4f177c; }
 .scoreRow { display: flex; align-items: center; gap: 14px; min-height: 52px; margin-top: 14px; }
 .moduleScore { flex: none; color: #562086; font-size: 44px; font-weight: 750; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .moduleScore > span { font-size: 24px; }
@@ -62,7 +70,8 @@
 }
 @media (max-width: 540px) {
   .moduleGrid { grid-template-columns: minmax(0, 1fr); }
-  .moduleCard { min-height: 190px; padding: 16px; }
+  .moduleCard { min-height: 90px; padding: 16px; }
+  .categoryTab { font-size: 12px; padding: 10px 4px; }
   .tableHeader { display: none; }
   .row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px; }
   .coverageCell, .answerCell { padding-left: 20px; }

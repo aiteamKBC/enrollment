@@ -122,8 +122,10 @@ WITH selected_modules AS (
          COALESCE(SUM(km.weight) FILTER (WHERE km.weight_class = 'possible'), 0)::text AS possible_weight,
          COUNT(*) FILTER (WHERE km.classification = 'main') AS main_count,
          COUNT(*) FILTER (WHERE km.classification = 'secondary') AS secondary_count,
+         COUNT(*) FILTER (WHERE km.classification = 'possible') AS possible_classification_count,
          COALESCE(SUM(km.weight) FILTER (WHERE km.classification = 'main'), 0)::text AS main_weight,
-         COALESCE(SUM(km.weight) FILTER (WHERE km.classification = 'secondary'), 0)::text AS secondary_weight
+         COALESCE(SUM(km.weight) FILTER (WHERE km.classification = 'secondary'), 0)::text AS secondary_weight,
+         COALESCE(SUM(km.weight) FILTER (WHERE km.classification = 'possible'), 0)::text AS possible_classification_weight
   FROM curriculum.components c
   JOIN selected_modules sm ON sm.module_catalogue_id = c.module_catalogue_id
   JOIN curriculum.weeks w
@@ -149,7 +151,9 @@ SELECT d.id, d.ksb_code, d.ksb_type, d.ksb_description,
          'hard_weight', cv.hard_weight, 'soft_weight', cv.soft_weight,
          'possible_weight', cv.possible_weight,
          'main_count', cv.main_count, 'secondary_count', cv.secondary_count,
-         'main_weight', cv.main_weight, 'secondary_weight', cv.secondary_weight
+         'possible_classification_count', cv.possible_classification_count,
+         'main_weight', cv.main_weight, 'secondary_weight', cv.secondary_weight,
+         'possible_classification_weight', cv.possible_classification_weight
        ) ORDER BY cv.module_catalogue_id)
          FILTER (WHERE cv.module_catalogue_id IS NOT NULL), '[]'::jsonb) AS module_weights
 FROM curriculum.ksb_standard_definitions d

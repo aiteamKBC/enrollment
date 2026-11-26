@@ -17,9 +17,11 @@ export function resolveCatalogueRadar(catalogue: RadarCatalogue | null, state: M
   if (error) return { ...empty, status: 'error', message: error };
   if (!catalogue || !state) return { ...empty, status: 'loading', message: 'Loading saved Skills Radar catalogue and modules…' };
   try {
+    if (state.selectedProgramme !== catalogue.programmeId) throw new Error('The saved Skills Radar catalogue does not match the learner’s selected programme.');
     const questions = catalogueQuestions(catalogue);
-    if (!questions.length || new Set(questions.map((q) => q.id)).size !== questions.length) throw new Error('The Skills Radar catalogue is empty or contains duplicate identifiers.');
+    if (new Set(questions.map((q) => q.id)).size !== questions.length) throw new Error('The Skills Radar catalogue contains duplicate identifiers.');
     if (catalogue.programmeId === 'PCP_L6') {
+      if (!questions.length) throw new Error('The Skills Radar catalogue is empty.');
       if (!state.selectionComplete || !state.savedSelection) return { ...empty, status: 'waiting', message: 'Complete and save your PCP module selection in Programme Suitability & Modules before answering Skills Radar.' };
       const modules = allocatePcpQuestions(questions, state, { ksbs: catalogue.records.map((r) => ({
         code: r.code, type: r.kind, full_description: r.description, original_owner_group_by_pathway: r.owners,
@@ -29,6 +31,10 @@ export function resolveCatalogueRadar(catalogue: RadarCatalogue | null, state: M
     const definition = state.configuration.programmes.find((p) => p.id === catalogue.programmeId);
     if (!definition) throw new Error('Published programme modules are unavailable.');
     const modules = leaves(definition.modules).map((m) => ({ id: m.id, title: m.title, sessions: m.sessions, questions: [] as Ksb[] }));
+    // An approved snapshot may have no assigned modules. Keep its questions
+    // available for assessment without inventing a delivery or screening card.
+    if (!modules.length) return { status: 'ready', message: '', modules, questions };
+    if (!questions.length) throw new Error('The Skills Radar catalogue is empty.');
     catalogue.records.forEach((r, index) => {
       const keys = Array.isArray(r.moduleKeys) && r.moduleKeys.length ? r.moduleKeys : (r.moduleKey ? [r.moduleKey] : []);
       const targets = modules.filter((m) => keys.includes(m.id));

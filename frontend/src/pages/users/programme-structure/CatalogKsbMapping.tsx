@@ -172,6 +172,7 @@ export function CatalogKsbMapping({ programmeCode, modules, ksbs, allKsbs, edita
                     <details className="text-left"><summary className={`cursor-pointer ${catalogueFocus}`}>Classification</summary>
                       <span className="block tabular-nums">Main {weight.main_count} ({weight.main_weight})</span>
                       <span className="block tabular-nums">Secondary {weight.secondary_count} ({weight.secondary_weight})</span>
+                      {weight.possible_classification_count != null && <span className="block tabular-nums">Possible {weight.possible_classification_count} ({weight.possible_classification_weight})</span>}
                     </details>
                   </div> : covered ? <>
                     <Check size={18} className="inline-block" aria-hidden />
