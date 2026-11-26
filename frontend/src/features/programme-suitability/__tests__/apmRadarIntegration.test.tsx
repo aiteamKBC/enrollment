@@ -8,7 +8,7 @@ import { BUILTIN_ITEMS } from '@/pages/users/wizard/layout/registry';
 import type { EnrolmentBoard, KsbAssessment, WizardDraft } from '@/pages/users/types';
 import { confirmedApm, apmModules, apmProfile } from './apmRadarFixtures';
 
-const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), profile: vi.fn(), modules: vi.fn() }));
+const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), profile: vi.fn(), modules: vi.fn(), impact: vi.fn() }));
 vi.mock('@/api/extendedIlr', () => ({ fetchExtendedIlr: api.read, peekExtendedIlr: () => undefined, saveExtendedIlr: api.write }));
 vi.mock('@/api/curriculum', () => ({ fetchKsbProfile: api.profile, peekKsbProfile: () => undefined }));
 vi.mock('@/api/enrolmentDocuments', () => ({ uploadEnrolmentDocument: vi.fn() }));
@@ -18,6 +18,7 @@ vi.mock('@/api/wizardLayout', () => ({ peekWizardLayout: () => undefined, fetchW
 vi.mock('../api', () => ({ getAssessment: async () => confirmedApm, peekAssessment: () => undefined,
   prefetchAssessmentSecurity: async () => ({ csrfToken: 'synthetic' }), primeAssessment: vi.fn() }));
 vi.mock('../modules/api', () => ({ getModules: api.modules, saveModuleSelection: vi.fn() }));
+vi.mock('../skills-radar/catalogue/api', () => ({ getModuleImpact: api.impact }));
 
 const board = { user: { id: '41', name: 'Learner' }, contact: { email: '', phone: '', dob: '' },
   programme: { name: 'Marketing Manager Level 6', onboardingStatus: 'In progress' } } as EnrolmentBoard;
@@ -30,6 +31,7 @@ const page = () => <WizardProvider userId="41" board={board}><SkillsRadar /><Obs
 const answer: KsbAssessment = { ksbId: 'st0310-v1-5-K1', level: 'frequently', note: 'Existing note', evidenceFiles: ['existing.pdf'], actionPlan: { text: 'Existing plan' } };
 beforeEach(() => {
   vi.clearAllMocks();
+  api.impact.mockResolvedValue({ status: 'unavailable', modules: [], reason: 'cohort_assignment_unavailable' });
   api.profile.mockResolvedValue({ results: apmProfile });
   api.modules.mockResolvedValue(apmModules());
   api.read.mockResolvedValue({ answers: null, draft: { skillsRadar: { standardId: 'standard:st0310-v1-5', assessments: {
@@ -39,16 +41,13 @@ beforeEach(() => {
 
 it('uses confirmed APM with a stale board and filters categories without changing saved answers', async () => {
   render(page());
-  await screen.findByLabelText('Selected module skills assessments');
+  await screen.findByRole('region', { name: 'Your prior knowledge by module' });
   await waitFor(() => expect(api.profile).toHaveBeenCalledWith('Associate Project Manager Level 4'));
   await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(62));
   expect(latest.draft.skillsRadar.assessments[answer.ksbId]).toEqual(answer);
   const calls = api.profile.mock.calls.length;
-  const knowledge = screen.getByRole('button', { name: /^Knowledge / });
-  await userEvent.click(knowledge);
-  expect(knowledge).toHaveAttribute('aria-pressed', 'true');
-  await userEvent.click(knowledge);
-  expect(knowledge).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.queryByRole('searchbox')).toBeNull();
+  expect(within(screen.getByRole('table', { name: 'Skills assessments' })).getAllByRole('row')).toHaveLength(63);
   expect(api.profile).toHaveBeenCalledTimes(calls);
   expect(api.write).not.toHaveBeenCalled();
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual(['61 competencies not yet rated']);
@@ -56,7 +55,7 @@ it('uses confirmed APM with a stale board and filters categories without changin
 
 it('keeps the existing answer persistence envelope and never stores grouping/derived validation metadata', async () => {
   render(page());
-  await screen.findByLabelText('Selected module skills assessments');
+  await screen.findByRole('region', { name: 'Your prior knowledge by module' });
   act(() => latest.setSection('skillsRadar', { ...latest.draft.skillsRadar, assessments: { ...latest.draft.skillsRadar.assessments,
     'st0310-v1-5-K2': { ...answer, ksbId: 'st0310-v1-5-K2', level: 'rarely', note: 'New answer' } } }));
   await userEvent.click(screen.getByRole('button', { name: 'Save existing answers' }));
@@ -88,16 +87,16 @@ it('requires all 62 distinct current answers, ignores historical ratings, and co
   assessments.historical = { ...answer, ksbId: 'historical' };
   api.read.mockResolvedValue({ answers: null, draft: { skillsRadar: { standardId: '', assessments } }, meta: { updatedAt: 'saved' } });
   render(page());
-  await screen.findByLabelText('Selected module skills assessments');
+  await screen.findByRole('region', { name: 'Your prior knowledge by module' });
   await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(62));
-  expect(screen.getByText('61 of 62 answered')).toBeVisible();
+  expect(screen.getByText('61 of 62')).toBeVisible();
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual(['1 competency not yet rated']);
   act(() => latest.setSection('skillsRadar', { ...latest.draft.skillsRadar, assessments: { ...latest.draft.skillsRadar.assessments,
     [final.id]: { ...answer, ksbId: final.id } } }));
-  expect(screen.getByText('62 of 62 answered')).toBeVisible();
+  expect(screen.getByText('62 of 62')).toBeVisible();
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual([]);
-  for (const card of within(screen.getByRole('navigation', { name: 'Selected modules' })).getAllByText(/\d+ of \d+ answered/)) {
-    const counts = card.textContent!.match(/(\d+) of (\d+) answered/)!;
+  for (const card of within(screen.getByRole('region', { name: 'Your prior knowledge by module' })).getAllByText(/\d+ of \d+ KSBs assessed/)) {
+    const counts = card.textContent!.match(/(\d+) of (\d+) KSBs assessed/)!;
     expect(counts[1]).toBe(counts[2]);
   }
   expect(latest.draft.skillsRadar.assessments.historical).toEqual(assessments.historical);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Flag } from 'lucide-react';
+import { Flag, Info } from 'lucide-react';
 import { AppIcon } from '@/components/feature/AppIcon';
 import { useWizard } from "../WizardContext.helpers";
 import { COMPETENCE_LEVELS, competenceMeta, competenceScore } from '@/mocks/enrolment-console';
@@ -17,23 +17,19 @@ import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/p
 import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
 import styles from './SkillsRadar.module.css';
 import { useLearnerStepPresentation } from '@/features/learner-enrolment/stepPresentation';
+import { bindImpactModules, screenModule, screeningRuleFromImpact, type ImpactModule } from '@/features/programme-suitability/skills-radar/moduleImpact';
 
 /**
  * Skills Radar: a sequential self-assessment questionnaire.
  *
- * One KSB at a time ("Question N of M") on a 9-point scale, with an optional
- * team sees the same list read-only (`readOnly` via the wizard's mode), because
- * the record they are meant to review.
+ * One KSB at a time ("Question N of M") on a 9-point scale. Historical notes
+ * and evidence remain in the saved answer and visible to staff in read-only mode.
  */
 
 /**
- * already largely competent, and an apprenticeship must involve substantial new
- * enrolment team sees the flag when they review the answers.
+ * Staff can see which self-ratings are above four during their review.
  */
 const FLAG_ABOVE_SCORE = 4;
-
-const HIGH_RATING_WARNING =
-  'Rating yourself above 4 on many skills may affect your eligibility for this apprenticeship, which requires substantial new learning.';
 
 function isHighRating(level?: string | null): boolean {
   return (competenceScore(level) ?? 0) > FLAG_ABOVE_SCORE;
@@ -66,15 +62,45 @@ function workingFrom(existing?: KsbAssessment): WorkingAnswer {
   };
 }
 
+type KsbCategory = 'Knowledge' | 'Skill' | 'Behaviour';
+const CATEGORIES: { kind: KsbCategory; label: string }[] = [
+  { kind: 'Knowledge', label: 'Knowledge' }, { kind: 'Skill', label: 'Skills' },
+  { kind: 'Behaviour', label: 'Behaviours' },
+];
+function categoryOf(ksb: Ksb): KsbCategory {
+  if (ksb.kind === 'Knowledge' || ksb.kind === 'Skill' || ksb.kind === 'Behaviour') return ksb.kind;
+  const prefixes = new Set(ksb.codes.map(code => code.match(/^([KSB])\d+$/i)?.[1]?.toUpperCase()));
+  if (prefixes.size === 1) {
+    const prefix = [...prefixes][0];
+    if (prefix === 'S') return 'Skill';
+    if (prefix === 'B') return 'Behaviour';
+  }
+  return 'Knowledge';
+}
+
+function codeNumber(ksb: Ksb, category: KsbCategory): number | null {
+  const prefix = category === 'Knowledge' ? 'K' : category === 'Skill' ? 'S' : 'B';
+  for (const code of ksb.codes) {
+    const match = code.trim().match(new RegExp(`^${prefix}(\\d+)$`, 'i'));
+    if (match) {
+      const value = Number(match[1]);
+      if (Number.isSafeInteger(value)) return value;
+    }
+  }
+  return null;
+}
+
 export default function SkillsRadar() {
   const learnerPresentation = useLearnerStepPresentation();
-  const { draft, setSection, readOnly, board, suitability, modules, radarCatalogue } = useWizard();
+  const { draft, setSection, readOnly, board, suitability, modules, radarCatalogue, radarImpact, radarImpactError, retryRadarImpact } = useWizard();
   const managed = Boolean(radarCatalogue?.enabled && !(radarCatalogue.data && !radarCatalogue.data.catalogue));
   const pcp = isPcpRadar(suitability?.state);
   const mm = isMmRadar(suitability?.state);
   const me = isMeRadar(suitability?.state);
   const apm = isApmRadar(suitability?.state) || isApmStaffReview(readOnly, board.programme.name || '', suitability?.state);
   const moduleBased = managed || pcp || mm || me || apm;
+  const impact = radarImpact ?? null;
+  const impactError = radarImpactError ?? '';
   const t = useText();
   const showErrors = useShowStepErrors();
   const sr = draft.skillsRadar;
@@ -84,6 +110,11 @@ export default function SkillsRadar() {
   // self-assess against their own programme's competencies.
   const programmeLookup = apm ? apmRadarProfileProgramme(suitability?.state) : me ? meRadarProfileProgramme(suitability?.state) : mm ? mmRadarProfileProgramme(suitability?.state) : radarProfileProgramme(board.programme.name || '', suitability?.state);
   const programme = managed ? modules?.data?.configuration.programmes.find((p) => p.id === radarCatalogue?.data?.programmeId)?.title || board.programme.name || '' : moduleBased ? modules?.data?.configuration.programmes.find((p) => p.id === (apm ? 'APM_L4' : me ? 'ME_L4' : mm ? 'MM_L6' : 'PCP_L6'))?.title || (apm ? 'Associate Project Manager Level 4' : me ? 'Marketing Executive Level 4' : mm ? 'Marketing Manager Level 6' : 'Project Controls Professional Level 6') : board.programme.name || '';
+  const selectedProgrammeId = suitability?.state?.selectedProgramme || modules?.data?.selectedProgramme;
+  const programmeLevel = suitability?.state?.configuration?.programmes.find((item) => item.id === selectedProgrammeId)?.level
+    ?? selectedProgrammeId?.match(/_L(\d+)$/)?.[1];
+  const programmeLabel = programme && programmeLevel && !/\blevel\s*\d+/i.test(programme)
+    ? `${programme} · Level ${programmeLevel}` : programme;
   // already visited (or one opened after the bootstrap) renders its competencies
   // on the first frame. Starting empty-and-loading meant a spinner flashed on
   // every mount for a list that was already in memory; effects run after paint,
@@ -130,54 +161,91 @@ export default function SkillsRadar() {
 
   const grouping = useMemo(() => managed ? radarCatalogue?.grouping : pcp ? resolvePcpRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : mm ? resolveMmRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : me ? resolveMeRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : apm ? resolveApmRadar(loading || loadedProgramme !== programmeLookup ? null : profileKsbs, modules?.data, loadError || modules?.error) : null,
     [managed, radarCatalogue?.grouping, pcp, mm, me, apm, loading, loadedProgramme, programmeLookup, profileKsbs, modules?.data, modules?.error, loadError]);
-  const coverage = useMemo(() => {
-    const source = grouping?.modules ?? [];
-    const byId = new Map<string, { ksb: Ksb; modules: string[] }>();
-    for (const module of source) for (const ksb of module.questions) {
-      const current = byId.get(ksb.id);
-      if (current) { if (!current.modules.includes(module.title)) current.modules.push(module.title); }
-      else byId.set(ksb.id, { ksb, modules: [module.title] });
+  const answerIdByCode = useMemo(() => {
+    const lookup = new Map<string, string>();
+    const duplicates = new Set<string>();
+    for (const question of grouping?.questions ?? profileKsbs) for (const code of question.codes) {
+      if (lookup.has(code) && lookup.get(code) !== question.id) duplicates.add(code);
+      else lookup.set(code, question.id);
     }
-    return [...byId.values()];
-  }, [grouping]);
-  const ksbs = useMemo(() => grouping ? coverage.map((item) => item.ksb) : managed ? [] : profileKsbs, [grouping, coverage, managed, profileKsbs]);
-  const coverageById = useMemo(() => new Map(coverage.map((item) => [item.ksb.id, item.modules])), [coverage]);
-  const coverageByCode = useMemo(() => new Map((grouping?.modules ?? []).flatMap((module) => module.questions.flatMap((question) => question.codes.map((code) => [code, module.title] as const)))), [grouping]);
-  const moduleCoverage = useMemo(() => (grouping?.modules ?? []).map((module) => {
-    const ids = new Set(module.questions.map((ksb) => ksb.id));
-    return {
-      title: module.title,
-      count: ids.size,
-      answered: [...ids].filter((id) => sr.assessments[id]?.level).length,
-    };
-  }), [grouping, sr.assessments]);
-  const coverageAvailable = coverage.some((item) => item.modules.length > 0);
-  const questionIndex = useMemo(() => new Map(ksbs.map((ksb, index) => [ksb.id, index])), [ksbs]);
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'Knowledge' | 'Skill' | 'Behaviour'>('all');
-
+    for (const code of duplicates) lookup.delete(code);
+    return lookup;
+  }, [grouping, profileKsbs]);
+  const mappedModules = useMemo(() => bindImpactModules(grouping?.modules ?? [], grouping?.questions ?? [],
+    impact, modules?.data?.selectedProgramme, sr.standardId ?? ''),
+  [grouping, impact, modules?.data?.selectedProgramme, sr.standardId]);
+  const savedAssessments = useMemo(() => Object.fromEntries(Object.entries(impact?.savedLevels ?? {}).map(([id, level]) =>
+    [id, { ksbId: id, level: level as KsbAssessment['level'], evidenceFiles: [], actionPlan: null }])), [impact?.savedLevels]);
+  const screeningRule = useMemo(() => screeningRuleFromImpact(impact), [impact]);
+  const screeningByModule = useMemo(() => new Map(mappedModules.flatMap((module) => {
+    const record = module.impact as ImpactModule | undefined;
+    return record?.status === 'ready'
+      ? [[module.id, screenModule(record, savedAssessments, answerIdByCode, screeningRule)] as const] : [];
+  })), [mappedModules, savedAssessments, answerIdByCode, screeningRule]);
+  // The assessment's published questions remain authoritative. A new local
+  // revision can cover fewer unique KSBs than the original questionnaire.
+  const ksbs = useMemo(() => {
+    if (!grouping) return managed ? [] : profileKsbs;
+    const seen = new Set<string>();
+    return grouping.questions.filter((question) => {
+      if (seen.has(question.id)) return false;
+      seen.add(question.id);
+      return true;
+    });
+  }, [grouping, managed, profileKsbs]);
+  const coverageById = useMemo(() => {
+    const byId = new Map<string, string[]>();
+    for (const module of mappedModules) {
+      if (impact && module.impact?.status !== 'ready') continue;
+      for (const question of module.questions) {
+        const modules = byId.get(question.id) ?? [];
+        if (!modules.includes(module.title)) modules.push(module.title);
+        byId.set(question.id, modules);
+      }
+    }
+    return byId;
+  }, [mappedModules, impact]);
+  const coverageByCode = useMemo(() => new Map(mappedModules.filter((module) => !impact || module.impact?.status === 'ready')
+    .flatMap((module) => module.questions.flatMap((question) => question.codes.map((code) => [code, module.title] as const)))), [mappedModules, impact]);
+  const moduleCoverage = useMemo(() => mappedModules.map((module) => {
+    const screening = screeningByModule.get(module.id) ?? null;
+    return { id: module.id, title: module.title, screening };
+  }), [mappedModules, screeningByModule]);
+  const orderedModuleCoverage = useMemo(() => [
+    ...moduleCoverage.filter((module) => module.screening?.status === 'potential'),
+    ...moduleCoverage.filter((module) => module.screening?.status === 'none'),
+    ...moduleCoverage.filter((module) => !module.screening || module.screening.status === 'unavailable'),
+  ], [moduleCoverage]);
   // An unrated row per competency is seeded by WizardProvider rather than here:
   // completeness is judged for every step at once, so a learner who never opens
   // this one must still show it as outstanding.
 
   // Keep the open question tied to its profile ID if module grouping changes.
   const [openKsbId, setOpenKsbId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<KsbCategory>('Knowledge');
+  const visibleQuestions = useMemo(() => ksbs.map((ksb, index) => ({ ksb, index }))
+    .filter(({ ksb }) => categoryOf(ksb) === activeCategory)
+    .sort((a, b) => {
+      const first = codeNumber(a.ksb, activeCategory);
+      const second = codeNumber(b.ksb, activeCategory);
+      if (first === null || second === null) return first === null && second === null
+        ? a.index - b.index : first === null ? 1 : -1;
+      return first - second || a.index - b.index;
+    }), [ksbs, activeCategory]);
   const position = openKsbId == null ? -1 : ksbs.findIndex((ksb) => ksb.id === openKsbId);
   const openIndex = position < 0 ? null : position;
+  const visiblePosition = openIndex == null ? -1 : visibleQuestions.findIndex(({ index }) => index === openIndex);
   const [work, setWork] = useState<WorkingAnswer>(workingFrom());
 
-  const visibleKsbs = useMemo(() => categoryFilter === 'all' ? ksbs : ksbs.filter((k) => k.kind === categoryFilter), [ksbs, categoryFilter]);
   const answeredCount = useMemo(
     () => ksbs.filter((k) => sr.assessments[k.id]?.level).length,
-    [ksbs, sr.assessments]
-  );
-  const flaggedCount = useMemo(
-    () => ksbs.filter((k) => isHighRating(sr.assessments[k.id]?.level)).length,
     [ksbs, sr.assessments]
   );
 
   const open = (index: number) => {
     const ksb = ksbs[index];
     if (!ksb) return;
+    setActiveCategory(categoryOf(ksb));
     setWork(workingFrom(sr.assessments[ksb.id]));
     setOpenKsbId(ksb.id);
   };
@@ -201,9 +269,9 @@ export default function SkillsRadar() {
   const confirm = () => {
     if (openIndex == null) return;
     commit(openIndex);
-    // through all of them without reopening the list each time.
-    const nextIndex = openIndex + 1;
-    if (nextIndex < ksbs.length) {
+    // Continue within the selected category; the learner chooses the next tab.
+    const nextIndex = visiblePosition < 0 ? undefined : visibleQuestions[visiblePosition + 1]?.index;
+    if (nextIndex != null) {
       open(nextIndex);
     } else {
       setOpenKsbId(null);
@@ -219,7 +287,7 @@ export default function SkillsRadar() {
     const meta = competenceMeta(level);
     const score = competenceScore(level);
     const linkedModules = coverageById.get(ksb.id) ?? ksb.codes.flatMap((code) => coverageByCode.has(code) ? [coverageByCode.get(code)!] : []);
-    const coverageLabel = linkedModules.length ? null : grouping?.status === 'ready' ? 'No modules mapped' : 'Not available';
+    const coverageLabel = linkedModules.length ? null : impact ? 'No verified module mapping' : grouping?.status === 'ready' ? 'Mapping unavailable' : 'Not available';
     // After a refused Next, every competency still to rate is marked.
     const unrated = showErrors && !readOnly && !level;
     return (
@@ -232,7 +300,9 @@ export default function SkillsRadar() {
         </span>
         <div role="cell" className={styles.coverageCell}>
           <span className={styles.mobileLabel}>Covered by Modules</span>
-          <div className={styles.chips}>{linkedModules.map((name) => <span key={name} className={styles.chip}>{name}</span>)}</div>
+          <div className={styles.chips}>{linkedModules.map((name) =>
+            <span key={name} className={styles.chip}>{name}</span>
+          )}</div>
           {coverageLabel && <span className="text-foreground-400">{coverageLabel}</span>}
         </div>
         <div role="cell" className={styles.answerCell}>
@@ -246,7 +316,7 @@ export default function SkillsRadar() {
         ) : (
           <span className="text-[11px] text-foreground-300 shrink-0">Not rated</span>
         )}
-        {isHighRating(level) && <HighRatingFlag />}
+        {readOnly && isHighRating(level) && <HighRatingFlag />}
         <button
           onClick={() => open(i)}
           aria-label={moduleBased ? `${actionLabel} ${ksb.codes[0]}` : undefined}
@@ -264,8 +334,11 @@ export default function SkillsRadar() {
     <div className={styles.radar}>
       <StepHeading
         title={t('block.skillsRadar.title')}
-        subtitle={programme ? `${programme} [${ksbs.length}]` : 'No programme assigned'}
+        subtitle={programmeLabel || 'No programme assigned'}
       />
+      <p className={styles.pageDescription}>{readOnly
+        ? "The Skills Radar records the learner's self-assessed knowledge, skills and behaviours (KSBs). Their responses help inform the initial assessment, identify potential prior learning and support an individualised training plan."
+        : 'The Skills Radar helps us understand the knowledge, skills and behaviours (KSBs) you already have from previous education, training and work experience. Your answers help us identify prior learning and tailor your apprenticeship training plan.'}</p>
 
       {loading && <RowsSkeleton rows={4} avatar={false} className="py-4" />}
       {!loading && loadError && (
@@ -286,70 +359,62 @@ export default function SkillsRadar() {
         </div>
       )}
 
-      {ksbs.length > 0 && (
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <p className="text-[12px] text-foreground-500">
-          {readOnly
-            ? "The learner's self-assessment. Read-only here; only the learner can change their own answers."
-            : t('block.skillsRadar.instructions')}
-        </p>
-        <span className="flex items-center gap-3 shrink-0">
-          {flaggedCount > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200">
-              <Flag aria-hidden="true" className="h-3 w-3" />{flaggedCount} rated above {FLAG_ABOVE_SCORE}
-            </span>
-          )}
-          <span className="text-[12px] font-semibold text-foreground-600">{answeredCount} of {ksbs.length} answered</span>
-        </span>
-      </div>
-      )}
+      {ksbs.length > 0 && <div className={styles.completion} role="status">
+        <span className={styles.completionValue}>{answeredCount} of {ksbs.length}</span>
+        <span>KSBs answered</span>
+      </div>}
 
-      {ksbs.length > 0 && <>
-        <div className={styles.categories}>
-          {(['Knowledge', 'Skill', 'Behaviour'] as const).map((kind) => {
-            const items = ksbs.filter((k) => k.kind === kind); const answered = items.filter((k) => sr.assessments[k.id]?.level).length;
-            const pct = items.length ? Math.round(answered / items.length * 100) : 0; const tone = pct === 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-amber-500' : 'bg-red-500';
-            return <button type="button" key={kind} onClick={() => setCategoryFilter(categoryFilter === kind ? 'all' : kind)} aria-pressed={categoryFilter === kind} className={`${styles.category} ${categoryFilter === kind ? styles.selected : ''}`}>
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground-800"><span className={`h-2.5 w-2.5 rounded-full ${tone}`} />{kind === 'Skill' ? 'Skills' : kind}</div><div className="mt-1 flex items-center justify-between gap-2 text-xs text-foreground-600"><span>{answered} / {items.length} answered</span><span className="font-semibold">{pct}%</span></div><div className="mt-2 h-1.5 rounded-full bg-primary-100"><div className={styles.progressFill} style={{width: `${pct}%`}} /></div>
-            </button>;
-          })}
-        </div>
-        <div className={styles.filters}><button type="button" onClick={() => setCategoryFilter('all')} aria-pressed={categoryFilter === 'all'} className={`${styles.allFilter} ${categoryFilter === 'all' ? styles.activeFilter : ''}`}>All KSBs ({ksbs.length})</button></div>
-        {moduleCoverage.length > 0 && <nav aria-label="Selected modules" className={styles.moduleCoverage}>
-          <label className="sr-only" htmlFor="selected-module-skills">Selected module skills assessments</label><input id="selected-module-skills" className="sr-only" readOnly />
-          <h3>Coverage by selected modules</h3>
-          <div className={styles.moduleGrid}>{moduleCoverage.map((module) => <div key={module.title} className={styles.moduleCard}>
-            <span className={styles.moduleName}>{module.title}</span>
-            <span className={styles.moduleCount}>{module.answered} of {module.count} answered</span>
-          </div>)}</div>
-        </nav>}
-      </>}
+      {moduleCoverage.length > 0 && <section aria-labelledby="module-results-heading" className={styles.moduleCoverage}>
+        <h3 id="module-results-heading" className={styles.moduleTitle}>Your prior knowledge by module</h3>
+        <p className={styles.moduleIntro}>Your answers may indicate prior learning for an assessor to review. This is not an RPL decision.</p>
+        {impactError && <div role="alert" className={styles.impactError}>
+          <span>We couldn’t load module results right now. Your answers are still saved.</span>
+          <button type="button" onClick={retryRadarImpact}>Retry</button>
+        </div>}
+        <div className={styles.moduleGrid}>{orderedModuleCoverage.map((module) => {
+          const status = impactError ? 'unavailable' : module.screening?.status ?? 'unavailable';
+          return <article key={module.id} className={`${styles.moduleCard} ${status === 'unavailable' ? styles.moduleCardUnavailable : ''}`}>
+            <div className={styles.moduleHeading}>
+              <h4 className={styles.moduleName}>{module.title}</h4>
+            </div>
+            <p className={`${styles.moduleStatus} ${status === 'potential' ? styles.moduleStatusPotential : ''}`}>
+              {status === 'potential' ? 'Potential Prior Learning' : status === 'none' ? 'No indication yet' : 'Not available yet'}
+            </p>
+          </article>;
+        })}</div>
+      </section>}
 
-      {/* Progress */}
-      {ksbs.length > 0 && (
-      <div className={styles.overallProgress}>
-        <div className={styles.progressFill} style={{ width: `${(answeredCount / ksbs.length) * 100}%` }} />
-      </div>
-      )}
-
-      {!readOnly && answeredCount < ksbs.length && (
-        <button
-          className={`${btnPrimary} mb-4`}
-          onClick={() => open(ksbs.findIndex((k) => !sr.assessments[k.id]?.level))}
-        >
-          <AppIcon className="ri-play-line" />{answeredCount === 0 ? 'Start assessment' : 'Continue assessment'}
-        </button>
-      )}
+      {ksbs.length > 0 && (grouping?.status === 'ready' || !moduleBased) &&
+        <div role="tablist" aria-label="KSB categories" className={styles.categoryTabs}>
+          {CATEGORIES.map(({ kind, label }, index) => <button key={kind} id={`ksb-tab-${kind.toLowerCase()}`}
+            type="button" role="tab" aria-selected={activeCategory === kind} aria-controls="skills-radar-ksb-table"
+            className={`${styles.categoryTab} ${activeCategory === kind ? styles.categoryTabActive : ''}`}
+            onClick={() => setActiveCategory(kind)}
+            onKeyDown={event => {
+              const current = CATEGORIES.findIndex(item => item.kind === activeCategory);
+              const next = event.key === 'ArrowRight' ? (current + 1) % CATEGORIES.length
+                : event.key === 'ArrowLeft' ? (current + CATEGORIES.length - 1) % CATEGORIES.length
+                : event.key === 'Home' ? 0 : event.key === 'End' ? CATEGORIES.length - 1 : index;
+              if (next !== index) { event.preventDefault(); setActiveCategory(CATEGORIES[next].kind);
+                document.getElementById(`ksb-tab-${CATEGORIES[next].kind.toLowerCase()}`)?.focus(); }
+            }}>{label}</button>)}
+        </div>}
 
       {/* One assessment row per stable KSB ID, for both learner and staff views. */}
-      {(grouping?.status === 'ready' || !moduleBased) && <div role="table" aria-label="Skills assessments" className={styles.table}>
+      {(grouping?.status === 'ready' || !moduleBased) && <div id="skills-radar-ksb-table" role="table" aria-label="Skills assessments" className={styles.table}>
         <div role="row" className={styles.tableHeader}>
           <span role="columnheader">SKILL DESCRIPTION</span>
           <span role="columnheader">COVERED BY MODULES</span>
           <span role="columnheader">ANSWER</span>
         </div>
-        {visibleKsbs.map((ksb) => renderQuestion(ksb, questionIndex.get(ksb.id)!))}
+        {visibleQuestions.map(({ ksb, index }) => renderQuestion(ksb, index))}
       </div>}
+
+      {!readOnly && answeredCount < ksbs.length && (
+        <button className={`${btnPrimary} mt-4`} onClick={() => open(ksbs.findIndex((k) => !sr.assessments[k.id]?.level))}>
+          <AppIcon className="ri-play-line" />{answeredCount === 0 ? 'Start assessment' : 'Continue assessment'}
+        </button>
+      )}
 
       {/* Question modal */}
       {openIndex != null && openKsb && (
@@ -365,8 +430,8 @@ export default function SkillsRadar() {
             ) : (
               <>
                 <button className={btnSecondary} onClick={() => setOpenKsbId(null)}>Cancel</button>
-                <button className={btnPrimary} onClick={confirm} disabled={!work.level || (highRating && !work.note.trim())}>
-                  <AppIcon className="ri-check-line" />{openIndex + 1 < ksbs.length ? 'Confirm & next' : 'Confirm'}
+                <button className={btnPrimary} onClick={confirm} disabled={!work.level}>
+                  <AppIcon className="ri-check-line" />{visiblePosition >= 0 && visiblePosition < visibleQuestions.length - 1 ? 'Confirm & next' : 'Confirm'}
                 </button>
               </>
             )
@@ -381,6 +446,17 @@ export default function SkillsRadar() {
             <span className="font-semibold mr-1.5">{openIndex + 1}.</span>
             {openKsb.codes.join(', ')} {openKsb.title}
           </p>
+
+          {!readOnly && highRating && (
+            <div role="status" aria-live="polite" className={styles.priorLearningNotice}>
+              <Info aria-hidden="true" />
+              <div>
+                <strong>Potential Prior Learning</strong>
+                <p>Your rating suggests you may already have relevant knowledge or experience that could be considered during your initial assessment.</p>
+                <p>If you already meet many of the apprenticeship requirements, this may affect how much new training you need and, in some cases, the suitability or funding eligibility of the apprenticeship.</p>
+              </div>
+            </div>
+          )}
 
           <div className="border border-foreground-200/70 rounded-lg overflow-hidden mb-4">
             <p className="text-[12px] font-medium text-foreground-700 px-3 py-2 bg-background-100/60 border-b border-foreground-100">
@@ -415,75 +491,40 @@ export default function SkillsRadar() {
             </div>
           </div>
 
-          {highRating && (
+          {readOnly && highRating && (
             <div role="status" className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
               <Flag aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <p className="text-[12px] leading-relaxed text-amber-800">
-                {readOnly ? (
-                  <>
-                    <span className="font-semibold">Flagged: the learner rated this above {FLAG_ABOVE_SCORE}.</span>{' '}
-                    High self-ratings may affect their eligibility for this apprenticeship, which requires substantial new learning.
-                  </>
-                ) : (
-                  <>
-                    <span className="font-semibold">{HIGH_RATING_WARNING}</span>{' '}
-                    Please add a note explaining this rating.
-                  </>
-                )}
+                <span className="font-semibold">Flagged: the learner rated this above {FLAG_ABOVE_SCORE}.</span>{' '}
+                This self-assessment does not determine eligibility or RPL. Review any existing evidence through the normal assessment process.
               </p>
             </div>
           )}
 
-          <div className="mb-4">
+          {readOnly && <div className="mb-4">
             <label htmlFor={`competence-note-${openKsb.id}`} className="block text-[12px] font-medium text-foreground-700 mb-1.5">
-              {t('block.skillsRadar.note')}{highRating && !readOnly && (
-                <><span aria-hidden="true" className="ml-0.5 text-red-500">*</span><span className="sr-only"> (required)</span></>
-              )}:
+              {t('block.skillsRadar.note')}:
             </label>
             <textarea
               id={`competence-note-${openKsb.id}`}
               rows={3}
               value={work.note}
-              readOnly={readOnly}
-              required={highRating && !readOnly}
-              aria-describedby={highRating && !readOnly ? `competence-note-hint-${openKsb.id}` : undefined}
-              onChange={(e) => setWork((w) => ({ ...w, note: e.target.value }))}
+              readOnly
               className={inputClass}
             />
-            {highRating && !readOnly && (
-              <p id={`competence-note-hint-${openKsb.id}`} className={`mt-1.5 text-[12px] ${work.note.trim() ? 'text-foreground-500' : 'text-red-600'}`}>
-                A note is required for ratings above {FLAG_ABOVE_SCORE}.
-              </p>
-            )}
-          </div>
+          </div>}
 
-          <div>
+          {readOnly && <div>
             <label className="block text-[12px] font-medium text-foreground-700 mb-1.5">{t('block.skillsRadar.upload')}</label>
-            {!readOnly && (
-              <label className="inline-flex items-center gap-2 px-3 py-2 text-[12px] bg-background-100 text-foreground-600 rounded-lg border border-background-200 hover:bg-background-200 transition-smooth cursor-pointer mb-2">
-                <AppIcon className="ri-folder-open-line" />Select file
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    const names = Array.from(e.target.files ?? []).map((f) => f.name);
-                    setWork((w) => ({ ...w, evidenceFiles: [...w.evidenceFiles, ...names] }));
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-            )}
-            {readOnly && work.evidenceFiles.length === 0 ? (
+            {work.evidenceFiles.length === 0 ? (
               <EmptyState text="No evidence uploaded" />
             ) : (
               <FileList
                 files={work.evidenceFiles.map((n, i) => ({ id: `${n}-${i}`, name: n }))}
-                onDelete={readOnly ? undefined : (id) => setWork((w) => ({ ...w, evidenceFiles: w.evidenceFiles.filter((_, i) => `${w.evidenceFiles[i]}-${i}` !== id) }))}
                 emptyText="No evidence uploaded"
               />
             )}
-          </div>
+          </div>}
         </Modal>
       )}
     </div>

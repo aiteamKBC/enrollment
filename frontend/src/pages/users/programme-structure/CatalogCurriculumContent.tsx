@@ -1,9 +1,9 @@
-import type { Ksb, Topic } from './catalogApi';
+import type { Topic, WeightedKsb } from './catalogApi';
 import { catalogueFocus } from './catalogControls';
 
 export function CurriculumContent({ topics, ksbs, embedded = false }: {
   topics: Topic[];
-  ksbs: Pick<Ksb, 'id' | 'code' | 'description'>[];
+  ksbs: WeightedKsb[];
   embedded?: boolean;
 }) {
   const panel = embedded ? 'border-t border-background-200 pt-3'
@@ -20,6 +20,12 @@ export function CurriculumContent({ topics, ksbs, embedded = false }: {
       <h3 className="font-semibold">Knowledge, skills and behaviours</h3>
       {ksbs.length ? <ul className="space-y-2">{ksbs.map(ksb => <li key={ksb.id} className="break-words text-sm">
         <strong>{ksb.code}</strong> — {ksb.description}
+        {ksb.mapping_weight && <span className="mt-1 block text-xs text-foreground-600">
+          Total Mapping Weight: <strong>{ksb.mapping_weight.total_weight}</strong> ·
+          Hard {ksb.mapping_weight.hard_count} ({ksb.mapping_weight.hard_weight}) ·
+          Soft {ksb.mapping_weight.soft_count} ({ksb.mapping_weight.soft_weight}) ·
+          Possible {ksb.mapping_weight.possible_count} ({ksb.mapping_weight.possible_weight})
+        </span>}
       </li>)}</ul> : <p className="text-sm text-foreground-600">No KSBs linked.</p>}
     </section>
   </div>;

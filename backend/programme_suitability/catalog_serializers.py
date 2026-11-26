@@ -139,7 +139,8 @@ class GroupSerializer(CatalogSerializer):
 class KsbSerializer(CatalogSerializer):
     class Meta(CatalogSerializer.Meta):
         model = CatalogKsb
-        fields = METADATA + ('code', 'description')
+        fields = METADATA + ('code', 'description', 'kind', 'standard', 'standard_version')
+        read_only_fields = METADATA + ('kind', 'standard', 'standard_version')
 
     def validate(self, attrs):
         if 'code' in attrs:
@@ -171,15 +172,24 @@ class ModuleSerializer(CatalogSerializer):
     weekly_topics = TopicSerializer(many=True, required=False, max_length=520, write_only=True)
 
     current_revision = serializers.SerializerMethodField()
+    ksb_weights = serializers.SerializerMethodField()
 
     class Meta(CatalogSerializer.Meta):
         model = CatalogModule
-        fields = METADATA + ('name', 'weeks', 'books', 'reviews', 'lectures', 'ksb_ids', 'weekly_topics', 'current_revision')
+        fields = METADATA + ('name', 'weeks', 'books', 'reviews', 'lectures', 'ksb_ids', 'weekly_topics', 'current_revision', 'ksb_weights')
+
+    def latest_revision(self, instance):
+        prefetched = getattr(instance, 'latest_revisions', None)
+        return instance.revisions.first() if prefetched is None else next(iter(prefetched), None)
 
     def get_current_revision(self, instance):
-        prefetched = getattr(instance, 'latest_revisions', None)
-        revision = instance.revisions.first() if prefetched is None else next(iter(prefetched), None)
+        revision = self.latest_revision(instance)
         return {'id': str(revision.pk), 'number': revision.number} if revision else None
+
+    def get_ksb_weights(self, instance):
+        revision = self.latest_revision(instance)
+        return {item['id']: item['mapping_weight'] for item in revision.ksbs
+                if 'mapping_weight' in item} if revision else {}
 
     def to_representation(self, instance):
         result = super().to_representation(instance)
@@ -214,6 +224,19 @@ class ModuleSerializer(CatalogSerializer):
         ksb_ids = validated_data.pop('ksb_ids', None)
         topics = validated_data.pop('weekly_topics', None)
         return self._save_related(super().update(instance, validated_data), ksb_ids, topics)
+
+
+class ModuleCommercialCountsSerializer(serializers.Serializer):
+    """Enrolment-owned delivery counts; never read from or written to LMS."""
+    reviews = serializers.IntegerField(min_value=0, max_value=10000)
+    books = serializers.IntegerField(min_value=0, max_value=10000)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, Mapping) or set(data) != {'reviews', 'books'}:
+            raise serializers.ValidationError({'counts': 'Provide only Progress Reviews and Books counts for each module.'})
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in data.values()):
+            raise serializers.ValidationError({'counts': 'Counts must be whole numbers from 0 to 10000.'})
+        return super().to_internal_value(data)
 
 
 class PinnedCurriculumSerializer(serializers.ModelSerializer):

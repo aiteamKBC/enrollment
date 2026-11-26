@@ -29,6 +29,9 @@ import { isMeRadar, meRadarProfileProgramme, resolveMeRadar } from '@/features/p
 import { isApmRadar, isApmStaffReview, apmRadarProfileProgramme, resolveApmRadar } from '@/features/programme-suitability/skills-radar/associateProjectManager';
 import { useCatalogue } from '@/features/programme-suitability/skills-radar/catalogue/useCatalogue';
 import { catalogueQuestions } from '@/features/programme-suitability/skills-radar/catalogue/runtime';
+import { getModuleImpact } from '@/features/programme-suitability/skills-radar/catalogue/api';
+import { SCREENING_RULE_CHANGED } from '@/features/programme-suitability/skills-radar/catalogue/screeningRefresh';
+import { assessmentQuestionIds, bindImpactModules, type ModuleImpact } from '@/features/programme-suitability/skills-radar/moduleImpact';
 
 function emptyIlr(firstNames: string, surname: string): IlrForm {
   return {
@@ -437,11 +440,44 @@ export function WizardProvider({
     modules.data, radarProfile.programme === programmeName ? radarProfile.error || modules.error : modules.error) : apmRadar ? resolveApmRadar(radarProfile.programme === programmeName ? radarProfile.ksbs : null,
     radarModulesData, radarProfile.programme === programmeName ? radarProfile.error || radarModulesError : radarModulesError) : null,
     [managedRadar, radarCatalogue.grouping, pcpRadar, mmRadar, meRadar, apmRadar, radarProfile, programmeName, modules.data, modules.error, radarModulesData, radarModulesError]);
+  const impactEnabled = hydrated && (managedRadar || moduleRadar) && /^\d+$/.test(userId);
+  const [impactRetry, setImpactRetry] = useState(0);
   useEffect(() => {
-    if (!managedRadar || radarCatalogue.loading) return;
+    if (!impactEnabled) return;
+    const reload = () => setImpactRetry(value => value + 1);
+    window.addEventListener('focus', reload);
+    window.addEventListener(SCREENING_RULE_CHANGED, reload);
+    return () => {
+      window.removeEventListener('focus', reload);
+      window.removeEventListener(SCREENING_RULE_CHANGED, reload);
+    };
+  }, [impactEnabled]);
+  const impactKey = `${kind}:${userId}:${ilrSavedAt}:${impactRetry}`;
+  const [impactResult, setImpactResult] = useState<{ key: string; data: ModuleImpact | null; error: string }>({ key: '', data: null, error: '' });
+  useEffect(() => {
+    if (!impactEnabled) return;
+    let cancelled = false;
+    getModuleImpact(kind, userId)
+      .then((data) => { if (!cancelled) setImpactResult({ key: impactKey, data, error: '' }); })
+      .catch((error: Error) => { if (!cancelled) setImpactResult({ key: impactKey, data: null, error: error.message }); });
+    return () => { cancelled = true; };
+  }, [impactEnabled, kind, userId, impactKey]);
+  const impactSettled = !impactEnabled || impactResult.key === impactKey;
+  const radarImpact = impactEnabled && impactSettled ? impactResult.data : null;
+  const radarImpactError = impactEnabled && impactSettled ? impactResult.error : '';
+  const effectiveRadarIds = useMemo(() => {
+    if (radarGrouping?.status !== 'ready' || !impactSettled) return undefined;
+    const selectedProgramme = (apmStaffReview ? radarModulesData : modules.data)?.selectedProgramme;
+    const bound = bindImpactModules(radarGrouping.modules, radarGrouping.questions, radarImpact,
+      selectedProgramme, draft.skillsRadar.standardId ?? '');
+    return assessmentQuestionIds(radarGrouping.questions, bound);
+  }, [radarGrouping, impactSettled, radarImpact, apmStaffReview, radarModulesData, modules.data, draft.skillsRadar.standardId]);
+  useEffect(() => {
+    if (!managedRadar || radarCatalogue.loading || !impactSettled || radarGrouping?.status === 'loading') return;
     const catalogue = radarCatalogue.data?.catalogue;
     if (catalogue) {
-      const questions = catalogueQuestions(catalogue);
+      const selected = effectiveRadarIds ? new Set(effectiveRadarIds) : null;
+      const questions = catalogueQuestions(catalogue).filter((question) => !selected || selected.has(question.id));
       setDraft((prev) => {
         const assessments = { ...prev.skillsRadar.assessments };
         if (!readOnlyLearnerSteps) for (const k of questions) {
@@ -454,7 +490,7 @@ export function WizardProvider({
       });
     }
     setKsbsSettled(true);
-  }, [managedRadar, radarCatalogue.loading, radarCatalogue.data, readOnlyLearnerSteps]);
+  }, [managedRadar, radarCatalogue.loading, radarCatalogue.data, readOnlyLearnerSteps, impactSettled, radarGrouping?.status, effectiveRadarIds]);
   useEffect(() => {
     if (managedRadar || !layoutSettled) return;
     // Staff never seed, and a learner with no programme has nothing to seed —
@@ -564,9 +600,14 @@ export function WizardProvider({
       board,
       draft: { ...draft, ...(suitability.enabled ? { programmeSuitability: { required: suitability.required, status: suitability.status, selectionConfirmed: suitability.selectionConfirmed, selectedProgramme: suitability.state?.selectedProgramme },
         programmeModulesCompletion: { required: modulesRequired, complete: modulesComplete } } : {}),
-        skillsRadar: radarGrouping ? { ...draft.skillsRadar, configurationError: radarGrouping.status === 'ready' ? undefined : radarGrouping.message } : draft.skillsRadar,
+        skillsRadar: radarGrouping ? { ...draft.skillsRadar,
+          ...(effectiveRadarIds ? { programmeKsbIds: effectiveRadarIds } : {}),
+          configurationError: radarGrouping.status === 'ready' ? undefined : radarGrouping.message } : draft.skillsRadar,
       },
       radarCatalogue,
+      radarImpact,
+      radarImpactError,
+      retryRadarImpact: () => setImpactRetry((value) => value + 1),
       importPlrPdf: (file, enteredUln, signal) => {
         if (!canEditUln || draft.plr.loadError) return Promise.reject(new Error('PLR import is not available right now.'));
         const target = `${kind}/${userId}`;
@@ -703,7 +744,7 @@ export function WizardProvider({
       ilrFinalisedAt,
       ilrLegacyReadOnly,
       hydrated,
-      ready: hydrated && ksbsSettled && !radarCatalogue.loading && layoutSettled && inclusionSettled && (!suitability.enabled || !suitability.loading) && (!modulesRequired || Boolean(modules.data || modules.error)),
+      ready: hydrated && ksbsSettled && impactSettled && !radarCatalogue.loading && layoutSettled && inclusionSettled && (!suitability.enabled || !suitability.loading) && (!modulesRequired || Boolean(modules.data || modules.error)),
       fileIlrDocument: async () => {
         setIlrFiling(true);
         try {
@@ -728,7 +769,7 @@ export function WizardProvider({
       inclusionCheck,
       plrCheck,
     }),
-    [userId, isCommercial, board, readOnlyLearnerSteps, draft, canEditUln, layout, publishedVersion, publishedLayoutToken, steps, completed, kind, ilrSaving, ilrSavedAt, ilrFinalisedAt, ilrLegacyReadOnly, hydrated, ksbsSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, plrCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
+    [userId, isCommercial, board, readOnlyLearnerSteps, draft, canEditUln, layout, publishedVersion, publishedLayoutToken, steps, completed, kind, ilrSaving, ilrSavedAt, ilrFinalisedAt, ilrLegacyReadOnly, hydrated, ksbsSettled, impactSettled, layoutSettled, ilrFiling, inclusionSettled, inclusionCheck, plrCheck, suitability, modules, modulesRequired, modulesComplete, moduleSaveQueue, radarGrouping, radarCatalogue, radarImpact, radarImpactError, effectiveRadarIds, managedRadar, apmStaffReview, radarModulesData, radarModulesError]
   );
   moduleWriter.current = value.saveModules;
 

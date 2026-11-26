@@ -84,6 +84,23 @@ class ModuleConfigurationDraft(models.Model):
         db_table = 'programme_modules_admin_drafts'
 
 
+class SkillsRadarScreeningSetting(models.Model):
+    """One provider-wide, non-decisional screening threshold and its edit trail."""
+
+    key = models.CharField(max_length=32, primary_key=True)
+    threshold_percent = models.PositiveSmallIntegerField(default=50)
+    minimum_high_rated_hard_ksbs = models.PositiveSmallIntegerField(default=2)
+    minimum_qualifying_rating = models.PositiveSmallIntegerField(default=5)
+    maximum_qualifying_rating = models.PositiveSmallIntegerField(default=9)
+    revision = models.PositiveBigIntegerField(default=1)
+    history = models.JSONField(default=list)
+    updated_by = models.CharField(max_length=200, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'programme_skills_radar_screening_settings'
+
+
 class SuitabilityRplReport(models.Model):
     """Admin-owned suitability/RPL assessment for one enrolment context.
 

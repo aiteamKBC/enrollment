@@ -26,13 +26,23 @@ export type Group = CatalogRecord & {
 };
 export type Topic = { id?: string; week: number; content: string };
 export type ModuleRevisionRef = { id: string; number: number };
+export type KsbMappingWeight = {
+  total_weight: string; mapping_count: number;
+  hard_count: number; soft_count: number; possible_count: number;
+  hard_weight: string; soft_weight: string; possible_weight: string;
+  main_count: number; secondary_count: number;
+  main_weight: string; secondary_weight: string;
+  possible_classification_count?: number; possible_classification_weight?: string;
+};
+export type WeightedKsb = Pick<Ksb, 'id' | 'code' | 'description'> & { mapping_weight?: KsbMappingWeight };
 export type PinnedCurriculum = ModuleRevisionRef & {
   name: string; weeks: number; books: number | null; reviews: number | null; lectures: number | null;
-  ksbs: Pick<Ksb, 'id' | 'code' | 'description'>[]; weekly_topics: Topic[];
+  ksbs: WeightedKsb[]; weekly_topics: Topic[];
 };
 export type CurriculumModule = CatalogRecord & {
   name: string; weeks: number; books: number | null; reviews: number | null; lectures: number | null;
   ksb_ids: string[]; weekly_topics: Topic[];
+  ksb_weights?: Record<string, KsbMappingWeight>;
   current_revision: ModuleRevisionRef | null;
 };
 export type Delivery = CatalogRecord & {
@@ -40,7 +50,9 @@ export type Delivery = CatalogRecord & {
   end_date_override?: string | null;
   curriculum: PinnedCurriculum;
 };
-export type Ksb = CatalogRecord & { code: string; description: string };
+export type Ksb = CatalogRecord & {
+  code: string; description: string; kind?: string; standard?: string; standard_version?: string;
+};
 export type Detail = {
   programme: Programme; cohorts: Cohort[]; groups: Group[]; modules: CurriculumModule[]; ksbs: Ksb[]; deliveries: Delivery[];
 };

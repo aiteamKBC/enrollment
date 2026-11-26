@@ -43,6 +43,9 @@ export interface WizardContextValue {
   canEditUln?: boolean;
   plrCheck?: { checking: boolean; refresh: () => void };
   radarCatalogue?: import('@/features/programme-suitability/skills-radar/catalogue/types').ManagedRadar;
+  radarImpact?: import('@/features/programme-suitability/skills-radar/moduleImpact').ModuleImpact | null;
+  radarImpactError?: string;
+  retryRadarImpact?: () => void;
   moduleSaveQueue?: import('@/features/programme-suitability/modules/moduleSaveQueue').ModuleSaveQueue;
   modules?: import('@/features/programme-suitability/modules/useModulesConfiguration').ModulesController;
   suitability?: import('@/features/programme-suitability/useSuitability').SuitabilityController;

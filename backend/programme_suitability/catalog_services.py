@@ -154,7 +154,7 @@ def validate_delivery(programme, group_id, module_id, start, *, end=None, cohort
     return revision
 
 
-def write_module_content(module, *, ksb_ids=None, topics=None):
+def write_module_content(module, *, ksb_ids=None, topics=None, ksb_weights=None):
     if getattr(module, '_prefetched_objects_cache', None):
         module._prefetched_objects_cache.clear()
     if ksb_ids is not None:
@@ -167,14 +167,22 @@ def write_module_content(module, *, ksb_ids=None, topics=None):
             module.weekly_topics.update_or_create(
                 week=topic['week'], defaults={'content': topic['content'], 'archived_at': None},
             )
-    return snapshot_module(module)
+    return snapshot_module(module, ksb_weights=ksb_weights)
 
 
-def snapshot_module(module):
+def snapshot_module(module, *, ksb_weights=None):
+    if module.source_system == 'lms' and ksb_weights is None:
+        previous = module.revisions.first()
+        ksb_weights = {
+            item['id']: item['mapping_weight'] for item in previous.ksbs
+            if 'mapping_weight' in item
+        } if previous else {}
+    ksb_weights = ksb_weights or {}
     return CatalogModuleRevision.objects.create(
         module=module, number=module.revision, name=module.name, weeks=module.weeks,
         books=module.books, reviews=module.reviews, lectures=module.lectures,
-        ksbs=[{'id': str(ksb.pk), 'code': ksb.code, 'description': ksb.description}
+        ksbs=[{'id': str(ksb.pk), 'code': ksb.code, 'description': ksb.description,
+               **({'mapping_weight': ksb_weights[str(ksb.pk)]} if str(ksb.pk) in ksb_weights else {})}
               for ksb in module.ksbs.order_by('code', 'id')],
         weekly_topics=[{'id': str(topic.pk), 'week': topic.week, 'content': topic.content}
                        for topic in module.weekly_topics.filter(archived_at__isnull=True).order_by('week')],

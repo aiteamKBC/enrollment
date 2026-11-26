@@ -52,3 +52,27 @@ it('removes only new-version questions and fails visibly for unavailable module 
   revised.records[0].moduleKey = 'missing';
   expect(resolveCatalogueRadar(revised, state)).toMatchObject({ status: 'error', questions: [] });
 });
+
+it.each([0, 1, 3, 5, 7])('uses exactly %i active modules from the learner’s published programme snapshot', (count) => {
+  const catalogue = catalogues().ME_L4;
+  catalogue.records = [{ ...catalogue.records[0], moduleKey: 'approved-0', moduleKeys: ['approved-0'] }];
+  const state = structuredClone(pcpModules());
+  state.selectedProgramme = 'ME_L4';
+  const programme = state.configuration.programmes.find((item) => item.id === 'ME_L4')!;
+  const template = programme.modules[0];
+  programme.modules = Array.from({ length: count }, (_, index) => ({ ...template,
+    id: `approved-${index}`, title: `Published module ${index + 1}`, order: index,
+    active: true, itemType: 'MODULE' as const, items: undefined }));
+  const resolved = resolveCatalogueRadar(catalogue, state);
+  expect(resolved.status).toBe('ready');
+  expect(resolved.modules.map((item) => item.title)).toEqual(
+    Array.from({ length: count }, (_, index) => `Published module ${index + 1}`));
+  expect(resolved.questions.map((item) => item.id)).toEqual([catalogue.records[0].id]);
+});
+
+it('does not bind a catalogue from another selected programme', () => {
+  const state = { ...pcpModules(), selectedProgramme: 'MM_L6' as const };
+  const resolved = resolveCatalogueRadar(catalogues().ME_L4, state);
+  expect(resolved).toMatchObject({ status: 'error', modules: [], questions: [] });
+  expect(resolved.message).toMatch(/does not match the learner/);
+});

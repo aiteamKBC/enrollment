@@ -136,7 +136,7 @@ export function CatalogKsbMapping({ programmeCode, modules, ksbs, allKsbs, edita
       </p> : <div role="region" aria-label="Scrollable KSB mapping matrix" tabIndex={0}
         className={`${styles.scroller} max-h-[65vh] w-full min-w-0 overflow-auto ${catalogueFocus}`}>
         <table className={`${styles.matrix} w-full table-fixed border-separate border-spacing-0 text-left text-sm`} aria-label="KSB mapping matrix"
-          style={{ minWidth: 328 + modules.length * 136 }}>
+          style={{ minWidth: 328 + modules.length * 210 }}>
           <colgroup><col className="w-[4.5rem]" /><col className="w-40 sm:w-64" /><col span={modules.length} /></colgroup>
           <thead>
             <tr>
@@ -161,9 +161,24 @@ export function CatalogKsbMapping({ programmeCode, modules, ksbs, allKsbs, edita
               </td>
               {moduleLinks.map((ids, index) => {
                 const covered = ids.has(ksb.id);
+                const module = modules[index];
+                const weight = module.ksb_weights?.[ksb.id];
                 return <td key={modules[index].id} className={`${cell} text-center ${covered ? styles.assigned : 'text-foreground-600'}`}>
-                  {covered ? <Check size={18} className="inline-block" aria-hidden /> : <Minus size={15} className="inline-block" aria-hidden />}
-                  <span className="sr-only">{covered ? 'Assigned' : 'Unassigned'}</span>
+                  {covered && weight ? <div className="space-y-1 text-xs" aria-label={`${module.name} ${ksb.code} mapping weight`}>
+                    <strong className="block text-sm tabular-nums">{weight.total_weight}</strong>
+                    <span className="block">Total Mapping Weight · {weight.mapping_count} mappings</span>
+                    <span className="block tabular-nums">Hard {weight.hard_count} ({weight.hard_weight}) · Soft {weight.soft_count} ({weight.soft_weight})</span>
+                    {weight.possible_count > 0 && <span className="block tabular-nums">Possible {weight.possible_count} ({weight.possible_weight})</span>}
+                    <details className="text-left"><summary className={`cursor-pointer ${catalogueFocus}`}>Classification</summary>
+                      <span className="block tabular-nums">Main {weight.main_count} ({weight.main_weight})</span>
+                      <span className="block tabular-nums">Secondary {weight.secondary_count} ({weight.secondary_weight})</span>
+                      {weight.possible_classification_count != null && <span className="block tabular-nums">Possible {weight.possible_classification_count} ({weight.possible_classification_weight})</span>}
+                    </details>
+                  </div> : covered ? <>
+                    <Check size={18} className="inline-block" aria-hidden />
+                    <span className="sr-only">Assigned</span>
+                    {module.source_system === 'lms' && <span className="block text-xs">Weight not recorded</span>}
+                  </> : <><Minus size={15} className="inline-block" aria-hidden /><span className="sr-only">Unassigned</span></>}
                 </td>;
               })}
             </tr>)}

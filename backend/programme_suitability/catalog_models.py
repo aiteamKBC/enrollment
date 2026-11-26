@@ -167,6 +167,9 @@ class CatalogKsb(CatalogRecord):
     programme = models.ForeignKey(CatalogProgramme, related_name='ksbs', on_delete=models.PROTECT)
     code = models.CharField(max_length=40)
     description = models.TextField(max_length=5000)
+    kind = models.CharField(max_length=40, blank=True)
+    standard = models.CharField(max_length=40, blank=True)
+    standard_version = models.CharField(max_length=40, blank=True)
 
     class Meta(CatalogRecord.Meta):
         ordering = ('code',)
@@ -259,3 +262,45 @@ def validate_delivery_dates(start, end, cohort_start, cohort_end, *, weeks, fiel
         raise ValidationError({field or 'start_date': 'The scheduled module must fit within the cohort training dates.'})
     if end > cohort_end:
         raise ValidationError({field or 'end_date': 'The scheduled module must fit within the cohort training dates.'})
+
+
+class CatalogSourceLink(models.Model):
+    """Durable identity and accepted source state for explicit catalogue syncs."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    source_system = models.CharField(max_length=50)
+    source_project_id = models.CharField(max_length=100)
+    source_branch_id = models.CharField(max_length=100)
+    source_entity_type = models.CharField(max_length=40)
+    source_entity_id = models.CharField(max_length=200)
+    local_entity_type = models.CharField(max_length=40)
+    local_record_id = models.UUIDField()
+    accepted_fingerprint = models.CharField(max_length=64)
+    accepted_state = models.JSONField(default=dict)
+    source_revision = models.CharField(max_length=150, blank=True)
+    local_revision = models.PositiveBigIntegerField(default=1)
+    last_synced_at = models.DateTimeField()
+    last_synced_by = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('source_entity_type', 'source_entity_id', 'local_entity_type')
+        constraints = [
+            models.UniqueConstraint(
+                fields=(
+                    'source_system', 'source_project_id', 'source_branch_id',
+                    'source_entity_type', 'source_entity_id', 'local_entity_type',
+                ), name='catalog_source_link_source_identity',
+            ),
+            models.UniqueConstraint(
+                fields=('local_entity_type', 'local_record_id'),
+                name='catalog_source_link_local_identity',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=('source_system', 'source_project_id', 'source_branch_id', 'source_entity_type'),
+                name='catalog_source_scope_idx',
+            ),
+        ]

@@ -2,6 +2,7 @@ import { afterAll, beforeEach, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WizardProvider } from '@/pages/users/wizard/WizardContext';
+import { SCREENING_RULE_CHANGED } from '../skills-radar/catalogue/screeningRefresh';
 import { useWizard } from '@/pages/users/wizard/WizardContext.helpers';
 import SkillsRadar from '@/pages/users/wizard/steps/SkillsRadar';
 import { BUILTIN_ITEMS } from '@/pages/users/wizard/layout/registry';
@@ -13,7 +14,7 @@ import { confirmedMm } from './mmRadarFixtures';
 import { confirmedApm } from './apmRadarFixtures';
 import { confirmedPcp, pcpModules } from './pcpRadarFixtures';
 
-const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), profile: vi.fn(), layout: vi.fn(), assessment: vi.fn(), radar: vi.fn(), modules: vi.fn() }));
+const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), profile: vi.fn(), layout: vi.fn(), assessment: vi.fn(), radar: vi.fn(), impact: vi.fn(), modules: vi.fn() }));
 vi.mock('@/api/extendedIlr', () => ({ fetchExtendedIlr: api.read, peekExtendedIlr: () => undefined, saveExtendedIlr: api.write }));
 vi.mock('@/api/curriculum', () => ({ fetchKsbProfile: api.profile, peekKsbProfile: () => undefined }));
 vi.mock('@/api/enrolmentDocuments', () => ({ uploadEnrolmentDocument: vi.fn() }));
@@ -21,7 +22,7 @@ vi.mock('@/api/wizardInclusion', () => ({ fetchInclusionStatus: vi.fn(async () =
 vi.mock('@/api/wizardLayout', () => ({ peekWizardLayout: () => undefined, fetchWizardLayout: api.layout }));
 vi.mock('../api', () => ({ getAssessment: api.assessment, peekAssessment: () => undefined, primeAssessment: vi.fn(), prefetchAssessmentSecurity: async () => ({ csrfToken: 'synthetic' }) }));
 vi.mock('../modules/api', () => ({ getModules: api.modules, saveModuleSelection: vi.fn() }));
-vi.mock('../skills-radar/catalogue/api', () => ({ getLearnerCatalogue: api.radar }));
+vi.mock('../skills-radar/catalogue/api', () => ({ getLearnerCatalogue: api.radar, getModuleImpact: api.impact }));
 const board = { user: { id: '41', name: 'Synthetic learner' }, contact: { email: '', phone: '', dob: '' },
   programme: { name: 'Marketing Executive Level 4', onboardingStatus: 'In progress' } } as EnrolmentBoard;
 const confirmed = { ME_L4: confirmedMe, MM_L6: confirmedMm, APM_L4: confirmedApm, PCP_L6: confirmedPcp };
@@ -42,22 +43,55 @@ beforeEach(() => {
   api.layout.mockResolvedValue({ version: 11, layout: { steps: [], programmeModules: index.modules, skillsRadarCatalogues: index.catalogues, programmeSuitability: confirmedMe.configuration } });
   api.read.mockResolvedValue({ answers: null, draft: null, meta: { updatedAt: '' } });
   api.write.mockResolvedValue({ meta: { updatedAt: 'saved' } });
+  api.impact.mockResolvedValue({ status: 'unavailable', modules: [], reason: 'cohort_assignment_unavailable' });
   setup('ME_L4');
 });
 afterAll(() => vi.unstubAllGlobals());
 
+it('refreshes only the module impact after a screening rule save in the same tab', async () => {
+  render(page());
+  await screen.findByRole('region', { name: 'Your prior knowledge by module' });
+  await waitFor(() => expect(api.impact).toHaveBeenCalled());
+  const impactRequests = api.impact.mock.calls.length;
+  const catalogueRequests = api.radar.mock.calls.length;
+  act(() => window.dispatchEvent(new Event(SCREENING_RULE_CHANGED)));
+  await waitFor(() => expect(api.impact).toHaveBeenCalledTimes(impactRequests + 1));
+  expect(api.radar).toHaveBeenCalledTimes(catalogueRequests);
+});
+
 it.each(['ME_L4', 'MM_L6', 'APM_L4', 'PCP_L6'] as ProgrammeId[])('renders a new imported %s catalogue with dynamic module/global progress and no curriculum fallback', async (pid) => {
   const catalogue = setup(pid);
   render(page());
-  await screen.findByRole('navigation', { name: 'Selected modules' });
+  await screen.findByRole('region', { name: 'Your prior knowledge by module' });
   await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(catalogue.records.length));
-  expect(screen.getByText(`0 of ${catalogue.records.length} answered`)).toBeVisible();
+  expect(screen.getByText(`0 of ${catalogue.records.length}`)).toBeVisible();
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual([`${catalogue.records.length} competencies not yet rated`]);
-  const cards = within(screen.getByRole('navigation', { name: 'Selected modules' })).getAllByText(/0 of \d+ answered/);
-  const total = cards.reduce((count, card) => count + Number(card.textContent!.match(/0 of (\d+) answered/)![1]), 0);
-  expect(total).toBe(catalogue.records.length);
-  expect(screen.getAllByRole('button', { name: /^Answer [KSB]\d+$/ })).toHaveLength(catalogue.records.length);
+  expect(within(screen.getByRole('region', { name: 'Your prior knowledge by module' })).getAllByRole('article').length).toBeGreaterThan(0);
+  let visibleTotal = 0;
+  for (const label of ['Knowledge', 'Skills', 'Behaviours']) {
+    await userEvent.click(screen.getByRole('tab', { name: label }));
+    visibleTotal += screen.queryAllByRole('button', { name: /^Answer [KSB]\d+$/ }).length;
+  }
+  expect(visibleTotal).toBe(catalogue.records.length);
   expect(api.profile).not.toHaveBeenCalled(); expect(api.write).not.toHaveBeenCalled();
+});
+
+it('keeps published KSB questions even when the current local module coverage excludes one', async () => {
+  const catalogue = setup('ME_L4');
+  const modules = ['marketing-impact', 'social-media', 'martech'].map((id) => ({
+    id, name: id, status: 'ready', ksbs: catalogue.records.filter((record) => record.code !== 'K99' &&
+      (record.moduleKeys ?? (record.moduleKey ? [record.moduleKey] : [])).includes(id)).map((record) => ({
+      id: record.id, code: record.code, description: record.description, kind: record.kind,
+      standard: 'ST0596', standardVersion: '1.0', weight: { total_weight: '40', mapping_count: 1 },
+    })),
+  }));
+  api.impact.mockResolvedValue({ status: 'ready', programmeId: 'ME_L4', modules, savedLevels: {} });
+  render(page());
+  await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(34));
+  expect(latest.draft.skillsRadar.programmeKsbIds).toContain('radar:ME_L4:K99');
+  await userEvent.click(screen.getByRole('tab', { name: 'Knowledge' }));
+  expect(screen.getByRole('button', { name: 'Answer K99' })).toBeVisible();
+  expect(catalogue.records).toHaveLength(34);
 });
 
 it('keeps pinned 33-question history after a 34-question publication, refresh and staff read-only View', async () => {
@@ -65,13 +99,13 @@ it('keeps pinned 33-question history after a 34-question publication, refresh an
   const ratings: Record<string, KsbAssessment> = Object.fromEntries(old.records.map((r) => [r.id, { ksbId: r.id, level: 'rarely', note: 'Historical note', evidenceFiles: ['old-proof.pdf'], actionPlan: { text: 'Keep' } }]));
   api.read.mockResolvedValue({ answers: null, draft: { skillsRadar: { standardId: '', catalogueVersions: { ME_L4: old.version }, assessments: ratings } }, meta: { updatedAt: 'old-save' } });
   const first = render(page());
-  await screen.findByText('33 of 33 answered');
+  await screen.findByText('33 of 33');
   await waitFor(() => expect(latest.draft.skillsRadar.programmeKsbIds).toHaveLength(33));
   expect(BUILTIN_ITEMS['block.skillsRadar'].missing!(latest.draft, true)).toEqual([]);
   expect(latest.draft.skillsRadar.assessments).toEqual(ratings);
   first.unmount();
   render(page(true));
-  await screen.findByText('33 of 33 answered');
+  await screen.findByText('33 of 33');
   await userEvent.click(screen.getAllByRole('button', { name: /^View [KSB]\d+$/ })[0]);
   const dialog = within(screen.getByRole('dialog'));
   expect(dialog.getByLabelText(/Add a note/)).toHaveValue('Historical note');
@@ -86,7 +120,7 @@ it('uses the existing Answer modal and saves signed version metadata without cha
   const answer = { ksbId: existing.id, level: 'rarely', note: 'Keep prior note', evidenceFiles: ['keep.pdf'], actionPlan: { text: 'Keep plan' } };
   api.read.mockResolvedValue({ answers: null, draft: { skillsRadar: { standardId: '', assessments: { [existing.id]: answer } }, cvJob: { experienceText: 'Saved CV' } }, meta: { updatedAt: 'old' } });
   render(page());
-  await screen.findByText('1 of 34 answered');
+  await screen.findByText('1 of 34');
   const next = catalogue.records[1];
   act(() => latest.setSection('skillsRadar', { ...latest.draft.skillsRadar, assessments: { ...latest.draft.skillsRadar.assessments, [next.id]: { ...answer, ksbId: next.id, level: 'occasionally' } } }));
   await userEvent.click(screen.getByRole('button', { name: 'Save answers' }));

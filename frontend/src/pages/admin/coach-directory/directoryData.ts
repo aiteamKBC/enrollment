@@ -20,4 +20,3 @@ export function directoryStatistics(coaches: DirectoryCoach[] | null) {
     sessionsOffered: null,
   };
 }
-

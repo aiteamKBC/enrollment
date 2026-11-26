@@ -37,7 +37,7 @@ describe('the Skills Radar scale', () => {
     expect(competenceMeta('always')?.label).toBe('Mastery');
   });
 
-  it('offers Champion first, scored 9, and flags it like any rating above 4', async () => {
+  it('offers Champion first, scored 9, without requesting justification', async () => {
     const user = userEvent.setup();
     render(<SkillsRadar />);
     await user.click(screen.getByRole('button', { name: /start assessment/i }));
@@ -49,17 +49,18 @@ describe('the Skills Radar scale', () => {
     expect(champion.closest('label')).toHaveTextContent('I set the standard in this area');
     expect(champion.closest('label')).toHaveTextContent(/9$/);
     expect(document.body.textContent).not.toMatch(/[\u00c2\u00c3\ufffd]/);
-    expect(screen.getByText('Select file')).toBeVisible();
+    expect(screen.queryByText('Select file')).toBeNull();
 
     await user.click(champion);
-    expect(screen.getByRole('status')).toHaveTextContent('may affect your eligibility for this apprenticeship');
-    expect(screen.getByLabelText(/Add a note/)).toBeRequired();
+    expect(screen.queryByText(/may affect your eligibility for this apprenticeship/)).toBeNull();
+    expect(screen.queryByLabelText(/Add a note/)).toBeNull();
+    expect(screen.getByRole('button', { name: /Confirm/i })).toBeEnabled();
   });
 
   it('renders clean progress text without mojibake separators', () => {
     render(<SkillsRadar />);
-    expect(screen.getByText('0 / 1 answered')).toBeVisible();
-    expect(screen.getAllByText('0%')).toHaveLength(3);
+    expect(screen.getByText('0 of 1')).toBeVisible();
+    expect(screen.getByText('KSBs answered')).toBeVisible();
     expect(screen.queryByText(/answered.*[Ãâ]/)).not.toBeInTheDocument();
   });
 });
