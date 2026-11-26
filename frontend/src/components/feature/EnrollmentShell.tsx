@@ -108,7 +108,7 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
   return (
     <div className={`min-h-screen bg-background-200 text-foreground-900 ${adminChrome ? 'enrolment-admin-shell' : ''} ${usersPortal ? 'users-portal' : ''} ${brandedLearner ? learnerStyles.theme : ''}`}>
       <header className={`flex items-center justify-between gap-4 border-b border-foreground-200 bg-background-50 px-5 py-4 ${brandedLearner ? learnerStyles.header : ''}`} inert={open}>
-        <Link to="/enrollment" aria-label="Enrolment Corner" className={brandedLearner ? learnerStyles.brand : 'font-heading text-lg font-semibold text-primary-700'}>{adminChrome ? <UsersPortalBrand /> : <>{brandedLearner && <><img src={enrolmentAsset('assets/document-branding/kbc-logo.png')} alt="Kent Business College" /><span className={learnerStyles.brandDivider} aria-hidden="true" /></>}Enrolment Corner</>}</Link>
+        {!adminChrome && <Link to="/enrollment" aria-label="Enrolment Corner" className={brandedLearner ? learnerStyles.brand : 'font-heading text-lg font-semibold text-primary-700'}>{brandedLearner && <><img src={enrolmentAsset('assets/document-branding/kbc-logo.png')} alt="Kent Business College" /><span className={learnerStyles.brandDivider} aria-hidden="true" /></>}Enrolment Corner</Link>}
         <div className="flex items-center gap-3">
           {auth.account?.role === 'learner' && <SignatureNotifications {...signatures} />}
           <div ref={accountRef} className={`relative ${brandedLearner ? learnerStyles.account : ''}`}>
@@ -153,8 +153,8 @@ export function WorkspaceShell({ children, pageTitle, pageSubtitle, headerExtras
       {open && <div className={styles.backdrop} aria-hidden="true" onClick={() => closeNavigation()} />}
       <div className={`md:flex ${adminChrome ? 'enrolment-admin-body' : ''}`}>
         <nav id="enrolment-navigation" aria-label="Enrolment navigation" data-open={open} className={`${styles.navigation} shrink-0 border-r border-foreground-200 bg-background-50 p-4 ${adminChrome ? 'up-navigation' : ''} ${brandedLearner ? learnerStyles.navigation : ''}`}>
-          {adminChrome && <UsersPortalSidebarBrand />}
-          <div className={styles.drawerHeader}>
+          {adminChrome && <><Link to="/enrollment" aria-label="Enrolment Corner" className="up-sidebar-logo" onClick={() => closeNavigation(false)}><UsersPortalBrand /></Link><UsersPortalSidebarBrand /></>}
+          <div className={adminChrome ? `${styles.drawerHeader} up-drawer-header` : styles.drawerHeader}>
             <span className="font-heading text-lg font-semibold text-primary-700">Enrolment Corner</span>
             <button type="button" ref={drawerCloseRef} className={styles.drawerCloseButton} aria-label="Close navigation" onClick={() => closeNavigation()}><X size={20} aria-hidden="true" /></button>
           </div>

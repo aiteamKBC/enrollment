@@ -17,6 +17,8 @@ import { renderAgreementPdf, agreementFilename } from '@/lib/apprenticeshipAgree
 import { fetchIlrDocument, issueIlrDocument, type IlrDocument } from '@/api/ilrDocument';
 import { SignaturePad } from './wizard/steps/SignaturePad';
 import { LearnerHeaderDates } from './components/LearnerHeaderDates';
+import { ContactFactIcon, EnrolmentProfileArtwork } from './components/EnrolmentProfileArtwork';
+import './enrolmentProfile.css';
 import { FirstSessionReschedule } from './components/FirstSessionReschedule';
 import { useAuth } from "@/hooks/useAuth.helpers";
 import { renderIlrPdf, ilrFilename } from '@/lib/ilrDocumentPdf';
@@ -77,7 +79,7 @@ import { formatSystemTimestamp } from '@/lib/format';
 import type { EnrolmentBoard, FsBlock } from './types';
 import { competenceMeta } from '@/mocks/enrolment-console';
 import {
-  Award, Briefcase, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, FileCheck2, Flag,
+  Award, Briefcase, CalendarDays, Calculator, ClipboardList, Contact, CreditCard, Download, ExternalLink, FileCheck2, Flag,
   FolderOpen, GraduationCap, History, Layers, LayoutGrid, ListChecks, Network, PenLine, Search,
   Check, Eye, FileText, Loader2, ShieldCheck, Target, Trash2, Upload, Users, Wand2, Wrench, X, type LucideIcon,
 } from 'lucide-react';
@@ -144,6 +146,8 @@ function LearnerHeader({
   programme,
   cohort,
   onboardingStatus,
+  programmeStatus,
+  enrolledAt,
   dates,
   status,
   actions,
@@ -155,44 +159,37 @@ function LearnerHeader({
   programme: string;
   cohort?: string;
   onboardingStatus: string;
+  programmeStatus: string;
+  enrolledAt: string;
   dates: ReactNode;
   status: ReactNode;
   actions: ReactNode;
 }) {
   return (
-    <section aria-label="Learner overview" className="overflow-hidden rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm">
-      <div className="p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-100 text-lg font-bold text-primary-700 ring-1 ring-inset ring-primary-200">
-              {initials(name) || <i className="ri-user-3-line text-xl" aria-hidden="true" />}
-            </span>
-            <div className="min-w-0">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-foreground-400">Enrolment</p>
-              <h2 className="break-words text-2xl font-heading font-bold leading-tight tracking-tight text-foreground-900">{name}</h2>
-              {reference && <p className="mt-1 break-all text-[12px] text-foreground-500">{reference}</p>}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+    <section aria-label="Learner overview" className="ep-summary">
+      <header className="ep-page-heading"><div><h1>Enrolment Details</h1><p>{name}</p></div><div className="ep-page-actions">{actions}</div></header>
+      <div className="ep-hero">
+        <EnrolmentProfileArtwork />
+        <div className="ep-identity">
+          <span className="ep-avatar">{initials(name) || <i className="ri-user-3-line" aria-hidden="true" />}</span>
+          <div><h2>{name}</h2>{reference && <p>{reference}</p>}{programmeStatus === 'Active' && <span className="ep-active-learner"><span aria-hidden="true" />Active learner</span>}</div>
         </div>
-        <div className="mt-5 grid grid-cols-1 gap-5 border-t border-foreground-100 pt-5 sm:grid-cols-2 lg:grid-cols-4">
-          <MetaItem icon="ri-briefcase-4-line" label="Case Owner" value={caseOwner || 'Not assigned'} />
-          <MetaItem icon="ri-graduation-cap-line" label="Skills Coach" value={skillsCoach || 'Not assigned'} />
-          <MetaItem icon="ri-book-open-line" label="Programme" value={programme || '—'} />
-          <MetaItem icon="ri-team-line" label="Cohort" value={cohort || '—'} />
+        <div className="ep-hero-facts">
+          <div><GraduationCap aria-hidden="true" /><div><span>Programme</span><strong>{programme || '\u2014'}</strong></div></div>
+          <div><Layers aria-hidden="true" /><div><span>Cohort</span><strong>{cohort || '\u2014'}</strong></div></div>
+          <div><CalendarDays aria-hidden="true" /><div><span>Enrolment</span><strong>{enrolledAt || '\u2014'}</strong></div></div>
         </div>
       </div>
-      <div className="flex flex-wrap items-end justify-between gap-4 border-t border-foreground-100 bg-background-100/60 px-5 py-4 sm:px-6">
-        <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
-          {status}
-          {dates}
-        </div>
-        {onboardingStatus && (
-          <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-[12px] font-medium text-primary-700">
-            <i className="ri-road-map-line shrink-0" aria-hidden="true" />
-            <span>Onboarding: {onboardingStatus}</span>
-          </span>
-        )}
+      <div className="ep-summary-strip">
+        <MetaItem icon="ri-briefcase-4-line" label="Case Owner" value={caseOwner || 'Not assigned'} />
+        <MetaItem icon="ri-graduation-cap-line" label="Skills Coach" value={skillsCoach || 'Not assigned'} />
+        <MetaItem icon="ri-book-open-line" label="Programme" value={programme || '\u2014'} />
+        <MetaItem icon="ri-team-line" label="Cohort" value={cohort || '\u2014'} />
+      </div>
+      <div className="ep-status-strip">
+        <div className="ep-programme-control">{status}</div>
+        <div className="ep-dates-session">{dates}</div>
+        {onboardingStatus && <span className="ep-onboarding"><i className="ri-road-map-line" aria-hidden="true" />Onboarding: {onboardingStatus}</span>}
       </div>
     </section>
   );
@@ -1635,7 +1632,7 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <section aria-label={title} className={`min-w-0 rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm ${className}`}>
+    <section aria-label={title} className={`ep-card min-w-0 rounded-2xl border border-foreground-200/60 bg-background-50 shadow-sm ${className}`}>
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-foreground-100 px-4 py-3 sm:px-5">
         <h3 className="flex min-w-0 items-center gap-2.5 text-[14px] font-heading font-semibold text-foreground-900">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
@@ -1672,11 +1669,12 @@ function CardButton({ icon: Icon, label, onClick, disabled, danger }: { icon: Lu
 }
 
 /** Label/value pairs. A blank value reads as a dash rather than vanishing. */
-function Facts({ items }: { items: { label: string; value: ReactNode; wide?: boolean }[] }) {
+function Facts({ items, variant = 'default' }: { items: { label: string; value: ReactNode; wide?: boolean }[]; variant?: 'default' | 'contact' | 'programme' }) {
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+    <dl className={`ep-facts ep-${variant}-facts grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2`}>
       {items.map((f) => (
-        <div key={f.label} className={`min-w-0 ${f.wide ? 'sm:col-span-2' : ''}`}>
+        <div key={f.label} data-fact={f.label} className={`min-w-0 ${f.wide ? 'sm:col-span-2' : ''}`}>
+          {variant === 'contact' && <ContactFactIcon label={f.label} />}
           <dt className="text-[11px] font-semibold uppercase tracking-wider text-foreground-400">{f.label}</dt>
           <dd className="mt-1 break-words text-[13px] text-foreground-800">
             {f.value === null || f.value === undefined || f.value === '' ? <span className="text-foreground-300">—</span> : f.value}
@@ -1698,7 +1696,7 @@ function BoardTabs({ tabs, active, onChange }: { tabs: { id: TabId; label: strin
     refs.current[next]?.focus();
   };
   return (
-    <div role="tablist" aria-label="Learner sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-foreground-200/60 bg-background-100 p-1.5">
+    <div role="tablist" aria-label="Learner sections" className="ep-tabs flex gap-1 overflow-x-auto rounded-2xl border border-foreground-200/60 bg-background-100 p-1.5">
       {tabs.map((t, i) => {
         const selected = t.id === active;
         return (
@@ -1859,8 +1857,8 @@ function BoardView({
 
   return (
     <WorkspaceShell role="compliance" roleLabel={enrolmentNav.label} navItems={enrolmentNav.items} workspaceLabel={enrolmentNav.workspaceLabel} pageTitle="Enrolment Details" pageSubtitle={board.user.name} userName="Enrolment Officer" userRole="Enrolment Officer">
-      <div className="mx-auto max-w-6xl space-y-4 p-3 sm:p-6">
-        <div className="animate-fade-in-up">
+      <div className="enrolment-details-page mx-auto min-w-0 space-y-4">
+        <div className="ep-summary-wrap">
           <LearnerHeader
             name={board.user.name}
             reference={board.user.reference}
@@ -1869,6 +1867,8 @@ function BoardView({
             programme={board.programme.name}
             cohort={board.programme.cohort}
             onboardingStatus={board.programme.onboardingStatus}
+            programmeStatus={board.programme.status}
+            enrolledAt={board.programme.enrolledAt}
             dates={
               <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
                 <LearnerHeaderDates learnerId={userId} startDate={board.programme.learnerStartDate} endDate={board.programme.learnerEndDate} />
@@ -1914,7 +1914,7 @@ function BoardView({
 
           {tab === 'overview' && (
             <>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="ep-overview-row grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Card
                   title="Contact details"
                   icon={Contact}
@@ -1925,7 +1925,7 @@ function BoardView({
                     </>
                   }
                 >
-                  <Facts items={[
+                  <Facts variant="contact" items={[
                     { label: 'Email', value: board.contact.email ? <a href={`mailto:${board.contact.email}`} className="text-primary-600 hover:underline">{board.contact.email}</a> : '' },
                     { label: 'Phone', value: board.contact.phone ? <a href={`tel:${board.contact.phone}`} className="text-primary-600 hover:underline">{board.contact.phone}</a> : '' },
                     { label: 'Date of birth', value: board.contact.dob },
@@ -1950,7 +1950,7 @@ function BoardView({
                     </>
                   }
                 >
-                  <Facts items={[
+                  <Facts variant="programme" items={[
                     { label: 'Programme', value: board.programme.name, wide: true },
                     { label: 'Type', value: board.programme.type },
                     { label: 'Cohort', value: board.programme.cohort },
@@ -1963,7 +1963,7 @@ function BoardView({
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="ep-overview-row grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <LearnerTeamCard learnerId={userId} team={board.learnerTeam} />
                 <EmploymentDetailsCard details={board.employmentDetails} />
               </div>

@@ -28,11 +28,14 @@ export function TextEditor({
   slot,
   texts,
   onChange,
+  collapsiblePreview = false,
 }: {
   slot: TextSlot;
   texts: Record<string, string> | undefined;
   /** `undefined` puts the standard wording back. */
   onChange: (value: string | undefined) => void;
+  /** Builder-only presentation; other callers retain their existing preview. */
+  collapsiblePreview?: boolean;
 }) {
   const id = useId();
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -106,7 +109,7 @@ export function TextEditor({
   };
 
   return (
-    <div className="space-y-1.5">
+    <div className="wb-text-editor space-y-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <label htmlFor={id} className="text-[12px] font-medium text-foreground-600">{slot.label}</label>
@@ -172,12 +175,19 @@ export function TextEditor({
             onKeyDown={onKeyDown}
             aria-invalid={empty || tooLong || undefined}
           />
-          {slot.kind === 'rich' && (
+          {slot.kind === 'rich' && (collapsiblePreview ? (
+            <details className="wb-preview">
+              <summary><AppIcon className="ri-eye-line" />PREVIEW<AppIcon className="ri-arrow-down-s-line" /></summary>
+              <div className="wb-preview-content">
+                <RichText source={value} classes={{ container: 'space-y-2 text-[13px] leading-relaxed text-foreground-700' }} />
+              </div>
+            </details>
+          ) : (
             <div className="rounded-lg border border-dashed border-foreground-200 bg-background-50 p-3">
               <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-wider text-foreground-400">Preview</p>
               <RichText source={value} classes={{ container: 'space-y-2 text-[13px] leading-relaxed text-foreground-700' }} />
             </div>
-          )}
+          ))}
         </>
       )}
       {slot.kind === 'rich' && (

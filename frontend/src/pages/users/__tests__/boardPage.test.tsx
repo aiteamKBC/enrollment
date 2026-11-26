@@ -180,6 +180,29 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 
 describe('the enrolment board', () => {
+  it('shows the active badge only for an active learner and uses the saved enrolment date in the hero', async () => {
+    const board = makeBoard();
+    api.fetchEnrolmentBoard.mockResolvedValue(makeBoard({ programme: { ...board.programme, status: 'Active', enrolledAt: '18/07/2026' } }));
+    renderBoard();
+    await screen.findByRole('heading', { name: 'Sam Example' });
+    const header = screen.getByRole('region', { name: 'Learner overview' });
+    expect(within(header).getByText('Active learner')).toBeInTheDocument();
+    expect(within(header).getByText('18/07/2026')).toBeInTheDocument();
+    expect(header.querySelector('.ep-hero-artwork')).toHaveAttribute('src', '/images/enrolment-details/enrolment-details-hero.png');
+  });
+
+  it('does not infer an active badge or an enrolment date from cohort dates', async () => {
+    const board = makeBoard();
+    api.fetchEnrolmentBoard.mockResolvedValue(makeBoard({ programme: { ...board.programme, enrolledAt: '' } }));
+    renderBoard();
+    await screen.findByRole('heading', { name: 'Sam Example' });
+    const header = screen.getByRole('region', { name: 'Learner overview' });
+    expect(within(header).queryByText('Active learner')).not.toBeInTheDocument();
+    const enrolment = within(header).getByText('Enrolment').parentElement;
+    expect(enrolment).toHaveTextContent('\u2014');
+    expect(enrolment).not.toHaveTextContent(board.programme.startDate);
+  });
+
   it('does not flash a report-evidence error while the initial report request is pending', async () => {
     let resolveReport!: (value: unknown) => void;
     rplApi.fetch.mockReturnValueOnce(new Promise((resolve) => { resolveReport = resolve; }));

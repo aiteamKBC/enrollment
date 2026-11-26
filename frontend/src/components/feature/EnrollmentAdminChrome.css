@@ -2,13 +2,14 @@
 .enrolment-admin-shell { --up-header-height: 60px; --up-sidebar-width: 215px; isolation: isolate; padding-top: var(--up-header-height); }
 .enrolment-admin-shell > header {
   position: fixed; inset: 0 0 auto; z-index: 30; height: var(--up-header-height); min-height: 60px;
-  padding: 4px 32px 4px 10px; border: 0; color: #fff;
+  padding: 4px 32px 4px 10px; border: 0; color: #fff; justify-content: flex-end;
   background: radial-gradient(ellipse at 40% -40%, #6f3585, transparent 65%), linear-gradient(100deg, #4c245c, #381748);
   box-shadow: 0 2px 9px #3c164529;
 }
-.enrolment-admin-shell > header > a { display: flex; min-width: 0; align-items: center; gap: 13px; color: #fff; }
+.up-sidebar-logo { display: flex; flex-shrink: 0; align-items: center; height: 84px; padding-top: 12px; color: #fff; }
+.up-sidebar-logo .up-brand-divider { display: none; }
 .up-college-lockup { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-.up-college-lockup > img { display: block; width: auto; height: 60px; object-fit: contain; mix-blend-mode: screen; }
+.up-college-lockup > img { display: block; width: auto; height: 72px; object-fit: contain; mix-blend-mode: screen; }
 .up-brand-divider { height: 36px; width: 1px; margin-left: 42px; background: #ffffff58; }
 .enrolment-admin-shell > header button[aria-haspopup='menu'] { width: auto; height: 43px; gap: 13px; border-radius: 8px; color: #fff; background: transparent; box-shadow: none; --tw-ring-color: transparent; }
 .enrolment-admin-shell > header button[aria-haspopup='menu']:focus-visible { outline: 2px solid #ead184; outline-offset: 3px; }
@@ -48,8 +49,8 @@
 .up-sidebar-slogan { position: relative; padding: 52px 8px 18px; color: #edc160; font: italic 20px/1.35 Georgia, 'Times New Roman', serif; text-align: center; text-shadow: 0 1px 3px #2a103d; }
 .up-sidebar-slogan::before { content: ''; display: block; width: 28px; height: 1px; margin: 0 auto 14px; background: #dcb35b; }
 .up-sidebar-slogan > span { display: block; }
-.enrolment-admin-shell .up-navigation > div:nth-child(2) > span { color: #fff; }
-.enrolment-admin-shell .up-navigation > div:nth-child(2) > button { color: #fff; background: #ffffff0e; border-color: #ffffff40; }
+.enrolment-admin-shell .up-navigation > .up-drawer-header > span { color: #fff; }
+.enrolment-admin-shell .up-navigation > .up-drawer-header > button { color: #fff; background: #ffffff0e; border-color: #ffffff40; }
 
 .enrolment-admin-shell > header :is(button, a):focus-visible { outline-color: #efd288; }
 @media (min-width: 768px) {
@@ -58,28 +59,30 @@
     height: 100vh; height: 100dvh; overflow: hidden;
   }
   .enrolment-admin-body { display: flex; flex: 1; min-height: 0; }
+  .enrolment-admin-shell > header { left: var(--up-sidebar-width); }
   .enrolment-admin-content {
     min-height: 0; margin-left: var(--up-sidebar-width);
     overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain;
   }
   .enrolment-admin-shell .up-navigation {
-    position: fixed; inset: var(--up-header-height) auto 0 0; z-index: 20;
-    width: var(--up-sidebar-width); height: calc(100vh - var(--up-header-height));
-    height: calc(100dvh - var(--up-header-height)); overflow-x: hidden; overflow-y: auto;
+    position: fixed; inset: 0 auto 0 0; z-index: 31;
+    width: var(--up-sidebar-width); height: 100vh;
+    height: 100dvh; overflow-x: hidden; overflow-y: auto;
   }
   .enrolment-admin-shell .up-navigation > ul a { white-space: nowrap; font-size: 12px; min-height: 36px; padding-inline: 14px; gap: 12px; }
   .up-college-lockup { margin-left: 16px; }
 }
 @media (max-width: 767px) {
   .enrolment-admin-shell > header { padding: 6px 14px; height: auto; min-height: 60px; }
-  .enrolment-admin-shell > header > a { gap: 8px; }
-  .up-college-lockup > img { height: 48px; }
+  .up-sidebar-logo { height: 72px; padding-left: 4px; }
+  .up-college-lockup > img { height: 56px; }
   .up-brand-divider { display: none; }
   .enrolment-admin-shell > header > div { flex-shrink: 0; gap: 8px; }
   .up-profile-copy, .enrolment-admin-shell > header button[aria-haspopup='menu'] > svg { display: none; }
   .enrolment-admin-shell > header button[aria-haspopup='menu'] { gap: 0; }
   .up-sidebar-brand { display: none; }
-  .enrolment-admin-shell .up-navigation { padding-top: 16px; }
+  .enrolment-admin-shell .up-navigation { padding-top: 0; }
+  .enrolment-admin-shell .up-navigation > .up-drawer-header { margin-top: 16px; }
   .up-sidebar-art { min-height: 320px; flex-basis: 320px; }
 }
 @media (max-width: 359px) {
