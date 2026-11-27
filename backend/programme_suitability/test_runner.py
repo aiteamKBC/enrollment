@@ -18,7 +18,7 @@ class SuitabilityRunner(DiscoverRunner):
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes('programme_suitability'))
         from learner_api.models import EnrolmentUser, LearnerProfile, StaffUser
-        from enrolment_api.models import ExtendedIlr, WizardCvJob, WizardIlrLearnerDetails, WizardKsbAssessment, WizardPersonalDetails, WizardPlr, WizardPlrRecord, WizardPolicyAck, WizardSkillsRadar
+        from enrolment_api.models import BksbInitialAssessment, ExtendedIlr, WizardCvJob, WizardIlrLearnerDetails, WizardKsbAssessment, WizardPersonalDetails, WizardPlr, WizardPlrRecord, WizardPolicyAck, WizardSkillsRadar
         from login.models import LoginAccount, LoginSession
         LoginAccount._meta.db_table = 'Login_accounts'
         LoginSession._meta.db_table = 'Login_sessions'
@@ -34,7 +34,7 @@ class SuitabilityRunner(DiscoverRunner):
             cursor.execute("CREATE TABLE login.Login_accounts (id INTEGER PRIMARY KEY, Subject_type TEXT, Subject_id INTEGER, Email TEXT, Display_name TEXT, Role TEXT, Password_hash TEXT DEFAULT '', Password_set_at TEXT, Is_active INTEGER DEFAULT 1, Failed_attempts INTEGER DEFAULT 0, Locked_until TEXT, Last_login_at TEXT, Last_login_ip TEXT, Created_at TEXT, Updated_at TEXT)")
             cursor.execute('CREATE TABLE login.Login_sessions (id INTEGER PRIMARY KEY, Account_id INTEGER, Token_hash TEXT UNIQUE, Expires_at TEXT, Revoked_at TEXT, Ip_address TEXT, User_agent TEXT, Created_at TEXT, Last_seen_at TEXT, Remember INTEGER DEFAULT 0)')
         with connection.schema_editor() as schema_editor:
-            for model in (EnrolmentUser, LearnerProfile, StaffUser, ExtendedIlr, WizardSkillsRadar, WizardKsbAssessment, WizardPersonalDetails, WizardIlrLearnerDetails, WizardPlr, WizardPlrRecord, WizardCvJob, WizardPolicyAck):
+            for model in (EnrolmentUser, LearnerProfile, StaffUser, BksbInitialAssessment, ExtendedIlr, WizardSkillsRadar, WizardKsbAssessment, WizardPersonalDetails, WizardIlrLearnerDetails, WizardPlr, WizardPlrRecord, WizardCvJob, WizardPolicyAck):
                 schema_editor.create_model(model)
         enrolment_connection = connections['enrolment']
         with enrolment_connection.cursor() as cursor:

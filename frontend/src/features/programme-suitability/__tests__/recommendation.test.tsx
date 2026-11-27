@@ -25,6 +25,18 @@ const confirmed = (state: AssessmentState): AssessmentState => ({ ...state,
   selectionStatus: 'SELECTION_CONFIRMED', selectionConfirmedAt: '2026-11-01T12:00:00Z' });
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(saveAssessment).mockImplementation(async (_kind, _id, state) => confirmed(state)); });
 
+it('does not confirm a recommendation missing from Programme Structure and preserves an available alternative', () => {
+  const state = structuredClone(stateFor('MM_L6'));
+  state.configuration!.programmes.find(p => p.id === 'MM_L6')!.catalogueAvailable = false;
+  state.configuration!.programmes.find(p => p.id === 'ME_L4')!.catalogueAvailable = true;
+  state.allowedSelections = ['ME_L4'];
+  render(<AssessmentDialog initial={state} kind="apprenticeship" learnerId="41" onClose={vi.fn()} onConfirmed={vi.fn()} />);
+  expect(screen.getByText(/not currently available in Programme Structure/)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Continue to Next Step' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /Choose Marketing Executive L4/ })).toBeEnabled();
+  expect(saveAssessment).not.toHaveBeenCalled();
+});
+
 function expectNoLearnerScoring() {
   expect(screen.queryByText(/Responsibility Matching Score/i)).not.toBeInTheDocument();
   expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();

@@ -12,10 +12,10 @@ export function RecommendationResult({ state, mode = 'summary', onSelect }: Resu
   const recommended = recommendedProgramme(state);
   const alternative = alternativeProgramme(state);
   const selected = state.configuration?.programmes.find((p) => p.id === state.selectedProgramme);
-  const confirmedAlternative = selectionConfirmed(state) && recommended && selected && selected.id !== recommended.id ? selected : null;
+  const confirmedAlternative = selectionConfirmed(state) && recommended && recommended.catalogueAvailable !== false && selected && selected.id !== recommended.id ? selected : null;
   return <section aria-label="Assessment recommendation result" className="space-y-4" data-recommendation-result>
     <p className="text-sm font-semibold text-primary-700" data-assessment-status>Assessment Completed</p>
-    {recommended ? <div className="space-y-4 rounded-2xl border border-primary-300 bg-primary-50/60 p-5 md:p-6" data-recommended-programme>
+    {recommended?.catalogueAvailable === false ? <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">The programme indicated by your assessment is not currently available in Programme Structure. You can choose an available alternative below or contact admissions.</p> : recommended ? <div className="space-y-4 rounded-2xl border border-primary-300 bg-primary-50/60 p-5 md:p-6" data-recommended-programme>
       <h3 className="text-lg font-semibold">Your Recommended Programme</h3>
       <h4 className="text-2xl font-bold text-primary-800">{recommended.title} — Level {recommended.level}</h4>
       <p className="text-sm text-foreground-600">Based on your answers and current job responsibilities.</p>

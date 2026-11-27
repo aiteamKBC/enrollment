@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_protect
 
 from enrolment_api.auth import enrolment_login_required
 from .configuration import ConfigurationError
-from .models import ModuleConfigurationDraft
+from .models import Assessment, ModuleConfigurationDraft
 from .modules_configuration import defaults, validate
 from .modules_service import pinned_configuration, published_modules, saved_choices, selection_complete, save_selection, ModuleSelectionConflict
 from .permissions import is_staff
@@ -39,6 +39,16 @@ def learner_modules(request, kind, learner_id):
     try:
         if learner_record(kind, learner_id) is None:
             return JsonResponse({'error': 'Not found.'}, status=404)
+        from . import enrolment_catalogue
+        if enrolment_catalogue.enabled():
+            if request.method != 'GET':
+                return JsonResponse({'error': 'Catalogue modules are read-only. Group and module allocation is paused.'}, status=409)
+            row = Assessment.objects.filter(learner_id=learner_id, learner_kind=kind).first()
+            if not row or not row.confirmed_at or not row.selection_confirmed_at or not row.selected_programme:
+                return JsonResponse({'error': 'Confirm your programme before loading its modules.'}, status=409)
+            response = JsonResponse(enrolment_catalogue.programme_modules(row))
+            response['Cache-Control'] = 'private, no-store'
+            return response
         if request.method == 'PUT':
             result = save_selection(kind, learner_id, body(request))
             logger.info('Module choices saved learner_id=%s revision=%s duration_ms=%.1f', learner_id, result['selectionRevision'], (perf_counter() - started) * 1000)

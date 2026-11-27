@@ -4,6 +4,7 @@ export type Responses = Record<string, string[]>;
 export interface Programme {
   id: ProgrammeId; title: string; level: number; pathway: Pathway; description: string;
   summary: string; responsibilities: string[]; active: boolean; order: number; catalogueId: string | null;
+  catalogueAvailable?: boolean; catalogueName?: string;
 }
 export interface Answer {
   id: string; text: string; active: boolean; order: number; affinities: Partial<Record<ProgrammeId, number>>;
@@ -41,6 +42,7 @@ export interface Review {
   recommendedProgramme?: ProgrammeId | null; reason?: string; actor?: string; at?: string; notificationStatus?: string;
 }
 export interface AssessmentState {
+  programmeSource?: 'catalogue' | 'legacy';
   alternativeSelectionReason?: string | null;
   selectionStatus?: 'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED_PENDING_CONFIRMATION' | 'SELECTION_CONFIRMED';
   selectionConfirmedAt?: string | null;

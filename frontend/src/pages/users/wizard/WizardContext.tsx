@@ -287,8 +287,8 @@ export function WizardProvider({
     return () => { cancelled = true; };
   }, [layoutOverride, kindForSeed, userId]);
   const layout = useMemo(
-    () => layoutForLearner(resolveLayout(layoutOverride ?? publishedLayout), isCommercial),
-    [layoutOverride, publishedLayout, isCommercial]
+    () => layoutForLearner(resolveLayout(layoutOverride ?? publishedLayout ?? (publishedVersion === 0 ? { steps: [] } : null)), isCommercial),
+    [layoutOverride, publishedLayout, publishedVersion, isCommercial]
   );
   const steps = useMemo(() => visibleSteps(layout), [layout]);
   const completed = useMemo(() => steps.map(step => Boolean(completedBySlug[step.slug])), [steps, completedBySlug]);
@@ -323,7 +323,7 @@ export function WizardProvider({
     setDraft((previous) => selectionFingerprint(previous.programmeModules) === selectionFingerprint(saved)
       ? previous : { ...previous, programmeModules: saved });
   }, [modules.data]);
-  const modulesRequired = !['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) && suitability.selectionConfirmed && suitability.state?.selectedProgramme === 'PCP_L6';
+  const modulesRequired = suitability.state?.programmeSource !== 'catalogue' && !['submitted', 'completed'].includes(String(board.programme?.onboardingStatus).toLowerCase()) && suitability.selectionConfirmed && suitability.state?.selectedProgramme === 'PCP_L6';
   const modulesComplete = Boolean(modules.data && modules.data.selectionComplete && !modules.error && savedModuleChoice && moduleEditVersion === savedModuleEditVersion &&
     selectionFingerprint(modules.data.savedSelection ?? undefined) === selectionFingerprint(savedModuleChoice) &&
     selectionFingerprint(draft.programmeModules) === selectionFingerprint(savedModuleChoice) &&
@@ -606,6 +606,8 @@ export function WizardProvider({
       },
       radarCatalogue,
       radarImpact,
+      radarBoundModules: radarGrouping?.status === 'ready' ? bindImpactModules(radarGrouping.modules, radarGrouping.questions,
+        radarImpact, modules.data?.selectedProgramme, draft.skillsRadar.standardId ?? '') : [],
       radarImpactError,
       retryRadarImpact: () => setImpactRetry((value) => value + 1),
       importPlrPdf: (file, enteredUln, signal) => {

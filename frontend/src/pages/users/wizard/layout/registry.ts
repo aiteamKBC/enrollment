@@ -426,6 +426,12 @@ const STEPS: { slug: string; label: string; sectionStyle?: 'fieldset' | 'section
     }],
   },
   {
+    slug: 'your-modules',
+    label: 'Your Modules',
+    items: [{ key: 'block.yourModules', kind: 'block', label: 'Your Modules and module timeline',
+      requirable: false, defaultRequired: false }],
+  },
+  {
     slug: 'inclusion',
     label: 'Inclusion',
     items: [{

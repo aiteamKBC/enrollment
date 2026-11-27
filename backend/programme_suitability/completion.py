@@ -34,6 +34,11 @@ def submission_error(learner):
     config = layout.get(KEY)
     row = Assessment.objects.filter(learner_id=learner.pk, confirmed_at__isnull=False).first()
     if selection_status_for(row) == "SELECTION_CONFIRMED":
+        from .enrolment_catalogue import enabled
+        if enabled():
+            # The existing assessment and confirmed programme remain required;
+            # optional module/group placement is paused in this phase.
+            return None
         if getattr(row, 'selected_programme', '') == 'PCP_L6':
             from .modules_service import saved_choices, selection_complete, pinned_configuration
             from .configuration import ConfigurationError

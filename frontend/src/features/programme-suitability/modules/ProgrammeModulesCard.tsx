@@ -13,8 +13,9 @@ import { CohortModuleConfirmation } from './CohortModuleConfirmation';
 
 const SchedulingTimeline = lazy(() => import('./ModuleSchedulingPreview'));
 
-function ModuleTable({ modules, selected = [], disabled = true, limitReached = false, onToggle }: {
+function ModuleTable({ modules, selected = [], disabled = true, limitReached = false, onToggle, durationUnit = 'sessions' }: {
   modules: ProgrammeModule[]; selected?: string[]; disabled?: boolean; limitReached?: boolean; onToggle?: (id: string) => void;
+  durationUnit?: 'sessions' | 'weeks';
 }) {
   const tableId = useId();
   // Keep group row headers scoped to their own children, not later root modules.
@@ -42,12 +43,12 @@ function ModuleTable({ modules, selected = [], disabled = true, limitReached = f
           </span>
         </label>
       </td>
-      <td className="py-3 text-right text-foreground-600">{item.sessions == null ? '—' : `${item.sessions} Sessions`}</td>
+      <td className="py-3 text-right text-foreground-600">{item[durationUnit] == null ? '—' : `${item[durationUnit]} ${durationUnit === 'weeks' ? 'Weeks' : 'Sessions'}`}</td>
     </tr>}
     {item.items && rows(item.items, true)}
   </Fragment>);
   return <table className="w-full text-left text-sm">
-    <thead><tr><th scope="col" className="pb-2 pr-3 font-medium">Module</th><th scope="col" className="pb-2 text-right font-medium">Sessions</th></tr></thead>
+    <thead><tr><th scope="col" className="pb-2 pr-3 font-medium">Module</th><th scope="col" className="pb-2 text-right font-medium">{durationUnit === 'weeks' ? 'Weeks' : 'Sessions'}</th></tr></thead>
     {sections.map((section, index) => <tbody key={section[0].id}
       aria-labelledby={isModuleGroup(section[0]) ? `${tableId}-${section[0].id}` : undefined}
       className={index > 0 && isModuleGroup(sections[index - 1][0])
@@ -58,12 +59,14 @@ function ModuleTable({ modules, selected = [], disabled = true, limitReached = f
 }
 
 /** Shared by real learner rendering and a fully local administration preview. */
-export function ProgrammeModulesView({ configuration, programmeId, selection, onChange, readOnly = false, version, homeCohort, showHomeCohort = false, schedulingPreview = false, scheduleContext }: {
+export function ProgrammeModulesView({ configuration, programmeId, selection, onChange, readOnly = false, version, homeCohort, showHomeCohort = false, schedulingPreview = false, scheduleContext, catalogueView = false, cohortName }: {
   configuration: ModulesConfiguration; programmeId: ProgrammeId; selection?: ProgrammeModuleSelection;
   onChange?: (next: ProgrammeModuleSelection) => void; readOnly?: boolean; version?: number | null;
   homeCohort?: HomeCohort; showHomeCohort?: boolean;
   schedulingPreview?: boolean;
   scheduleContext?: ScheduleContext;
+  catalogueView?: boolean;
+  cohortName?: string | null;
 }) {
   const programme = configuration.programmes.find((p) => p.id === programmeId);
   if (!programme) return null;
@@ -75,9 +78,9 @@ export function ProgrammeModulesView({ configuration, programmeId, selection, on
   return <section aria-label="Programme Modules" className={`mt-6 rounded-xl border border-primary-200 bg-background-50 p-4 md:p-5 ${pcp ? 'max-w-7xl' : 'max-w-3xl'}`}>
     <h3 className="text-lg font-semibold">Programme Modules</h3>
     <p className="mt-1 text-sm text-foreground-600">These are the modules for your selected programme.</p>
-    <p className="mb-5 mt-2 text-sm font-semibold text-primary-700"><span>{programme.title}</span></p>
-    {liveLmsModules && <LmsAssignedModules home={homeCohort} />}
-    {showSchedulingPreview ? <Suspense fallback={<p role="status">Loading scheduling preview…</p>}><SchedulingTimeline programme={programme} selection={selection} homeCohort={homeCohort} samplePreview /></Suspense> : !pcp ? (liveLmsModules ? null : <ModuleTable modules={programme.modules} />) : <div role="radiogroup" aria-label="Project Controls Professional pathway" className={`grid gap-4 ${columns}`}>
+    <p className="mb-5 mt-2 text-sm font-semibold text-primary-700"><span>{programme.title}</span>{catalogueView && <span className="ml-2 inline-block">· Cohort: {cohortName || 'Not assigned'}</span>}</p>
+    {!catalogueView && liveLmsModules && <LmsAssignedModules home={homeCohort} />}
+    {catalogueView ? (programme.modules.length ? <ModuleTable modules={programme.modules} durationUnit="weeks" /> : <p role="status" className="text-sm text-foreground-600">No modules have been added to this programme yet.</p>) : showSchedulingPreview ? <Suspense fallback={<p role="status">Loading scheduling preview…</p>}><SchedulingTimeline programme={programme} selection={selection} homeCohort={homeCohort} samplePreview /></Suspense> : !pcp ? (liveLmsModules ? null : <ModuleTable modules={programme.modules} />) : <div role="radiogroup" aria-label="Project Controls Professional pathway" className={`grid gap-4 ${columns}`}>
       {paths.map((pathway) => {
         const active = selection?.programme === 'PCP_L6' && selection.pathway === pathway.id;
         const selected = selectedModuleIds(selection, pathway);
@@ -114,7 +117,7 @@ export function ProgrammeModulesView({ configuration, programmeId, selection, on
       })}
       {paths.length === 0 && <p className="text-sm text-foreground-600">No pathways are currently available.</p>}
     </div>}
-    {showHomeCohort && !showSchedulingPreview && <div className="mt-6 border-t border-primary-100 pt-5" data-module-timeline>
+    {!catalogueView && showHomeCohort && !showSchedulingPreview && <div className="mt-6 border-t border-primary-100 pt-5" data-module-timeline>
       <Suspense fallback={<p role="status">Loading module timeline…</p>}><SchedulingTimeline programme={programme} selection={selection} homeCohort={homeCohort} scheduleContext={scheduleContext} /></Suspense>
     </div>}
   </section>;
@@ -162,6 +165,14 @@ export function ProgrammeModulesCard() {
   if (!confirmed && !preview) return <p role="status" className="mt-6 text-sm text-foreground-600">Confirm your programme selection to load its modules.</p>;
   if (error) return <div role="alert" className="mt-6 text-sm text-red-700">{error}<button type="button" className={`${btnSecondary} ml-3`} onClick={retry}>Retry loading modules</button></div>;
   if (!data) return <p role="status" className="mt-6 text-sm">Loading programme modules…</p>;
+  if (data.source === 'programme_catalogue') {
+    if (!data.catalogueProgramme || data.catalogueProgramme.id !== resolvedProgramme) return <div role="alert" className="mt-6 text-sm text-red-700">
+      The selected programme could not be loaded from Programme Structure.
+      <button type="button" className={`${btnSecondary} ml-3`} onClick={retry}>Retry loading modules</button>
+    </div>;
+    return <ProgrammeModulesView configuration={{ schemaVersion: 1, programmes: [data.catalogueProgramme] }}
+      programmeId={resolvedProgramme} cohortName={data.assignedCohortName} catalogueView readOnly />;
+  }
   // Bypass the save-queue component entirely: sample session clicks cannot enqueue writes.
   if (confirmed && schedulingPreviewEnabled()) return <ProgrammeModulesView configuration={data.configuration} programmeId={resolvedProgramme}
     version={data.configurationVersion} selection={draft.programmeModules} homeCohort={data.homeCohort} showHomeCohort schedulingPreview readOnly />;

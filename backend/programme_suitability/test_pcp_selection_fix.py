@@ -18,6 +18,12 @@ from .management.commands.repair_pcp_rules import repaired_configuration
 
 class PublishedPcpSelectionTests(TestCase):
     def setUp(self):
+        from learner_api.models import EnrolmentUser
+        # The authenticated learner must exist as well as their assessment.
+        # These isolated fixtures previously returned 404 at the ownership gate.
+        EnrolmentUser.all_learners.bulk_create([EnrolmentUser(
+            id=41, username='Synthetic PCP learner', learner_type='apprenticeship',
+            programme_status='Onboarding', onboarding_status='Not started')])
         self.factory = RequestFactory(); self.version = 7; self.config = validate(defaults())
         self.row = Assessment.objects.create(learner_id=41, learner_kind='apprenticeship', configuration_version=3,
             configuration=assessment_defaults(), pathway='project-controls', selected_programme='PCP_L6',

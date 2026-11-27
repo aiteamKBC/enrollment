@@ -14,7 +14,7 @@ import { fresh, result, configuration } from './fixtures';
 import { missingForStep } from '@/pages/users/wizard/validation';
 import { resolveLayout, visibleSteps } from '@/pages/users/wizard/layout/resolve';
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), olderPinnedLayout: false }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), olderPinnedLayout: false, catalogue: false }));
 vi.mock('@/api/extendedIlr', () => ({ fetchExtendedIlr: mocks.read, saveExtendedIlr: mocks.write, peekExtendedIlr: () => undefined }));
 vi.mock('@/api/curriculum', () => ({ fetchKsbProfile: vi.fn(async () => ({ results: [] })), peekKsbProfile: () => undefined }));
 vi.mock('@/api/wizardInclusion', () => ({ fetchInclusionStatus: vi.fn(async () => ({ applicable: false, completed: false })) }));
@@ -24,7 +24,7 @@ vi.mock('@/api/enrolmentDocuments', () => ({ uploadEnrolmentDocument: vi.fn() })
 vi.mock('@/hooks/useToast.helpers', () => ({ useToast: () => ({ error: vi.fn(), success: vi.fn() }) }));
 vi.mock('../api', () => ({ request: async () => ({ review: false, modules: [], offeringCount: 0 }), getAssessment: async () => ({ ...fresh(), pathway: 'project-controls',
   result: { ...result, outcome: 'RECOMMENDED_PCP_L6', recommendedProgramme: 'PCP_L6' }, selectedProgramme: 'PCP_L6', completionStatus: 'SUBMITTED',
-  confirmedAt: '2026-11-01T12:00:00Z', selectionStatus: 'SELECTION_CONFIRMED', selectionConfirmedAt: '2026-11-01T12:01:00Z' }),
+  confirmedAt: '2026-11-01T12:00:00Z', selectionStatus: 'SELECTION_CONFIRMED', selectionConfirmedAt: '2026-11-01T12:01:00Z', programmeSource: mocks.catalogue ? 'catalogue' : 'legacy' }),
   peekAssessment: () => undefined, primeAssessment: vi.fn(), prefetchAssessmentSecurity: async () => ({ csrfToken: 'synthetic' }) }));
 
 const board = { user: { id: '41', name: 'Test Learner' }, contact: { email: 'learner@example.test', dob: '', phone: '' },
@@ -40,7 +40,7 @@ async function persist(_kind: string, _id: string, selection: ProgrammeModuleSel
 }
 beforeAll(() => { HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; });
 beforeEach(() => {
-  vi.clearAllMocks(); mocks.olderPinnedLayout = false; revision = 0; serverSelection = undefined; publishedModules = modulesConfiguration;
+  vi.clearAllMocks(); mocks.olderPinnedLayout = false; mocks.catalogue = false; revision = 0; serverSelection = undefined; publishedModules = modulesConfiguration;
   vi.mocked(getModules).mockImplementation(async () => ({ configuration: publishedModules, configurationVersion: 3, selectedProgramme: 'PCP_L6',
     savedSelection: serverSelection, selectionRevision: revision, selectionComplete: moduleSelectionComplete(publishedModules, serverSelection, 3) }));
   vi.mocked(saveModuleSelection).mockImplementation(persist);
@@ -115,6 +115,25 @@ function ModuleCompletion() {
   const { draft } = useWizard();
   return <output data-testid="module-completion">{draft.programmeModulesCompletion?.complete ? 'complete' : 'incomplete'}</output>;
 }
+
+it('catalogue mode stops at programme/cohort and does not require or save PCP module choices', async () => {
+  mocks.catalogue = true;
+  vi.mocked(getModules).mockResolvedValue({ source: 'programme_catalogue', configuration: publishedModules,
+    configurationVersion: 3, selectedProgramme: 'PCP_L6', selectionComplete: true,
+    catalogueProgramme: { id: 'PCP_L6', title: 'Catalogue PCP programme', pathways: [], modules: [
+      { id: 'catalogue-module', title: 'Catalogue PCP module', description: '', order: 0, active: true },
+    ] } });
+  function Required() {
+    const { draft } = useWizard();
+    return <output data-testid="module-required">{draft.programmeModulesCompletion?.required ? 'required' : 'not required'}</output>;
+  }
+  render(<WizardProvider userId="41" board={board} isCommercial={false}><ProgrammeSuitabilityStep /><Required /></WizardProvider>);
+  expect(await screen.findByText('Catalogue PCP module')).toBeVisible();
+  expect(screen.getByTestId('module-required')).toHaveTextContent('not required');
+  expect(screen.queryByRole('radio', { name: 'Operational Pathway' })).not.toBeInTheDocument();
+  expect(saveModuleSelection).not.toHaveBeenCalled();
+  expect(mocks.write).not.toHaveBeenCalled();
+});
 it('marks Step 6 complete only after the valid new PCP selection is saved and restores completion on reopening', async () => {
   publishedModules = rules as ModulesConfiguration;
   const first = render(<WizardProvider userId="41" board={board} isCommercial={false}><ProgrammeSuitabilityStep /><ModuleCompletion /></WizardProvider>);

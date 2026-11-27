@@ -63,6 +63,9 @@ def _guard(fn):
 def programmes(request):
     if request.method != "GET":
         return _error("Method not allowed.", 405)
+    from programme_suitability import enrolment_catalogue
+    if enrolment_catalogue.enabled():
+        return _guard(lambda: list(enrolment_catalogue.programmes().order_by('name').values_list('name', flat=True).distinct()))
     return _guard(lambda: [
         r["name"]
         for r in _rows(
@@ -81,6 +84,11 @@ def cohorts(request):
     programme = (request.GET.get("programme") or "").strip()
     if not programme:
         return _error("programme query param is required.", 400)
+    from programme_suitability import enrolment_catalogue
+    if enrolment_catalogue.enabled():
+        return _guard(lambda: list(enrolment_catalogue.programmes().filter(name__iexact=programme,
+            cohorts__archived_at__isnull=True).exclude(cohorts__isnull=True).order_by('cohorts__name')
+            .values_list('cohorts__name', flat=True).distinct()))
     from programme_suitability.lms_placement import enabled, curriculum_programme_id, programme_cohorts
     identifier = curriculum_programme_id(name=programme) or curriculum_programme_id(identifier=programme)
     if enabled() and identifier:
@@ -105,6 +113,14 @@ def groups(request):
     cohort = (request.GET.get("cohort") or "").strip()
     if not programme or not cohort:
         return _error("programme and cohort query params are required.", 400)
+    from programme_suitability import enrolment_catalogue
+    if enrolment_catalogue.enabled():
+        # Manual Admin placement remains available; confirmation never chooses
+        # or writes one of these groups for the learner.
+        return _guard(lambda: list(enrolment_catalogue.programmes().filter(name__iexact=programme,
+            cohorts__name__iexact=cohort, cohorts__archived_at__isnull=True,
+            cohorts__groups__archived_at__isnull=True).exclude(cohorts__groups__isnull=True)
+            .order_by('cohorts__groups__name').values_list('cohorts__groups__name', flat=True).distinct()))
     from programme_suitability.lms_placement import enabled, curriculum_programme_id, saved_cohort
     identifier = curriculum_programme_id(name=programme) or curriculum_programme_id(identifier=programme)
     if enabled() and identifier:

@@ -45,10 +45,13 @@ def published():
 
 
 def payload(row, staff=False):
+    from . import enrolment_catalogue
+    configuration = enrolment_catalogue.assessment_configuration(row.configuration) if enrolment_catalogue.enabled() else row.configuration
     result = score_based_result(row.configuration, row.pathway, row.result)
     if not staff:
         result.pop("breakdown", None)
-    return {"available": True, "configuration": learner_configuration(row.configuration),
+    return {"available": True, "configuration": learner_configuration(configuration),
+            "programmeSource": "catalogue" if enrolment_catalogue.enabled() else "legacy",
             "configurationVersion": row.configuration_version, "pathway": row.pathway,
             "responses": row.responses, "result": result, "selectedProgramme": row.selected_programme,
             "originalPreference": row.original_preference, "reviewStatus": row.review_status,
@@ -60,7 +63,7 @@ def payload(row, staff=False):
             "recommendedProgramme": result.get("recommendedProgramme"),
             "recommendationStatus": result.get("outcome"), "assessmentStatus": status_for(row),
             "admissionsReviewStatus": row.review_status,
-            "allowedSelections": allowed_selections(row.configuration, row.pathway, row.result),
+            "allowedSelections": allowed_selections(configuration, row.pathway, row.result),
             "review": row.review, "revision": row.revision,
             "confirmedAt": row.confirmed_at.isoformat() if row.confirmed_at else None,
             "updatedAt": row.updated_at.isoformat(), **({"history": row.history} if staff else {})}
@@ -132,6 +135,9 @@ def assessment(request, kind, learner_id):
             if row:
                 return JsonResponse(completion_payload(row, learner, is_staff(request)))
             version, config = published()
+            from . import enrolment_catalogue
+            if config and enrolment_catalogue.enabled():
+                config = enrolment_catalogue.assessment_configuration(config)
             return JsonResponse({"available": config is not None, "configurationVersion": version,
                                  "configuration": learner_configuration(config) if config else None,
                                  "responses": {}, "revision": 0, "pathway": "", "result": None,

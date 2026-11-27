@@ -123,7 +123,7 @@ export function AssessmentDialog({ initial, kind, learnerId, onClose, onConfirme
         {canConfirm ? <RecommendationResult mode="confirmation" state={state} onSelect={requestAlternative} /> : <RecommendationResult state={state} />}
         <div className="flex flex-wrap justify-between gap-3">
           <button type="button" className={btnSecondary} onClick={() => setStage('answers')}>Show Answers</button>
-          {canConfirm && <button type="button" className={btnPrimary} onClick={() => confirmProgramme()}>Continue to Next Step</button>}
+          {canConfirm && <button type="button" className={btnPrimary} disabled={recommended?.catalogueAvailable === false} onClick={() => confirmProgramme()}>Continue to Next Step</button>}
         </div>
       </>}
       {stage === 'answers' && <>

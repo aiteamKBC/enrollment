@@ -4,6 +4,7 @@ import Introduction from '../steps/Introduction';
 import BeforeYouBegin from '../steps/BeforeYouBegin';
 import Plr from '../steps/Plr';
 import SkillsRadar from '../steps/SkillsRadar';
+import YourModules from '../steps/YourModules';
 import Inclusion from '../steps/Inclusion';
 import Policies from '../steps/Policies';
 import InitialAssessments from '../steps/InitialAssessments';
@@ -27,6 +28,7 @@ const BLOCKS: Record<string, ComponentType> = {
   'block.beforeYouBegin': BeforeYouBegin,
   'block.plr': Plr,
   'block.skillsRadar': SkillsRadar,
+  'block.yourModules': YourModules,
   'block.inclusion': Inclusion,
   'block.policies': Policies,
   'block.initialAssessments': InitialAssessments,

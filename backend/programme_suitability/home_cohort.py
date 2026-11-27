@@ -187,6 +187,11 @@ def home_cohort_for_board(source):
     A configured LMS reader or the existing cohort-learner flag enables lookup.
     Old pending learners retain their current board label and publication pins.
     """
+    from .enrolment_catalogue import enabled
+    if enabled():
+        # Catalogue confirmation already saves the programme/cohort labels.
+        # Do not replace those fields with an LMS lookup or a group preview.
+        return None
     from django.conf import settings
     if (not (os.environ.get('LMS_READONLY_DATABASE_URL', '').strip()
              or getattr(settings, 'PROGRAMME_STRUCTURE_COHORT_LEARNER_ENABLED', False))

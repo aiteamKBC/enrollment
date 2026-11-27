@@ -1,7 +1,7 @@
 import type { ProgrammeId } from '../types';
 
 export interface ProgrammeModule {
-  id: string; title: string; itemType?: 'GROUP' | 'MODULE'; sessions?: number | null; credits?: number;
+  id: string; title: string; itemType?: 'GROUP' | 'MODULE'; sessions?: number | null; weeks?: number | null; credits?: number;
   description: string; order: number; active: boolean; selectable?: boolean; isMandatory?: boolean; items?: ProgrammeModule[];
 }
 export interface ModulePathway {
@@ -26,6 +26,8 @@ export interface HomeCohort {
   lmsModules?: { id: string; title: string; sessions: number | null; weeks?: number | null; start: string | null; end: string | null; groupId?: string | null; groupName?: string | null }[];
 }
 export interface ModulesState { configuration: ModulesConfiguration; configurationVersion: number | null; selectedProgramme: ProgrammeId;
+  source?: 'programme_catalogue'; catalogueProgramme?: ProgrammeModules;
+  assignedCohortName?: string | null;
   selectionComplete?: boolean; savedSelection?: ProgrammeModuleSelection | null; selectionRevision?: number; homeCohort?: HomeCohort }
 
 export interface ModuleSelectionCommit { selection: ProgrammeModuleSelection; selectionComplete: boolean; selectionRevision: number }

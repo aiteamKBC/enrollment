@@ -177,6 +177,9 @@ def preview_uninitialised_fixed_plan(source):
     This never pins configuration, writes a plan or repairs a live learner on GET.
     Saved/cleared/manual plans remain governed by the existing serializer.
     """
+    from .enrolment_catalogue import enabled
+    if enabled():
+        return None
     from learner_api.mappers import stored_training_plan
     if (stored_training_plan(source) is not None or curriculum_programme_id('', source.programme)
             not in {CURRICULUM_PROGRAMME_IDS[code] for code in FIXED_PROGRAMMES}):
@@ -195,6 +198,10 @@ def preview_uninitialised_fixed_plan(source):
 
 def populate_fixed_learning_plan(row):
     """Caller holds the confirmation transaction/assessment lock on this alias."""
+    from .enrolment_catalogue import enabled
+    if enabled():
+        # Programme confirmation stops at the cohort. Existing plans are kept.
+        return None
     if row.selected_programme not in FIXED_PROGRAMMES or not row.confirmed_at or not row.selection_confirmed_at:
         return None
     using = assignment_database(row)

@@ -94,6 +94,7 @@ BUILTIN_STEP_TABLES = {
     "programme-suitability": ("Wizard_Programme_Suitability", "wizard_programme_suitability_learner_uniq", True),
     "plr": ("Wizard_Plr", "wizard_plr_learner_uniq", False),
     "skills-radar": ("Wizard_Skills_Radar", "wizard_skills_radar_learner_uniq", False),
+    "your-modules": ("Extended_ILR", "extended_ilr_learner_uniq", False),
     "introduction": ("Wizard_Introduction", "wizard_introduction_learner_uniq", True),
     "before-you-begin": ("Wizard_Before_You_Begin", "wizard_before_you_begin_learner_uniq", True),
     "inclusion": ("Wizard_Inclusion", "wizard_inclusion_learner_uniq", True),
@@ -112,6 +113,7 @@ BUILTIN_STEP_LABELS = {
     "cv-job": "CV/Job Description",
     "plr": "Personal Learning Record",
     "skills-radar": "Skills Radar",
+    "your-modules": "Your Modules",
     "inclusion": "Inclusion",
     "policies": "Policies",
     "initial-assessments": "Initial Assessments",
@@ -817,6 +819,14 @@ def publish_wizard_layout(request):
                     if parent[7] not in (None, kind):
                         return _error("The parent version belongs to another learner type.", 400)
                 layout, plan = normalize_layout(body.get("layout"), parent[1] if parent else None)
+                from programme_suitability.your_modules import KEY, capture_catalogue, enabled
+                if enabled(layout):
+                    try:
+                        layout[KEY] = capture_catalogue()
+                    except ValueError as exc:
+                        raise LayoutError(str(exc)) from exc
+                    if len(json.dumps(layout).encode('utf-8')) > MAX_LAYOUT_BYTES:
+                        raise LayoutError('The published Programme Structure exceeds the wizard size limit.')
                 apply_plan(cursor, plan)
                 cursor.execute(
                     f'INSERT INTO enrolment."{LAYOUT_TABLE}" '

@@ -13,7 +13,7 @@ export function LearnerNavIcon({ path }: { path: string }) {
 export function EnrolmentStepIcon({ slug, locked = false }: { slug: string; locked?: boolean }) {
   const icons = { introduction: House, 'before-you-begin': ClipboardList, 'personal-details': UserRound, 'ilr-details': UserRound,
     ilr: Layers3, 'programme-suitability': LayoutGrid, 'cv-job': BriefcaseBusiness, plr: FileText,
-    'skills-radar': ChartColumnIncreasing, inclusion: HeartHandshake, policies: ShieldCheck, 'initial-assessments': ClipboardList, 'next-steps': GraduationCap };
+    'skills-radar': ChartColumnIncreasing, 'your-modules': Layers3, inclusion: HeartHandshake, policies: ShieldCheck, 'initial-assessments': ClipboardList, 'next-steps': GraduationCap };
   const Icon = locked ? LockKeyhole : icons[slug as keyof typeof icons] || Layers3;
   return <Icon size={21} strokeWidth={1.8} aria-hidden="true" />;
 }
