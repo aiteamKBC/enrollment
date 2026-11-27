@@ -11,5 +11,6 @@ export function alternativeProgramme(state: AssessmentState): Programme | undefi
   if (!recommended) return undefined;
   const level = recommended.level === 6 ? 4 : 6;
   return state.configuration?.programmes.find((p) => p.active && p.pathway === state.pathway && p.level === level
+    && p.catalogueAvailable !== false
     && (level === 6 || !state.allowedSelections || state.allowedSelections.includes(p.id)));
 }

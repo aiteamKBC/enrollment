@@ -372,10 +372,10 @@ describe('Next Steps in the step rail', () => {
     expect(tab.querySelector('.ri-check-line')).toBeNull();
     // Only the Introduction, Before You Begin, the Personal Learning Record
     // (nothing required) and the Skills Radar (no competencies on this
-    // programme), plus unconfigured suitability, count so far — Next Steps
-    // would make it 6. The Inclusion
+    // programme), plus unconfigured suitability and informational Your Modules,
+    // count so far. The Inclusion
     // assessment is not answered.
-    expect(screen.getByText('6 of 13 steps complete')).toBeInTheDocument();
+    expect(screen.getByText('7 of 14 steps complete')).toBeInTheDocument();
   });
 
   it('shows its number rather than a tick for staff, who are not gated', async () => {
@@ -383,12 +383,12 @@ describe('Next Steps in the step rail', () => {
     const tab = await screen.findByRole('tab', { name: 'What Happens Now?' });
 
     await waitFor(() => expect(within(tab).getByText('Not started')).toBeInTheDocument());
-    expect(within(tab).getByText('13')).toBeInTheDocument();
+    expect(within(tab).getByText('14')).toBeInTheDocument();
     expect(tab.querySelector('.ri-check-line')).toBeNull();
   });
 
   it('does not count as complete just by being opened while earlier steps are unfinished', async () => {
-    renderWizard(board(), { mode: 'staff', currentIndex: 12 });
+    renderWizard(board(), { mode: 'staff', currentIndex: visibleSteps(DEFAULT_LAYOUT).findIndex(step => step.slug === 'next-steps') });
     const tab = await screen.findByRole('tab', { name: 'What Happens Now?' });
 
     await waitFor(() => expect(within(tab).getByText('In progress')).toBeInTheDocument());

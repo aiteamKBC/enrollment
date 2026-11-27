@@ -11,6 +11,7 @@ import ProgrammeSuitabilityStep from '@/features/programme-suitability/Programme
 import CvJob from '../steps/CvJob';
 import Plr from '../steps/Plr';
 import SkillsRadar from '../steps/SkillsRadar';
+import YourModules from '../steps/YourModules';
 import Inclusion from '../steps/Inclusion';
 import Policies from '../steps/Policies';
 import InitialAssessments from '../steps/InitialAssessments';
@@ -28,6 +29,7 @@ describe('wizard step order', () => {
       ['cv-job', 'CV/Job Description'],
       ['plr', 'Personal Learning Record'],
       ['skills-radar', 'Skills Radar'],
+      ['your-modules', 'Your Modules'],
       // Added 2026-10: the inclusion assessment, before the policies are read.
       ['inclusion', 'Inclusion'],
       ['policies', 'Policies'],
@@ -51,6 +53,7 @@ describe('wizard step order', () => {
     expect(bodyFor('cv-job')).toBe(CvJob);
     expect(bodyFor('plr')).toBe(Plr);
     expect(bodyFor('skills-radar')).toBe(SkillsRadar);
+    expect(bodyFor('your-modules')).toBe(YourModules);
     expect(bodyFor('inclusion')).toBe(Inclusion);
     expect(bodyFor('policies')).toBe(Policies);
     expect(bodyFor('initial-assessments')).toBe(InitialAssessments);

@@ -25,6 +25,12 @@ def cohort_module_confirmation(request, kind, learner_id):
         return JsonResponse({'error': 'Only the signed-in learner can confirm their cohort modules.'}, status=403)
     if request.method not in {'GET', 'PUT'}:
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    from .enrolment_catalogue import enabled
+    if enabled():
+        response = JsonResponse({'error': 'Group and module allocation is paused. Programme confirmation saves only your programme and cohort.',
+                                 'code': 'allocation_paused'}, status=409)
+        response['Cache-Control'] = 'private, no-store'
+        return response
     try:
         if learner_record(kind, learner_id) is None:
             return JsonResponse({'error': 'Not found.'}, status=404)

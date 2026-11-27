@@ -696,6 +696,7 @@ export const WIZARD_STEPS: WizardStepDef[] = [
   { slug: 'cv-job', label: 'CV/Job Description' },
   { slug: 'plr', label: 'Personal Learning Record' },
   { slug: 'skills-radar', label: 'Skills Radar' },
+  { slug: 'your-modules', label: 'Your Modules' },
   { slug: 'inclusion', label: 'Inclusion' },
   { slug: 'policies', label: 'Policies' },
   { slug: 'initial-assessments', label: 'Initial Assessments' },

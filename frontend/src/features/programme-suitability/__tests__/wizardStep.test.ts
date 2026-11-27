@@ -3,14 +3,14 @@ import { defaultLayout, layoutForLearner, resolveLayout, visibleSteps } from '@/
 import { configuration } from './fixtures';
 import { SUITABILITY_STEP } from '../wizardStep';
 
-it('uses the published visibility for the thirteen-step apprenticeship journey', () => {
+it('uses the published visibility for the fourteen-step apprenticeship journey', () => {
   const layout = defaultLayout();
-  expect(layout.steps).toHaveLength(13);
+  expect(layout.steps).toHaveLength(14);
   expect(layout.steps[2].slug).toBe('personal-details');
   expect(layout.steps[5]).toMatchObject(SUITABILITY_STEP);
   expect(layout.steps[6].slug).toBe('cv-job');
   const apprentice = visibleSteps(layoutForLearner(layout, false));
-  expect(apprentice).toHaveLength(13);
+  expect(apprentice).toHaveLength(14);
   expect(apprentice.map(step => step.slug)).toContain('personal-details');
   expect(apprentice[5]).toMatchObject(SUITABILITY_STEP);
   expect(apprentice[6].slug).toBe('cv-job');

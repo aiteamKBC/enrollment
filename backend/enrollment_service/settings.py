@@ -52,6 +52,11 @@ ENROLLMENT_ONLY = True
 ENROLMENT_ULN_STORAGE = os.environ.get('ENROLMENT_ULN_STORAGE', 'created_users')
 if ENROLMENT_ULN_STORAGE not in ('legacy', 'created_users'):
     raise ImproperlyConfigured('ENROLMENT_ULN_STORAGE must be legacy or created_users.')
+# Programme Structure owns new programme/cohort placement. The old reader is
+# retained for a controlled rollback and historical compatibility tests.
+ENROLMENT_PROGRAMME_SOURCE = os.environ.get('ENROLMENT_PROGRAMME_SOURCE', 'catalogue')
+if ENROLMENT_PROGRAMME_SOURCE not in ('catalogue', 'legacy'):
+    raise ImproperlyConfigured('ENROLMENT_PROGRAMME_SOURCE must be catalogue or legacy.')
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Background LMS projections are not processes owned by this service.

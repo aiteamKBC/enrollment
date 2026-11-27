@@ -108,7 +108,8 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
   const radar = { ...(saved?.skillsRadarCatalogues ? { skillsRadarCatalogues: saved.skillsRadarCatalogues } : {}),
     ...(saved?.skillsRadarImportApprovals ? { skillsRadarImportApprovals: saved.skillsRadarImportApprovals } : {}) };
   if (!saved || !Array.isArray(saved.steps) || saved.steps.length === 0) return {
-    ...defaultLayout(), ...radar, ...(saved?.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
+    ...defaultLayout(), ...(saved ? { steps: defaultLayout().steps.map(step => step.slug === 'your-modules' ? { ...step, hidden: true } : step) } : {}),
+    ...radar, ...(saved?.programmeSuitability ? { programmeSuitability: saved.programmeSuitability } : {}),
     ...(saved?.programmeModules ? { programmeModules: saved.programmeModules } : {}),
   };
 
@@ -143,7 +144,9 @@ export function resolveLayout(saved: WizardLayout | null | undefined): WizardLay
     if (steps.some((s) => s.slug === def.slug)) return;
     const cvIndex = steps.findIndex((s) => s.slug === 'cv-job');
     const at = def.slug === SUITABILITY_STEP.slug && cvIndex >= 0 ? cvIndex : Math.min(index, steps.length);
-    steps.splice(at, 0, { slug: def.slug, label: def.label, builtin: true, hidden: false, items: [] });
+    // This new informational step requires an explicit publication. Historical
+    // layouts retain their original visible journey and completion denominator.
+    steps.splice(at, 0, { slug: def.slug, label: def.label, builtin: true, hidden: def.slug === 'your-modules', items: [] });
   });
 
   if (saved.programmeSuitability?.enabled) {

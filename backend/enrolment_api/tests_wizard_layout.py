@@ -412,6 +412,29 @@ class PublishViewTests(SimpleTestCase):
                              ("ALTER TABLE" in s and '"Wizard_Form_Layouts"' not in s)
                              for s, _ in cursor.executed))
 
+    def test_your_modules_captures_only_the_server_catalogue_on_explicit_publish(self):
+        now = datetime(2026, 11, 27, tzinfo=timezone.utc)
+        cursor = FakeCursor([('x',), None, (7, now)])
+        layout = {'steps': [step('your-modules', [{'key': 'block.yourModules', 'builtin': True, 'hidden': False}])],
+                  'yourModulesCatalogue': {'programmes': [{'id': 'forged-client-value'}]}}
+        snapshot = {'format': 1, 'programmes': [{'id': 'synthetic-server-catalogue'}]}
+        with patch('programme_suitability.your_modules.capture_catalogue', return_value=snapshot) as capture:
+            result = self._put({'baseVersion': None, 'layout': layout}, cursor)
+        self.assertEqual(result.status_code, 200, result.content)
+        capture.assert_called_once_with()
+        self.assertEqual(json.loads(result.content)['layout']['yourModulesCatalogue'], snapshot)
+        self.assertEqual(layout['yourModulesCatalogue']['programmes'][0]['id'], 'forged-client-value')
+        self.assertFalse(any('Wizard_Layout_Assignments' in sql and sql.startswith(('INSERT', 'UPDATE'))
+                             for sql, _ in cursor.executed))
+
+    def test_old_publication_does_not_capture_catalogue_or_gain_a_visible_step(self):
+        cursor = FakeCursor([('x',), None, (7, datetime(2026, 11, 27, tzinfo=timezone.utc))])
+        with patch('programme_suitability.your_modules.capture_catalogue') as capture:
+            result = self._put({'baseVersion': None, 'layout': {'steps': [step('skills-radar', [])]}}, cursor)
+        self.assertEqual(result.status_code, 200, result.content)
+        capture.assert_not_called()
+        self.assertNotIn('your-modules', [s['slug'] for s in json.loads(result.content)['layout']['steps']])
+
     def test_invalid_layout_is_a_400_with_the_reason(self):
         cursor = FakeCursor([("x",), None])
         res = self._put({"baseVersion": None, "layout": {"steps": [step("cv-job", [custom("", "text")])]}}, cursor)
@@ -500,13 +523,17 @@ class LayoutAccessTests(SimpleTestCase):
 
     def test_learner_can_read_the_layout(self):
         cursor = FakeCursor([(None,)])  # no layout table yet
-        with patch.object(wl, "connections", FakeConnections(cursor)):
+        with patch.object(wl, "connections", FakeConnections(cursor)), patch('learner_api.models.EnrolmentUser.all_learners') as learners:
+            # The authentication gate now checks current onboarding status.
+            # Keep this SimpleTestCase read synthetic rather than querying a DB.
+            learners.filter.return_value.values.return_value.first.return_value = {
+                'learner_type': 'apprenticeship', 'programme_status': 'Onboarding'}
             res = wl.wizard_layout(self._as_learner(self.factory.get("/enrolment_api/wizard-layout/")))
         self.assertEqual(res.status_code, 200)
         self.assertEqual(json.loads(res.content)["layout"], None)
 
     def test_version_detail_url_does_not_match_learner_layout_route(self):
-        match = resolve('/enrolment_api/wizard-layout/versions/7/')
+        match = resolve('/enrolment_api/wizard-layout/versions/7/', urlconf='enrollment_service.urls')
         self.assertEqual(match.func, wl.wizard_layout_version)
         self.assertEqual(match.kwargs, {'version': 7})
 

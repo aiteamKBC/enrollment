@@ -69,7 +69,7 @@ function AdmissionsReview({ state, onSave }: { state: AssessmentState;
       {['PRELIMINARY_RECOMMENDATION', 'PENDING_ADMISSIONS_REVIEW', 'FURTHER_INFORMATION_REQUIRED', 'REVIEW_COMPLETED'].map((s) => <option key={s} value={s}>{s.replaceAll('_', ' ')}</option>)}
     </select></label>
     <label className="block text-sm">Manual programme recommendation<select className={inputClass} value={programme} onChange={(e) => setProgramme(e.target.value as ProgrammeId | '')}>
-      <option value="">Keep automated recommendation</option>{state.configuration!.programmes.filter((p) => p.pathway === state.pathway && p.active).map((p) => <option key={p.id} value={p.id}>{p.title} Level {p.level}</option>)}
+      <option value="">Keep automated recommendation</option>{state.configuration!.programmes.filter((p) => p.pathway === state.pathway && p.active && p.catalogueAvailable !== false).map((p) => <option key={p.id} value={p.id}>{p.title} Level {p.level}</option>)}
     </select></label>
     <label className="block text-sm">Reason for review / override<textarea className={inputClass} rows={3} maxLength={4000} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
     <button type="button" className={btnSecondary} onClick={() => {

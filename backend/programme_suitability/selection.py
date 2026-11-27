@@ -49,7 +49,8 @@ def allowed_selections(configuration, pathway, result):
     if recommended["level"] == 6:
         allowed.extend(p["id"] for p in configuration["programmes"]
                        if p["active"] and p["pathway"] == pathway and p["level"] == 4)
-    return allowed
+    available = {p['id'] for p in configuration['programmes'] if p.get('catalogueAvailable', True)}
+    return [identifier for identifier in allowed if identifier in available]
 
 
 def validate_selection(configuration, pathway, result, selection):

@@ -819,6 +819,8 @@ function PublishDialog({ layout, kind, publishing, onCancel, onConfirm }: { layo
           {kind === 'apprenticeship' ? 'Apprenticeship' : 'Commercial'} learners who have not reached Skills Radar will use this default version next time they open the wizard. Reaching Skills Radar saves and pins the version they used; submitted learners retain their submitted version.
         </p>
         {layout.skillsRadarCatalogues && <p className="mt-2 text-[13px] text-foreground-600">Skills Radar assessments already started keep their saved catalogue version and answers.</p>}
+        {layout.steps.some(step => !step.hidden && step.items.some(item => item.key === 'block.yourModules' && !item.hidden)) &&
+          <p className="mt-2 text-[13px] text-foreground-600">Publishing Your Modules includes the current Programme Structure modules and schedules in this version. Review those details before publishing. Existing pinned versions remain unchanged.</p>}
         {columns.length > 0 && (
           <div className="mt-3 rounded-lg border border-foreground-100 bg-background-100/60 p-3 text-[12px] text-foreground-700">
             <p className="font-medium">New database columns ({columns.length}) will be added to the step tables in the enrolment schema:</p>

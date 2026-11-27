@@ -4,9 +4,11 @@ from . import modules_views
 from . import rpl_report
 from .module_schedules import learner_module_schedule
 from .cohort_confirmation import cohort_module_confirmation
+from .your_modules import your_modules
 from learner_api.module_activities import learner_module_activities_view
 
 urlpatterns = [
+    path('<str:kind>/<int:learner_id>/your-modules/', your_modules, name='learner-your-modules'),
     path('<str:kind>/<int:learner_id>/module-activities/', learner_module_activities_view, name='learner-module-activities'),
     path('<str:kind>/<int:learner_id>/cohort-module-confirmation/', cohort_module_confirmation, name='cohort-module-confirmation'),
     path('<str:kind>/<int:learner_id>/module-schedules/', learner_module_schedule, name='learner-module-schedules'),

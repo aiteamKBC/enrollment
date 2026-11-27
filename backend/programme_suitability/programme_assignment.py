@@ -219,6 +219,9 @@ def _check_placement(database, assignment, cohort, group, cohort_id=None, group_
 
 def sync_confirmed_programme_to_learner(row, *, actor="system", reconcile=False, dry_run=False):
     """Called after row.save(), inside its transaction. Never creates accounts/profiles."""
+    from . import enrolment_catalogue
+    if enrolment_catalogue.enabled():
+        return enrolment_catalogue.sync(row, actor=actor, reconcile=reconcile, dry_run=dry_run)
     if not row.selection_confirmed_at or not row.confirmed_at:
         raise ProgrammeAssignmentError("Confirm the programme selection before assigning it to the learner.")
     if not row.selected_programme:

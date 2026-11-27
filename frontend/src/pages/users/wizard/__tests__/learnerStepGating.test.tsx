@@ -402,7 +402,7 @@ describe('learner step gating', () => {
     await waitFor(() => expect(within(screen.getByRole('tab', { name: 'Inclusion' })).getByText('Complete')).toBeInTheDocument());
     expect(screen.getByRole('tab', { name: 'Policies' })).not.toHaveAttribute('aria-disabled');
     await userEvent.click(screen.getByRole('tab', { name: 'Policies' }));
-    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(9));
+    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(10));
   });
 
   it('claims no progress until the saved answers have loaded', async () => {
@@ -441,8 +441,8 @@ describe('learner step gating', () => {
     // Details is still unanswered. Next Steps is not counted: it only counts
     // once the learner has reached it with every earlier step done, and the
     // Inclusion assessment has not been answered.
-    await waitFor(() => expect(screen.getByText(/7 of 12 steps complete/i)).toBeInTheDocument());
-    expect(screen.getByText('58%')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/8 of 13 steps complete/i)).toBeInTheDocument());
+    expect(screen.getByText('62%')).toBeInTheDocument();
   });
 
   it('claims no progress until the programme competencies have seeded either', async () => {
@@ -480,8 +480,8 @@ describe('learner step gating', () => {
     // Now measurable — and the Skills Radar is correctly outstanding, so the
     // count settles at 6, including unconfigured suitability and the Initial
     // Assessments page, without first showing 7 while the competencies load.
-    await waitFor(() => expect(screen.getByText(/6 of 12 steps complete/i)).toBeInTheDocument());
-    expect(screen.queryByText(/7 of 12 steps complete/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/7 of 13 steps complete/i)).toBeInTheDocument());
+    expect(screen.queryByText(/8 of 13 steps complete/i)).not.toBeInTheDocument();
   });
 
   it('does not gate the staff wizard, and keeps its Save progress button', async () => {
@@ -492,6 +492,6 @@ describe('learner step gating', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: 'Policies' }));
     // Policies sits after the Inclusion step.
-    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(9));
+    await waitFor(() => expect(onNavigateStep).toHaveBeenCalledWith(10));
   });
 });
